@@ -6,6 +6,16 @@
   <meta name="theme-color" content="#101114" />
   <title>Shrink — GLB Optimizer</title>
   <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "@gltf-transform/core": "https://esm.sh/@gltf-transform/core@4.5.0",
+      "@gltf-transform/extensions": "https://esm.sh/@gltf-transform/extensions@4.5.0?external=@gltf-transform/core",
+      "@gltf-transform/functions": "https://esm.sh/@gltf-transform/functions@4.5.0?external=@gltf-transform/core",
+      "meshoptimizer": "https://esm.sh/meshoptimizer@0.24.0"
+    }
+  }
+  </script>
 </head>
 <body>
   <main class="app-shell">
@@ -88,6 +98,10 @@
         </div>
 
         <button id="optimizeBtn" class="button primary">Optimize model</button>
+        <div id="progressWrap" class="progress-wrap hidden" aria-live="polite">
+          <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+          <div id="progressLabel" class="progress-label">Starting…</div>
+        </div>
         <div id="status" class="status">Ready.</div>
 
         <div id="resultCard" class="result-card hidden">
