@@ -55,6 +55,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 9px 0 4p
 .toggle-row { padding: 11px 12px; background: rgba(255,255,255,.018); font-size: 13px; }
 .toggle-row + .toggle-row { border-top: 1px solid var(--line); }
 .toggle-row input { accent-color: var(--accent); width: 18px; height: 18px; }
+.progress-wrap { margin-top: 12px; }
+.progress-track { width: 100%; height: 8px; overflow: hidden; border-radius: 999px; background: #272c34; border: 1px solid #323844; }
+.progress-bar { height: 100%; width: 0%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), #ff7b67); transition: width .22s ease; }
+.progress-label { color: #c9d0da; font-size: 11px; margin-top: 6px; text-align: center; }
 .status { min-height: 18px; color: var(--muted); font-size: 12px; text-align: center; padding-top: 8px; }
 .status.error { color: #ff8b8b; }
 .result-card { margin-top: 12px; padding: 14px; border: 1px solid #35403a; border-radius: 14px; background: rgba(75, 172, 112, .07); }
