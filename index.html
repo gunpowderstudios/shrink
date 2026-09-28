@@ -1,1 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#101114" />
+  <title>Shrink — GLB Optimizer</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">GUNPOWDER STUDIOS</div>
+        <h1>Shrink</h1>
+        <p class="subtitle">Make GLB models smaller, then compare the quality before you save.</p>
+      </div>
+      <div class="privacy-pill">Runs locally in your browser</div>
+    </header>
 
+    <section id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Choose a GLB file">
+      <input id="fileInput" type="file" accept=".glb,model/gltf-binary" hidden />
+      <div class="drop-icon">↓</div>
+      <strong>Drop a GLB here</strong>
+      <span>or click to choose a file</span>
+    </section>
+
+    <section id="workspace" class="workspace hidden">
+      <aside class="control-panel panel">
+        <div class="file-row">
+          <div>
+            <div class="label">MODEL</div>
+            <div id="fileName" class="file-name">—</div>
+          </div>
+          <button id="newFileBtn" class="button ghost">Change</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat"><span>Original</span><strong id="originalSize">—</strong></div>
+          <div class="stat"><span>Triangles</span><strong id="triangleCount">—</strong></div>
+          <div class="stat"><span>Vertices</span><strong id="vertexCount">—</strong></div>
+          <div class="stat"><span>Textures</span><strong id="textureCount">—</strong></div>
+        </div>
+
+        <hr />
+
+        <div class="control-block">
+          <label for="preset">Preset</label>
+          <select id="preset">
+            <option value="safe">Safe</option>
+            <option value="game" selected>Game Optimized</option>
+            <option value="small">Small</option>
+            <option value="aggressive">Aggressive</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+
+        <div class="control-block">
+          <div class="range-heading">
+            <label for="geometry">Keep polygons</label>
+            <output id="geometryValue">70%</output>
+          </div>
+          <input id="geometry" type="range" min="20" max="100" step="1" value="70" />
+          <div class="hint">100% keeps all geometry. Lower values reduce the mesh.</div>
+        </div>
+
+        <div class="control-block">
+          <label for="textureSize">Maximum texture size</label>
+          <select id="textureSize">
+            <option value="2048">2048 px</option>
+            <option value="1024" selected>1024 px</option>
+            <option value="512">512 px</option>
+            <option value="256">256 px</option>
+          </select>
+        </div>
+
+        <div class="control-block">
+          <div class="range-heading">
+            <label for="textureQuality">WebP texture quality</label>
+            <output id="textureQualityValue">82%</output>
+          </div>
+          <input id="textureQuality" type="range" min="45" max="95" step="1" value="82" />
+        </div>
+
+        <div class="toggles">
+          <label class="toggle-row"><span>Convert textures to WebP</span><input id="webpToggle" type="checkbox" checked /></label>
+          <label class="toggle-row"><span>Quantize mesh data</span><input id="quantizeToggle" type="checkbox" checked /></label>
+        </div>
+
+        <button id="optimizeBtn" class="button primary">Optimize model</button>
+        <div id="status" class="status">Ready.</div>
+
+        <div id="resultCard" class="result-card hidden">
+          <div class="result-top">
+            <div><span>Optimized</span><strong id="optimizedSize">—</strong></div>
+            <div id="savingBadge" class="saving-badge">—</div>
+          </div>
+          <button id="downloadBtn" class="button download">Save optimized GLB</button>
+        </div>
+      </aside>
+
+      <section class="viewer-panel panel">
+        <div class="viewer-toolbar">
+          <div class="segmented" role="group" aria-label="Viewer model">
+            <button id="showOriginalBtn" class="segment active">Original</button>
+            <button id="showOptimizedBtn" class="segment" disabled>Optimized</button>
+          </div>
+          <button id="resetViewBtn" class="button ghost small">Reset view</button>
+        </div>
+        <div id="viewer" class="viewer"></div>
+        <div class="viewer-help">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
