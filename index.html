@@ -22,7 +22,7 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">GUNPOWDER STUDIOS</div>
-        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v0.3</span></div>
+        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v0.4</span></div>
         <p class="subtitle">Make GLB models smaller, then compare the quality before you save.</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
@@ -95,6 +95,7 @@
         <div class="toggles">
           <label class="toggle-row"><span>Convert textures to WebP</span><input id="webpToggle" type="checkbox" checked /></label>
           <label class="toggle-row"><span>Quantize mesh data</span><input id="quantizeToggle" type="checkbox" checked /></label>
+          <label class="toggle-row"><span>Meshopt compression</span><input id="meshoptToggle" type="checkbox" checked /></label>
         </div>
 
         <button id="optimizeBtn" class="button primary">Optimize model</button>
@@ -109,6 +110,10 @@
             <div><span>Optimized</span><strong id="optimizedSize">—</strong></div>
             <div id="savingBadge" class="saving-badge">—</div>
           </div>
+          <div class="stats-grid result-stats">
+            <div class="stat"><span>Triangles</span><strong id="optimizedTriangleCount">—</strong></div>
+            <div class="stat"><span>Vertices</span><strong id="optimizedVertexCount">—</strong></div>
+          </div>
           <button id="downloadBtn" class="button download">Save optimized GLB</button>
         </div>
       </aside>
@@ -119,7 +124,10 @@
             <button id="showOriginalBtn" class="segment active">Original</button>
             <button id="showOptimizedBtn" class="segment" disabled>Optimized</button>
           </div>
-          <button id="resetViewBtn" class="button ghost small">Reset view</button>
+          <div class="viewer-actions">
+            <button id="wireframeBtn" class="button ghost small">Wireframe</button>
+            <button id="resetViewBtn" class="button ghost small">Reset view</button>
+          </div>
         </div>
         <div id="viewer" class="viewer"></div>
         <div class="viewer-help">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
