@@ -3,8 +3,8 @@ import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/control
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { WebIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
-import { dedup, prune, weld, simplify, quantize } from '@gltf-transform/functions';
-import { MeshoptSimplifier, MeshoptDecoder } from 'meshoptimizer';
+import { dedup, prune, weld, simplify, quantize, meshopt } from '@gltf-transform/functions';
+import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -12,17 +12,18 @@ const els = {
   originalSize: $('originalSize'), triangleCount: $('triangleCount'), vertexCount: $('vertexCount'), textureCount: $('textureCount'),
   preset: $('preset'), geometry: $('geometry'), geometryValue: $('geometryValue'), textureSize: $('textureSize'),
   textureQuality: $('textureQuality'), textureQualityValue: $('textureQualityValue'), webpToggle: $('webpToggle'),
-  quantizeToggle: $('quantizeToggle'), optimizeBtn: $('optimizeBtn'), status: $('status'), resultCard: $('resultCard'),
-  optimizedSize: $('optimizedSize'), savingBadge: $('savingBadge'), downloadBtn: $('downloadBtn'), newFileBtn: $('newFileBtn'),
-  viewer: $('viewer'), showOriginalBtn: $('showOriginalBtn'), showOptimizedBtn: $('showOptimizedBtn'), resetViewBtn: $('resetViewBtn'),
+  quantizeToggle: $('quantizeToggle'), meshoptToggle: $('meshoptToggle'), optimizeBtn: $('optimizeBtn'), status: $('status'), resultCard: $('resultCard'),
+  optimizedSize: $('optimizedSize'), optimizedTriangleCount: $('optimizedTriangleCount'), optimizedVertexCount: $('optimizedVertexCount'),
+  savingBadge: $('savingBadge'), downloadBtn: $('downloadBtn'), newFileBtn: $('newFileBtn'),
+  viewer: $('viewer'), showOriginalBtn: $('showOriginalBtn'), showOptimizedBtn: $('showOptimizedBtn'), resetViewBtn: $('resetViewBtn'), wireframeBtn: $('wireframeBtn'),
   progressWrap: $('progressWrap'), progressBar: $('progressBar'), progressLabel: $('progressLabel')
 };
 
 const PRESETS = {
-  safe:       { geometry: 90, textureSize: 2048, textureQuality: 88, webp: true, quantize: true },
-  game:       { geometry: 70, textureSize: 1024, textureQuality: 82, webp: true, quantize: true },
-  small:      { geometry: 50, textureSize: 1024, textureQuality: 76, webp: true, quantize: true },
-  aggressive: { geometry: 35, textureSize: 512,  textureQuality: 70, webp: true, quantize: true }
+  safe:       { geometry: 90, textureSize: 2048, textureQuality: 88, webp: true, quantize: true, meshopt: true },
+  game:       { geometry: 70, textureSize: 1024, textureQuality: 82, webp: true, quantize: true, meshopt: true },
+  small:      { geometry: 50, textureSize: 1024, textureQuality: 76, webp: true, quantize: true, meshopt: true },
+  aggressive: { geometry: 35, textureSize: 512,  textureQuality: 70, webp: true, quantize: true, meshopt: true }
 };
 
 let sourceFile = null;
@@ -33,6 +34,7 @@ let optimizedURL = null;
 let originalModel = null;
 let optimizedModel = null;
 let currentModel = null;
+let wireframeEnabled = false;
 
 // ---------- Viewer ----------
 const scene = new THREE.Scene();
@@ -88,10 +90,26 @@ function disposeModel(model) {
   });
 }
 
+function applyWireframe(model, enabled) {
+  if (!model) return;
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => {
+      if (!m || !('wireframe' in m)) return;
+      m.wireframe = enabled;
+      m.needsUpdate = true;
+    });
+  });
+}
+
 function showModel(model, which) {
   if (currentModel) scene.remove(currentModel);
   currentModel = model;
-  if (currentModel) scene.add(currentModel);
+  if (currentModel) {
+    applyWireframe(currentModel, wireframeEnabled);
+    scene.add(currentModel);
+  }
   els.showOriginalBtn.classList.toggle('active', which === 'original');
   els.showOptimizedBtn.classList.toggle('active', which === 'optimized');
   frameModel(model);
@@ -146,8 +164,13 @@ function markCustom(){ els.preset.value = 'custom'; }
 
 function applyPreset(name) {
   const p = PRESETS[name]; if (!p) return;
-  els.geometry.value = p.geometry; els.textureSize.value = p.textureSize; els.textureQuality.value = p.textureQuality;
-  els.webpToggle.checked = p.webp; els.quantizeToggle.checked = p.quantize; updateLabels();
+  els.geometry.value = p.geometry;
+  els.textureSize.value = p.textureSize;
+  els.textureQuality.value = p.textureQuality;
+  els.webpToggle.checked = p.webp;
+  els.quantizeToggle.checked = p.quantize;
+  els.meshoptToggle.checked = p.meshopt;
+  updateLabels();
 }
 function updateLabels(){ els.geometryValue.textContent = `${els.geometry.value}%`; els.textureQualityValue.textContent = `${els.textureQuality.value}%`; }
 
@@ -157,6 +180,7 @@ els.textureQuality.addEventListener('input', () => { updateLabels(); markCustom(
 els.textureSize.addEventListener('change', markCustom);
 els.webpToggle.addEventListener('change', markCustom);
 els.quantizeToggle.addEventListener('change', markCustom);
+els.meshoptToggle.addEventListener('change', markCustom);
 
 els.dropZone.addEventListener('click', () => els.fileInput.click());
 els.dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') els.fileInput.click(); });
@@ -168,6 +192,12 @@ els.newFileBtn.addEventListener('click', () => els.fileInput.click());
 els.showOriginalBtn.addEventListener('click', () => originalModel && showModel(originalModel, 'original'));
 els.showOptimizedBtn.addEventListener('click', () => optimizedModel && showModel(optimizedModel, 'optimized'));
 els.resetViewBtn.addEventListener('click', () => currentModel && frameModel(currentModel));
+els.wireframeBtn.addEventListener('click', () => {
+  wireframeEnabled = !wireframeEnabled;
+  applyWireframe(currentModel, wireframeEnabled);
+  els.wireframeBtn.classList.toggle('active', wireframeEnabled);
+  els.wireframeBtn.textContent = wireframeEnabled ? 'Shaded' : 'Wireframe';
+});
 els.optimizeBtn.addEventListener('click', optimizeModel);
 els.downloadBtn.addEventListener('click', downloadOptimized);
 
@@ -192,6 +222,8 @@ async function openFile(file) {
     els.triangleCount.textContent = num(stats.triangles);
     els.vertexCount.textContent = num(stats.vertices);
     els.textureCount.textContent = num(stats.textures);
+    els.optimizedTriangleCount.textContent = '—';
+    els.optimizedVertexCount.textContent = '—';
     els.dropZone.classList.add('hidden'); els.workspace.classList.remove('hidden');
     els.resultCard.classList.add('hidden'); els.showOptimizedBtn.disabled = true;
     showModel(originalModel, 'original'); resizeViewer();
@@ -202,7 +234,12 @@ async function openFile(file) {
 }
 
 // ---------- Optimizer ----------
-const io = new WebIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
+const io = new WebIO()
+  .registerExtensions(ALL_EXTENSIONS)
+  .registerDependencies({
+    'meshopt.decoder': MeshoptDecoder,
+    'meshopt.encoder': MeshoptEncoder
+  });
 
 async function optimizeModel() {
   if (!sourceBytes) return;
@@ -213,31 +250,36 @@ async function optimizeModel() {
     setStatus('Optimization is running locally in your browser.');
     await MeshoptSimplifier.ready;
     await MeshoptDecoder.ready;
+    await MeshoptEncoder.ready;
     const document = await io.readBinary(sourceBytes);
     const keepRatio = Number(els.geometry.value) / 100;
 
-    setProgress(18, 'Cleaning geometry…');
+    setProgress(15, 'Cleaning geometry…');
     await document.transform(dedup(), weld());
 
     if (keepRatio < 0.999) {
-      setProgress(35, `Reducing polygons to about ${Math.round(keepRatio*100)}%…`);
+      setProgress(30, `Reducing polygons to about ${Math.round(keepRatio*100)}%…`);
       await document.transform(simplify({ simplifier: MeshoptSimplifier, ratio: keepRatio, error: 0.001 }));
     } else {
-      setProgress(48, 'Keeping original polygon count…');
-    }
-
-    if (els.quantizeToggle.checked) {
-      setProgress(58, 'Quantizing mesh data…');
-      await document.transform(quantize());
+      setProgress(42, 'Keeping original polygon count…');
     }
 
     if (els.webpToggle.checked) {
-      setProgress(68, 'Resizing and compressing textures…');
-      await convertTexturesToWebP(document, Number(els.textureSize.value), Number(els.textureQuality.value) / 100, 68, 88);
+      setProgress(52, 'Resizing and compressing textures…');
+      await convertTexturesToWebP(document, Number(els.textureSize.value), Number(els.textureQuality.value) / 100, 52, 72);
     }
 
-    setProgress(90, 'Removing unused data…');
+    setProgress(76, 'Removing unused data…');
     await document.transform(prune());
+
+    if (els.meshoptToggle.checked) {
+      setProgress(84, 'Applying Meshopt compression…');
+      await document.transform(meshopt({ encoder: MeshoptEncoder, level: 'high' }));
+    } else if (els.quantizeToggle.checked) {
+      setProgress(84, 'Quantizing mesh data…');
+      await document.transform(quantize());
+    }
+
     setProgress(94, 'Writing optimized GLB…');
     optimizedBytes = await io.writeBinary(document);
 
@@ -247,13 +289,16 @@ async function optimizeModel() {
     disposeModel(optimizedModel);
     optimizedModel = await loadSceneFromURL(optimizedURL);
 
+    const optimizedStats = getModelStats(optimizedModel);
     const saving = 100 * (1 - optimizedBytes.byteLength / sourceBytes.byteLength);
     els.optimizedSize.textContent = formatBytes(optimizedBytes.byteLength);
+    els.optimizedTriangleCount.textContent = num(optimizedStats.triangles);
+    els.optimizedVertexCount.textContent = num(optimizedStats.vertices);
     els.savingBadge.textContent = saving >= 0 ? `${saving.toFixed(0)}% smaller` : `${Math.abs(saving).toFixed(0)}% larger`;
     els.resultCard.classList.remove('hidden'); els.showOptimizedBtn.disabled = false; els.downloadBtn.disabled = false;
     showModel(optimizedModel, 'optimized');
     setProgress(100, 'Finished');
-    setStatus('Done — compare Original and Optimized in the viewer.');
+    setStatus('Done — compare Original and Optimized, or use Wireframe to inspect the mesh.');
     setTimeout(hideProgress, 1200);
   } catch (err) {
     console.error(err);
@@ -265,7 +310,7 @@ async function optimizeModel() {
   }
 }
 
-async function convertTexturesToWebP(document, maxSize, quality, progressStart = 68, progressEnd = 88) {
+async function convertTexturesToWebP(document, maxSize, quality, progressStart = 52, progressEnd = 72) {
   const textures = document.getRoot().listTextures();
   if (!textures.length) return;
   document.createExtension(EXTTextureWebP).setRequired(true);
