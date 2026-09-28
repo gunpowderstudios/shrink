@@ -1,10 +1,10 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
-import { WebIO } from 'https://esm.sh/@gltf-transform/core@4.2.1';
-import { ALL_EXTENSIONS, EXTTextureWebP } from 'https://esm.sh/@gltf-transform/extensions@4.2.1';
-import { dedup, prune, weld, simplify, quantize } from 'https://esm.sh/@gltf-transform/functions@4.2.1';
-import { MeshoptSimplifier, MeshoptDecoder } from 'https://esm.sh/meshoptimizer@0.23.0';
+import { WebIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
+import { dedup, prune, weld, simplify, quantize } from '@gltf-transform/functions';
+import { MeshoptSimplifier, MeshoptDecoder } from 'meshoptimizer';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -14,7 +14,8 @@ const els = {
   textureQuality: $('textureQuality'), textureQualityValue: $('textureQualityValue'), webpToggle: $('webpToggle'),
   quantizeToggle: $('quantizeToggle'), optimizeBtn: $('optimizeBtn'), status: $('status'), resultCard: $('resultCard'),
   optimizedSize: $('optimizedSize'), savingBadge: $('savingBadge'), downloadBtn: $('downloadBtn'), newFileBtn: $('newFileBtn'),
-  viewer: $('viewer'), showOriginalBtn: $('showOriginalBtn'), showOptimizedBtn: $('showOptimizedBtn'), resetViewBtn: $('resetViewBtn')
+  viewer: $('viewer'), showOriginalBtn: $('showOriginalBtn'), showOptimizedBtn: $('showOptimizedBtn'), resetViewBtn: $('resetViewBtn'),
+  progressWrap: $('progressWrap'), progressBar: $('progressBar'), progressLabel: $('progressLabel')
 };
 
 const PRESETS = {
@@ -134,6 +135,13 @@ function formatBytes(bytes) {
 }
 function num(n) { return new Intl.NumberFormat().format(n); }
 function setStatus(msg, error = false) { els.status.textContent = msg; els.status.classList.toggle('error', error); }
+function setProgress(percent, label) {
+  const p = Math.max(0, Math.min(100, percent));
+  els.progressWrap.classList.remove('hidden');
+  els.progressBar.style.width = `${p}%`;
+  els.progressLabel.textContent = label;
+}
+function hideProgress() { els.progressWrap.classList.add('hidden'); }
 function markCustom(){ els.preset.value = 'custom'; }
 
 function applyPreset(name) {
@@ -167,6 +175,7 @@ async function openFile(file) {
   if (!file.name.toLowerCase().endsWith('.glb')) { setStatus('Please choose a .glb file.', true); return; }
   try {
     setStatus('Opening model…');
+    hideProgress();
     sourceFile = file;
     sourceBytes = new Uint8Array(await file.arrayBuffer());
     optimizedBytes = null;
@@ -198,35 +207,41 @@ const io = new WebIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
 async function optimizeModel() {
   if (!sourceBytes) return;
   els.optimizeBtn.disabled = true; els.downloadBtn.disabled = true; els.resultCard.classList.add('hidden');
+  els.optimizeBtn.textContent = 'Optimizing…';
   try {
-    setStatus('Reading GLB…');
+    setProgress(5, 'Reading GLB…');
+    setStatus('Optimization is running locally in your browser.');
     await MeshoptSimplifier.ready;
     await MeshoptDecoder.ready;
     const document = await io.readBinary(sourceBytes);
     const keepRatio = Number(els.geometry.value) / 100;
 
-    setStatus('Cleaning geometry…');
+    setProgress(18, 'Cleaning geometry…');
     await document.transform(dedup(), weld());
 
     if (keepRatio < 0.999) {
-      setStatus(`Reducing geometry to about ${Math.round(keepRatio*100)}%…`);
+      setProgress(35, `Reducing polygons to about ${Math.round(keepRatio*100)}%…`);
       await document.transform(simplify({ simplifier: MeshoptSimplifier, ratio: keepRatio, error: 0.001 }));
+    } else {
+      setProgress(48, 'Keeping original polygon count…');
     }
 
     if (els.quantizeToggle.checked) {
-      setStatus('Quantizing mesh data…');
+      setProgress(58, 'Quantizing mesh data…');
       await document.transform(quantize());
     }
 
     if (els.webpToggle.checked) {
-      setStatus('Resizing and compressing textures…');
-      await convertTexturesToWebP(document, Number(els.textureSize.value), Number(els.textureQuality.value) / 100);
+      setProgress(68, 'Resizing and compressing textures…');
+      await convertTexturesToWebP(document, Number(els.textureSize.value), Number(els.textureQuality.value) / 100, 68, 88);
     }
 
+    setProgress(90, 'Removing unused data…');
     await document.transform(prune());
-    setStatus('Writing optimized GLB…');
+    setProgress(94, 'Writing optimized GLB…');
     optimizedBytes = await io.writeBinary(document);
 
+    setProgress(97, 'Loading optimized preview…');
     if (optimizedURL) URL.revokeObjectURL(optimizedURL);
     optimizedURL = URL.createObjectURL(new Blob([optimizedBytes], { type: 'model/gltf-binary' }));
     disposeModel(optimizedModel);
@@ -237,19 +252,22 @@ async function optimizeModel() {
     els.savingBadge.textContent = saving >= 0 ? `${saving.toFixed(0)}% smaller` : `${Math.abs(saving).toFixed(0)}% larger`;
     els.resultCard.classList.remove('hidden'); els.showOptimizedBtn.disabled = false; els.downloadBtn.disabled = false;
     showModel(optimizedModel, 'optimized');
+    setProgress(100, 'Finished');
     setStatus('Done — compare Original and Optimized in the viewer.');
+    setTimeout(hideProgress, 1200);
   } catch (err) {
     console.error(err);
+    setProgress(100, 'Stopped');
     setStatus(`Optimization failed: ${err.message}`, true);
   } finally {
     els.optimizeBtn.disabled = false;
+    els.optimizeBtn.textContent = 'Optimize model';
   }
 }
 
-async function convertTexturesToWebP(document, maxSize, quality) {
+async function convertTexturesToWebP(document, maxSize, quality, progressStart = 68, progressEnd = 88) {
   const textures = document.getRoot().listTextures();
   if (!textures.length) return;
-  // Ensures the writer can represent WebP textures legally in glTF 2.0.
   document.createExtension(EXTTextureWebP).setRequired(true);
 
   for (let i = 0; i < textures.length; i++) {
@@ -268,7 +286,9 @@ async function convertTexturesToWebP(document, maxSize, quality) {
     const blob = await canvasToBlob(canvas, 'image/webp', quality);
     const bytes = new Uint8Array(await blob.arrayBuffer());
     texture.setImage(bytes).setMimeType('image/webp');
-    setStatus(`Compressing texture ${i + 1} of ${textures.length}…`);
+    const step = progressStart + ((i + 1) / textures.length) * (progressEnd - progressStart);
+    setProgress(step, `Compressing texture ${i + 1} of ${textures.length}…`);
+    await new Promise(requestAnimationFrame);
   }
 }
 
