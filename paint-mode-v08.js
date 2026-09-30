@@ -4,13 +4,15 @@
   const viewer = document.getElementById('viewer');
   if (!viewer) return;
 
+  const badge = document.querySelector('.version-badge');
+  if (badge) badge.textContent = 'v0.8';
+
   const nativeAdd = viewer.addEventListener.bind(viewer);
   const paintHandlers = new Set(['handlePointerDown', 'handlePointerMove', 'stopPaint']);
 
   viewer.addEventListener = function(type, listener, options) {
     if (['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].includes(type) && listener && paintHandlers.has(listener.name)) {
       const wrapped = function(event) {
-        // Cmd on Mac / Ctrl on Windows temporarily means orbit, not paint.
         if (event.metaKey || event.ctrlKey || viewer.classList.contains('modifier-rotate')) return;
         return listener.call(this, event);
       };
@@ -32,7 +34,6 @@
   window.addEventListener('keydown', (event) => {
     if ((event.key === 'Meta' || event.key === 'Control') && viewer.classList.contains('direct-paint')) {
       setModifierRotate(true);
-      // End a paint stroke cleanly if the modifier is pressed mid-stroke.
       viewer.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }));
     }
   }, true);
@@ -43,7 +44,6 @@
 
   window.addEventListener('blur', () => setModifierRotate(false));
 
-  // paint3d.js creates these buttons after this file runs. Rename/simplify once they exist.
   const tidyControls = () => {
     const paint = document.getElementById('paintModelBtn');
     const sample = document.getElementById('sampleModelBtn');
