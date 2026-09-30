@@ -10,6 +10,8 @@ function installRotationLock() {
 
   const block = (event) => {
     if (!paintingMode()) return;
+    // Hold Cmd on Mac or Ctrl on Windows to temporarily use OrbitControls.
+    if (event.metaKey || event.ctrlKey || viewer.classList.contains('modifier-rotate')) return;
     event.stopImmediatePropagation();
   };
 
@@ -17,7 +19,7 @@ function installRotationLock() {
   canvas.addEventListener('pointermove', block, true);
   canvas.addEventListener('pointerup', block, true);
   canvas.addEventListener('pointercancel', block, true);
-  canvas.addEventListener('wheel', block, true);
+  // Wheel is deliberately left alone so zoom continues to work in Paint mode.
 }
 
 installRotationLock();
