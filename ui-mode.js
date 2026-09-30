@@ -1,6 +1,6 @@
-// Shrink v1.62 — simple two-mode UI layer.
+// Shrink v1.63 — simple two-mode UI layer.
 (() => {
-  const VERSION = '1.62';
+  const VERSION = '1.63';
   const body = document.body;
   const header = document.querySelector('.topbar');
   const dropZone = document.getElementById('dropZone');
