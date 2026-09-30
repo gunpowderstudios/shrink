@@ -4,10 +4,10 @@
   if (!viewer) return;
 
   const badge = document.querySelector('.version-badge');
-  if (badge) badge.textContent = 'v1.63';
+  if (badge) badge.textContent = 'v1.64';
 
   // Load multi-step undo after the 3D paint controls exist.
-  import('./multi-undo.js?v=1.63').catch(err => console.warn('Could not load multi-step undo:', err));
+  import('./multi-undo.js?v=1.64').catch(err => console.warn('Could not load multi-step undo:', err));
 
   const nativeAdd = viewer.addEventListener.bind(viewer);
   const paintHandlers = new Set(['handlePointerDown', 'handlePointerMove', 'stopPaint']);
