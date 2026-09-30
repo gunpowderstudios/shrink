@@ -10,7 +10,8 @@ const state = {
   lastPoint: null,
   activeMaterial: null,
   liveTexture: null,
-  undoImage: null
+  undoImage: null,
+  activeTextureIndex: null
 };
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
@@ -139,26 +140,6 @@ function texturePoint(hit, material) {
   return { x, y };
 }
 
-function selectedTextureLooksCompatible(material) {
-  const image = material?.map?.image;
-  if (!image || !textureCanvas.width || !textureCanvas.height) return true;
-  const w = image.width || image.videoWidth || image.naturalWidth;
-  const h = image.height || image.videoHeight || image.naturalHeight;
-  if (!w || !h) return true;
-  return w === textureCanvas.width && h === textureCanvas.height;
-}
-
-function tryAutoSelectByName(material) {
-  const name = material?.map?.name?.trim();
-  if (!name || !textureSelect?.options?.length) return false;
-  const option = [...textureSelect.options].find(o => o.textContent.trim() === name || o.textContent.trim().includes(name));
-  if (!option || textureSelect.value === option.value) return false;
-  textureSelect.value = option.value;
-  textureSelect.dispatchEvent(new Event('change', { bubbles: true }));
-  say(`Selected ${option.textContent} for this surface. Click the model again when the texture appears.`);
-  return true;
-}
-
 function saveUndo() {
   if (!paintCtx || !textureCanvas.width || !textureCanvas.height) return;
   try {
@@ -189,6 +170,53 @@ function draw(from, to) {
   }
   paintCtx.restore();
   if (state.liveTexture) state.liveTexture.needsUpdate = true;
+}
+
+function materialTextureName(material) {
+  return material?.map?.name?.trim() || '';
+}
+
+function findTextureOptionForMaterial(material) {
+  const options = [...(textureSelect?.options || [])];
+  if (!options.length) return null;
+
+  const name = materialTextureName(material);
+  if (name) {
+    const exact = options.find(o => o.textContent.trim() === name);
+    if (exact) return exact;
+    const loose = options.find(o => o.textContent.trim().includes(name) || name.includes(o.textContent.trim()));
+    if (loose) return loose;
+  }
+
+  const image = material?.map?.image;
+  const w = image?.width || image?.videoWidth || image?.naturalWidth;
+  const h = image?.height || image?.videoHeight || image?.naturalHeight;
+  if (w && h) {
+    for (const option of options) {
+      const index = Number(option.value);
+      if (index === Number(textureSelect.value) && textureCanvas.width === w && textureCanvas.height === h) return option;
+    }
+  }
+
+  if (options.length === 1) return options[0];
+  return null;
+}
+
+async function ensureTextureForMaterial(material) {
+  const option = findTextureOptionForMaterial(material);
+  if (!option) {
+    say('I could not identify which embedded texture this surface uses. Try another part of the model or choose the matching texture on the left once.', true);
+    return false;
+  }
+
+  const index = Number(option.value);
+  if (Number(textureSelect.value) !== index || state.activeTextureIndex !== index) {
+    textureSelect.value = String(index);
+    textureSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    state.activeTextureIndex = index;
+    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+  return true;
 }
 
 function attachLiveCanvas(material) {
@@ -233,7 +261,7 @@ function modifierOrbit(evt) {
   return evt.metaKey || evt.ctrlKey || viewer?.classList.contains('modifier-rotate');
 }
 
-function handlePointerDown(evt) {
+async function handlePointerDown(evt) {
   if (state.mode === 'navigate' || evt.button !== 0 || modifierOrbit(evt)) return;
   if (!state.renderer || evt.target !== state.renderer.domElement) return;
   evt.preventDefault();
@@ -250,11 +278,8 @@ function handlePointerDown(evt) {
     return;
   }
 
-  if (tryAutoSelectByName(material)) return;
-  if (!selectedTextureLooksCompatible(material)) {
-    say('The selected texture does not match this surface. Choose another Texture on the left, then click the model again.', true);
-    return;
-  }
+  const ready = await ensureTextureForMaterial(material);
+  if (!ready) return;
 
   const point = texturePoint(hit, material);
   if (!point) return;
@@ -270,7 +295,7 @@ function handlePointerDown(evt) {
   state.lastPoint = point;
   draw(point, point);
   try { state.renderer.domElement.setPointerCapture(evt.pointerId); } catch {}
-  say('Painting directly on the model — hold Cmd / Ctrl to rotate, then release to continue painting.');
+  say(`Live painting ${textureSelect?.selectedOptions?.[0]?.textContent || 'the surface texture'} — changes should appear immediately on the model.`);
 }
 
 function handlePointerMove(evt) {
@@ -317,6 +342,7 @@ applyBtn?.addEventListener('click', () => {
   state.lastPoint = null;
   state.activeMaterial = null;
   state.liveTexture = null;
+  state.activeTextureIndex = Number(textureSelect?.value ?? -1);
   setMode('paint');
 });
 
