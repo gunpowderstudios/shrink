@@ -4,8 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#101114" />
-  <title>Shrink — GLB Optimizer</title>
-  <link rel="stylesheet" href="./style.css?v=1.5" />
+  <title>Shrink — Model Optimizer</title>
+  <link rel="stylesheet" href="./style.css?v=1.61" />
+  <link rel="stylesheet" href="./ui-mode.css?v=1.61" />
   <script type="importmap">
   {
     "imports": {
@@ -22,17 +23,17 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">GUNPOWDER STUDIOS</div>
-        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v1.5</span></div>
-        <p class="subtitle">Paint directly on models, retouch textures, shrink GLBs and sculpts, then compare before you save.</p>
+        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v1.61</span></div>
+        <p class="subtitle">Edit, paint and optimise GLB models for browser and video games.</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
     </header>
 
     <section id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Choose a model file">
-      <input id="fileInput" type="file" accept=".glb,.stl,.obj,.ply,model/gltf-binary" hidden />
+      <input id="fileInput" type="file" accept=".glb,model/gltf-binary" hidden />
       <div class="drop-icon">↓</div>
-      <strong>Drop a model here</strong>
-      <span>GLB, STL, OBJ or PLY — or click to choose a file</span>
+      <strong>Drop a GLB game model here</strong>
+      <span>GLB — or click to choose a file</span>
     </section>
 
     <section id="workspace" class="workspace hidden">
@@ -104,10 +105,10 @@
         <div class="control-block">
           <label for="preset">Preset</label>
           <select id="preset">
-            <option value="safe">Safe</option>
-            <option value="game" selected>Game Optimized</option>
-            <option value="small">Small</option>
-            <option value="aggressive">Aggressive</option>
+            <option value="safe">High quality</option>
+            <option value="game" selected>Balanced</option>
+            <option value="small">Small file</option>
+            <option value="aggressive">Maximum reduction</option>
             <option value="custom">Custom</option>
           </select>
         </div>
@@ -121,14 +122,13 @@
           <div class="hint">100% keeps all geometry. Lower values reduce the mesh.</div>
         </div>
 
-
         <section id="printPanel" class="print-panel hidden">
-          <div class="label">PRINT &amp; SHARE</div>
-          <strong class="print-title">Reduce a sculpt and see what you lose</strong>
+          <div class="label">3D PRINT</div>
+          <strong class="print-title">Reduce a sculpt without losing visible detail</strong>
 
           <div class="field-grid">
             <label class="field"><span>Figure height (mm)</span><input id="figureHeightMm" type="number" min="1" step="any" value="75" /></label>
-            <label class="field"><span>Printer detail (mm)</span><input id="printerDetailMm" type="number" min="0.005" step="0.005" value="0.05" title="Smallest feature the printer can show. Elegoo Mars 5 Ultra pixel = 0.018 mm; 0.05 mm is a realistic detail limit." /></label>
+            <label class="field"><span>Printer detail (mm)</span><input id="printerDetailMm" type="number" min="0.005" step="0.005" value="0.05" title="Smallest feature the printer can show. Elegoo Mars 5 Ultra pixel = 0.018 mm; 0.05 mm is a practical detail threshold." /></label>
           </div>
           <label class="field"><span>Target triangles</span><input id="targetTris" type="number" min="1" step="1000" /></label>
           <div id="estimateLine" class="estimate-line">—</div>
@@ -136,7 +136,7 @@
 
           <div class="protect-box">
             <div class="protect-head">
-              <button id="protectBtn" class="button ghost small" type="button">Protect brush</button>
+              <button id="protectBtn" class="button ghost small" type="button">Protect detail</button>
               <button id="protectClearBtn" class="button ghost small" type="button" disabled>Clear</button>
             </div>
             <div class="range-heading"><label for="protectRadius">Brush radius</label><output id="protectRadiusValue">3.0 mm</output></div>
@@ -151,7 +151,7 @@
             <button id="saveObjBtn" class="button ghost small" type="button">Save OBJ</button>
           </div>
           <label class="toggle-row zup-row"><span>Z-up for slicers (Lychee, Chitubox)</span><input id="zUpToggle" type="checkbox" checked /></label>
-          <div class="hint">STL and OBJ are saved in millimetres, scaled to the figure height above. Optimize first to save the reduced model.</div>
+          <div class="hint">STL and OBJ are saved in millimetres, scaled to the figure height above. Reduce first to save the smaller model.</div>
         </section>
 
         <div class="control-block">
@@ -178,7 +178,7 @@
           <label class="toggle-row"><span>Meshopt compression</span><input id="meshoptToggle" type="checkbox" checked /></label>
         </div>
 
-        <button id="optimizeBtn" class="button primary">Optimize model</button>
+        <button id="optimizeBtn" class="button primary">Optimize game model</button>
         <div id="progressWrap" class="progress-wrap hidden" aria-live="polite">
           <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
           <div id="progressLabel" class="progress-label">Starting…</div>
@@ -205,8 +205,8 @@
             <button id="showOptimizedBtn" class="segment" disabled>Optimized</button>
           </div>
           <div class="viewer-actions">
-            <button id="compareBtn" class="button ghost small" title="Drag a divider across the model: original on the left, reduced on the right">Compare</button>
-            <button id="heatBtn" class="button ghost small" title="Colour the original by how far the reduction moved its surface">Detail loss</button>
+            <button id="compareBtn" class="button ghost small" title="Compare original and optimized model">Compare</button>
+            <button id="heatBtn" class="button ghost small" title="Show detail loss against the original model">Detail loss</button>
             <button id="wireframeBtn" class="button ghost small">Wireframe</button>
             <button id="resetViewBtn" class="button ghost small">Reset view</button>
           </div>
@@ -217,10 +217,11 @@
     </section>
   </main>
 
-  <script type="module" src="./paint3d.js?v=1.5"></script>
-  <script type="module" src="./app.js?v=1.5"></script>
-  <script type="module" src="./paint-input-fix.js?v=1.5"></script>
-  <script type="module" src="./brush-cursor.js?v=1.5"></script>
-  <script type="module" src="./print-tools.js?v=1.5"></script>
+  <script type="module" src="./paint3d.js?v=1.61"></script>
+  <script type="module" src="./app.js?v=1.61"></script>
+  <script type="module" src="./paint-input-fix.js?v=1.61"></script>
+  <script type="module" src="./brush-cursor.js?v=1.61"></script>
+  <script type="module" src="./print-tools.js?v=1.61"></script>
+  <script type="module" src="./ui-mode.js?v=1.61"></script>
 </body>
 </html>
