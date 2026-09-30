@@ -3,9 +3,6 @@ import './gltf-texture-index.js';
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
 const state = {
-  renderer: null,
-  scene: null,
-  camera: null,
   mode: 'navigate',
   painting: false,
   lastPoint: null,
@@ -13,14 +10,6 @@ const state = {
   liveTexture: null,
   undoImage: null,
   activeTextureIndex: null
-};
-
-const originalRender = THREE.WebGLRenderer.prototype.render;
-THREE.WebGLRenderer.prototype.render = function(scene, camera) {
-  state.renderer = this;
-  state.scene = scene;
-  state.camera = camera;
-  return originalRender.call(this, scene, camera);
 };
 
 const viewer = document.getElementById('viewer');
@@ -36,6 +25,10 @@ const originalBtn = document.getElementById('showOriginalBtn');
 const applyBtn = document.getElementById('applyTextureBtn');
 const paintCtx = textureCanvas?.getContext('2d', { willReadFrequently: true });
 const raycaster = new THREE.Raycaster();
+
+function getViewerState() {
+  return window.__shrinkViewer || null;
+}
 
 function say(message, error = false) {
   if (!status) return;
@@ -117,16 +110,20 @@ function materialForHit(hit) {
 }
 
 function rayHit(evt) {
-  if (!state.renderer || !state.scene || !state.camera) return null;
-  const canvas = state.renderer.domElement;
+  const v = getViewerState();
+  if (!v?.renderer || !v?.scene || !v?.camera) {
+    say('3D painter is not connected to the viewer yet. Reload the page and try again.', true);
+    return null;
+  }
+  const canvas = v.renderer.domElement;
   const rect = canvas.getBoundingClientRect();
   if (!rect.width || !rect.height) return null;
   const ndc = new THREE.Vector2(
     ((evt.clientX - rect.left) / rect.width) * 2 - 1,
     -((evt.clientY - rect.top) / rect.height) * 2 + 1
   );
-  raycaster.setFromCamera(ndc, state.camera);
-  const hits = raycaster.intersectObjects(state.scene.children, true);
+  raycaster.setFromCamera(ndc, v.camera);
+  const hits = raycaster.intersectObjects(v.scene.children, true);
   return hits.find(hit => hit.object?.isMesh && hit.uv) || null;
 }
 
@@ -176,7 +173,6 @@ function draw(from, to) {
 function fallbackTextureIndex(material) {
   const options = [...(textureSelect?.options || [])];
   if (!options.length) return null;
-
   const name = material?.map?.name?.trim() || '';
   if (name) {
     const exact = options.find(o => o.textContent.trim() === name);
@@ -184,7 +180,6 @@ function fallbackTextureIndex(material) {
     const loose = options.find(o => o.textContent.trim().includes(name) || name.includes(o.textContent.trim()));
     if (loose) return Number(loose.value);
   }
-
   if (options.length === 1) return Number(options[0].value);
   return null;
 }
@@ -200,7 +195,6 @@ async function waitForTextureEditor(index, material) {
   const expectedWidth = image?.width || image?.videoWidth || image?.naturalWidth || 0;
   const expectedHeight = image?.height || image?.videoHeight || image?.naturalHeight || 0;
   const started = performance.now();
-
   while (performance.now() - started < 1800) {
     const sameIndex = Number(textureSelect?.value) === index;
     const hasCanvas = textureCanvas.width > 1 && textureCanvas.height > 1;
@@ -217,13 +211,11 @@ async function ensureTextureForMaterial(material) {
     say('This surface has a texture, but Shrink could not link it to the embedded GLB image.', true);
     return false;
   }
-
   if (Number(textureSelect.value) !== index || state.activeTextureIndex !== index) {
     textureSelect.value = String(index);
     textureSelect.dispatchEvent(new Event('change', { bubbles: true }));
     state.activeTextureIndex = index;
   }
-
   const ready = await waitForTextureEditor(index, material);
   if (!ready) {
     say(`Texture ${index + 1} was identified, but its image did not finish loading into the paint canvas.`, true);
@@ -235,7 +227,6 @@ async function ensureTextureForMaterial(material) {
 function attachLiveCanvas(material) {
   if (!material?.map || !textureCanvas.width || !textureCanvas.height) return;
   if (state.activeMaterial === material && state.liveTexture) return;
-
   state.liveTexture?.dispose?.();
   const oldMap = material.map;
   const live = new THREE.CanvasTexture(textureCanvas);
@@ -277,7 +268,12 @@ function modifierOrbit(evt) {
 
 async function handlePointerDown(evt) {
   if (state.mode === 'navigate' || evt.button !== 0 || modifierOrbit(evt)) return;
-  if (!state.renderer || evt.target !== state.renderer.domElement) return;
+  const v = getViewerState();
+  if (!v?.renderer) {
+    say('3D painter could not access the viewer. Reload the page and try again.', true);
+    return;
+  }
+  if (evt.target !== v.renderer.domElement) return;
   evt.preventDefault();
   evt.stopImmediatePropagation();
 
@@ -292,8 +288,9 @@ async function handlePointerDown(evt) {
     return;
   }
 
+  const pointerId = evt.pointerId;
   const ready = await ensureTextureForMaterial(material);
-  if (!ready) return;
+  if (!ready || evt.buttons === 0) return;
 
   const point = texturePoint(hit, material);
   if (!point) return;
@@ -308,12 +305,16 @@ async function handlePointerDown(evt) {
   state.painting = true;
   state.lastPoint = point;
   draw(point, point);
-  try { state.renderer.domElement.setPointerCapture(evt.pointerId); } catch {}
+  try { v.renderer.domElement.setPointerCapture(pointerId); } catch {}
   say(`LIVE PAINT · Texture ${state.activeTextureIndex + 1} · ${paintColor?.value || '#000000'} · changes should appear immediately.`);
 }
 
 function handlePointerMove(evt) {
   if (state.mode !== 'paint' || !state.painting || modifierOrbit(evt)) return;
+  if ((evt.buttons & 1) === 0) {
+    stopPaint(evt);
+    return;
+  }
   evt.preventDefault();
   evt.stopImmediatePropagation();
   const hit = rayHit(evt);
@@ -334,13 +335,14 @@ function stopPaint(evt) {
   }
   state.painting = false;
   state.lastPoint = null;
-  try { state.renderer?.domElement?.releasePointerCapture(evt.pointerId); } catch {}
+  try { getViewerState()?.renderer?.domElement?.releasePointerCapture(evt.pointerId); } catch {}
 }
 
 viewer?.addEventListener('pointerdown', handlePointerDown, true);
 viewer?.addEventListener('pointermove', handlePointerMove, true);
 viewer?.addEventListener('pointerup', stopPaint, true);
 viewer?.addEventListener('pointercancel', stopPaint, true);
+viewer?.addEventListener('pointerleave', evt => { if ((evt.buttons & 1) === 0) stopPaint(evt); }, true);
 
 undo3DBtn.addEventListener('click', () => {
   if (!state.undoImage || !paintCtx) return;
