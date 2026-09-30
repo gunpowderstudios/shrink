@@ -148,12 +148,23 @@ function saveUndo() {
   }
 }
 
-function draw(from, to) {
+function dab(point) {
+  if (!paintCtx || !point) return;
+  paintCtx.save();
+  paintCtx.globalAlpha = Number(brushOpacity?.value || 100) / 100;
+  paintCtx.fillStyle = paintColor?.value || '#000000';
+  paintCtx.beginPath();
+  paintCtx.arc(point.x, point.y, Number(brushSize?.value || 32) / 2, 0, Math.PI * 2);
+  paintCtx.fill();
+  paintCtx.restore();
+  if (state.liveTexture) state.liveTexture.needsUpdate = true;
+}
+
+function drawSegment(from, to) {
   if (!paintCtx || !from || !to) return;
   paintCtx.save();
   paintCtx.globalAlpha = Number(brushOpacity?.value || 100) / 100;
   paintCtx.strokeStyle = paintColor?.value || '#000000';
-  paintCtx.fillStyle = paintColor?.value || '#000000';
   paintCtx.lineWidth = Number(brushSize?.value || 32);
   paintCtx.lineCap = 'round';
   paintCtx.lineJoin = 'round';
@@ -161,13 +172,32 @@ function draw(from, to) {
   paintCtx.moveTo(from.x, from.y);
   paintCtx.lineTo(to.x, to.y);
   paintCtx.stroke();
-  if (Math.abs(from.x - to.x) < 0.01 && Math.abs(from.y - to.y) < 0.01) {
-    paintCtx.beginPath();
-    paintCtx.arc(to.x, to.y, Number(brushSize?.value || 32) / 2, 0, Math.PI * 2);
-    paintCtx.fill();
-  }
   paintCtx.restore();
   if (state.liveTexture) state.liveTexture.needsUpdate = true;
+}
+
+function paintBetween(from, to) {
+  if (!from || !to) return;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy);
+  const brush = Number(brushSize?.value || 32);
+  const seamThreshold = Math.max(brush * 4, Math.min(textureCanvas.width, textureCanvas.height) * 0.06);
+
+  if (distance > seamThreshold) {
+    dab(to);
+    return;
+  }
+
+  const step = Math.max(1, brush * 0.35);
+  const steps = Math.max(1, Math.ceil(distance / step));
+  let prev = from;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const next = { x: from.x + dx * t, y: from.y + dy * t };
+    drawSegment(prev, next);
+    prev = next;
+  }
 }
 
 function fallbackTextureIndex(material) {
@@ -304,9 +334,9 @@ async function handlePointerDown(evt) {
   attachLiveCanvas(material);
   state.painting = true;
   state.lastPoint = point;
-  draw(point, point);
+  dab(point);
   try { v.renderer.domElement.setPointerCapture(pointerId); } catch {}
-  say(`LIVE PAINT · Texture ${state.activeTextureIndex + 1} · ${paintColor?.value || '#000000'} · changes should appear immediately.`);
+  say(`LIVE PAINT · Texture ${state.activeTextureIndex + 1} · ${paintColor?.value || '#000000'} · seam-safe stroke.`);
 }
 
 function handlePointerMove(evt) {
@@ -320,10 +350,14 @@ function handlePointerMove(evt) {
   const hit = rayHit(evt);
   if (!hit) return;
   const material = materialForHit(hit);
-  if (material !== state.activeMaterial) return;
+  if (material !== state.activeMaterial) {
+    state.lastPoint = null;
+    return;
+  }
   const point = texturePoint(hit, material);
   if (!point) return;
-  draw(state.lastPoint, point);
+  if (state.lastPoint) paintBetween(state.lastPoint, point);
+  else dab(point);
   state.lastPoint = point;
 }
 
