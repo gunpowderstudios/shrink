@@ -58,7 +58,6 @@ const io = new WebIO()
     'meshopt.encoder': MeshoptEncoder
   });
 
-// ---------- Viewer ----------
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 100000);
 camera.position.set(4, 3, 6);
@@ -72,6 +71,7 @@ els.viewer.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
+window.__shrinkViewer = { renderer, scene, camera, controls };
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x303540, 2.2));
 const key = new THREE.DirectionalLight(0xffffff, 3.0); key.position.set(4, 8, 6); scene.add(key);
@@ -176,7 +176,6 @@ async function reloadOriginalPreview(reframe = false) {
   disposeModel(oldModel);
 }
 
-// ---------- UI ----------
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return '—';
   if (bytes < 1024) return `${bytes} B`;
@@ -238,7 +237,6 @@ els.wireframeBtn.addEventListener('click', () => {
 els.optimizeBtn.addEventListener('click', optimizeModel);
 els.downloadBtn.addEventListener('click', downloadOptimized);
 
-// ---------- Texture editor ----------
 const paintCtx = els.textureCanvas.getContext('2d', { willReadFrequently: true });
 
 function setPaintTool(tool) {
@@ -518,7 +516,6 @@ async function openFile(file) {
   }
 }
 
-// ---------- Optimizer ----------
 async function optimizeModel() {
   if (!sourceBytes) return;
   if (textureDirty) setStatus('Tip: Apply your texture edit before optimizing if you want it included.');
