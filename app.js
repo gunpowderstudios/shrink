@@ -16,7 +16,12 @@ const els = {
   optimizedSize: $('optimizedSize'), optimizedTriangleCount: $('optimizedTriangleCount'), optimizedVertexCount: $('optimizedVertexCount'),
   savingBadge: $('savingBadge'), downloadBtn: $('downloadBtn'), newFileBtn: $('newFileBtn'),
   viewer: $('viewer'), showOriginalBtn: $('showOriginalBtn'), showOptimizedBtn: $('showOptimizedBtn'), resetViewBtn: $('resetViewBtn'), wireframeBtn: $('wireframeBtn'),
-  progressWrap: $('progressWrap'), progressBar: $('progressBar'), progressLabel: $('progressLabel')
+  progressWrap: $('progressWrap'), progressBar: $('progressBar'), progressLabel: $('progressLabel'),
+  textureEditor: $('textureEditor'), textureSelect: $('textureSelect'), textureDimensions: $('textureDimensions'),
+  textureCanvas: $('textureCanvas'), textureEmpty: $('textureEmpty'), brushToolBtn: $('brushToolBtn'), eyedropperToolBtn: $('eyedropperToolBtn'),
+  paintColor: $('paintColor'), blackSwatchBtn: $('blackSwatchBtn'), whiteSwatchBtn: $('whiteSwatchBtn'),
+  brushSize: $('brushSize'), brushSizeValue: $('brushSizeValue'), brushOpacity: $('brushOpacity'), brushOpacityValue: $('brushOpacityValue'),
+  undoPaintBtn: $('undoPaintBtn'), resetTextureBtn: $('resetTextureBtn'), applyTextureBtn: $('applyTextureBtn'), saveEditedBtn: $('saveEditedBtn')
 };
 
 const PRESETS = {
@@ -35,6 +40,23 @@ let originalModel = null;
 let optimizedModel = null;
 let currentModel = null;
 let wireframeEnabled = false;
+
+let textureOriginals = [];
+let selectedTextureIndex = 0;
+let selectedTextureMime = 'image/png';
+let selectedTextureName = '';
+let paintTool = 'brush';
+let painting = false;
+let lastPoint = null;
+let undoImageData = null;
+let textureDirty = false;
+
+const io = new WebIO()
+  .registerExtensions(ALL_EXTENSIONS)
+  .registerDependencies({
+    'meshopt.decoder': MeshoptDecoder,
+    'meshopt.encoder': MeshoptEncoder
+  });
 
 // ---------- Viewer ----------
 const scene = new THREE.Scene();
@@ -103,7 +125,7 @@ function applyWireframe(model, enabled) {
   });
 }
 
-function showModel(model, which) {
+function showModel(model, which, reframe = true) {
   if (currentModel) scene.remove(currentModel);
   currentModel = model;
   if (currentModel) {
@@ -112,7 +134,7 @@ function showModel(model, which) {
   }
   els.showOriginalBtn.classList.toggle('active', which === 'original');
   els.showOptimizedBtn.classList.toggle('active', which === 'optimized');
-  frameModel(model);
+  if (reframe) frameModel(model);
 }
 
 function frameModel(model) {
@@ -144,6 +166,16 @@ function getModelStats(model) {
   return { triangles, vertices, textures: textures.size };
 }
 
+async function reloadOriginalPreview(reframe = false) {
+  if (!sourceBytes) return;
+  if (originalURL) URL.revokeObjectURL(originalURL);
+  originalURL = URL.createObjectURL(new Blob([sourceBytes], { type: 'model/gltf-binary' }));
+  const oldModel = originalModel;
+  originalModel = await loadSceneFromURL(originalURL);
+  if (currentModel === oldModel || !currentModel) showModel(originalModel, 'original', reframe);
+  disposeModel(oldModel);
+}
+
 // ---------- UI ----------
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return '—';
@@ -172,7 +204,12 @@ function applyPreset(name) {
   els.meshoptToggle.checked = p.meshopt;
   updateLabels();
 }
-function updateLabels(){ els.geometryValue.textContent = `${els.geometry.value}%`; els.textureQualityValue.textContent = `${els.textureQuality.value}%`; }
+function updateLabels(){
+  els.geometryValue.textContent = `${els.geometry.value}%`;
+  els.textureQualityValue.textContent = `${els.textureQuality.value}%`;
+  els.brushSizeValue.textContent = `${els.brushSize.value} px`;
+  els.brushOpacityValue.textContent = `${els.brushOpacity.value}%`;
+}
 
 els.preset.addEventListener('change', () => applyPreset(els.preset.value));
 els.geometry.addEventListener('input', () => { updateLabels(); markCustom(); });
@@ -201,6 +238,252 @@ els.wireframeBtn.addEventListener('click', () => {
 els.optimizeBtn.addEventListener('click', optimizeModel);
 els.downloadBtn.addEventListener('click', downloadOptimized);
 
+// ---------- Texture editor ----------
+const paintCtx = els.textureCanvas.getContext('2d', { willReadFrequently: true });
+
+function setPaintTool(tool) {
+  paintTool = tool;
+  els.brushToolBtn.classList.toggle('active', tool === 'brush');
+  els.eyedropperToolBtn.classList.toggle('active', tool === 'eyedropper');
+  els.textureCanvas.style.cursor = tool === 'eyedropper' ? 'copy' : 'crosshair';
+}
+
+els.brushToolBtn.addEventListener('click', () => setPaintTool('brush'));
+els.eyedropperToolBtn.addEventListener('click', () => setPaintTool('eyedropper'));
+els.blackSwatchBtn.addEventListener('click', () => { els.paintColor.value = '#000000'; setPaintTool('brush'); });
+els.whiteSwatchBtn.addEventListener('click', () => { els.paintColor.value = '#ffffff'; setPaintTool('brush'); });
+els.brushSize.addEventListener('input', updateLabels);
+els.brushOpacity.addEventListener('input', updateLabels);
+els.textureSelect.addEventListener('change', async () => {
+  selectedTextureIndex = Number(els.textureSelect.value);
+  await loadTextureIntoEditor(selectedTextureIndex);
+});
+els.undoPaintBtn.addEventListener('click', undoLastStroke);
+els.resetTextureBtn.addEventListener('click', resetSelectedTexture);
+els.applyTextureBtn.addEventListener('click', applyTextureToModel);
+els.saveEditedBtn.addEventListener('click', downloadEdited);
+
+function canvasPoint(evt) {
+  const rect = els.textureCanvas.getBoundingClientRect();
+  return {
+    x: (evt.clientX - rect.left) * (els.textureCanvas.width / rect.width),
+    y: (evt.clientY - rect.top) * (els.textureCanvas.height / rect.height)
+  };
+}
+
+function sampleColour(point) {
+  const x = Math.max(0, Math.min(els.textureCanvas.width - 1, Math.round(point.x)));
+  const y = Math.max(0, Math.min(els.textureCanvas.height - 1, Math.round(point.y)));
+  const p = paintCtx.getImageData(x, y, 1, 1).data;
+  els.paintColor.value = `#${[p[0], p[1], p[2]].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+  setPaintTool('brush');
+  setStatus(`Sampled ${els.paintColor.value}. Paint over the unwanted detail.`);
+}
+
+function drawBrush(from, to) {
+  paintCtx.save();
+  paintCtx.globalAlpha = Number(els.brushOpacity.value) / 100;
+  paintCtx.strokeStyle = els.paintColor.value;
+  paintCtx.fillStyle = els.paintColor.value;
+  paintCtx.lineWidth = Number(els.brushSize.value);
+  paintCtx.lineCap = 'round';
+  paintCtx.lineJoin = 'round';
+  paintCtx.beginPath();
+  paintCtx.moveTo(from.x, from.y);
+  paintCtx.lineTo(to.x, to.y);
+  paintCtx.stroke();
+  if (from.x === to.x && from.y === to.y) {
+    paintCtx.beginPath();
+    paintCtx.arc(to.x, to.y, Number(els.brushSize.value) / 2, 0, Math.PI * 2);
+    paintCtx.fill();
+  }
+  paintCtx.restore();
+  textureDirty = true;
+}
+
+els.textureCanvas.addEventListener('pointerdown', evt => {
+  if (!els.textureCanvas.width || !els.textureCanvas.height) return;
+  evt.preventDefault();
+  const point = canvasPoint(evt);
+  if (paintTool === 'eyedropper') {
+    sampleColour(point);
+    return;
+  }
+  try {
+    undoImageData = paintCtx.getImageData(0, 0, els.textureCanvas.width, els.textureCanvas.height);
+    els.undoPaintBtn.disabled = false;
+  } catch (err) {
+    console.warn('Could not capture undo image:', err);
+    undoImageData = null;
+  }
+  painting = true;
+  lastPoint = point;
+  els.textureCanvas.setPointerCapture?.(evt.pointerId);
+  drawBrush(point, point);
+});
+
+els.textureCanvas.addEventListener('pointermove', evt => {
+  if (!painting || paintTool !== 'brush') return;
+  evt.preventDefault();
+  const point = canvasPoint(evt);
+  drawBrush(lastPoint, point);
+  lastPoint = point;
+});
+
+function stopPainting(evt) {
+  if (!painting) return;
+  painting = false;
+  lastPoint = null;
+  if (evt?.pointerId !== undefined) els.textureCanvas.releasePointerCapture?.(evt.pointerId);
+}
+els.textureCanvas.addEventListener('pointerup', stopPainting);
+els.textureCanvas.addEventListener('pointercancel', stopPainting);
+els.textureCanvas.addEventListener('pointerleave', evt => { if (evt.buttons === 0) stopPainting(evt); });
+
+function undoLastStroke() {
+  if (!undoImageData) return;
+  paintCtx.putImageData(undoImageData, 0, 0);
+  undoImageData = null;
+  els.undoPaintBtn.disabled = true;
+  textureDirty = true;
+  setStatus('Last brush stroke undone.');
+}
+
+async function prepareTextureEditor() {
+  textureOriginals = [];
+  els.textureSelect.innerHTML = '';
+  els.textureEditor.classList.add('hidden');
+  if (!sourceBytes) return;
+
+  const doc = await io.readBinary(sourceBytes);
+  const textures = doc.getRoot().listTextures();
+  if (!textures.length) return;
+
+  textures.forEach((texture, index) => {
+    const image = texture.getImage();
+    const mime = texture.getMimeType() || 'image/png';
+    textureOriginals.push({
+      bytes: image ? new Uint8Array(image) : null,
+      mime,
+      name: texture.getName() || `Texture ${index + 1}`
+    });
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = texture.getName() || `Texture ${index + 1}`;
+    els.textureSelect.appendChild(option);
+  });
+
+  els.textureEditor.classList.remove('hidden');
+  selectedTextureIndex = 0;
+  els.textureSelect.value = '0';
+  await loadTextureIntoEditor(0);
+}
+
+async function loadTextureIntoEditor(index) {
+  if (!sourceBytes) return;
+  textureDirty = false;
+  undoImageData = null;
+  els.undoPaintBtn.disabled = true;
+  els.applyTextureBtn.disabled = true;
+  els.resetTextureBtn.disabled = true;
+  els.textureEmpty.classList.add('hidden');
+
+  try {
+    const doc = await io.readBinary(sourceBytes);
+    const textures = doc.getRoot().listTextures();
+    const texture = textures[index];
+    const image = texture?.getImage();
+    if (!texture || !image?.byteLength) throw new Error('This texture has no editable embedded image.');
+
+    selectedTextureIndex = index;
+    selectedTextureMime = texture.getMimeType() || 'image/png';
+    selectedTextureName = texture.getName() || `Texture ${index + 1}`;
+    await drawImageBytesToCanvas(new Uint8Array(image), selectedTextureMime);
+    els.textureDimensions.textContent = `${els.textureCanvas.width} × ${els.textureCanvas.height}`;
+    els.applyTextureBtn.disabled = false;
+    els.resetTextureBtn.disabled = !textureOriginals[index]?.bytes;
+    setStatus(`Texture ready — use Eyedropper then Brush to retouch it.`);
+  } catch (err) {
+    console.warn(err);
+    els.textureCanvas.width = 1;
+    els.textureCanvas.height = 1;
+    paintCtx.clearRect(0, 0, 1, 1);
+    els.textureDimensions.textContent = 'Unavailable';
+    els.textureEmpty.textContent = err.message || 'No editable image texture found.';
+    els.textureEmpty.classList.remove('hidden');
+    setStatus('This texture cannot be painted in the browser.', true);
+  }
+}
+
+async function drawImageBytesToCanvas(bytes, mime) {
+  const bitmap = await createImageBitmap(new Blob([bytes], { type: mime }));
+  els.textureCanvas.width = bitmap.width;
+  els.textureCanvas.height = bitmap.height;
+  paintCtx.clearRect(0, 0, bitmap.width, bitmap.height);
+  paintCtx.drawImage(bitmap, 0, 0);
+  bitmap.close?.();
+}
+
+async function resetSelectedTexture() {
+  const original = textureOriginals[selectedTextureIndex];
+  if (!original?.bytes) return;
+  try {
+    await drawImageBytesToCanvas(original.bytes, original.mime);
+    selectedTextureMime = original.mime;
+    textureDirty = true;
+    undoImageData = null;
+    els.undoPaintBtn.disabled = true;
+    setStatus('Texture reset to the version in the GLB you originally opened. Press Apply texture to model to commit it.');
+  } catch (err) {
+    setStatus(`Could not reset texture: ${err.message}`, true);
+  }
+}
+
+function outputMimeForTexture(mime) {
+  if (mime === 'image/jpeg' || mime === 'image/webp' || mime === 'image/png') return mime;
+  return 'image/png';
+}
+
+async function applyTextureToModel() {
+  if (!sourceBytes || !els.textureCanvas.width) return;
+  els.applyTextureBtn.disabled = true;
+  const oldText = els.applyTextureBtn.textContent;
+  els.applyTextureBtn.textContent = 'Applying…';
+  try {
+    const doc = await io.readBinary(sourceBytes);
+    const textures = doc.getRoot().listTextures();
+    const texture = textures[selectedTextureIndex];
+    if (!texture) throw new Error('Texture is no longer available.');
+
+    const mime = outputMimeForTexture(selectedTextureMime);
+    const quality = mime === 'image/jpeg' || mime === 'image/webp' ? 0.95 : undefined;
+    const blob = await canvasToBlob(els.textureCanvas, mime, quality);
+    texture.setImage(new Uint8Array(await blob.arrayBuffer())).setMimeType(mime);
+    sourceBytes = await io.writeBinary(doc);
+    optimizedBytes = null;
+    disposeModel(optimizedModel); optimizedModel = null;
+    if (optimizedURL) { URL.revokeObjectURL(optimizedURL); optimizedURL = null; }
+    els.showOptimizedBtn.disabled = true;
+    els.resultCard.classList.add('hidden');
+    els.originalSize.textContent = formatBytes(sourceBytes.byteLength);
+    await reloadOriginalPreview(false);
+    textureDirty = false;
+    setStatus(`Applied ${selectedTextureName}. The 3D preview and future optimized GLB now use your edit.`);
+  } catch (err) {
+    console.error(err);
+    setStatus(`Could not apply texture: ${err.message}`, true);
+  } finally {
+    els.applyTextureBtn.disabled = false;
+    els.applyTextureBtn.textContent = oldText;
+  }
+}
+
+function downloadEdited() {
+  if (!sourceBytes || !sourceFile) return;
+  const base = sourceFile.name.replace(/\.glb$/i, '');
+  downloadBytes(sourceBytes, `${base}-edited.glb`);
+}
+
 async function openFile(file) {
   if (!file.name.toLowerCase().endsWith('.glb')) { setStatus('Please choose a .glb file.', true); return; }
   try {
@@ -209,6 +492,7 @@ async function openFile(file) {
     sourceFile = file;
     sourceBytes = new Uint8Array(await file.arrayBuffer());
     optimizedBytes = null;
+    textureDirty = false;
     if (originalURL) URL.revokeObjectURL(originalURL);
     if (optimizedURL) URL.revokeObjectURL(optimizedURL);
     originalURL = URL.createObjectURL(file);
@@ -227,22 +511,17 @@ async function openFile(file) {
     els.dropZone.classList.add('hidden'); els.workspace.classList.remove('hidden');
     els.resultCard.classList.add('hidden'); els.showOptimizedBtn.disabled = true;
     showModel(originalModel, 'original'); resizeViewer();
-    setStatus('Ready to optimize.');
+    await prepareTextureEditor();
+    if (!stats.textures) setStatus('Ready to optimize. This GLB has no image textures to retouch.');
   } catch (err) {
     console.error(err); setStatus(`Could not open this GLB: ${err.message}`, true);
   }
 }
 
 // ---------- Optimizer ----------
-const io = new WebIO()
-  .registerExtensions(ALL_EXTENSIONS)
-  .registerDependencies({
-    'meshopt.decoder': MeshoptDecoder,
-    'meshopt.encoder': MeshoptEncoder
-  });
-
 async function optimizeModel() {
   if (!sourceBytes) return;
+  if (textureDirty) setStatus('Tip: Apply your texture edit before optimizing if you want it included.');
   els.optimizeBtn.disabled = true; els.downloadBtn.disabled = true; els.resultCard.classList.add('hidden');
   els.optimizeBtn.textContent = 'Optimizing…';
   try {
@@ -298,7 +577,7 @@ async function optimizeModel() {
     els.resultCard.classList.remove('hidden'); els.showOptimizedBtn.disabled = false; els.downloadBtn.disabled = false;
     showModel(optimizedModel, 'optimized');
     setProgress(100, 'Finished');
-    setStatus('Done — compare Original and Optimized, or use Wireframe to inspect the mesh.');
+    setStatus('Done — compare Original / Edited and Optimized, or use Wireframe to inspect the mesh.');
     setTimeout(hideProgress, 1200);
   } catch (err) {
     console.error(err);
@@ -320,7 +599,13 @@ async function convertTexturesToWebP(document, maxSize, quality, progressStart =
     const image = texture.getImage();
     if (!image?.byteLength) continue;
     const mime = texture.getMimeType() || 'image/png';
-    const bitmap = await createImageBitmap(new Blob([image], { type: mime }));
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(new Blob([image], { type: mime }));
+    } catch (err) {
+      console.warn(`Skipping unsupported texture ${i + 1}:`, err);
+      continue;
+    }
     const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));
     const height = Math.max(1, Math.round(bitmap.height * scale));
@@ -347,14 +632,20 @@ async function canvasToBlob(canvas, type, quality) {
   return await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('Texture conversion failed.')), type, quality));
 }
 
-function downloadOptimized() {
-  if (!optimizedBytes || !sourceFile) return;
-  const base = sourceFile.name.replace(/\.glb$/i, '');
+function downloadBytes(bytes, filename) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([optimizedBytes], { type: 'model/gltf-binary' }));
-  a.download = `${base}-shrink.glb`;
+  a.href = URL.createObjectURL(new Blob([bytes], { type: 'model/gltf-binary' }));
+  a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+function downloadOptimized() {
+  if (!optimizedBytes || !sourceFile) return;
+  const base = sourceFile.name.replace(/\.glb$/i, '');
+  downloadBytes(optimizedBytes, `${base}-shrink.glb`);
+}
+
 applyPreset('game');
+updateLabels();
+setPaintTool('brush');
