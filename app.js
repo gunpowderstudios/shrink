@@ -1,15 +1,11 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
-import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'https://esm.sh/three-mesh-bvh@0.9.2?deps=three@0.180.0';
-import { WebIO } from '@gltf-transform/core';
+import { WebIO, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt } from '@gltf-transform/functions';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
-
-THREE.Mesh.prototype.raycast = acceleratedRaycast;
-THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
-THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+import { simplifyWithProtection, smoothNormals } from './mesh-tools.js?v=1.5';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -33,7 +29,7 @@ const PRESETS = {
   safe:       { geometry: 90, textureSize: 2048, textureQuality: 88, webp: true, quantize: true, meshopt: true },
   game:       { geometry: 70, textureSize: 1024, textureQuality: 82, webp: true, quantize: true, meshopt: true },
   small:      { geometry: 50, textureSize: 1024, textureQuality: 76, webp: true, quantize: true, meshopt: true },
-  aggressive: { geometry: 35, textureSize: 512, textureQuality: 70, webp: true, quantize: true, meshopt: true }
+  aggressive: { geometry: 35, textureSize: 512,  textureQuality: 70, webp: true, quantize: true, meshopt: true }
 };
 
 let sourceFile = null;
@@ -45,6 +41,11 @@ let originalModel = null;
 let optimizedModel = null;
 let currentModel = null;
 let wireframeEnabled = false;
+let currentWhich = 'original';
+let compareOn = false;
+let compareSplit = 0.5;
+let sourceKind = 'glb';          // glb | stl | obj | ply (what the user opened)
+let lastReduce = null;
 
 let textureOriginals = [];
 let selectedTextureIndex = 0;
@@ -94,40 +95,39 @@ function resizeViewer() {
 }
 new ResizeObserver(resizeViewer).observe(els.viewer);
 
-(function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
+const _size = new THREE.Vector2();
+function renderFrame() {
+  if (compareOn && originalModel && optimizedModel) {
+    // Split-screen: original on the left of the divider, reduced on the right.
+    renderer.getSize(_size);
+    const sx = Math.round(_size.x * compareSplit);
+    renderer.setScissorTest(true);
+    originalModel.visible = true; optimizedModel.visible = false;
+    renderer.setScissor(0, 0, sx, _size.y);
+    renderer.render(scene, camera);
+    originalModel.visible = false; optimizedModel.visible = true;
+    renderer.setScissor(sx, 0, _size.x - sx, _size.y);
+    renderer.render(scene, camera);
+    originalModel.visible = true;
+    renderer.setScissorTest(false);
+  } else {
+    renderer.render(scene, camera);
+  }
+}
+(function animate(){ requestAnimationFrame(animate); controls.update(); renderFrame(); })();
 
 const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);
 
-function prepareBVH(model) {
-  if (!model) return;
-  const seen = new Set();
-  model.traverse(o => {
-    if (!o.isMesh || !o.geometry || seen.has(o.geometry.uuid)) return;
-    seen.add(o.geometry.uuid);
-    if (!o.geometry.boundsTree) {
-      try { o.geometry.computeBoundsTree({ maxLeafTris: 20 }); }
-      catch (err) { console.warn('BVH unavailable for mesh:', err); }
-    }
-  });
-}
-
 async function loadSceneFromURL(url) {
-  const model = await new Promise((resolve, reject) => loader.load(url, g => resolve(g.scene), undefined, reject));
-  prepareBVH(model);
-  return model;
+  return await new Promise((resolve, reject) => loader.load(url, g => resolve(g.scene), undefined, reject));
 }
 
 function disposeModel(model) {
   if (!model) return;
-  const disposedGeometry = new Set();
   model.traverse(o => {
     if (!o.isMesh) return;
-    if (o.geometry && !disposedGeometry.has(o.geometry.uuid)) {
-      disposedGeometry.add(o.geometry.uuid);
-      o.geometry.disposeBoundsTree?.();
-      o.geometry.dispose?.();
-    }
+    o.geometry?.dispose?.();
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     mats.forEach(m => {
       if (!m) return;
@@ -151,8 +151,10 @@ function applyWireframe(model, enabled) {
 }
 
 function showModel(model, which, reframe = true) {
+  if (compareOn) leaveCompare();
   if (currentModel) scene.remove(currentModel);
   currentModel = model;
+  currentWhich = which;
   if (currentModel) {
     applyWireframe(currentModel, wireframeEnabled);
     scene.add(currentModel);
@@ -160,6 +162,36 @@ function showModel(model, which, reframe = true) {
   els.showOriginalBtn.classList.toggle('active', which === 'original');
   els.showOptimizedBtn.classList.toggle('active', which === 'optimized');
   if (reframe) frameModel(model);
+}
+
+function enterCompare() {
+  if (!originalModel || !optimizedModel) return false;
+  if (currentModel) scene.remove(currentModel);
+  scene.add(originalModel); scene.add(optimizedModel);
+  applyWireframe(originalModel, wireframeEnabled); applyWireframe(optimizedModel, wireframeEnabled);
+  compareOn = true;
+  els.showOriginalBtn.classList.remove('active'); els.showOptimizedBtn.classList.remove('active');
+  window.dispatchEvent(new CustomEvent('shrink:compare', { detail: { on: true } }));
+  return true;
+}
+
+function leaveCompare() {
+  if (!compareOn) return;
+  compareOn = false;
+  if (originalModel) { scene.remove(originalModel); originalModel.visible = true; }
+  if (optimizedModel) { scene.remove(optimizedModel); optimizedModel.visible = true; }
+  currentModel = null;
+  window.dispatchEvent(new CustomEvent('shrink:compare', { detail: { on: false } }));
+}
+
+function setCompare(on) {
+  if (on) return enterCompare();
+  if (!compareOn) return true;
+  const which = currentWhich === 'optimized' && optimizedModel ? 'optimized' : 'original';
+  const model = which === 'optimized' ? optimizedModel : originalModel;
+  leaveCompare();
+  showModel(model, which, false);
+  return true;
 }
 
 function frameModel(model) {
@@ -252,10 +284,10 @@ els.dropZone.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; 
 els.newFileBtn.addEventListener('click', () => els.fileInput.click());
 els.showOriginalBtn.addEventListener('click', () => originalModel && showModel(originalModel, 'original'));
 els.showOptimizedBtn.addEventListener('click', () => optimizedModel && showModel(optimizedModel, 'optimized'));
-els.resetViewBtn.addEventListener('click', () => currentModel && frameModel(currentModel));
+els.resetViewBtn.addEventListener('click', () => { const m = currentModel || originalModel; if (m) frameModel(m); });
 els.wireframeBtn.addEventListener('click', () => {
   wireframeEnabled = !wireframeEnabled;
-  applyWireframe(currentModel, wireframeEnabled);
+  if (compareOn) { applyWireframe(originalModel, wireframeEnabled); applyWireframe(optimizedModel, wireframeEnabled); } else applyWireframe(currentModel, wireframeEnabled);
   els.wireframeBtn.classList.toggle('active', wireframeEnabled);
   els.wireframeBtn.textContent = wireframeEnabled ? 'Shaded' : 'Wireframe';
 });
@@ -482,6 +514,14 @@ async function applyTextureToModel() {
     const quality = mime === 'image/jpeg' || mime === 'image/webp' ? 0.95 : undefined;
     const blob = await canvasToBlob(els.textureCanvas, mime, quality);
     texture.setImage(new Uint8Array(await blob.arrayBuffer())).setMimeType(mime);
+    // Other textures painted directly on the 3D model but not currently open in the flat editor.
+    for (const extra of (window.__shrinkPaint?.collectDirtyLayers?.() || [])) {
+      const other = textures[extra.index];
+      if (!other) continue;
+      const otherMime = outputMimeForTexture(other.getMimeType() || 'image/png');
+      const otherBlob = await canvasToBlob(extra.canvas, otherMime, otherMime === 'image/png' ? undefined : 0.95);
+      other.setImage(new Uint8Array(await otherBlob.arrayBuffer())).setMimeType(otherMime);
+    }
     sourceBytes = await io.writeBinary(doc);
     optimizedBytes = null;
     disposeModel(optimizedModel); optimizedModel = null;
@@ -492,6 +532,7 @@ async function applyTextureToModel() {
     await reloadOriginalPreview(false);
     textureDirty = false;
     setStatus(`Applied ${selectedTextureName}. The 3D preview and future optimized GLB now use your edit.`);
+    window.dispatchEvent(new Event('shrink:texture-applied'));
   } catch (err) {
     console.error(err);
     setStatus(`Could not apply texture: ${err.message}`, true);
@@ -503,22 +544,80 @@ async function applyTextureToModel() {
 
 function downloadEdited() {
   if (!sourceBytes || !sourceFile) return;
-  const base = sourceFile.name.replace(/\.glb$/i, '');
-  downloadBytes(sourceBytes, `${base}-edited.glb`);
+  downloadBytes(sourceBytes, `${baseName()}-edited.glb`);
+}
+
+async function convertMeshToGlb(file, ext) {
+  // STL / OBJ / PLY -> GLB so the same viewer, reducer and painter can be used on sculpts from ShapeLab, C4D, Blender, ZBrush.
+  const buf = await file.arrayBuffer();
+  const base = 'https://esm.sh/three@0.180.0/examples/jsm/loaders/';
+  const parts = [];
+  let zUp = ext === 'stl' || ext === 'ply';             // STL/PLY are normally Z-up; glTF is Y-up
+  if (ext === 'obj') zUp = /^# Shrink OBJ[^\n]*Z-up/.test(new TextDecoder().decode(buf.slice(0, 200)));   // our own exports say which axis they use
+  const take = (geometry, matrix) => {
+    const pos = geometry.attributes.position;
+    const positions = new Float32Array(pos.count * 3);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      if (matrix) v.applyMatrix4(matrix);
+      if (zUp) positions.set([v.x, v.z, -v.y], i * 3); else positions.set([v.x, v.y, v.z], i * 3);
+    }
+    let colors = null;
+    const col = geometry.attributes.color;
+    if (col) { colors = new Float32Array(col.count * 3); for (let i = 0; i < col.count; i++) colors.set([col.getX(i), col.getY(i), col.getZ(i)], i * 3); }
+    parts.push({ positions, colors, indices: geometry.index ? new Uint32Array(geometry.index.array) : null });
+  };
+  if (ext === 'stl') { const { STLLoader } = await import(base + 'STLLoader.js'); take(new STLLoader().parse(buf)); }
+  else if (ext === 'ply') { const { PLYLoader } = await import(base + 'PLYLoader.js'); take(new PLYLoader().parse(buf)); }
+  else {
+    const { OBJLoader } = await import(base + 'OBJLoader.js');
+    const group = new OBJLoader().parse(new TextDecoder().decode(buf));
+    group.updateMatrixWorld(true);
+    group.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) take(o.geometry, o.matrixWorld); });
+  }
+  if (!parts.length) throw new Error('No mesh data found in this file.');
+
+  const doc = new Document();
+  const buffer = doc.createBuffer();
+  const material = doc.createMaterial('Shrink').setBaseColorFactor([0.78, 0.78, 0.8, 1]).setMetallicFactor(0).setRoughnessFactor(0.75);
+  const sceneDef = doc.createScene('Scene');
+  parts.forEach((part, i) => {
+    const prim = doc.createPrimitive().setMaterial(material)
+      .setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(part.positions).setBuffer(buffer));
+    if (part.colors) prim.setAttribute('COLOR_0', doc.createAccessor().setType('VEC3').setArray(part.colors).setBuffer(buffer));
+    if (part.indices) prim.setIndices(doc.createAccessor().setType('SCALAR').setArray(part.indices).setBuffer(buffer));
+    sceneDef.addChild(doc.createNode(`part${i}`).setMesh(doc.createMesh(`part${i}`).addPrimitive(prim)));
+  });
+  await doc.transform(weld());                            // STL/OBJ triangles are unshared: merge identical vertices
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const indices = prim.getIndices();
+      if (!indices) continue;
+      const positions = prim.getAttribute('POSITION').getArray();
+      const normals = smoothNormals(positions, indices.getArray());
+      prim.setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(normals).setBuffer(buffer));
+    }
+  }
+  return await io.writeBinary(doc);
 }
 
 async function openFile(file) {
-  if (!file.name.toLowerCase().endsWith('.glb')) { setStatus('Please choose a .glb file.', true); return; }
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!['glb', 'stl', 'obj', 'ply'].includes(ext)) { setStatus('Please choose a .glb, .stl, .obj or .ply file.', true); return; }
   try {
-    setStatus('Opening model…');
+    setStatus(ext === 'glb' ? 'Opening model…' : `Converting ${ext.toUpperCase()} for editing…`);
     hideProgress();
     sourceFile = file;
-    sourceBytes = new Uint8Array(await file.arrayBuffer());
+    sourceKind = ext;
+    sourceBytes = ext === 'glb' ? new Uint8Array(await file.arrayBuffer()) : await convertMeshToGlb(file, ext);
     optimizedBytes = null;
+    lastReduce = null;
     textureDirty = false;
+    if (compareOn) leaveCompare();
     if (originalURL) URL.revokeObjectURL(originalURL);
     if (optimizedURL) URL.revokeObjectURL(optimizedURL);
-    originalURL = URL.createObjectURL(file);
+    originalURL = URL.createObjectURL(new Blob([sourceBytes], { type: 'model/gltf-binary' }));
     optimizedURL = null;
     disposeModel(originalModel); disposeModel(optimizedModel);
     originalModel = await loadSceneFromURL(originalURL);
@@ -534,10 +633,13 @@ async function openFile(file) {
     els.dropZone.classList.add('hidden'); els.workspace.classList.remove('hidden');
     els.resultCard.classList.add('hidden'); els.showOptimizedBtn.disabled = true;
     showModel(originalModel, 'original'); resizeViewer();
+    window.dispatchEvent(new CustomEvent('shrink:model-opened', { detail: { kind: ext, triangles: stats.triangles, vertices: stats.vertices } }));
     await prepareTextureEditor();
-    if (!stats.textures) setStatus('Ready to optimize. This GLB has no image textures to retouch.');
+    if (!stats.textures) setStatus(ext === 'glb'
+      ? 'Ready to optimize. This GLB has no image textures to retouch.'
+      : `${ext.toUpperCase()} loaded. Use Print & Share to reduce it, check detail loss and export.`);
   } catch (err) {
-    console.error(err); setStatus(`Could not open this GLB: ${err.message}`, true);
+    console.error(err); setStatus(`Could not open this file: ${err.message}`, true);
   }
 }
 
@@ -555,12 +657,17 @@ async function optimizeModel() {
     const document = await io.readBinary(sourceBytes);
     const keepRatio = Number(els.geometry.value) / 100;
 
+    lastReduce = null;
     setProgress(15, 'Cleaning geometry…');
     await document.transform(dedup(), weld());
 
     if (keepRatio < 0.999) {
       setProgress(30, `Reducing polygons to about ${Math.round(keepRatio*100)}%…`);
-      await document.transform(simplify({ simplifier: MeshoptSimplifier, ratio: keepRatio, error: 0.001 }));
+      const printOpts = window.__shrinkPrint?.getReduceOptions?.() || {};
+      lastReduce = await simplifyWithProtection(document, {
+        ratio: keepRatio, error: 0.05, simplifier: MeshoptSimplifier,
+        dabs: printOpts.dabs || [], protectKeep: printOpts.protectKeep ?? 1
+      });
     } else {
       setProgress(42, 'Keeping original polygon count…');
     }
@@ -599,7 +706,8 @@ async function optimizeModel() {
     els.resultCard.classList.remove('hidden'); els.showOptimizedBtn.disabled = false; els.downloadBtn.disabled = false;
     showModel(optimizedModel, 'optimized');
     setProgress(100, 'Finished');
-    setStatus('Done — compare Original / Edited and Optimized, or use Wireframe to inspect the mesh.');
+    setStatus('Done — use Compare or Detail loss in the viewer to see exactly what changed.');
+    window.dispatchEvent(new CustomEvent('shrink:optimized', { detail: { reduce: lastReduce, bytes: optimizedBytes.byteLength, triangles: optimizedStats.triangles } }));
     setTimeout(hideProgress, 1200);
   } catch (err) {
     console.error(err);
@@ -654,6 +762,8 @@ async function canvasToBlob(canvas, type, quality) {
   return await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('Texture conversion failed.')), type, quality));
 }
 
+function baseName() { return (sourceFile?.name || 'model').replace(/\.[^.]+$/, ''); }
+
 function downloadBytes(bytes, filename) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([bytes], { type: 'model/gltf-binary' }));
@@ -664,10 +774,33 @@ function downloadBytes(bytes, filename) {
 
 function downloadOptimized() {
   if (!optimizedBytes || !sourceFile) return;
-  const base = sourceFile.name.replace(/\.glb$/i, '');
-  downloadBytes(optimizedBytes, `${base}-shrink.glb`);
+  downloadBytes(optimizedBytes, `${baseName()}-shrink.glb`);
 }
 
 applyPreset('game');
 updateLabels();
 setPaintTool('brush');
+
+window.__shrinkApp = {
+  THREE,
+  get originalModel() { return originalModel; },
+  get optimizedModel() { return optimizedModel; },
+  get currentModel() { return currentModel; },
+  get sourceBytes() { return sourceBytes; },
+  get optimizedBytes() { return optimizedBytes; },
+  get sourceKind() { return sourceKind; },
+  get sourceFile() { return sourceFile; },
+  get lastReduce() { return lastReduce; },
+  get wireframe() { return wireframeEnabled; },
+  baseName,
+  show(which) {
+    if (which === 'optimized' && optimizedModel) showModel(optimizedModel, 'optimized', false);
+    else if (originalModel) showModel(originalModel, 'original', false);
+  },
+  setCompare,
+  isCompare: () => compareOn,
+  setCompareSplit(v) { compareSplit = Math.max(0.03, Math.min(0.97, v)); },
+  getCompareSplit: () => compareSplit,
+  formatBytes,
+  setStatus
+};

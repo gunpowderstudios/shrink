@@ -23,16 +23,16 @@
       <div>
         <div class="eyebrow">GUNPOWDER STUDIOS</div>
         <div class="title-row"><h1>Shrink</h1><span class="version-badge">v1.5</span></div>
-        <p class="subtitle">Paint directly on models, retouch textures, shrink GLBs, then compare before you save.</p>
+        <p class="subtitle">Paint directly on models, retouch textures, shrink GLBs and sculpts, then compare before you save.</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
     </header>
 
-    <section id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Choose a GLB file">
-      <input id="fileInput" type="file" accept=".glb,model/gltf-binary" hidden />
+    <section id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Choose a model file">
+      <input id="fileInput" type="file" accept=".glb,.stl,.obj,.ply,model/gltf-binary" hidden />
       <div class="drop-icon">↓</div>
-      <strong>Drop a GLB here</strong>
-      <span>or click to choose a file</span>
+      <strong>Drop a model here</strong>
+      <span>GLB, STL, OBJ or PLY — or click to choose a file</span>
     </section>
 
     <section id="workspace" class="workspace hidden">
@@ -96,7 +96,7 @@
           </div>
           <button id="applyTextureBtn" class="button texture-apply" type="button">Apply texture to model</button>
           <button id="saveEditedBtn" class="button ghost save-edited" type="button">Save edited GLB</button>
-          <div class="hint paint-hint">Use Paint, Clone or Pick colour above the 3D model. Paint and Clone now follow the car in screen space instead of drawing lines across the UV atlas.</div>
+          <div class="hint paint-hint">Use Paint, Clone or Pick colour above the 3D model. In Clone mode, Option/Alt-click a clean source, then brush over the unwanted detail.</div>
         </section>
 
         <hr />
@@ -117,9 +117,42 @@
             <label for="geometry">Keep polygons</label>
             <output id="geometryValue">70%</output>
           </div>
-          <input id="geometry" type="range" min="20" max="100" step="1" value="70" />
+          <input id="geometry" type="range" min="1" max="100" step="0.1" value="70" />
           <div class="hint">100% keeps all geometry. Lower values reduce the mesh.</div>
         </div>
+
+
+        <section id="printPanel" class="print-panel hidden">
+          <div class="label">PRINT &amp; SHARE</div>
+          <strong class="print-title">Reduce a sculpt and see what you lose</strong>
+
+          <div class="field-grid">
+            <label class="field"><span>Figure height (mm)</span><input id="figureHeightMm" type="number" min="1" step="any" value="75" /></label>
+            <label class="field"><span>Printer detail (mm)</span><input id="printerDetailMm" type="number" min="0.005" step="0.005" value="0.05" title="Smallest feature the printer can show. Elegoo Mars 5 Ultra pixel = 0.018 mm; 0.05 mm is a realistic detail limit." /></label>
+          </div>
+          <label class="field"><span>Target triangles</span><input id="targetTris" type="number" min="1" step="1000" /></label>
+          <div id="estimateLine" class="estimate-line">—</div>
+          <div id="actualLine" class="estimate-line actual hidden"></div>
+
+          <div class="protect-box">
+            <div class="protect-head">
+              <button id="protectBtn" class="button ghost small" type="button">Protect brush</button>
+              <button id="protectClearBtn" class="button ghost small" type="button" disabled>Clear</button>
+            </div>
+            <div class="range-heading"><label for="protectRadius">Brush radius</label><output id="protectRadiusValue">3.0 mm</output></div>
+            <input id="protectRadius" type="range" min="0.5" max="20" step="0.5" value="3" />
+            <div class="range-heading"><label for="protectKeep">Protected detail kept</label><output id="protectKeepValue">100%</output></div>
+            <input id="protectKeep" type="range" min="20" max="100" step="5" value="100" />
+            <div id="protectInfo" class="hint">Paint over faces, hands and fine ornament you want to keep sharp. Everything else is reduced first.</div>
+          </div>
+
+          <div class="export-row">
+            <button id="saveStlBtn" class="button ghost small" type="button">Save STL</button>
+            <button id="saveObjBtn" class="button ghost small" type="button">Save OBJ</button>
+          </div>
+          <label class="toggle-row zup-row"><span>Z-up for slicers (Lychee, Chitubox)</span><input id="zUpToggle" type="checkbox" checked /></label>
+          <div class="hint">STL and OBJ are saved in millimetres, scaled to the figure height above. Optimize first to save the reduced model.</div>
+        </section>
 
         <div class="control-block">
           <label for="textureSize">Maximum texture size</label>
@@ -172,11 +205,13 @@
             <button id="showOptimizedBtn" class="segment" disabled>Optimized</button>
           </div>
           <div class="viewer-actions">
+            <button id="compareBtn" class="button ghost small" title="Drag a divider across the model: original on the left, reduced on the right">Compare</button>
+            <button id="heatBtn" class="button ghost small" title="Colour the original by how far the reduction moved its surface">Detail loss</button>
             <button id="wireframeBtn" class="button ghost small">Wireframe</button>
             <button id="resetViewBtn" class="button ghost small">Reset view</button>
           </div>
         </div>
-        <div id="viewer" class="viewer"></div>
+        <div id="viewer" class="viewer"><div id="heatLegend" class="heat-legend" style="display:none"></div></div>
         <div class="viewer-help">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
       </section>
     </section>
@@ -186,5 +221,6 @@
   <script type="module" src="./app.js?v=1.5"></script>
   <script type="module" src="./paint-input-fix.js?v=1.5"></script>
   <script type="module" src="./brush-cursor.js?v=1.5"></script>
+  <script type="module" src="./print-tools.js?v=1.5"></script>
 </body>
 </html>

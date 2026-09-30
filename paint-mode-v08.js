@@ -6,6 +6,7 @@
   const badge = document.querySelector('.version-badge');
   if (badge) badge.textContent = 'v1.5';
 
+  // Load multi-step undo after the 3D paint controls exist.
   import('./multi-undo.js?v=1.5').catch(err => console.warn('Could not load multi-step undo:', err));
 
   const nativeAdd = viewer.addEventListener.bind(viewer);
@@ -27,9 +28,9 @@
   function normalHelpText() {
     const clone = document.getElementById('cloneModelBtn');
     if (clone?.classList.contains('active')) {
-      return 'CLONE · Option/Alt-click source · drag to clone · Cmd/Ctrl to rotate';
+      return 'CLONE · Option/Alt-click a clean source · drag to clone · Cmd/Ctrl to rotate';
     }
-    return 'PAINT · screen-space brush · hold Cmd / Ctrl to rotate · scroll to zoom';
+    return 'PAINT · drag on model · hold Cmd / Ctrl to rotate · scroll to zoom';
   }
 
   function syncModifier(event) {
@@ -37,7 +38,9 @@
     viewer.classList.toggle('modifier-rotate', on);
     const help = document.querySelector('.viewer-help');
     if (help && viewer.classList.contains('direct-paint')) {
-      help.textContent = on ? 'ROTATE · release Cmd / Ctrl to continue' : normalHelpText();
+      help.textContent = on
+        ? 'ROTATE · release Cmd / Ctrl to continue'
+        : normalHelpText();
     }
   }
 
