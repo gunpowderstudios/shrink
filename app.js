@@ -1,10 +1,15 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
+import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'https://esm.sh/three-mesh-bvh@0.9.2?deps=three@0.180.0';
 import { WebIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt } from '@gltf-transform/functions';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
+
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -28,7 +33,7 @@ const PRESETS = {
   safe:       { geometry: 90, textureSize: 2048, textureQuality: 88, webp: true, quantize: true, meshopt: true },
   game:       { geometry: 70, textureSize: 1024, textureQuality: 82, webp: true, quantize: true, meshopt: true },
   small:      { geometry: 50, textureSize: 1024, textureQuality: 76, webp: true, quantize: true, meshopt: true },
-  aggressive: { geometry: 35, textureSize: 512,  textureQuality: 70, webp: true, quantize: true, meshopt: true }
+  aggressive: { geometry: 35, textureSize: 512, textureQuality: 70, webp: true, quantize: true, meshopt: true }
 };
 
 let sourceFile = null;
@@ -94,15 +99,35 @@ new ResizeObserver(resizeViewer).observe(els.viewer);
 const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);
 
+function prepareBVH(model) {
+  if (!model) return;
+  const seen = new Set();
+  model.traverse(o => {
+    if (!o.isMesh || !o.geometry || seen.has(o.geometry.uuid)) return;
+    seen.add(o.geometry.uuid);
+    if (!o.geometry.boundsTree) {
+      try { o.geometry.computeBoundsTree({ maxLeafTris: 20 }); }
+      catch (err) { console.warn('BVH unavailable for mesh:', err); }
+    }
+  });
+}
+
 async function loadSceneFromURL(url) {
-  return await new Promise((resolve, reject) => loader.load(url, g => resolve(g.scene), undefined, reject));
+  const model = await new Promise((resolve, reject) => loader.load(url, g => resolve(g.scene), undefined, reject));
+  prepareBVH(model);
+  return model;
 }
 
 function disposeModel(model) {
   if (!model) return;
+  const disposedGeometry = new Set();
   model.traverse(o => {
     if (!o.isMesh) return;
-    o.geometry?.dispose?.();
+    if (o.geometry && !disposedGeometry.has(o.geometry.uuid)) {
+      disposedGeometry.add(o.geometry.uuid);
+      o.geometry.disposeBoundsTree?.();
+      o.geometry.dispose?.();
+    }
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     mats.forEach(m => {
       if (!m) return;
