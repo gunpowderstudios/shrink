@@ -1,4 +1,5 @@
 import './paint-mode-v08.js';
+import './gltf-texture-index.js';
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
 const state = {
@@ -172,49 +173,61 @@ function draw(from, to) {
   if (state.liveTexture) state.liveTexture.needsUpdate = true;
 }
 
-function materialTextureName(material) {
-  return material?.map?.name?.trim() || '';
-}
-
-function findTextureOptionForMaterial(material) {
+function fallbackTextureIndex(material) {
   const options = [...(textureSelect?.options || [])];
   if (!options.length) return null;
 
-  const name = materialTextureName(material);
+  const name = material?.map?.name?.trim() || '';
   if (name) {
     const exact = options.find(o => o.textContent.trim() === name);
-    if (exact) return exact;
+    if (exact) return Number(exact.value);
     const loose = options.find(o => o.textContent.trim().includes(name) || name.includes(o.textContent.trim()));
-    if (loose) return loose;
+    if (loose) return Number(loose.value);
   }
 
-  const image = material?.map?.image;
-  const w = image?.width || image?.videoWidth || image?.naturalWidth;
-  const h = image?.height || image?.videoHeight || image?.naturalHeight;
-  if (w && h) {
-    for (const option of options) {
-      const index = Number(option.value);
-      if (index === Number(textureSelect.value) && textureCanvas.width === w && textureCanvas.height === h) return option;
-    }
-  }
-
-  if (options.length === 1) return options[0];
+  if (options.length === 1) return Number(options[0].value);
   return null;
 }
 
+function textureIndexForMaterial(material) {
+  const exact = material?.map?.userData?.gltfTextureIndex;
+  if (Number.isInteger(exact) && exact >= 0 && exact < (textureSelect?.options?.length || 0)) return exact;
+  return fallbackTextureIndex(material);
+}
+
+async function waitForTextureEditor(index, material) {
+  const image = material?.map?.image;
+  const expectedWidth = image?.width || image?.videoWidth || image?.naturalWidth || 0;
+  const expectedHeight = image?.height || image?.videoHeight || image?.naturalHeight || 0;
+  const started = performance.now();
+
+  while (performance.now() - started < 1800) {
+    const sameIndex = Number(textureSelect?.value) === index;
+    const hasCanvas = textureCanvas.width > 1 && textureCanvas.height > 1;
+    const rightSize = !expectedWidth || !expectedHeight || (textureCanvas.width === expectedWidth && textureCanvas.height === expectedHeight);
+    if (sameIndex && hasCanvas && rightSize && !applyBtn?.disabled) return true;
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  return Number(textureSelect?.value) === index && textureCanvas.width > 1 && textureCanvas.height > 1;
+}
+
 async function ensureTextureForMaterial(material) {
-  const option = findTextureOptionForMaterial(material);
-  if (!option) {
-    say('I could not identify which embedded texture this surface uses. Try another part of the model or choose the matching texture on the left once.', true);
+  const index = textureIndexForMaterial(material);
+  if (!Number.isInteger(index)) {
+    say('This surface has a texture, but Shrink could not link it to the embedded GLB image.', true);
     return false;
   }
 
-  const index = Number(option.value);
   if (Number(textureSelect.value) !== index || state.activeTextureIndex !== index) {
     textureSelect.value = String(index);
     textureSelect.dispatchEvent(new Event('change', { bubbles: true }));
     state.activeTextureIndex = index;
-    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+
+  const ready = await waitForTextureEditor(index, material);
+  if (!ready) {
+    say(`Texture ${index + 1} was identified, but its image did not finish loading into the paint canvas.`, true);
+    return false;
   }
   return true;
 }
@@ -240,6 +253,7 @@ function attachLiveCanvas(material) {
   live.rotation = oldMap.rotation;
   live.matrixAutoUpdate = oldMap.matrixAutoUpdate;
   if (!oldMap.matrixAutoUpdate) live.matrix.copy(oldMap.matrix);
+  live.userData = { ...(oldMap.userData || {}) };
   live.needsUpdate = true;
   material.map = live;
   material.needsUpdate = true;
@@ -295,7 +309,7 @@ async function handlePointerDown(evt) {
   state.lastPoint = point;
   draw(point, point);
   try { state.renderer.domElement.setPointerCapture(evt.pointerId); } catch {}
-  say(`Live painting ${textureSelect?.selectedOptions?.[0]?.textContent || 'the surface texture'} — changes should appear immediately on the model.`);
+  say(`LIVE PAINT · Texture ${state.activeTextureIndex + 1} · ${paintColor?.value || '#000000'} · changes should appear immediately.`);
 }
 
 function handlePointerMove(evt) {
