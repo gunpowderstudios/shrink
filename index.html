@@ -22,8 +22,8 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">GUNPOWDER STUDIOS</div>
-        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v0.5</span></div>
-        <p class="subtitle">Retouch textures, shrink GLB models, then compare the quality before you save.</p>
+        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v0.6</span></div>
+        <p class="subtitle">Paint directly on models, retouch textures, shrink GLBs, then compare before you save.</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
     </header>
@@ -96,7 +96,7 @@
           </div>
           <button id="applyTextureBtn" class="button texture-apply" type="button">Apply texture to model</button>
           <button id="saveEditedBtn" class="button ghost save-edited" type="button">Save edited GLB</button>
-          <div class="hint paint-hint">Use Eyedropper to sample the body colour, switch back to Brush, then paint over a number plate or sticker. Apply reloads the 3D preview.</div>
+          <div class="hint paint-hint">For the easiest retouching, use Paint car or Sample car above the 3D model. The flat texture editor remains available for precise work.</div>
         </section>
 
         <hr />
@@ -182,6 +182,7 @@
     </section>
   </main>
 
+  <script type="module" src="./paint3d.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>
