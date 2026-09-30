@@ -22,8 +22,8 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">GUNPOWDER STUDIOS</div>
-        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v0.4</span></div>
-        <p class="subtitle">Make GLB models smaller, then compare the quality before you save.</p>
+        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v0.5</span></div>
+        <p class="subtitle">Retouch textures, shrink GLB models, then compare the quality before you save.</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
     </header>
@@ -51,6 +51,53 @@
           <div class="stat"><span>Vertices</span><strong id="vertexCount">—</strong></div>
           <div class="stat"><span>Textures</span><strong id="textureCount">—</strong></div>
         </div>
+
+        <section id="textureEditor" class="texture-editor hidden">
+          <div class="section-heading">
+            <div>
+              <div class="label">TEXTURE RETOUCH</div>
+              <strong>Paint over plates, stickers &amp; marks</strong>
+            </div>
+            <span id="textureDimensions" class="texture-dimensions">—</span>
+          </div>
+
+          <div class="control-block compact">
+            <label for="textureSelect">Texture</label>
+            <select id="textureSelect"></select>
+          </div>
+
+          <div class="paint-toolbar" role="group" aria-label="Texture paint tools">
+            <button id="brushToolBtn" class="button tool active" type="button">Brush</button>
+            <button id="eyedropperToolBtn" class="button tool" type="button">Eyedropper</button>
+            <input id="paintColor" class="paint-color" type="color" value="#000000" aria-label="Paint colour" />
+            <button id="blackSwatchBtn" class="swatch black" type="button" aria-label="Black"></button>
+            <button id="whiteSwatchBtn" class="swatch white" type="button" aria-label="White"></button>
+          </div>
+
+          <div class="paint-canvas-wrap">
+            <canvas id="textureCanvas" class="texture-canvas"></canvas>
+            <div id="textureEmpty" class="texture-empty hidden">No editable image texture found.</div>
+          </div>
+
+          <div class="paint-ranges">
+            <div>
+              <div class="range-heading"><label for="brushSize">Brush size</label><output id="brushSizeValue">32 px</output></div>
+              <input id="brushSize" type="range" min="1" max="250" step="1" value="32" />
+            </div>
+            <div>
+              <div class="range-heading"><label for="brushOpacity">Opacity</label><output id="brushOpacityValue">100%</output></div>
+              <input id="brushOpacity" type="range" min="5" max="100" step="1" value="100" />
+            </div>
+          </div>
+
+          <div class="paint-actions">
+            <button id="undoPaintBtn" class="button ghost small" type="button" disabled>Undo stroke</button>
+            <button id="resetTextureBtn" class="button ghost small" type="button">Reset texture</button>
+          </div>
+          <button id="applyTextureBtn" class="button texture-apply" type="button">Apply texture to model</button>
+          <button id="saveEditedBtn" class="button ghost save-edited" type="button">Save edited GLB</button>
+          <div class="hint paint-hint">Use Eyedropper to sample the body colour, switch back to Brush, then paint over a number plate or sticker. Apply reloads the 3D preview.</div>
+        </section>
 
         <hr />
 
@@ -121,7 +168,7 @@
       <section class="viewer-panel panel">
         <div class="viewer-toolbar">
           <div class="segmented" role="group" aria-label="Viewer model">
-            <button id="showOriginalBtn" class="segment active">Original</button>
+            <button id="showOriginalBtn" class="segment active">Original / Edited</button>
             <button id="showOptimizedBtn" class="segment" disabled>Optimized</button>
           </div>
           <div class="viewer-actions">
