@@ -1,16 +1,73 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#101114" />
-  <meta name="description" content="SHRINK — an app for reducing and optimising 3D files for gaming or 3D printing." />
-  <title>SHRINK — Model Optimizer</title>
-  <link rel="icon" type="image/png" href="./src/app-icon.png?v=1.62" />
-  <link rel="apple-touch-icon" href="./src/app-icon.png?v=1.62" />
-  <link rel="manifest" href="./manifest.webmanifest?v=1.62" />
-  <link rel="stylesheet" href="./style.css?v=1.62" />
-  <link rel="stylesheet" href="./ui-mode.css?v=1.62" />
+
+  <title>SHRINK — Free 3D Model Optimizer for Games & 3D Printing</title>
+  <meta name="description" content="SHRINK is a free browser-based 3D model optimizer for reducing GLB, STL, OBJ and PLY files for games and resin 3D printing. Reduce polygons, optimise textures, protect fine detail, compare results and export smaller models." />
+  <meta name="keywords" content="3D model optimizer, GLB optimizer, STL optimizer, OBJ optimizer, PLY optimizer, polygon reducer, mesh optimizer, decimate 3D model, reduce GLB size, reduce STL size, game asset optimizer, 3D printing optimizer, resin printing, mesh reduction, texture compression, WebP textures" />
+  <meta name="author" content="Gunpowder Studios" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="application-name" content="SHRINK" />
+  <meta name="apple-mobile-web-app-title" content="SHRINK" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <link rel="canonical" href="https://gunpowderstudios.github.io/shrink/" />
+  <link rel="icon" type="image/png" href="./src/app-icon.png?v=1.63" />
+  <link rel="apple-touch-icon" href="./src/app-icon.png?v=1.63" />
+  <link rel="manifest" href="./manifest.webmanifest?v=1.63" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="en_GB" />
+  <meta property="og:site_name" content="SHRINK" />
+  <meta property="og:title" content="SHRINK — 3D Model Optimizer for Games & 3D Printing" />
+  <meta property="og:description" content="Reduce and optimise GLB, STL, OBJ and PLY models directly in your browser. Shrink game assets, protect printable detail, compare results and export smaller 3D files." />
+  <meta property="og:url" content="https://gunpowderstudios.github.io/shrink/" />
+  <meta property="og:image" content="https://gunpowderstudios.github.io/shrink/src/app-icon.png" />
+  <meta property="og:image:alt" content="SHRINK 3D model optimizer app icon" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="SHRINK — 3D Model Optimizer" />
+  <meta name="twitter:description" content="Reduce and optimise 3D files for gaming or 3D printing, directly in your browser." />
+  <meta name="twitter:image" content="https://gunpowderstudios.github.io/shrink/src/app-icon.png" />
+  <meta name="twitter:image:alt" content="SHRINK 3D model optimizer app icon" />
+
+  <link rel="stylesheet" href="./style.css?v=1.63" />
+  <link rel="stylesheet" href="./ui-mode.css?v=1.63" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "SHRINK",
+    "url": "https://gunpowderstudios.github.io/shrink/",
+    "image": "https://gunpowderstudios.github.io/shrink/src/app-icon.png",
+    "description": "A browser-based 3D model optimizer for reducing and optimising GLB, STL, OBJ and PLY files for gaming or 3D printing.",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Any modern web browser",
+    "browserRequirements": "Requires JavaScript and WebGL",
+    "creator": {
+      "@type": "Organization",
+      "name": "Gunpowder Studios",
+      "url": "https://www.gunpowderstudios.co.uk/"
+    },
+    "featureList": [
+      "GLB game model optimisation",
+      "STL, OBJ and PLY mesh reduction",
+      "Polygon reduction",
+      "Texture resizing and WebP compression",
+      "Direct 3D texture painting and cloning",
+      "Protected-detail reduction for 3D printing",
+      "Original versus reduced comparison",
+      "3D print detail-loss visualisation",
+      "STL and OBJ export"
+    ]
+  }
+  </script>
+
   <script type="importmap">
   {
     "imports": {
@@ -27,8 +84,8 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">GUNPOWDER STUDIOS</div>
-        <div class="title-row"><h1>Shrink</h1><span class="version-badge">v1.62</span></div>
-        <p class="subtitle">Edit, paint and optimise GLB models for browser and video games.</p>
+        <div class="title-row"><h1>SHRINK</h1><span class="version-badge">v1.63</span></div>
+        <p class="subtitle">An app for reducing and optimising 3D files for gaming or 3D printing.</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
     </header>
@@ -221,11 +278,11 @@
     </section>
   </main>
 
-  <script type="module" src="./paint3d.js?v=1.62"></script>
-  <script type="module" src="./app.js?v=1.62"></script>
-  <script type="module" src="./paint-input-fix.js?v=1.62"></script>
-  <script type="module" src="./brush-cursor.js?v=1.62"></script>
-  <script type="module" src="./print-tools.js?v=1.62"></script>
-  <script type="module" src="./ui-mode.js?v=1.62"></script>
+  <script type="module" src="./paint3d.js?v=1.63"></script>
+  <script type="module" src="./app.js?v=1.63"></script>
+  <script type="module" src="./paint-input-fix.js?v=1.63"></script>
+  <script type="module" src="./brush-cursor.js?v=1.63"></script>
+  <script type="module" src="./print-tools.js?v=1.63"></script>
+  <script type="module" src="./ui-mode.js?v=1.63"></script>
 </body>
 </html>
