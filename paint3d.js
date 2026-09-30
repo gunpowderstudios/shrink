@@ -1,7 +1,6 @@
+import './paint-mode-v08.js';
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// Direct 3D texture painting for Shrink.
-// This module loads before app.js and captures the Three.js scene/camera from the renderer.
 const state = {
   renderer: null,
   scene: null,
@@ -53,10 +52,10 @@ function makeButton(id, label) {
 
 const controls = document.createElement('div');
 controls.className = 'model-paint-controls';
-const paintModelBtn = makeButton('paintModelBtn', 'Paint car');
-const sampleModelBtn = makeButton('sampleModelBtn', 'Sample car');
+const paintModelBtn = makeButton('paintModelBtn', 'Paint');
+const sampleModelBtn = makeButton('sampleModelBtn', 'Pick colour');
 const navigateModelBtn = makeButton('navigateModelBtn', 'Navigate');
-const undo3DBtn = makeButton('undo3DBtn', 'Undo 3D');
+const undo3DBtn = makeButton('undo3DBtn', 'Undo');
 undo3DBtn.disabled = true;
 controls.append(paintModelBtn, sampleModelBtn, navigateModelBtn, undo3DBtn);
 
@@ -70,8 +69,11 @@ const style = document.createElement('style');
 style.textContent = `
   .model-paint-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;margin-right:8px}
   .model-paint-button.active{border-color:#ff6b6b!important;background:#5a2a2f!important;color:#fff!important}
-  .viewer.direct-paint canvas{cursor:crosshair!important;touch-action:none}
+  #navigateModelBtn{display:none!important}
+  .viewer.direct-paint canvas{cursor:none!important;touch-action:none}
   .viewer.direct-sample canvas{cursor:copy!important;touch-action:none}
+  .viewer.direct-paint.modifier-rotate canvas{cursor:grab!important}
+  .viewer.direct-paint.modifier-rotate canvas:active{cursor:grabbing!important}
   @media(max-width:1100px){.viewer-toolbar{flex-wrap:wrap}.model-paint-controls{order:3;width:100%;margin:4px 0 0}}
 `;
 document.head.appendChild(style);
@@ -90,14 +92,14 @@ function setMode(mode) {
 
   if (help) {
     help.textContent = mode === 'paint'
-      ? 'PAINT MODE · drag directly on the model · use Navigate to rotate'
+      ? 'PAINT · drag on model · hold Cmd / Ctrl to rotate · scroll to zoom'
       : mode === 'sample'
-        ? 'SAMPLE MODE · click the model to pick its texture colour'
+        ? 'PICK COLOUR · click the model to sample its texture colour'
         : 'Drag to rotate · Scroll to zoom · Right-drag to pan';
   }
 
-  if (mode === 'paint') say('Paint car mode: drag directly over a plate, sticker or mark. Click Apply texture to model when finished.');
-  if (mode === 'sample') say('Sample car mode: click the body colour you want to paint with.');
+  if (mode === 'paint') say('Paint mode: drag directly on the model. Hold Cmd / Ctrl while dragging to rotate.');
+  if (mode === 'sample') say('Pick colour: click the model to sample a colour, then Paint resumes automatically.');
 }
 
 paintModelBtn.addEventListener('click', () => setMode('paint'));
@@ -138,8 +140,7 @@ function texturePoint(hit, material) {
 }
 
 function selectedTextureLooksCompatible(material) {
-  const map = material?.map;
-  const image = map?.image;
+  const image = material?.map?.image;
   if (!image || !textureCanvas.width || !textureCanvas.height) return true;
   const w = image.width || image.videoWidth || image.naturalWidth;
   const h = image.height || image.videoHeight || image.naturalHeight;
@@ -154,7 +155,7 @@ function tryAutoSelectByName(material) {
   if (!option || textureSelect.value === option.value) return false;
   textureSelect.value = option.value;
   textureSelect.dispatchEvent(new Event('change', { bubbles: true }));
-  say(`Selected ${option.textContent} for this surface. Click the car again when the texture appears.`);
+  say(`Selected ${option.textContent} for this surface. Click the model again when the texture appears.`);
   return true;
 }
 
@@ -224,12 +225,16 @@ function sampleAt(point) {
   const px = paintCtx.getImageData(x, y, 1, 1).data;
   const hex = `#${[px[0], px[1], px[2]].map(v => v.toString(16).padStart(2, '0')).join('')}`;
   if (paintColor) paintColor.value = hex;
-  say(`Sampled ${hex} from the car. Drag over the unwanted detail to paint with it.`);
+  say(`Picked ${hex} from the model. Paint mode is active again.`);
   setMode('paint');
 }
 
+function modifierOrbit(evt) {
+  return evt.metaKey || evt.ctrlKey || viewer?.classList.contains('modifier-rotate');
+}
+
 function handlePointerDown(evt) {
-  if (state.mode === 'navigate' || evt.button !== 0) return;
+  if (state.mode === 'navigate' || evt.button !== 0 || modifierOrbit(evt)) return;
   if (!state.renderer || evt.target !== state.renderer.domElement) return;
   evt.preventDefault();
   evt.stopImmediatePropagation();
@@ -247,7 +252,7 @@ function handlePointerDown(evt) {
 
   if (tryAutoSelectByName(material)) return;
   if (!selectedTextureLooksCompatible(material)) {
-    say('The selected texture does not match this surface. Choose another Texture on the left, then click the car again.', true);
+    say('The selected texture does not match this surface. Choose another Texture on the left, then click the model again.', true);
     return;
   }
 
@@ -265,11 +270,11 @@ function handlePointerDown(evt) {
   state.lastPoint = point;
   draw(point, point);
   try { state.renderer.domElement.setPointerCapture(evt.pointerId); } catch {}
-  say(`Painting directly on ${textureSelect?.selectedOptions?.[0]?.textContent || 'the selected texture'} — press Apply texture to model when finished.`);
+  say('Painting directly on the model — hold Cmd / Ctrl to rotate, then release to continue painting.');
 }
 
 function handlePointerMove(evt) {
-  if (state.mode !== 'paint' || !state.painting) return;
+  if (state.mode !== 'paint' || !state.painting || modifierOrbit(evt)) return;
   evt.preventDefault();
   evt.stopImmediatePropagation();
   const hit = rayHit(evt);
@@ -284,7 +289,7 @@ function handlePointerMove(evt) {
 
 function stopPaint(evt) {
   if (!state.painting) return;
-  if (state.mode !== 'navigate') {
+  if (state.mode !== 'navigate' && !modifierOrbit(evt)) {
     evt?.preventDefault?.();
     evt?.stopImmediatePropagation?.();
   }
@@ -308,9 +313,11 @@ undo3DBtn.addEventListener('click', () => {
 });
 
 applyBtn?.addEventListener('click', () => {
-  setMode('navigate');
+  state.painting = false;
+  state.lastPoint = null;
   state.activeMaterial = null;
   state.liveTexture = null;
+  setMode('paint');
 });
 
 setMode('navigate');
