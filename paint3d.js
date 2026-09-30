@@ -9,7 +9,10 @@ const state = {
   activeMaterial: null,
   liveTexture: null,
   undoImage: null,
-  activeTextureIndex: null
+  activeTextureIndex: null,
+  cloneSource: null,
+  cloneStartDest: null,
+  cloneSnapshot: null
 };
 
 const viewer = document.getElementById('viewer');
@@ -48,11 +51,12 @@ function makeButton(id, label) {
 const controls = document.createElement('div');
 controls.className = 'model-paint-controls';
 const paintModelBtn = makeButton('paintModelBtn', 'Paint');
+const cloneModelBtn = makeButton('cloneModelBtn', 'Clone');
 const sampleModelBtn = makeButton('sampleModelBtn', 'Pick colour');
 const navigateModelBtn = makeButton('navigateModelBtn', 'Navigate');
 const undo3DBtn = makeButton('undo3DBtn', 'Undo');
 undo3DBtn.disabled = true;
-controls.append(paintModelBtn, sampleModelBtn, navigateModelBtn, undo3DBtn);
+controls.append(paintModelBtn, cloneModelBtn, sampleModelBtn, navigateModelBtn, undo3DBtn);
 
 if (toolbar) {
   const actions = toolbar.querySelector('.viewer-actions');
@@ -77,10 +81,13 @@ function setMode(mode) {
   state.mode = mode;
   state.painting = false;
   state.lastPoint = null;
+  state.cloneStartDest = null;
+  state.cloneSnapshot = null;
   paintModelBtn.classList.toggle('active', mode === 'paint');
+  cloneModelBtn.classList.toggle('active', mode === 'clone');
   sampleModelBtn.classList.toggle('active', mode === 'sample');
   navigateModelBtn.classList.toggle('active', mode === 'navigate');
-  viewer?.classList.toggle('direct-paint', mode === 'paint');
+  viewer?.classList.toggle('direct-paint', mode === 'paint' || mode === 'clone');
   viewer?.classList.toggle('direct-sample', mode === 'sample');
 
   if (mode !== 'navigate' && originalBtn && !originalBtn.classList.contains('active')) originalBtn.click();
@@ -88,16 +95,22 @@ function setMode(mode) {
   if (help) {
     help.textContent = mode === 'paint'
       ? 'PAINT · drag on model · hold Cmd / Ctrl to rotate · scroll to zoom'
-      : mode === 'sample'
-        ? 'PICK COLOUR · click the model to sample its texture colour'
-        : 'Drag to rotate · Scroll to zoom · Right-drag to pan';
+      : mode === 'clone'
+        ? 'CLONE · Option/Alt-click a clean source · drag to clone · Cmd/Ctrl to rotate'
+        : mode === 'sample'
+          ? 'PICK COLOUR · click the model to sample its texture colour'
+          : 'Drag to rotate · Scroll to zoom · Right-drag to pan';
   }
 
   if (mode === 'paint') say('Paint mode: drag directly on the model. Hold Cmd / Ctrl while dragging to rotate.');
+  if (mode === 'clone') say(state.cloneSource
+    ? 'Clone mode: drag to clone from the saved source. Option/Alt-click anywhere to choose a new source.'
+    : 'Clone mode: Option-click (Mac) or Alt-click (Windows) a clean area of the car to set the source.');
   if (mode === 'sample') say('Pick colour: click the model to sample a colour, then Paint resumes automatically.');
 }
 
 paintModelBtn.addEventListener('click', () => setMode('paint'));
+cloneModelBtn.addEventListener('click', () => setMode('clone'));
 sampleModelBtn.addEventListener('click', () => setMode('sample'));
 navigateModelBtn.addEventListener('click', () => setMode('navigate'));
 
@@ -176,15 +189,19 @@ function drawSegment(from, to) {
   if (state.liveTexture) state.liveTexture.needsUpdate = true;
 }
 
+function seamThreshold() {
+  const brush = Number(brushSize?.value || 32);
+  return Math.max(brush * 4, Math.min(textureCanvas.width, textureCanvas.height) * 0.06);
+}
+
 function paintBetween(from, to) {
   if (!from || !to) return;
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const distance = Math.hypot(dx, dy);
   const brush = Number(brushSize?.value || 32);
-  const seamThreshold = Math.max(brush * 4, Math.min(textureCanvas.width, textureCanvas.height) * 0.06);
 
-  if (distance > seamThreshold) {
+  if (distance > seamThreshold()) {
     dab(to);
     return;
   }
@@ -197,6 +214,81 @@ function paintBetween(from, to) {
     const next = { x: from.x + dx * t, y: from.y + dy * t };
     drawSegment(prev, next);
     prev = next;
+  }
+}
+
+function cloneDab(destPoint) {
+  const source = state.cloneSource;
+  const startDest = state.cloneStartDest;
+  const snapshot = state.cloneSnapshot;
+  if (!paintCtx || !source || !startDest || !snapshot || !destPoint) return;
+
+  const radius = Math.max(1, Number(brushSize?.value || 32) / 2);
+  const opacity = Number(brushOpacity?.value || 100) / 100;
+  const offsetX = destPoint.x - startDest.x;
+  const offsetY = destPoint.y - startDest.y;
+  const sourceCenterX = source.x + offsetX;
+  const sourceCenterY = source.y + offsetY;
+
+  const minX = Math.max(0, Math.floor(destPoint.x - radius));
+  const minY = Math.max(0, Math.floor(destPoint.y - radius));
+  const maxX = Math.min(textureCanvas.width - 1, Math.ceil(destPoint.x + radius));
+  const maxY = Math.min(textureCanvas.height - 1, Math.ceil(destPoint.y + radius));
+  const width = Math.max(1, maxX - minX + 1);
+  const height = Math.max(1, maxY - minY + 1);
+  const patch = paintCtx.getImageData(minX, minY, width, height);
+  const out = patch.data;
+  const src = snapshot.data;
+  const sw = snapshot.width;
+  const sh = snapshot.height;
+
+  for (let py = 0; py < height; py++) {
+    const y = minY + py;
+    for (let px = 0; px < width; px++) {
+      const x = minX + px;
+      const localX = x - destPoint.x;
+      const localY = y - destPoint.y;
+      const distance = Math.hypot(localX, localY);
+      if (distance > radius) continue;
+
+      const sx = Math.round(sourceCenterX + localX);
+      const sy = Math.round(sourceCenterY + localY);
+      if (sx < 0 || sy < 0 || sx >= sw || sy >= sh) continue;
+
+      const feather = Math.min(1, Math.max(0, (radius - distance) / Math.max(1, radius * 0.28)));
+      const alpha = opacity * feather;
+      if (alpha <= 0) continue;
+
+      const si = (sy * sw + sx) * 4;
+      const di = (py * width + px) * 4;
+      out[di] = Math.round(out[di] * (1 - alpha) + src[si] * alpha);
+      out[di + 1] = Math.round(out[di + 1] * (1 - alpha) + src[si + 1] * alpha);
+      out[di + 2] = Math.round(out[di + 2] * (1 - alpha) + src[si + 2] * alpha);
+      out[di + 3] = Math.round(out[di + 3] * (1 - alpha) + src[si + 3] * alpha);
+    }
+  }
+
+  paintCtx.putImageData(patch, minX, minY);
+  if (state.liveTexture) state.liveTexture.needsUpdate = true;
+}
+
+function cloneBetween(from, to) {
+  if (!from || !to) return;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy);
+  const brush = Number(brushSize?.value || 32);
+
+  if (distance > seamThreshold()) {
+    cloneDab(to);
+    return;
+  }
+
+  const step = Math.max(1, brush * 0.28);
+  const steps = Math.max(1, Math.ceil(distance / step));
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    cloneDab({ x: from.x + dx * t, y: from.y + dy * t });
   }
 }
 
@@ -245,6 +337,7 @@ async function ensureTextureForMaterial(material) {
     textureSelect.value = String(index);
     textureSelect.dispatchEvent(new Event('change', { bubbles: true }));
     state.activeTextureIndex = index;
+    state.cloneSource = null;
   }
   const ready = await waitForTextureEditor(index, material);
   if (!ready) {
@@ -320,7 +413,7 @@ async function handlePointerDown(evt) {
 
   const pointerId = evt.pointerId;
   const ready = await ensureTextureForMaterial(material);
-  if (!ready || evt.buttons === 0) return;
+  if (!ready) return;
 
   const point = texturePoint(hit, material);
   if (!point) return;
@@ -330,17 +423,47 @@ async function handlePointerDown(evt) {
     return;
   }
 
+  if (state.mode === 'clone' && evt.altKey) {
+    state.cloneSource = { x: point.x, y: point.y, textureIndex: state.activeTextureIndex };
+    state.cloneStartDest = null;
+    state.cloneSnapshot = null;
+    say(`Clone source set on Texture ${state.activeTextureIndex + 1}. Now drag over the area you want to replace.`);
+    return;
+  }
+
+  if (state.mode === 'clone' && !state.cloneSource) {
+    say('Set a clone source first: hold Option (Mac) or Alt (Windows) and click a clean area of the car.', true);
+    return;
+  }
+
+  if (state.mode === 'clone' && state.cloneSource.textureIndex !== state.activeTextureIndex) {
+    state.cloneSource = null;
+    say('That surface uses a different texture. Option/Alt-click a new clone source on this surface.', true);
+    return;
+  }
+
+  if (evt.buttons === 0) return;
+
   saveUndo();
   attachLiveCanvas(material);
   state.painting = true;
   state.lastPoint = point;
-  dab(point);
+
+  if (state.mode === 'clone') {
+    state.cloneStartDest = { x: point.x, y: point.y };
+    state.cloneSnapshot = state.undoImage;
+    cloneDab(point);
+    say(`LIVE CLONE · Texture ${state.activeTextureIndex + 1} · Option/Alt-click to choose another source.`);
+  } else {
+    dab(point);
+    say(`LIVE PAINT · Texture ${state.activeTextureIndex + 1} · ${paintColor?.value || '#000000'} · seam-safe stroke.`);
+  }
+
   try { v.renderer.domElement.setPointerCapture(pointerId); } catch {}
-  say(`LIVE PAINT · Texture ${state.activeTextureIndex + 1} · ${paintColor?.value || '#000000'} · seam-safe stroke.`);
 }
 
 function handlePointerMove(evt) {
-  if (state.mode !== 'paint' || !state.painting || modifierOrbit(evt)) return;
+  if (!['paint', 'clone'].includes(state.mode) || !state.painting || modifierOrbit(evt)) return;
   if ((evt.buttons & 1) === 0) {
     stopPaint(evt);
     return;
@@ -356,8 +479,14 @@ function handlePointerMove(evt) {
   }
   const point = texturePoint(hit, material);
   if (!point) return;
-  if (state.lastPoint) paintBetween(state.lastPoint, point);
-  else dab(point);
+
+  if (state.mode === 'clone') {
+    if (state.lastPoint) cloneBetween(state.lastPoint, point);
+    else cloneDab(point);
+  } else {
+    if (state.lastPoint) paintBetween(state.lastPoint, point);
+    else dab(point);
+  }
   state.lastPoint = point;
 }
 
@@ -369,6 +498,8 @@ function stopPaint(evt) {
   }
   state.painting = false;
   state.lastPoint = null;
+  state.cloneStartDest = null;
+  state.cloneSnapshot = null;
   try { getViewerState()?.renderer?.domElement?.releasePointerCapture(evt.pointerId); } catch {}
 }
 
@@ -387,12 +518,21 @@ undo3DBtn.addEventListener('click', () => {
   say('Last 3D paint stroke undone.');
 });
 
+textureSelect?.addEventListener('change', () => {
+  state.cloneSource = null;
+  state.cloneStartDest = null;
+  state.cloneSnapshot = null;
+});
+
 applyBtn?.addEventListener('click', () => {
   state.painting = false;
   state.lastPoint = null;
   state.activeMaterial = null;
   state.liveTexture = null;
   state.activeTextureIndex = Number(textureSelect?.value ?? -1);
+  state.cloneSource = null;
+  state.cloneStartDest = null;
+  state.cloneSnapshot = null;
   setMode('paint');
 });
 
