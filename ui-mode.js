@@ -9,6 +9,8 @@
   const textureEditor = document.getElementById('textureEditor');
   const printPanel = document.getElementById('printPanel');
   const optimizeBtn = document.getElementById('optimizeBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const resultLabel = document.querySelector('#resultCard .result-top span');
   const compareBtn = document.getElementById('compareBtn');
   const heatBtn = document.getElementById('heatBtn');
   const preset = document.getElementById('preset');
@@ -17,7 +19,6 @@
   const badge = document.querySelector('.version-badge');
   if (badge) badge.textContent = `v${VERSION}`;
 
-  // Make the old preset names easier to understand without changing their values.
   if (preset) {
     const names = {
       safe: 'High quality',
@@ -46,7 +47,6 @@
   workflow.className = 'workflow-strip';
   chooser.insertAdjacentElement('afterend', workflow);
 
-  // Mark existing blocks rather than changing the working tools themselves.
   textureEditor?.classList.add('game-only');
   printPanel?.classList.add('print-only');
   heatBtn?.classList.add('print-only-inline');
@@ -54,7 +54,6 @@
   const presetBlock = preset?.closest('.control-block');
   presetBlock?.classList.add('game-only');
 
-  // Put technical game compression controls under one collapsed Advanced section.
   const textureSize = document.getElementById('textureSize');
   const textureQuality = document.getElementById('textureQuality');
   const textureSizeBlock = textureSize?.closest('.control-block');
@@ -70,7 +69,6 @@
     inner.append(textureSizeBlock, textureQualityBlock, toggles);
   }
 
-  // The main polygon control is useful in both modes; give it a clearer heading.
   const geometryBlock = geometry?.closest('.control-block');
   if (geometryBlock) geometryBlock.classList.add('geometry-block');
 
@@ -107,11 +105,15 @@
       if (subtitle) subtitle.textContent = 'Edit, paint and optimise GLB models for browser and video games.';
       workflow.innerHTML = '<b>Game Model</b><span>1&nbsp; Edit</span><i>→</i><span>2&nbsp; Optimize</span><i>→</i><span>3&nbsp; Save GLB</span>';
       if (optimizeBtn) optimizeBtn.textContent = 'Optimize game model';
+      if (downloadBtn) downloadBtn.textContent = 'Save optimized GLB';
+      if (resultLabel) resultLabel.textContent = 'Optimized';
       if (compareBtn) compareBtn.title = 'Compare the original and optimized game model';
     } else {
       if (subtitle) subtitle.textContent = 'Reduce heavy sculpt meshes while keeping the detail your resin printer can actually show.';
       workflow.innerHTML = '<b>3D Print</b><span>1&nbsp; Size</span><i>→</i><span>2&nbsp; Protect</span><i>→</i><span>3&nbsp; Reduce</span><i>→</i><span>4&nbsp; Check</span><i>→</i><span>5&nbsp; Save</span>';
       if (optimizeBtn) optimizeBtn.textContent = 'Reduce print model';
+      if (downloadBtn) downloadBtn.textContent = 'Save reduced GLB';
+      if (resultLabel) resultLabel.textContent = 'Reduced';
       if (compareBtn) compareBtn.title = 'Compare the original and reduced print model';
     }
 
@@ -127,7 +129,6 @@
     if (button) setMode(button.dataset.mode, true);
   });
 
-  // Non-GLB mesh formats are unambiguously print assets.
   fileInput?.addEventListener('change', () => {
     const name = fileInput.files?.[0]?.name?.toLowerCase() || '';
     if (/\.(stl|obj|ply)$/.test(name)) setMode('print');
@@ -137,7 +138,6 @@
     if (/\.(stl|obj|ply)$/.test(name)) setMode('print');
   }, true);
 
-  // Print tools may unhide themselves after a model loads; the mode CSS remains authoritative.
   window.addEventListener('shrink:model-opened', () => {
     const kind = window.__shrinkApp?.sourceKind;
     if (kind && kind !== 'glb') setMode('print');
