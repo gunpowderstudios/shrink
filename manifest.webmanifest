@@ -1,6 +1,6 @@
 {
-  "name": "SHRINK",
-  "short_name": "SHRINK",
+  "name": "SHRINK 3D",
+  "short_name": "SHRINK 3D",
   "description": "An app for reducing and optimising 3D files for gaming or 3D printing.",
   "start_url": "./",
   "scope": "./",
