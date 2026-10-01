@@ -1,9 +1,10 @@
+import './game-live-export.js?v=1.83';
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=1.82';
+import { buildBinaryStl } from './mesh-tools.js?v=1.83';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
-import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=1.82';
+import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=1.83';
 
-// SHRINK 3D v1.82 — intercept a failed solid split and try a direct capped triangle-mesh split.
+// SHRINK 3D v1.83 — intercept a failed solid split and try a direct capped triangle-mesh split.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let busy = false;
@@ -26,7 +27,7 @@ async function directSplit(rawReason) {
   busy=true;
   let parts=[];
   try {
-    console.warn('[SHRINK 3D v1.82] Solid split could not complete; trying direct capped split.', { reason: rawReason });
+    console.warn('[SHRINK 3D v1.83] Solid split could not complete; trying direct capped split.', { reason: rawReason });
     app()?.setStatus?.('The solid split could not be made. Trying a direct flat-cut split instead…', false);
     await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
     const out=splitModelFlat(model,n);
@@ -44,7 +45,7 @@ async function directSplit(rawReason) {
     app()?.setStatus?.(`Saved ${parts.length} separate STL sections with flat capped cuts. Pegs were skipped because this mesh could not use the solid split safely.`,false);
     return true;
   } catch(err){
-    console.error('[SHRINK 3D v1.82] Direct split fallback also failed',err);
+    console.error('[SHRINK 3D v1.83] Direct split fallback also failed',err);
     return false;
   } finally {
     disposeSplitParts(parts);
