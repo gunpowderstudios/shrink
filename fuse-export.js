@@ -13,9 +13,7 @@ async function loadManifold() {
   if (!manifoldPromise) {
     manifoldPromise = import(MANIFOLD_JS).then(async mod => {
       const factory = mod.default;
-      const wasm = await factory({
-        locateFile: path => path.endsWith('.wasm') ? MANIFOLD_WASM : new URL(path, MANIFOLD_JS).href
-      });
+      const wasm = await factory({ locateFile: path => path.endsWith('.wasm') ? MANIFOLD_WASM : new URL(path, MANIFOLD_JS).href });
       wasm.setup();
       return wasm;
     });
@@ -33,9 +31,7 @@ function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(link.href), 4000);
 }
 
-function sourceModel() {
-  return app()?.optimizedModel || app()?.originalModel || null;
-}
+function sourceModel() { return app()?.optimizedModel || app()?.originalModel || null; }
 
 function statusText(solid) {
   try {
@@ -57,9 +53,7 @@ function meshToSolid(mesh, wasm) {
   const verts = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i).applyMatrix4(world);
-    verts[i * 3] = v.x;
-    verts[i * 3 + 1] = v.y;
-    verts[i * 3 + 2] = v.z;
+    verts[i * 3] = v.x; verts[i * 3 + 1] = v.y; verts[i * 3 + 2] = v.z;
   }
 
   const count = g.index ? g.index.count : pos.count;
@@ -69,54 +63,24 @@ function meshToSolid(mesh, wasm) {
     const a = g.index ? g.index.getX(i) : i;
     const b = g.index ? g.index.getX(i + 1) : i + 1;
     const c = g.index ? g.index.getX(i + 2) : i + 2;
-    tris[i] = a;
-    tris[i + 1] = flipped ? c : b;
-    tris[i + 2] = flipped ? b : c;
+    tris[i] = a; tris[i + 1] = flipped ? c : b; tris[i + 2] = flipped ? b : c;
   }
 
   const mg = new Mesh({ numProp: 3, vertProperties: verts, triVerts: tris });
   try { mg.merge(); } catch (err) { console.warn('Manifold mesh.merge warning:', err); }
-  let solid = null;
-  try {
-    solid = new Manifold(mg);
-  } finally {
-    try { mg.delete?.(); } catch {}
-  }
+  let solid;
+  try { solid = new Manifold(mg); }
+  finally { try { mg.delete?.(); } catch {} }
+
   const status = statusText(solid);
   if (solid?.isEmpty?.()) {
     try { solid.delete?.(); } catch {}
     throw new Error(status ? `Manifold rejected a mesh part: ${status}` : 'Manifold rejected a mesh part as non-manifold.');
   }
-  if (status) console.warn('Manifold import status:', status);
   return solid;
 }
 
-function solidToThree(solid) {
-  const m = solid.getMesh();
-  const n = Math.floor(m.vertProperties.length / m.numProp);
-  const positions = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    positions[i * 3] = m.vertProperties[i * m.numProp];
-    positions[i * 3 + 1] = m.vertProperties[i * m.numProp + 1];
-    positions[i * 3 + 2] = m.vertProperties[i * m.numProp + 2];
-  }
-  const indices = new Uint32Array(m.triVerts);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  try { m.delete?.(); } catch {}
-  const material = new THREE.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72, metalness: 0 });
-  const mesh = new THREE.Mesh(geometry, material);
-  const root = new THREE.Group();
-  root.add(mesh);
-  root.updateMatrixWorld(true);
-  return root;
-}
-
-async function fuseModel(model) {
+async function modelToSolid(model) {
   const wasm = await loadManifold();
   const solids = [];
   const failures = [];
@@ -137,23 +101,45 @@ async function fuseModel(model) {
   }
 
   let result = null;
-  let pieces = [];
   try {
     result = solids.length === 1 ? solids[0] : wasm.Manifold.union(solids);
     const status = statusText(result);
-    if (status) console.warn('Manifold union status:', status);
     if (result?.isEmpty?.()) throw new Error(status ? `Boolean union failed: ${status}` : 'Boolean union produced an empty mesh.');
-    pieces = result.decompose();
+    const pieces = result.decompose();
     const components = pieces.length;
-    const root = solidToThree(result);
-    return { root, components };
-  } finally {
     for (const p of pieces) try { p.delete?.(); } catch {}
-    for (const s of solids) {
-      if (s !== result) try { s.delete?.(); } catch {}
-    }
+    for (const s of solids) if (s !== result) try { s.delete?.(); } catch {}
+    return { solid: result, components, wasm };
+  } catch (err) {
+    for (const s of solids) try { s.delete?.(); } catch {}
     try { result?.delete?.(); } catch {}
+    throw err;
   }
+}
+
+function solidToThree(solid) {
+  const m = solid.getMesh();
+  const n = Math.floor(m.vertProperties.length / m.numProp);
+  const positions = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    positions[i * 3] = m.vertProperties[i * m.numProp];
+    positions[i * 3 + 1] = m.vertProperties[i * m.numProp + 1];
+    positions[i * 3 + 2] = m.vertProperties[i * m.numProp + 2];
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(m.triVerts), 1));
+  geometry.computeVertexNormals();
+  try { m.delete?.(); } catch {}
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72, metalness: 0 }));
+  const root = new THREE.Group(); root.add(mesh); root.updateMatrixWorld(true);
+  return root;
+}
+
+async function fuseModel(model) {
+  const { solid, components } = await modelToSolid(model);
+  try { return { root: solidToThree(solid), components }; }
+  finally { try { solid.delete?.(); } catch {} }
 }
 
 function injectUI() {
@@ -161,41 +147,24 @@ function injectUI() {
   const save = $('stepSave');
   const exportRow = save?.querySelector('.export-row');
   if (!save || !exportRow) return;
-
   const box = document.createElement('div');
   box.className = 'fuse-solid-box print-only';
-  box.innerHTML = `
-    <label class="toggle-row fuse-solid-row">
-      <span><strong>Fuse into one solid</strong><small>Boolean-union touching/overlapping parts, remove internal faces and make a manifold shell before export.</small></span>
-      <input id="fuseSolidToggle" type="checkbox" checked />
-    </label>
-    <div class="hint fuse-solid-hint">If parts are genuinely separate and do not touch, SHRINK will stop and tell you instead of saving a fake “single solid”.</div>`;
+  box.innerHTML = `<label class="toggle-row fuse-solid-row"><span><strong>Fuse into one solid</strong><small>Boolean-union touching/overlapping parts, remove internal faces and make a manifold shell before export.</small></span><input id="fuseSolidToggle" type="checkbox" checked /></label><div class="hint fuse-solid-hint">If parts are genuinely separate and do not touch, SHRINK will stop and tell you instead of saving a fake “single solid”.</div>`;
   save.insertBefore(box, exportRow);
-
   const style = document.createElement('style');
-  style.textContent = `
-    .fuse-solid-box{margin:12px 0;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.018)}
-    .fuse-solid-row{border:0!important;margin:0!important;padding:0!important;background:transparent!important;align-items:flex-start!important}
-    .fuse-solid-row span{display:block;min-width:0}.fuse-solid-row strong{display:block;font-size:13px;margin-bottom:3px}.fuse-solid-row small{display:block;color:var(--muted);font-size:11px;line-height:1.4;font-weight:400}
-    .fuse-solid-hint{margin-top:7px}
-  `;
+  style.textContent = `.fuse-solid-box{margin:12px 0;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.018)}.fuse-solid-row{border:0!important;margin:0!important;padding:0!important;background:transparent!important;align-items:flex-start!important}.fuse-solid-row span{display:block;min-width:0}.fuse-solid-row strong{display:block;font-size:13px;margin-bottom:3px}.fuse-solid-row small{display:block;color:var(--muted);font-size:11px;line-height:1.4;font-weight:400}.fuse-solid-hint{margin-top:7px}`;
   document.head.appendChild(style);
 }
 
 async function fusedExport(kind, evt) {
   const toggle = $('fuseSolidToggle');
   if (!toggle?.checked || document.body.classList.contains('app-mode-game')) return;
-  evt.preventDefault();
-  evt.stopImmediatePropagation();
-
-  const model = sourceModel();
-  if (!model) return;
+  evt.preventDefault(); evt.stopImmediatePropagation();
+  const model = sourceModel(); if (!model) return;
   const stlBtn = $('saveStlBtn'), objBtn = $('saveObjBtn');
   stlBtn.disabled = true; objBtn.disabled = true;
   const oldStl = stlBtn.textContent, oldObj = objBtn.textContent;
-  const clicked = kind === 'stl' ? stlBtn : objBtn;
-  clicked.textContent = 'Fusing parts…';
-
+  (kind === 'stl' ? stlBtn : objBtn).textContent = 'Fusing parts…';
   try {
     say('Fusing overlapping parts and removing internal geometry…');
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
@@ -204,7 +173,6 @@ async function fusedExport(kind, evt) {
       root.traverse(o => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
       throw new Error(`The Boolean union still contains ${components} disconnected solids. Move/overlap those parts, or use a voxel-remesh tool to bridge the gaps.`);
     }
-
     const scale = window.__shrinkPrint?.mmPerUnit?.() || 1;
     const zUp = $('zUpToggle')?.checked !== false;
     const name = app()?.baseName?.() || 'model';
@@ -219,11 +187,9 @@ async function fusedExport(kind, evt) {
     }
     root.traverse(o => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
   } catch (err) {
-    console.error(err);
-    say(`Fuse failed: ${err.message}`, true);
+    console.error(err); say(`Fuse failed: ${err.message}`, true);
   } finally {
-    stlBtn.disabled = false; objBtn.disabled = false;
-    stlBtn.textContent = oldStl; objBtn.textContent = oldObj;
+    stlBtn.disabled = false; objBtn.disabled = false; stlBtn.textContent = oldStl; objBtn.textContent = oldObj;
   }
 }
 
@@ -233,7 +199,5 @@ function wire() {
   $('saveObjBtn')?.addEventListener('click', e => fusedExport('obj', e), true);
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true });
-else wire();
-
-window.__shrinkFuse = { fuseModel, loadManifold };
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true }); else wire();
+window.__shrinkFuse = { fuseModel, modelToSolid, loadManifold, solidToThree };
