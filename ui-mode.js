@@ -1,6 +1,6 @@
-// SHRINK 3D v1.85 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.86 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.85';
+  const VERSION = '1.86';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -13,6 +13,9 @@
   );
   import(`./game-save-guard.js?v=${VERSION}`).catch(err =>
     console.warn(`[SHRINK 3D ${VERSION}] Game save verification did not load`, err)
+  );
+  import(`./game-protection-fix.js?v=${VERSION}`).catch(err =>
+    console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err)
   );
 
   if (!document.querySelector('link[data-shrink-matrix-theme]')) {
