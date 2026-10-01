@@ -1,9 +1,10 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=1.84';
+import { buildBinaryStl, analyzeTopology } from './mesh-tools.js?v=1.87';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
-import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=1.84';
+import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=1.87';
 
-// SHRINK 3D v1.84 — intercept a failed solid split and try a direct capped triangle-mesh split.
+// SHRINK 3D v1.87 — intercept a failed solid split and try a direct capped triangle-mesh split.
+// The fallback can now add peg/socket joints when the cut outline is a safe closed loop.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let busy = false;
@@ -26,25 +27,52 @@ async function directSplit(rawReason) {
   busy=true;
   let parts=[];
   try {
-    console.warn('[SHRINK 3D v1.84] Solid split could not complete; trying direct capped split.', { reason: rawReason });
-    app()?.setStatus?.('The solid split could not be made. Trying a direct flat-cut split instead…', false);
+    console.warn('[SHRINK 3D v1.87] Solid split could not complete; trying direct capped split.', { reason: rawReason });
+    const scale=mmPerUnit();
+    const wantsPegs=$('splitJoint')?.value !== 'flat';
+    const pegRadius=Math.max(.5,Number($('pegDiameter')?.value||4)/2)/scale;
+    const pegDepth=Math.max(2,Number($('pegDepth')?.value||6))/scale;
+    const clearance=Math.max(.05,Number($('pegClearance')?.value||.2))/scale;
+
+    app()?.setStatus?.(wantsPegs
+      ? 'The solid split could not be made. Trying a direct split with safe peg/socket joints…'
+      : 'The solid split could not be made. Trying a direct flat-cut split instead…', false);
     await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
-    const out=splitModelFlat(model,n);
+
+    const out=splitModelFlat(model,n,{withPegs:wantsPegs,pegRadius,pegDepth,clearance});
     parts=out.parts;
-    const files={}, scale=mmPerUnit(), zUp=$('zUpToggle')?.checked!==false;
+    const files={}, zUp=$('zUpToggle')?.checked!==false;
     const base=app()?.baseName?.()||'model';
     let total=0;
+    const topology=[];
     for(let i=0;i<parts.length;i++){
+      const topo=analyzeTopology(THREE,parts[i]);
+      topology.push(topo);
       const stl=buildBinaryStl({THREE,model:parts[i],mmPerUnit:scale,zUp});
       total+=stl.triangles;
       files[`${base}-part-${i+1}-of-${parts.length}.stl`]=new Uint8Array(stl.buffer);
     }
     const zip=zipSync(files,{level:0});
-    saveBlob(new Blob([zip],{type:'application/zip'}),`${base}-split-${parts.length}-parts-flat.zip`);
-    app()?.setStatus?.(`Saved ${parts.length} separate STL sections with flat capped cuts. Pegs were skipped because this mesh could not use the solid split safely.`,false);
+    saveBlob(new Blob([zip],{type:'application/zip'}),`${base}-split-${parts.length}-parts-fallback.zip`);
+
+    const pegCuts=out.joints?.filter(j=>j.pegsAdded).length||0;
+    const unsafe=topology.map((t,i)=>({part:i+1,...t})).filter(t=>!t.watertight);
+    console.info('[SHRINK 3D v1.87] Direct split result',{joints:out.joints,topology});
+
+    let msg=`Saved ${parts.length} separate STL sections`;
+    if(wantsPegs){
+      msg += pegCuts ? ` with peg/socket joints on ${pegCuts} cut${pegCuts===1?'':'s'}` : ' with flat cuts — no safe peg position was found';
+    } else msg += ' with flat cuts';
+    msg += ` · ${new Intl.NumberFormat().format(total)} triangles total.`;
+    if(unsafe.length){
+      const detail=unsafe.map(t=>`Section ${t.part}: ${t.openEdges} open edge${t.openEdges===1?'':'s'}, ${t.nonManifold} pinched edge${t.nonManifold===1?'':'s'}`).join(' · ');
+      app()?.setStatus?.(`${msg} Check before printing — ${detail}. Your slicer may need to repair it.`,true);
+    } else {
+      app()?.setStatus?.(`${msg} Topology check found closed sections.`,false);
+    }
     return true;
   } catch(err){
-    console.error('[SHRINK 3D v1.84] Direct split fallback also failed',err);
+    console.error('[SHRINK 3D v1.87] Direct split fallback also failed',err);
     return false;
   } finally {
     disposeSplitParts(parts);
@@ -60,9 +88,7 @@ function install(){
     const text=String(msg||'');
     if(!busy && text.startsWith('Split failed:')){
       const reason=text.slice('Split failed:'.length).trim();
-      directSplit(reason).then(ok=>{
-        if(!ok) previous(msg,error);
-      });
+      directSplit(reason).then(ok=>{ if(!ok) previous(msg,error); });
       return;
     }
     return previous(msg,error);
