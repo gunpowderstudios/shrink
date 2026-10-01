@@ -1,8 +1,8 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v1.82 — direct triangle-mesh splitter used when solid/Boolean splitting cannot read the source.
-// Clips the visible triangle soup into horizontal slabs and caps each cut plane. This path deliberately
-// does not require a watertight/manifold source mesh.
+// SHRINK 3D v1.87 — direct triangle-mesh splitter used when solid/Boolean splitting cannot read the source.
+// Clips triangle soup into horizontal slabs, caps each cut, and can add keyed peg/socket joints when
+// the cut outline forms a clean closed loop with enough material around the joint.
 
 const EPS = 1e-7;
 
@@ -23,9 +23,7 @@ function worldTriangles(model) {
       c.fromBufferAttribute(pos, i2).applyMatrix4(o.matrixWorld);
       const area2 = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).lengthSq();
       if (area2 < 1e-20) continue;
-      out.push([
-        {x:a.x,y:a.y,z:a.z}, {x:b.x,y:b.y,z:b.z}, {x:c.x,y:c.y,z:c.z}
-      ]);
+      out.push([{x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z},{x:c.x,y:c.y,z:c.z}]);
     }
   });
   return out;
@@ -65,15 +63,8 @@ function planeSegment(tri, y) {
   return unique.length >= 2 ? [unique[0],unique[1]] : null;
 }
 
-function pushTri(arr,a,b,c) {
-  arr.push(a.x,a.y,a.z,b.x,b.y,b.z,c.x,c.y,c.z);
-}
-
-function triangulateFan(arr, poly) {
-  if (poly.length < 3) return;
-  for (let i=1;i+1<poly.length;i++) pushTri(arr,poly[0],poly[i],poly[i+1]);
-}
-
+function pushTri(arr,a,b,c) { arr.push(a.x,a.y,a.z,b.x,b.y,b.z,c.x,c.y,c.z); }
+function triangulateFan(arr, poly) { if (poly.length >= 3) for (let i=1;i+1<poly.length;i++) pushTri(arr,poly[0],poly[i],poly[i+1]); }
 function key2(p, scale) { return `${Math.round(p.x*scale)},${Math.round(p.z*scale)}`; }
 
 function stitchLoops(segments, tolerance) {
@@ -87,7 +78,7 @@ function stitchLoops(segments, tolerance) {
     if (unused[seed].used) continue;
     const s=unused[seed]; s.used=true;
     const loop=[s.a,s.b];
-    let current=s.b, guard=0;
+    let current=s.b, guard=0, closed=false;
     while (guard++ < unused.length+4) {
       const k=key2(current,scale), candidates=byKey.get(k)||[];
       let next=null;
@@ -96,75 +87,173 @@ function stitchLoops(segments, tolerance) {
       next.used=true;
       const ka=key2(next.a,scale);
       current = ka===k ? next.b : next.a;
-      if ((current.x-loop[0].x)**2+(current.z-loop[0].z)**2 <= tolerance*tolerance) break;
+      if ((current.x-loop[0].x)**2+(current.z-loop[0].z)**2 <= tolerance*tolerance) { closed=true; break; }
       loop.push(current);
     }
-    if (loop.length >= 3) loops.push(loop);
+    if (loop.length >= 3) loops.push({points:loop,closed});
   }
   return loops;
 }
 
-function capLoop(arr, loop, y, normalY) {
-  const pts2 = loop.map(p => new THREE.Vector2(p.x,p.z));
+function areaXZ(loop) {
+  let a=0;
+  for(let i=0;i<loop.length;i++){ const p=loop[i],q=loop[(i+1)%loop.length]; a+=p.x*q.z-q.x*p.z; }
+  return a*.5;
+}
+
+function pointInPolyXZ(x,z,loop){
+  let inside=false;
+  for(let i=0,j=loop.length-1;i<loop.length;j=i++){
+    const a=loop[i],b=loop[j];
+    const hit=((a.z>z)!==(b.z>z)) && (x < (b.x-a.x)*(z-a.z)/((b.z-a.z)||1e-20)+a.x);
+    if(hit) inside=!inside;
+  }
+  return inside;
+}
+
+function distToSegXZ(x,z,a,b){
+  const dx=b.x-a.x,dz=b.z-a.z, l2=dx*dx+dz*dz || 1;
+  const t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/l2));
+  return Math.hypot(x-(a.x+t*dx),z-(a.z+t*dz));
+}
+
+function boundaryDistance(x,z,loop){
+  let d=Infinity;
+  for(let i=0;i<loop.length;i++) d=Math.min(d,distToSegXZ(x,z,loop[i],loop[(i+1)%loop.length]));
+  return d;
+}
+
+function circleLoop(x,z,r,y,segments=28,clockwise=false){
+  const pts=[];
+  for(let i=0;i<segments;i++){
+    const a=(clockwise?-1:1)*Math.PI*2*i/segments;
+    pts.push({x:x+Math.cos(a)*r,y,z:z+Math.sin(a)*r});
+  }
+  return pts;
+}
+
+function capLoop(arr, loop, y, normalY, holes=[]) {
+  const contour = loop.map(p=>new THREE.Vector2(p.x,p.z));
+  const holeVecs = holes.map(h=>h.map(p=>new THREE.Vector2(p.x,p.z)));
   let faces;
-  try { faces = THREE.ShapeUtils.triangulateShape(pts2, []); } catch { return; }
-  const verts = loop.map(p => ({x:p.x,y,z:p.z}));
+  try { faces = THREE.ShapeUtils.triangulateShape(contour, holeVecs); } catch { return false; }
+  const all=[...loop,...holes.flat()].map(p=>({x:p.x,y,z:p.z}));
   for (const f of faces) {
-    let a=verts[f[0]], b=verts[f[1]], c=verts[f[2]];
+    let a=all[f[0]], b=all[f[1]], c=all[f[2]];
     const ux=b.x-a.x, uz=b.z-a.z, vx=c.x-a.x, vz=c.z-a.z;
     const ny = uz*vx - ux*vz;
     if ((normalY > 0 && ny < 0) || (normalY < 0 && ny > 0)) [b,c]=[c,b];
     pushTri(arr,a,b,c);
   }
+  return true;
+}
+
+function addCylinderPeg(arr,x,z,y,r,depth,segments=28){
+  const base=circleLoop(x,z,r,y,segments), top=circleLoop(x,z,r,y+depth,segments);
+  for(let i=0;i<segments;i++){
+    const j=(i+1)%segments;
+    pushTri(arr,base[i],base[j],top[j]); pushTri(arr,base[i],top[j],top[i]);
+  }
+  const center={x,y:y+depth,z};
+  for(let i=0;i<segments;i++){ const j=(i+1)%segments; pushTri(arr,center,top[i],top[j]); }
+}
+
+function addSocket(arr,x,z,y,r,depth,segments=28){
+  const mouth=circleLoop(x,z,r,y,segments), floor=circleLoop(x,z,r,y+depth,segments);
+  for(let i=0;i<segments;i++){
+    const j=(i+1)%segments;
+    pushTri(arr,mouth[i],floor[j],mouth[j]); pushTri(arr,mouth[i],floor[i],floor[j]);
+  }
+  const center={x,y:y+depth,z};
+  for(let i=0;i<segments;i++){ const j=(i+1)%segments; pushTri(arr,center,floor[j],floor[i]); }
+}
+
+function choosePegPoints(loop, radius, clearance){
+  if(!loop?.length) return [];
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  for(const p of loop){ minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z); }
+  const cx=(minX+maxX)/2, cz=(minZ+maxZ)/2, dx=(maxX-minX)*.22, dz=(maxZ-minZ)*.22;
+  const candidates=[[cx,cz],[cx-dx,cz],[cx+dx,cz],[cx,cz-dz],[cx,cz+dz],[cx-dx,cz-dz],[cx+dx,cz+dz],[cx-dx,cz+dz],[cx+dx,cz-dz]];
+  const margin=(radius+clearance)*1.35;
+  const good=candidates.filter(([x,z])=>pointInPolyXZ(x,z,loop)&&boundaryDistance(x,z,loop)>=margin).map(([x,z])=>({x,z}));
+  if(!good.length) return [];
+  const first=good[0];
+  const second=good.slice(1).sort((a,b)=>((b.x-first.x)**2+(b.z-first.z)**2)-((a.x-first.x)**2+(a.z-first.z)**2))[0];
+  return second?[first,second]:[first];
 }
 
 function geometryFromPositions(values) {
   if (!values.length) return null;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(values,3));
-  g.computeVertexNormals();
-  g.computeBoundingBox();
-  g.computeBoundingSphere();
+  g.computeVertexNormals(); g.computeBoundingBox(); g.computeBoundingSphere();
   return g;
 }
 
-export function splitModelFlat(model, sections=2) {
+export function splitModelFlat(model, sections=2, options={}) {
   const tris = worldTriangles(model);
   if (!tris.length) throw new Error('No triangles were found in this model.');
   let minY=Infinity,maxY=-Infinity,minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
   for (const t of tris) for (const p of t) {
-    minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
-    minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minZ=Math.min(minZ,p.z); maxZ=Math.max(maxZ,p.z);
+    minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minZ=Math.min(minZ,p.z); maxZ=Math.max(maxZ,p.z);
   }
-  const span=Math.max(maxY-minY,EPS);
-  const diag=Math.hypot(maxX-minX,maxY-minY,maxZ-minZ);
-  const tol=Math.max(diag*1e-6,1e-7);
+  const span=Math.max(maxY-minY,EPS), diag=Math.hypot(maxX-minX,maxY-minY,maxZ-minZ), tol=Math.max(diag*1e-6,1e-7);
   const cuts=Array.from({length:sections-1},(_,i)=>minY+span*(i+1)/sections);
-  const result=[];
+  const withPegs=!!options.withPegs, radius=Math.max(EPS,Number(options.pegRadius)||0), depth=Math.max(EPS,Number(options.pegDepth)||0), clearance=Math.max(0,Number(options.clearance)||0);
 
+  const cutData=cuts.map(y=>{
+    const segs=[]; for(const tri of tris){ const s=planeSegment(tri,y); if(s) segs.push(s); }
+    const loops=stitchLoops(segs,tol);
+    const closed=loops.filter(l=>l.closed).sort((a,b)=>Math.abs(areaXZ(b.points))-Math.abs(areaXZ(a.points)));
+    const outer=closed[0]?.points||null;
+    const points=withPegs&&outer?choosePegPoints(outer,radius,clearance):[];
+    return {y,segs,loops,outer,points,pegsSafe:!!outer&&points.length>0};
+  });
+
+  const result=[];
   for (let part=0;part<sections;part++) {
-    const low = part===0 ? -Infinity : cuts[part-1];
-    const high = part===sections-1 ? Infinity : cuts[part];
+    const low = part===0 ? -Infinity : cuts[part-1], high = part===sections-1 ? Infinity : cuts[part];
     const positions=[];
-    const lowerSegs=[], upperSegs=[];
     for (const tri of tris) {
       let poly=tri;
       if (Number.isFinite(low)) poly=clipPolygonY(poly,low,true);
       if (poly.length && Number.isFinite(high)) poly=clipPolygonY(poly,high,false);
       if (poly.length>=3) triangulateFan(positions,poly);
-      if (Number.isFinite(low)) { const s=planeSegment(tri,low); if(s) lowerSegs.push(s); }
-      if (Number.isFinite(high)) { const s=planeSegment(tri,high); if(s) upperSegs.push(s); }
     }
-    if (Number.isFinite(low)) for (const loop of stitchLoops(lowerSegs,tol)) capLoop(positions,loop,low,-1);
-    if (Number.isFinite(high)) for (const loop of stitchLoops(upperSegs,tol)) capLoop(positions,loop,high,1);
+
+    if (Number.isFinite(low)) {
+      const cd=cutData[part-1];
+      const socketHoles=[];
+      if(withPegs&&cd.pegsSafe){
+        cd.points.slice(0,2).forEach((p,i)=>{ const r=(i===0?radius:radius*.76)+clearance; socketHoles.push(circleLoop(p.x,p.z,r,low,28,true)); });
+      }
+      for(const entry of cd.loops){
+        if(!entry.closed) continue;
+        const holes=(entry.points===cd.outer)?socketHoles:[];
+        capLoop(positions,entry.points,low,-1,holes);
+      }
+      if(withPegs&&cd.pegsSafe) cd.points.slice(0,2).forEach((p,i)=>addSocket(positions,p.x,p.z,low,(i===0?radius:radius*.76)+clearance,depth));
+    }
+
+    if (Number.isFinite(high)) {
+      const cd=cutData[part];
+      for(const entry of cd.loops) if(entry.closed) capLoop(positions,entry.points,high,1,[]);
+      if(withPegs&&cd.pegsSafe) cd.points.slice(0,2).forEach((p,i)=>addCylinderPeg(positions,p.x,p.z,high,i===0?radius:radius*.76,depth));
+    }
+
     const geometry=geometryFromPositions(positions);
     if (!geometry) throw new Error(`Section ${part+1} is empty.`);
     const root=new THREE.Group();
     root.add(new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xe8ebef,roughness:.72,metalness:0})));
-    root.updateMatrixWorld(true);
-    result.push(root);
+    root.updateMatrixWorld(true); result.push(root);
   }
-  return { parts:result, cuts, mode:'flat-fallback' };
+
+  return {
+    parts:result,
+    cuts,
+    mode:withPegs?'flat-fallback-pegs':'flat-fallback',
+    joints:cutData.map((c,i)=>({cut:i+1,pegsAdded:withPegs&&c.pegsSafe,count:withPegs&&c.pegsSafe?Math.min(2,c.points.length):0,closedLoops:c.loops.filter(l=>l.closed).length,openChains:c.loops.filter(l=>!l.closed).length}))
+  };
 }
 
 export function disposeSplitParts(parts=[]) {
