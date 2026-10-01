@@ -1,16 +1,18 @@
-// SHRINK 3D v1.84 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.85 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.84';
+  const VERSION = '1.85';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
   const header = document.querySelector('.topbar');
   const dropZone = $('dropZone'), fileInput = $('fileInput'), subtitle = document.querySelector('.subtitle');
 
-  // Optional print helpers are isolated from the core UI. If one CDN/helper fails,
-  // SHRINK still loads and the normal save path remains available.
+  // Optional helpers are isolated from the core UI. If one helper fails, SHRINK still loads normally.
   import(`./print-export-safety.js?v=${VERSION}`).catch(err =>
     console.warn(`[SHRINK 3D ${VERSION}] Optional print tools did not load`, err)
+  );
+  import(`./game-save-guard.js?v=${VERSION}`).catch(err =>
+    console.warn(`[SHRINK 3D ${VERSION}] Game save verification did not load`, err)
   );
 
   if (!document.querySelector('link[data-shrink-matrix-theme]')) {
