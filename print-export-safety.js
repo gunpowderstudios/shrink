@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v1.81 — safety layer around optional Fuse / Split helpers.
-const VERSION = '1.81';
+// SHRINK 3D v1.82 — safety layer around optional Fuse / Split helpers.
+const VERSION = '1.82';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 
@@ -154,7 +154,8 @@ window.addEventListener('shrink:model-opened', maintain);
 Promise.allSettled([
   import(`./preview-material-fix.js?v=${VERSION}`),
   import(`./fuse-export.js?v=${VERSION}`),
-  import(`./split-print.js?v=${VERSION}`)
+  import(`./split-print.js?v=${VERSION}`),
+  import(`./split-fallback.js?v=${VERSION}`)
 ]).then(results => {
   results.forEach((r, i) => {
     if (r.status === 'rejected') console.warn(`[SHRINK 3D ${VERSION}] Optional print helper ${i + 1} did not load`, r.reason);
