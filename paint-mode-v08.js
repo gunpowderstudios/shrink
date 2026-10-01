@@ -4,10 +4,10 @@
   if (!viewer) return;
 
   const badge = document.querySelector('.version-badge');
-  if (badge) badge.textContent = 'v1.79';
+  if (badge) badge.textContent = 'v1.80';
 
   // Load multi-step undo after the 3D paint controls exist.
-  import('./multi-undo.js?v=1.79').catch(err => console.warn('Could not load multi-step undo:', err));
+  import('./multi-undo.js?v=1.80').catch(err => console.warn('Could not load multi-step undo:', err));
 
   const nativeAdd = viewer.addEventListener.bind(viewer);
   const paintHandlers = new Set(['handlePointerDown', 'handlePointerMove', 'stopPaint']);
@@ -38,9 +38,7 @@
     viewer.classList.toggle('modifier-rotate', on);
     const help = document.querySelector('.viewer-help');
     if (help && viewer.classList.contains('direct-paint')) {
-      help.textContent = on
-        ? 'ROTATE · release Cmd / Ctrl to continue'
-        : normalHelpText();
+      help.textContent = on ? 'ROTATE · release Cmd / Ctrl to continue' : normalHelpText();
     }
   }
 
@@ -50,11 +48,9 @@
       viewer.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }));
     }
   }, true);
-
   window.addEventListener('keyup', event => {
     if (event.key === 'Meta' || event.key === 'Control') syncModifier(event);
   }, true);
-
   viewer.addEventListener('pointerdown', syncModifier, true);
   viewer.addEventListener('pointermove', syncModifier, true);
   viewer.addEventListener('pointerup', syncModifier, true);
