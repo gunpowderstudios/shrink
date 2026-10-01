@@ -1,10 +1,34 @@
-// Shrink v1.7 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.71 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.7';
+  const VERSION = '1.71';
+  const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
   const header = document.querySelector('.topbar');
   const dropZone = $('dropZone'), fileInput = $('fileInput'), subtitle = document.querySelector('.subtitle');
+
+  // Keep visible branding, browser title, social metadata and schema in sync with the app name.
+  const h1 = document.querySelector('.title-row h1');
+  if (h1) h1.textContent = APP_NAME;
+  document.title = `${APP_NAME} — Free 3D Model Optimizer for Games & 3D Printing`;
+  const setMeta = (selector, value) => {
+    const el = document.querySelector(selector);
+    if (el) el.setAttribute('content', value);
+  };
+  setMeta('meta[name="application-name"]', APP_NAME);
+  setMeta('meta[name="apple-mobile-web-app-title"]', APP_NAME);
+  setMeta('meta[property="og:site_name"]', APP_NAME);
+  setMeta('meta[property="og:title"]', `${APP_NAME} — 3D Model Optimizer for Games & 3D Printing`);
+  setMeta('meta[name="twitter:title"]', `${APP_NAME} — 3D Model Optimizer`);
+  const schema = document.querySelector('script[type="application/ld+json"]');
+  if (schema) {
+    try {
+      const data = JSON.parse(schema.textContent);
+      data.name = APP_NAME;
+      schema.textContent = JSON.stringify(data);
+    } catch {}
+  }
+
   const badge = document.querySelector('.version-badge');
   if (badge) badge.textContent = `v${VERSION}`;
 
