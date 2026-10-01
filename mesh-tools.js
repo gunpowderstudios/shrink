@@ -1,16 +1,16 @@
 // Shrink mesh tools — pure algorithms (no DOM). Works in the browser and in Node tests.
 // three / three-mesh-bvh are injected by the caller so this file has no hard dependency on how they are loaded.
 import { compactPrimitive, getPrimitiveVertexCount, weld } from '@gltf-transform/functions';
-import { reduceIndices } from './reduce-core.js?v=1.75';
+import { reduceIndices } from './reduce-core.js?v=1.85';
 
 /* ------------------------------------------------------------------ */
 /* Size estimates                                                      */
 /* ------------------------------------------------------------------ */
-export function stlBytes(tris) { return 84 + 50 * tris; }                       // binary STL is exact
-export function objBytesEstimate(tris) { return Math.round(tris * 42); }         // text, ~6 decimals, indexed
+export function stlBytes(tris) { return 84 + 50 * tris; }
+export function objBytesEstimate(tris) { return Math.round(tris * 42); }
 export function glbBytesEstimate(tris, { meshopt = true, textureBytes = 0 } = {}) {
   const verts = tris / 2;
-  const raw = verts * 32 + tris * 12;            // pos+normal+uv + 32-bit indices
+  const raw = verts * 32 + tris * 12;
   return Math.round((meshopt ? raw * 0.4 : raw) + textureBytes);
 }
 
@@ -19,7 +19,7 @@ export function glbBytesEstimate(tris, { meshopt = true, textureBytes = 0 } = {}
 /* ------------------------------------------------------------------ */
 export class DabIndex {
   constructor(dabs) {
-    this.dabs = dabs;                              // flat array [x,y,z,r, x,y,z,r, ...]
+    this.dabs = dabs;
     this.count = dabs.length / 4;
     let maxR = 0;
     for (let i = 0; i < this.count; i++) maxR = Math.max(maxR, dabs[i * 4 + 3]);
@@ -47,7 +47,7 @@ export class DabIndex {
   }
 }
 
-function applyMat(m, x, y, z) {                    // column-major 4x4 (gl-matrix / glTF layout)
+function applyMat(m, x, y, z) {
   return [
     m[0] * x + m[4] * y + m[8] * z + m[12],
     m[1] * x + m[5] * y + m[9] * z + m[13],
@@ -62,6 +62,24 @@ function applyMat(m, x, y, z) {                    // column-major 4x4 (gl-matri
 // areas keep their triangles and the rest of the model absorbs the reduction.
 export async function simplifyWithProtection(document, { ratio, error = 0.05, dabs = [], simplifier, lockBorder = false, protectKeep = 1 } = {}) {
   await simplifier.ready;
+
+  // Some game GLBs contain triangle primitives without an index accessor. The live Three.js reducer can
+  // reduce those, but the old file-save path skipped them completely. Give every triangle primitive a simple
+  // sequential index first, then let weld merge duplicate vertices/seams where it safely can. This keeps the
+  // saved GLB on the same reduction path as the live preview instead of silently leaving whole meshes untouched.
+  for (const mesh of document.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      if (prim.getMode() !== 4 || prim.getIndices()) continue;
+      const position = prim.getAttribute('POSITION');
+      if (!position) continue;
+      const count = position.getCount();
+      const arr = count <= 65534 ? new Uint16Array(count) : new Uint32Array(count);
+      for (let i = 0; i < count; i++) arr[i] = i;
+      const buffer = position.getBuffer() || document.getRoot().listBuffers()[0] || document.createBuffer();
+      prim.setIndices(document.createAccessor().setType('SCALAR').setArray(arr).setBuffer(buffer));
+    }
+  }
+
   await document.transform(weld({ overwrite: false }));
   const index = dabs.length ? new DabIndex(dabs) : null;
   let before = 0, after = 0, locked = 0, protectedTris = 0, keepUsed = 1;
@@ -71,14 +89,14 @@ export async function simplifyWithProtection(document, { ratio, error = 0.05, da
     const world = parentNode ? parentNode.getWorldMatrix() : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
     for (const prim of mesh.listPrimitives()) {
-      if (prim.getMode() !== 4) continue;          // triangles only
+      if (prim.getMode() !== 4) continue;
       const srcVertexCount = getPrimitiveVertexCount(prim, 'upload');
       const srcIndexCount = getPrimitiveVertexCount(prim, 'render');
       if (srcIndexCount < srcVertexCount / 2) compactPrimitive(prim);
 
       const position = prim.getAttribute('POSITION');
       const srcIndices = prim.getIndices();
-      if (!srcIndices) continue;
+      if (!position || !srcIndices) continue;
       let positions = position.getArray();
       if (!(positions instanceof Float32Array)) {
         const out = new Float32Array(positions.length);
@@ -108,6 +126,8 @@ export async function simplifyWithProtection(document, { ratio, error = 0.05, da
       const newIdx = document.createAccessor().setType('SCALAR').setArray(dst).setBuffer(srcIndices.getBuffer());
       prim.setIndices(newIdx);
       if (srcIndices.listParents().filter(p => p.propertyType !== 'Root').length === 0) srcIndices.dispose();
+
+      // Important for file size: remove vertices/attributes that are no longer referenced by the reduced index list.
       compactPrimitive(prim);
       const dstVertexCount = getPrimitiveVertexCount(prim, 'upload');
       if (dstVertexCount <= 65534) prim.getIndices().setArray(new Uint16Array(prim.getIndices().getArray()));
@@ -119,8 +139,6 @@ export async function simplifyWithProtection(document, { ratio, error = 0.05, da
 /* ------------------------------------------------------------------ */
 /* Detail-loss measurement                                             */
 /* ------------------------------------------------------------------ */
-// For every vertex of the ORIGINAL model, measure how far it now sits from the REDUCED surface.
-// (Measuring reduced -> original would read ~0 because decimation keeps a subset of original vertices.)
 export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onProgress, chunk = 12000, stride = 1, yieldToUi = true }) {
   original.updateMatrixWorld(true);
   reduced.updateMatrixWorld(true);
@@ -166,7 +184,6 @@ export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onP
     results.push({ mesh, distances });
   }
 
-  // statistics (sampled for percentiles)
   let sum = 0, max = 0, n = 0;
   const sample = [];
   const keepEvery = Math.max(1, Math.floor(total / stride / 120000));
@@ -181,7 +198,6 @@ export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onP
   return { results, stats: { count: n, mean: n ? sum / n : 0, max, p50: pct(0.5), p95: pct(0.95), p99: pct(0.99) } };
 }
 
-// ratio = loss / printer detail. Blue = invisible at print resolution, green = about one pixel, yellow/red = visible.
 const RAMP = [
   [0.0, [0.10, 0.25, 0.95]],
   [0.5, [0.10, 0.75, 0.95]],
@@ -212,9 +228,8 @@ export function heatColorArray(distances, mmPerUnit, detailMM) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Exporters (from a three.js model, so they work for edited/optimised) */
+/* Exporters                                                           */
 /* ------------------------------------------------------------------ */
-// opts: { THREE, mmPerUnit, zUp }  -> transform: world * mmPerUnit, optional Y-up -> Z-up (x, -z, y)
 function collectTriangles(THREE, model, { mmPerUnit = 1, zUp = true }) {
   model.updateMatrixWorld(true);
   const v = new THREE.Vector3();
@@ -299,7 +314,6 @@ export function modelHeight(THREE, model) {
   return box.isEmpty() ? 0 : box.max.y - box.min.y;
 }
 
-// Area-weighted smooth vertex normals for an indexed triangle mesh.
 export function smoothNormals(positions, indices) {
   const n = new Float32Array(positions.length);
   for (let t = 0; t + 2 < indices.length; t += 3) {
@@ -316,12 +330,9 @@ export function smoothNormals(positions, indices) {
   return n;
 }
 
-
 /* ------------------------------------------------------------------ */
 /* Printability: is the surface watertight?                            */
 /* ------------------------------------------------------------------ */
-// Vertices that sit at the same position (UV seams, hard edges) are treated as one, then every edge is counted:
-// a closed surface has each edge shared by exactly two triangles.
 export function analyzeTopology(THREE, model) {
   model.updateMatrixWorld(true);
   let openEdges = 0, nonManifold = 0, triangles = 0, degenerate = 0;
