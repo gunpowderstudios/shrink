@@ -1,6 +1,7 @@
 // Shrink mesh tools — pure algorithms (no DOM). Works in the browser and in Node tests.
 // three / three-mesh-bvh are injected by the caller so this file has no hard dependency on how they are loaded.
 import { compactPrimitive, getPrimitiveVertexCount, weld } from '@gltf-transform/functions';
+import { reduceIndices } from './reduce-core.js?v=1.7';
 
 /* ------------------------------------------------------------------ */
 /* Size estimates                                                      */
@@ -67,7 +68,7 @@ export async function simplifyWithProtection(document, { ratio, error = 0.05, da
 
   for (const mesh of document.getRoot().listMeshes()) {
     const parentNode = mesh.listParents().find(p => p.propertyType === 'Node');
-    const world = parentNode ? parentNode.getWorldMatrix() : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    const world = parentNode ? parentNode.getWorldMatrix() : [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
     for (const prim of mesh.listPrimitives()) {
       if (prim.getMode() !== 4) continue;          // triangles only
@@ -97,32 +98,10 @@ export async function simplifyWithProtection(document, { ratio, error = 0.05, da
         }
       }
 
-      const target = Math.floor(ratio * indices.length / 3) * 3;
-      const flags = lockBorder ? ['LockBorder'] : [];
-      const dummy = new Float32Array(position.getCount());
-      const run = (idx, lk, tgt) => simplifier.simplifyWithAttributes(idx, positions, 3, dummy, 1, [0], lk, tgt, error, flags)[0];
-
-      let work = indices;
-      if (lock) {
-        let prot = 0;
-        for (let t = 0; t < indices.length; t += 3) if (lock[indices[t]] && lock[indices[t + 1]] && lock[indices[t + 2]]) prot++;
-        // The painted area may use at most ~60% of the triangle budget; beyond that it is thinned a little
-        // so the rest of the model is not destroyed to pay for it.
-        const cap = 0.6 * (target / 3);
-        const keepEff = prot ? Math.min(protectKeep, cap / prot) : 1;
-        keepUsed = Math.min(keepUsed, keepEff);
-        if (keepEff < 1) {
-          // Stage A: freeze everything OUTSIDE the painted area and thin only the painted area.
-          const inverse = new Uint8Array(lock.length);
-          for (let i = 0; i < lock.length; i++) inverse[i] = lock[i] ? 0 : 1;
-          const total = indices.length / 3;
-          const targetA = Math.max(0, Math.min(total, Math.floor(total - prot * (1 - keepEff)))) * 3;
-          work = run(indices, inverse, targetA);
-        }
-      }
-      // Stage B: freeze the painted area, let everything else absorb the reduction.
-      const dst = run(work, lock, target);
-      if (lock) for (let t = 0; t < dst.length; t += 3) if (lock[dst[t]] && lock[dst[t + 1]] && lock[dst[t + 2]]) protectedTris++;
+      const r = reduceIndices({ simplifier, positions, indices, lock, ratio, error, protectKeep, lockBorder });
+      const dst = r.indices;
+      keepUsed = Math.min(keepUsed, r.protectKeepUsed);
+      protectedTris += r.protectedTriangles;
 
       before += indices.length / 3;
       after += dst.length / 3;
@@ -142,7 +121,7 @@ export async function simplifyWithProtection(document, { ratio, error = 0.05, da
 /* ------------------------------------------------------------------ */
 // For every vertex of the ORIGINAL model, measure how far it now sits from the REDUCED surface.
 // (Measuring reduced -> original would read ~0 because decimation keeps a subset of original vertices.)
-export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onProgress, chunk = 12000 }) {
+export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onProgress, chunk = 12000, stride = 1, yieldToUi = true }) {
   original.updateMatrixWorld(true);
   reduced.updateMatrixWorld(true);
 
@@ -165,10 +144,10 @@ export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onP
 
   for (const mesh of meshes) {
     const pos = mesh.geometry.attributes.position;
-    const distances = new Float32Array(pos.count);
+    const distances = new Float32Array(pos.count).fill(stride > 1 ? NaN : 0);
     for (let start = 0; start < pos.count; start += chunk) {
       const end = Math.min(pos.count, start + chunk);
-      for (let i = start; i < end; i++) {
+      for (let i = start; i < end; i += stride) {
         w.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
         let best = Infinity;
         for (const t of targets) {
@@ -182,7 +161,7 @@ export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onP
       }
       done += end - start;
       if (onProgress) onProgress(done / total);
-      await new Promise(r => setTimeout(r, 0));
+      if (yieldToUi) await new Promise(r => setTimeout(r, 0));
     }
     results.push({ mesh, distances });
   }
@@ -190,10 +169,12 @@ export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onP
   // statistics (sampled for percentiles)
   let sum = 0, max = 0, n = 0;
   const sample = [];
-  const stride = Math.max(1, Math.floor(total / 120000));
+  const keepEvery = Math.max(1, Math.floor(total / stride / 120000));
+  let seen = 0;
   for (const r of results) for (let i = 0; i < r.distances.length; i++) {
-    const d = r.distances[i]; sum += d; n++; if (d > max) max = d;
-    if (i % stride === 0) sample.push(d);
+    const d = r.distances[i]; if (Number.isNaN(d)) continue;
+    sum += d; n++; if (d > max) max = d;
+    if (seen++ % keepEvery === 0) sample.push(d);
   }
   sample.sort((a, b) => a - b);
   const pct = p => sample.length ? sample[Math.min(sample.length - 1, Math.floor(p * sample.length))] : 0;
@@ -333,4 +314,48 @@ export function smoothNormals(positions, indices) {
     n[i] /= l; n[i + 1] /= l; n[i + 2] /= l;
   }
   return n;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Printability: is the surface watertight?                            */
+/* ------------------------------------------------------------------ */
+// Vertices that sit at the same position (UV seams, hard edges) are treated as one, then every edge is counted:
+// a closed surface has each edge shared by exactly two triangles.
+export function analyzeTopology(THREE, model) {
+  model.updateMatrixWorld(true);
+  let openEdges = 0, nonManifold = 0, triangles = 0, degenerate = 0;
+  model.traverse(mesh => {
+    if (!mesh.isMesh || !mesh.geometry?.attributes?.position) return;
+    const g = mesh.geometry, pos = g.attributes.position, n = pos.count;
+    let min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    const px = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { const v = k === 0 ? pos.getX(i) : k === 1 ? pos.getY(i) : pos.getZ(i); px[i * 3 + k] = v; if (v < min[k]) min[k] = v; if (v > max[k]) max[k] = v; }
+    const ext = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]) || 1;
+    const q = 100000 / ext, K = 131072;
+    const canon = new Int32Array(n), seen = new Map();
+    for (let i = 0; i < n; i++) {
+      const key = ((Math.round((px[i * 3] - min[0]) * q) * K) + Math.round((px[i * 3 + 1] - min[1]) * q)) * K + Math.round((px[i * 3 + 2] - min[2]) * q);
+      const c = seen.get(key);
+      if (c === undefined) { seen.set(key, i); canon[i] = i; } else canon[i] = c;
+    }
+    const idx = g.index, count = idx ? idx.count : n, tri = Math.floor(count / 3);
+    const keys = new Float64Array(tri * 3);
+    let e = 0;
+    for (let t = 0; t < tri; t++) {
+      const a = canon[idx ? idx.getX(t * 3) : t * 3], b = canon[idx ? idx.getX(t * 3 + 1) : t * 3 + 1], c = canon[idx ? idx.getX(t * 3 + 2) : t * 3 + 2];
+      if (a === b || b === c || a === c) { degenerate++; continue; }
+      keys[e++] = Math.min(a, b) * n + Math.max(a, b);
+      keys[e++] = Math.min(b, c) * n + Math.max(b, c);
+      keys[e++] = Math.min(c, a) * n + Math.max(c, a);
+      triangles++;
+    }
+    const sorted = keys.subarray(0, e).sort();
+    for (let i = 0; i < sorted.length;) {
+      let j = i + 1; while (j < sorted.length && sorted[j] === sorted[i]) j++;
+      const run = j - i; if (run === 1) openEdges++; else if (run > 2) nonManifold++;
+      i = j;
+    }
+  });
+  return { openEdges, nonManifold, triangles, degenerate, watertight: openEdges === 0 && nonManifold === 0 };
 }
