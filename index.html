@@ -16,27 +16,27 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <link rel="canonical" href="https://gunpowderstudios.github.io/shrink/" />
-  <link rel="icon" type="image/png" href="./src/app-icon.png?v=1.64" />
-  <link rel="apple-touch-icon" href="./src/app-icon.png?v=1.64" />
-  <link rel="manifest" href="./manifest.webmanifest?v=1.64" />
+  <link rel="icon" type="image/png" href="./src/app-icon.png?v=1.7" />
+  <link rel="apple-touch-icon" href="./src/app-icon.png?v=1.7" />
+  <link rel="manifest" href="./manifest.webmanifest?v=1.7" />
 
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="en_GB" />
   <meta property="og:site_name" content="SHRINK" />
   <meta property="og:title" content="SHRINK — 3D Model Optimizer for Games & 3D Printing" />
-  <meta property="og:description" content="Reduce and optimise GLB, STL, OBJ and PLY models directly in your browser. Shrink game assets, protect printable detail, compare results and export smaller 3D files." />
+  <meta property="og:description" content="Reduce and optimise GLB, STL, OBJ and PLY models directly in your browser. Live-preview polygon reduction, game asset optimisation and resin-print detail checks." />
   <meta property="og:url" content="https://gunpowderstudios.github.io/shrink/" />
   <meta property="og:image" content="https://gunpowderstudios.github.io/shrink/src/app-icon.png" />
   <meta property="og:image:alt" content="SHRINK 3D model optimizer app icon" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="SHRINK — 3D Model Optimizer" />
-  <meta name="twitter:description" content="Reduce and optimise 3D files for gaming or 3D printing, directly in your browser." />
+  <meta name="twitter:description" content="Live-preview 3D model reduction and optimisation for gaming or 3D printing, directly in your browser." />
   <meta name="twitter:image" content="https://gunpowderstudios.github.io/shrink/src/app-icon.png" />
   <meta name="twitter:image:alt" content="SHRINK 3D model optimizer app icon" />
 
-  <link rel="stylesheet" href="./style.css?v=1.64" />
-  <link rel="stylesheet" href="./ui-mode.css?v=1.64" />
+  <link rel="stylesheet" href="./style.css?v=1.7" />
+  <link rel="stylesheet" href="./ui-mode.css?v=1.7" />
 
   <script type="application/ld+json">
   {
@@ -45,24 +45,21 @@
     "name": "SHRINK",
     "url": "https://gunpowderstudios.github.io/shrink/",
     "image": "https://gunpowderstudios.github.io/shrink/src/app-icon.png",
-    "description": "A browser-based 3D model optimizer for reducing and optimising GLB, STL, OBJ and PLY files for gaming or 3D printing.",
+    "description": "A browser-based 3D model optimizer with live mesh reduction for GLB, STL, OBJ and PLY files for gaming or 3D printing.",
     "applicationCategory": "MultimediaApplication",
     "operatingSystem": "Any modern web browser",
     "browserRequirements": "Requires JavaScript and WebGL",
-    "creator": {
-      "@type": "Organization",
-      "name": "Gunpowder Studios",
-      "url": "https://www.gunpowderstudios.co.uk/"
-    },
+    "creator": {"@type":"Organization","name":"Gunpowder Studios","url":"https://www.gunpowderstudios.co.uk/"},
     "featureList": [
+      "Live 3D polygon reduction preview",
       "GLB game model optimisation",
       "STL, OBJ and PLY mesh reduction",
-      "Polygon reduction",
       "Texture resizing and WebP compression",
       "Direct 3D texture painting and cloning",
       "Protected-detail reduction for 3D printing",
       "Original versus reduced comparison",
       "3D print detail-loss visualisation",
+      "Watertight and topology checks",
       "STL and OBJ export"
     ]
   }
@@ -84,7 +81,7 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">GUNPOWDER STUDIOS</div>
-        <div class="title-row"><h1>SHRINK</h1><span class="version-badge">v1.64</span></div>
+        <div class="title-row"><h1>SHRINK</h1><span class="version-badge">v1.7</span></div>
         <p class="subtitle">An app for reducing and optimising 3D files for gaming or 3D printing.</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
@@ -114,163 +111,116 @@
           <div class="stat"><span>Textures</span><strong id="textureCount">—</strong></div>
         </div>
 
-        <section id="textureEditor" class="texture-editor hidden">
-          <div class="section-heading">
-            <div>
-              <div class="label">TEXTURE RETOUCH</div>
-              <strong>Paint over plates, stickers &amp; marks</strong>
+        <section id="stepSetup" class="step">
+          <div class="step-head"><span class="step-num">1</span><div><strong id="setupTitle">Where will it be used?</strong><small id="setupSub">Pick one — it sets sensible limits for you.</small></div></div>
+          <div id="targetCards" class="target-cards game-only">
+            <button type="button" class="target-card" data-target="web"><span class="t-icon">🌐</span><b>Web / mobile</b><small>~25k triangles<br>1024 px textures</small></button>
+            <button type="button" class="target-card active" data-target="pc"><span class="t-icon">🖥</span><b>PC / console</b><small>~100k triangles<br>2048 px textures</small></button>
+            <button type="button" class="target-card" data-target="hero"><span class="t-icon">🎬</span><b>Close-up / hero</b><small>~300k triangles<br>4096 px textures</small></button>
+          </div>
+          <div id="budgetChip" class="chip game-only" hidden></div>
+          <div class="print-only print-setup">
+            <div class="field-grid">
+              <label class="field"><span>Finished height (mm)</span><input id="figureHeightMm" type="number" min="1" step="any" value="75" title="How tall the printed figure will be." /></label>
+              <label class="field"><span>Printer</span>
+                <select id="printerPreset">
+                  <option value="0.05" selected>Resin 8K / 9K (e.g. Mars 5 Ultra)</option>
+                  <option value="0.1">Resin 2K–4K</option>
+                  <option value="0.2">FDM filament</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </label>
             </div>
-            <span id="textureDimensions" class="texture-dimensions">—</span>
+            <label class="field custom-detail" id="customDetailField" hidden><span>Smallest detail it can show (mm)</span><input id="printerDetailMm" type="number" min="0.005" step="0.005" value="0.05" /></label>
+            <div class="hint" id="printerHint">Sending it to someone else? Pick <em>their</em> printer — the check below uses it.</div>
           </div>
-
-          <div class="control-block compact">
-            <label for="textureSelect">Texture</label>
-            <select id="textureSelect"></select>
-          </div>
-
-          <div class="paint-toolbar" role="group" aria-label="Texture paint tools">
-            <button id="brushToolBtn" class="button tool active" type="button">Brush</button>
-            <button id="eyedropperToolBtn" class="button tool" type="button">Eyedropper</button>
-            <input id="paintColor" class="paint-color" type="color" value="#000000" aria-label="Paint colour" />
-            <button id="blackSwatchBtn" class="swatch black" type="button" aria-label="Black"></button>
-            <button id="whiteSwatchBtn" class="swatch white" type="button" aria-label="White"></button>
-          </div>
-
-          <div class="paint-canvas-wrap">
-            <canvas id="textureCanvas" class="texture-canvas"></canvas>
-            <div id="textureEmpty" class="texture-empty hidden">No editable image texture found.</div>
-          </div>
-
-          <div class="paint-ranges">
-            <div>
-              <div class="range-heading"><label for="brushSize">Brush size</label><output id="brushSizeValue">32 px</output></div>
-              <input id="brushSize" type="range" min="1" max="250" step="1" value="32" />
-            </div>
-            <div>
-              <div class="range-heading"><label for="brushOpacity">Opacity</label><output id="brushOpacityValue">100%</output></div>
-              <input id="brushOpacity" type="range" min="5" max="100" step="1" value="100" />
-            </div>
-          </div>
-
-          <div class="paint-actions">
-            <button id="undoPaintBtn" class="button ghost small" type="button" disabled>Undo stroke</button>
-            <button id="resetTextureBtn" class="button ghost small" type="button">Reset texture</button>
-          </div>
-          <button id="applyTextureBtn" class="button texture-apply" type="button">Apply texture to model</button>
-          <button id="saveEditedBtn" class="button ghost save-edited" type="button">Save edited GLB</button>
-          <div class="hint paint-hint">Use Paint, Clone or Pick colour above the 3D model. In Clone mode, Option/Alt-click a clean source, then brush over the unwanted detail.</div>
         </section>
 
-        <hr />
-
-        <div class="control-block">
-          <label for="preset">Preset</label>
-          <select id="preset">
-            <option value="safe">High quality</option>
-            <option value="game" selected>Balanced</option>
-            <option value="small">Small file</option>
-            <option value="aggressive">Maximum reduction</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-
-        <div class="control-block">
-          <div class="range-heading">
-            <label for="geometry">Keep polygons</label>
-            <output id="geometryValue">70%</output>
+        <section id="stepDetail" class="step">
+          <div class="step-head"><span class="step-num">2</span><div><strong>How much detail to keep?</strong><small id="detailSub">Drag the slider — the model on the right updates live.</small></div></div>
+          <div class="control-block slider-block">
+            <div class="range-heading"><label for="geometry">Detail kept</label><output id="geometryValue">70%</output></div>
+            <input id="geometry" type="range" min="1" max="100" step="0.1" value="70" />
+            <div class="slider-ends"><span>Smaller</span><span>More detail</span></div>
           </div>
-          <input id="geometry" type="range" min="1" max="100" step="0.1" value="70" />
-          <div class="hint">100% keeps all geometry. Lower values reduce the mesh.</div>
-        </div>
-
-        <section id="printPanel" class="print-panel hidden">
-          <div class="label">3D PRINT</div>
-          <strong class="print-title">Reduce a sculpt without losing visible detail</strong>
-
-          <div class="field-grid">
-            <label class="field"><span>Figure height (mm)</span><input id="figureHeightMm" type="number" min="1" step="any" value="75" /></label>
-            <label class="field"><span>Printer detail (mm)</span><input id="printerDetailMm" type="number" min="0.005" step="0.005" value="0.05" title="Smallest feature the printer can show. Elegoo Mars 5 Ultra pixel = 0.018 mm; 0.05 mm is a practical detail threshold." /></label>
+          <div class="live-card">
+            <div id="liveLine" class="live-line">—</div>
+            <div id="verdict" class="verdict" data-level="none"><span class="v-dot"></span><span id="verdictText">Measuring…</span></div>
+            <div id="verdictNums" class="verdict-nums"></div>
           </div>
-          <label class="field"><span>Target triangles</span><input id="targetTris" type="number" min="1" step="1000" /></label>
-          <div id="estimateLine" class="estimate-line">—</div>
-          <div id="actualLine" class="estimate-line actual hidden"></div>
-
-          <div class="protect-box">
-            <div class="protect-head">
-              <button id="protectBtn" class="button ghost small" type="button">Protect detail</button>
-              <button id="protectClearBtn" class="button ghost small" type="button" disabled>Clear</button>
-            </div>
-            <div class="range-heading"><label for="protectRadius">Brush radius</label><output id="protectRadiusValue">3.0 mm</output></div>
-            <input id="protectRadius" type="range" min="0.5" max="20" step="0.5" value="3" />
-            <div class="range-heading"><label for="protectKeep">Protected detail kept</label><output id="protectKeepValue">100%</output></div>
-            <input id="protectKeep" type="range" min="20" max="100" step="5" value="100" />
-            <div id="protectInfo" class="hint">Paint over faces, hands and fine ornament you want to keep sharp. Everything else is reduced first.</div>
-          </div>
-
-          <div class="export-row">
-            <button id="saveStlBtn" class="button ghost small" type="button">Save STL</button>
-            <button id="saveObjBtn" class="button ghost small" type="button">Save OBJ</button>
-          </div>
-          <label class="toggle-row zup-row"><span>Z-up for slicers (Lychee, Chitubox)</span><input id="zUpToggle" type="checkbox" checked /></label>
-          <div class="hint">STL and OBJ are saved in millimetres, scaled to the figure height above. Reduce first to save the smaller model.</div>
+          <div class="detail-row"><button id="autoBtn" class="button small auto-btn" type="button">✨ Find the smallest that still looks the same</button></div>
+          <label class="field tri-field"><span>…or type a triangle count</span><input id="targetTris" type="number" min="1" step="1000" /></label>
+          <div id="estimateLine" class="hidden"></div><div id="actualLine" class="hidden"></div>
+          <div id="topoLine" class="topo-line print-only" hidden></div>
+          <div class="hidden-legacy"><select id="preset"><option value="safe">High quality</option><option value="game" selected>Balanced</option><option value="small">Small file</option><option value="aggressive">Maximum reduction</option><option value="custom">Custom</option></select></div>
         </section>
 
-        <div class="control-block">
-          <label for="textureSize">Maximum texture size</label>
-          <select id="textureSize">
-            <option value="2048">2048 px</option>
-            <option value="1024" selected>1024 px</option>
-            <option value="512">512 px</option>
-            <option value="256">256 px</option>
-          </select>
-        </div>
+        <section id="stepExtra" class="step">
+          <div class="step-head"><span class="step-num" id="extraNum">3</span><div><strong id="extraTitle">Touch up (optional)</strong><small id="extraSub">Paint out stickers, plates or marks on the textures.</small></div></div>
+          <details id="retouchDetails" class="fold game-only"><summary>Retouch textures</summary><div class="fold-inner">
+            <section id="textureEditor" class="texture-editor hidden">
+              <div class="section-heading"><div><div class="label">TEXTURE RETOUCH</div><strong>Paint over plates, stickers &amp; marks</strong></div><span id="textureDimensions" class="texture-dimensions">—</span></div>
+              <div class="control-block compact"><label for="textureSelect">Texture</label><select id="textureSelect"></select></div>
+              <div class="paint-toolbar" role="group" aria-label="Texture paint tools">
+                <button id="brushToolBtn" class="button tool active" type="button">Brush</button>
+                <button id="eyedropperToolBtn" class="button tool" type="button">Eyedropper</button>
+                <input id="paintColor" class="paint-color" type="color" value="#000000" aria-label="Paint colour" />
+                <button id="blackSwatchBtn" class="swatch black" type="button" aria-label="Black"></button>
+                <button id="whiteSwatchBtn" class="swatch white" type="button" aria-label="White"></button>
+              </div>
+              <div class="paint-canvas-wrap"><canvas id="textureCanvas" class="texture-canvas"></canvas><div id="textureEmpty" class="texture-empty hidden">No editable image texture found.</div></div>
+              <div class="paint-ranges">
+                <div><div class="range-heading"><label for="brushSize">Brush size</label><output id="brushSizeValue">32 px</output></div><input id="brushSize" type="range" min="1" max="250" step="1" value="32" /></div>
+                <div><div class="range-heading"><label for="brushOpacity">Opacity</label><output id="brushOpacityValue">100%</output></div><input id="brushOpacity" type="range" min="5" max="100" step="1" value="100" /></div>
+              </div>
+              <div class="paint-actions"><button id="undoPaintBtn" class="button ghost small" type="button" disabled>Undo stroke</button><button id="resetTextureBtn" class="button ghost small" type="button">Reset texture</button></div>
+              <button id="applyTextureBtn" class="button texture-apply" type="button">Apply texture to model</button>
+              <button id="saveEditedBtn" class="button ghost save-edited" type="button">Save edited GLB</button>
+              <div class="hint paint-hint">Use Paint, Clone or Pick colour above the 3D model. In Clone mode, Option/Alt-click a clean source, then brush over the unwanted detail.</div>
+            </section>
+          </div></details>
 
-        <div class="control-block">
-          <div class="range-heading">
-            <label for="textureQuality">WebP texture quality</label>
-            <output id="textureQualityValue">82%</output>
+          <details id="advancedDetails" class="fold game-only"><summary>File settings</summary><div class="fold-inner">
+            <div class="control-block"><label for="textureSize">Largest texture size</label><select id="textureSize"><option value="4096">4096 px</option><option value="2048">2048 px</option><option value="1024" selected>1024 px</option><option value="512">512 px</option><option value="256">256 px</option></select></div>
+            <div class="control-block"><div class="range-heading"><label for="textureQuality">Texture quality</label><output id="textureQualityValue">82%</output></div><input id="textureQuality" type="range" min="45" max="95" step="1" value="82" /></div>
+            <div class="toggles">
+              <label class="toggle-row"><span>Smaller textures (WebP)</span><input id="webpToggle" type="checkbox" checked /></label>
+              <label class="toggle-row"><span>Shrink mesh data</span><input id="quantizeToggle" type="checkbox" checked /></label>
+              <label class="toggle-row"><span>Compress mesh (Meshopt)</span><input id="meshoptToggle" type="checkbox" checked /></label>
+            </div>
+            <div class="hint">Games read WebP + Meshopt fine in most engines. Turn these off if your engine can't load them.</div>
+          </div></details>
+
+          <section id="printPanel" class="print-only print-panel hidden">
+            <div class="protect-box">
+              <div class="protect-head"><button id="protectBtn" class="button ghost small" type="button">🖌 Protect detail</button><button id="protectClearBtn" class="button ghost small" type="button" disabled>Clear</button></div>
+              <div id="protectInfo" class="hint">Paint over faces, hands and fine ornament you want to keep sharp. Everything else is reduced first.</div>
+              <div class="range-heading"><label for="protectRadius">Brush size</label><output id="protectRadiusValue">3.0 mm</output></div><input id="protectRadius" type="range" min="0.5" max="20" step="0.5" value="3" />
+              <details class="fold tiny"><summary>Advanced</summary><div class="fold-inner"><div class="range-heading"><label for="protectKeep">Protected detail kept</label><output id="protectKeepValue">100%</output></div><input id="protectKeep" type="range" min="20" max="100" step="5" value="100" /></div></details>
+            </div>
+          </section>
+        </section>
+
+        <section id="stepSave" class="step">
+          <div class="step-head"><span class="step-num" id="saveNum">4</span><div><strong id="saveTitle">Save</strong><small id="saveSub">Builds the final file and downloads it.</small></div></div>
+          <div class="print-only export-row"><button id="saveStlBtn" class="button primary" type="button">Save STL</button><button id="saveObjBtn" class="button ghost" type="button">Save OBJ</button></div>
+          <label class="toggle-row zup-row print-only"><span>Z-up for slicers (Lychee, Chitubox)</span><input id="zUpToggle" type="checkbox" checked /></label>
+          <div id="exportNote" class="hint print-only">STL / OBJ hold only the shape, in millimetres at your finished height — no textures.</div>
+          <button id="optimizeBtn" class="button primary save-main" data-label="Save game GLB">Save game GLB</button>
+          <div id="progressWrap" class="progress-wrap hidden" aria-live="polite"><div class="progress-track"><div id="progressBar" class="progress-bar"></div></div><div id="progressLabel" class="progress-label">Starting…</div></div>
+          <div id="status" class="status">Ready.</div>
+          <div id="resultCard" class="result-card hidden">
+            <div class="result-top"><div><span>File</span><strong id="optimizedSize">—</strong></div><div id="savingBadge" class="saving-badge">—</div></div>
+            <div class="stats-grid result-stats"><div class="stat"><span>Triangles</span><strong id="optimizedTriangleCount">—</strong></div><div class="stat"><span>Vertices</span><strong id="optimizedVertexCount">—</strong></div></div>
+            <div id="keptLine" class="kept-line"></div><button id="downloadBtn" class="button download">Download again</button>
           </div>
-          <input id="textureQuality" type="range" min="45" max="95" step="1" value="82" />
-        </div>
-
-        <div class="toggles">
-          <label class="toggle-row"><span>Convert textures to WebP</span><input id="webpToggle" type="checkbox" checked /></label>
-          <label class="toggle-row"><span>Quantize mesh data</span><input id="quantizeToggle" type="checkbox" checked /></label>
-          <label class="toggle-row"><span>Meshopt compression</span><input id="meshoptToggle" type="checkbox" checked /></label>
-        </div>
-
-        <button id="optimizeBtn" class="button primary">Optimize game model</button>
-        <div id="progressWrap" class="progress-wrap hidden" aria-live="polite">
-          <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
-          <div id="progressLabel" class="progress-label">Starting…</div>
-        </div>
-        <div id="status" class="status">Ready.</div>
-
-        <div id="resultCard" class="result-card hidden">
-          <div class="result-top">
-            <div><span>Optimized</span><strong id="optimizedSize">—</strong></div>
-            <div id="savingBadge" class="saving-badge">—</div>
-          </div>
-          <div class="stats-grid result-stats">
-            <div class="stat"><span>Triangles</span><strong id="optimizedTriangleCount">—</strong></div>
-            <div class="stat"><span>Vertices</span><strong id="optimizedVertexCount">—</strong></div>
-          </div>
-          <button id="downloadBtn" class="button download">Save optimized GLB</button>
-        </div>
+        </section>
       </aside>
 
       <section class="viewer-panel panel">
         <div class="viewer-toolbar">
-          <div class="segmented" role="group" aria-label="Viewer model">
-            <button id="showOriginalBtn" class="segment active">Original / Edited</button>
-            <button id="showOptimizedBtn" class="segment" disabled>Optimized</button>
-          </div>
-          <div class="viewer-actions">
-            <button id="compareBtn" class="button ghost small" title="Compare original and optimized model">Compare</button>
-            <button id="heatBtn" class="button ghost small" title="Show detail loss against the original model">Detail loss</button>
-            <button id="wireframeBtn" class="button ghost small">Wireframe</button>
-            <button id="resetViewBtn" class="button ghost small">Reset view</button>
-          </div>
+          <div class="segmented" role="group" aria-label="Viewer model"><button id="showOriginalBtn" class="segment active">Original</button><button id="showOptimizedBtn" class="segment" disabled>Reduced</button></div>
+          <div class="viewer-actions"><button id="compareBtn" class="button ghost small" title="Compare original and optimized model">Compare</button><button id="heatBtn" class="button ghost small" title="Show detail loss against the original model">Detail loss</button><button id="wireframeBtn" class="button ghost small">Wireframe</button><button id="resetViewBtn" class="button ghost small">Reset view</button></div>
         </div>
         <div id="viewer" class="viewer"><div id="heatLegend" class="heat-legend" style="display:none"></div></div>
         <div class="viewer-help">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
@@ -278,12 +228,14 @@
     </section>
   </main>
 
-  <script type="module" src="./paint3d.js?v=1.64"></script>
-  <script type="module" src="./app.js?v=1.64"></script>
-  <script type="module" src="./paint-input-fix.js?v=1.64"></script>
-  <script type="module" src="./brush-cursor.js?v=1.64"></script>
-  <script type="module" src="./print-tools.js?v=1.64"></script>
-  <script type="module" src="./ui-mode.js?v=1.64"></script>
-  <script type="module" src="./print-preview-fix.js?v=1.64"></script>
+  <script type="module" src="./paint3d.js?v=1.7"></script>
+  <script type="module" src="./app.js?v=1.7"></script>
+  <script type="module" src="./v17-app-compat.js?v=1.7"></script>
+  <script type="module" src="./paint-input-fix.js?v=1.7"></script>
+  <script type="module" src="./brush-cursor.js?v=1.7"></script>
+  <script type="module" src="./print-tools.js?v=1.7"></script>
+  <script type="module" src="./v17-print-compat.js?v=1.7"></script>
+  <script type="module" src="./ui-mode.js?v=1.7"></script>
+  <script type="module" src="./live-ui.js?v=1.7"></script>
 </body>
 </html>
