@@ -1,11 +1,20 @@
-// SHRINK 3D v1.71 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.72 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.71';
+  const VERSION = '1.72';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
   const header = document.querySelector('.topbar');
   const dropZone = $('dropZone'), fileInput = $('fileInput'), subtitle = document.querySelector('.subtitle');
+
+  // Load the Matrix background theme after the core styles so it can gently override them.
+  if (!document.querySelector('link[data-shrink-matrix-theme]')) {
+    const theme = document.createElement('link');
+    theme.rel = 'stylesheet';
+    theme.href = `./matrix-theme.css?v=${VERSION}`;
+    theme.dataset.shrinkMatrixTheme = 'true';
+    document.head.appendChild(theme);
+  }
 
   // Keep visible branding, browser title, social metadata and schema in sync with the app name.
   const h1 = document.querySelector('.title-row h1');
