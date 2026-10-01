@@ -1,9 +1,10 @@
 import './preview-material-fix.js?v=1.76';
+import './split-print.js?v=1.78';
 import './fuse-export.js?v=1.77';
 
-// SHRINK 3D v1.77 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.78 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.77';
+  const VERSION = '1.78';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
