@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=1.79';
+import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=1.80';
 
-// SHRINK 3D v1.79 — optional print export Boolean union / make-manifold pass.
+// SHRINK 3D v1.80 — optional print export Boolean union / make-manifold pass.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 const say = (msg, error = false) => app()?.setStatus?.(msg, error);
@@ -37,6 +37,14 @@ function sourceModel() {
   return app()?.optimizedModel || app()?.originalModel || null;
 }
 
+function statusText(solid) {
+  try {
+    const s = solid?.status?.();
+    if (s == null || s === 0 || String(s).toLowerCase() === 'noerror') return '';
+    return String(s);
+  } catch { return ''; }
+}
+
 function meshToSolid(mesh, wasm) {
   const { Mesh, Manifold } = wasm;
   const g = mesh.geometry;
@@ -67,9 +75,19 @@ function meshToSolid(mesh, wasm) {
   }
 
   const mg = new Mesh({ numProp: 3, vertProperties: verts, triVerts: tris });
-  try { mg.merge(); } catch {}
-  const solid = Manifold.ofMesh(mg);
-  try { mg.delete?.(); } catch {}
+  try { mg.merge(); } catch (err) { console.warn('Manifold mesh.merge warning:', err); }
+  let solid = null;
+  try {
+    solid = new Manifold(mg);
+  } finally {
+    try { mg.delete?.(); } catch {}
+  }
+  const status = statusText(solid);
+  if (solid?.isEmpty?.()) {
+    try { solid.delete?.(); } catch {}
+    throw new Error(status ? `Manifold rejected a mesh part: ${status}` : 'Manifold rejected a mesh part as non-manifold.');
+  }
+  if (status) console.warn('Manifold import status:', status);
   return solid;
 }
 
@@ -101,6 +119,7 @@ function solidToThree(solid) {
 async function fuseModel(model) {
   const wasm = await loadManifold();
   const solids = [];
+  const failures = [];
   model.updateMatrixWorld(true);
   model.traverse(obj => {
     if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
@@ -108,19 +127,22 @@ async function fuseModel(model) {
       const solid = meshToSolid(obj, wasm);
       if (solid) solids.push(solid);
     } catch (err) {
+      failures.push(err?.message || String(err));
       console.warn('Could not convert one mesh part to a manifold solid', err);
     }
   });
-  if (!solids.length) throw new Error('No printable solid parts could be read from this model.');
+  if (!solids.length) {
+    const reason = failures[0] ? ` ${failures[0]}` : '';
+    throw new Error(`No printable solid parts could be read from this model.${reason}`);
+  }
 
   let result = null;
   let pieces = [];
   try {
     result = solids.length === 1 ? solids[0] : wasm.Manifold.union(solids);
-    const status = result.status?.();
-    if (status && String(status).toLowerCase() !== 'noerror' && String(status) !== '0') {
-      console.warn('Manifold status:', status);
-    }
+    const status = statusText(result);
+    if (status) console.warn('Manifold union status:', status);
+    if (result?.isEmpty?.()) throw new Error(status ? `Boolean union failed: ${status}` : 'Boolean union produced an empty mesh.');
     pieces = result.decompose();
     const components = pieces.length;
     const root = solidToThree(result);
