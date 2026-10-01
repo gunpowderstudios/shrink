@@ -1,17 +1,22 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=1.78';
+import { buildBinaryStl } from './mesh-tools.js?v=1.79';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v1.78 — split tall print models into watertight STL sections with keyed alignment pegs.
+// SHRINK 3D v1.79 — split tall print models into watertight STL sections with keyed alignment pegs.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 const say = (msg, error = false) => app()?.setStatus?.(msg, error);
 
+const MANIFOLD_JS = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.js';
+const MANIFOLD_WASM = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.wasm';
 let manifoldPromise = null;
 async function loadManifold() {
   if (!manifoldPromise) {
-    manifoldPromise = import('https://esm.sh/manifold-3d@3.5.1?bundle').then(async mod => {
-      const wasm = await mod.default();
+    manifoldPromise = import(MANIFOLD_JS).then(async mod => {
+      const factory = mod.default;
+      const wasm = await factory({
+        locateFile: path => path.endsWith('.wasm') ? MANIFOLD_WASM : new URL(path, MANIFOLD_JS).href
+      });
       wasm.setup();
       return wasm;
     });
@@ -86,7 +91,6 @@ function disposeThree(root) {
 }
 
 async function modelToSolid(model, wasm) {
-  // Splitting needs a single manifold body first. Reuse the fuse pass when available.
   let fusedRoot = null;
   if (window.__shrinkFuse?.fuseModel) {
     const fused = await window.__shrinkFuse.fuseModel(model);
@@ -119,8 +123,7 @@ function partCount() {
 }
 
 function boundsFor(model) {
-  const box = new THREE.Box3().setFromObject(model);
-  return box;
+  return new THREE.Box3().setFromObject(model);
 }
 
 let previewGroup = null;
@@ -220,7 +223,7 @@ async function splitSolid(solid, wasm, n, withPegs) {
       if (!points.length) continue;
       for (let p=0;p<Math.min(2,points.length);p++) {
         const {x,z} = points[p];
-        const r = p===0 ? radiusMain : radiusMain*.76; // asymmetry keys the orientation
+        const r = p===0 ? radiusMain : radiusMain*.76;
         let peg=null,socket=null,newLower=null,newUpper=null;
         try {
           peg = makeYCylinder(wasm, depth+eps, r, x, y-eps, z);
@@ -312,7 +315,6 @@ function injectUI() {
 
 function wire() {
   injectUI();
-  // Capture first: when splitting is enabled this owns the STL export before fuse-export's normal handler.
   $('saveStlBtn')?.addEventListener('click', exportSplitSTL, true);
 }
 
