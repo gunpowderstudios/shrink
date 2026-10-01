@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v1.87 — safety layer around optional Fuse / Split helpers.
-const VERSION = '1.87';
+// SHRINK 3D v1.88 — safety layer around optional Fuse / Split helpers.
+const VERSION = '1.88';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 
@@ -113,6 +113,8 @@ function enforcePriority() {
     fuse.dataset.safeDefaultApplied = '1';
   }
   const sync = () => {
+    // Split already runs modelToSolid() internally. Keep the standalone Fuse export
+    // toggle off while splitting so two click handlers cannot race each other.
     if (split?.value && split.value !== 'off' && fuse?.checked) fuse.checked = false;
   };
   if (split && !split.dataset.safePriority) {
