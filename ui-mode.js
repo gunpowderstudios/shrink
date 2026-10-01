@@ -1,6 +1,6 @@
-// SHRINK 3D v1.72 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.73 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.72';
+  const VERSION = '1.73';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
