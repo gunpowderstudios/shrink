@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v1.84 — safety layer around optional Fuse / Split helpers.
-const VERSION = '1.84';
+// SHRINK 3D v1.87 — safety layer around optional Fuse / Split helpers.
+const VERSION = '1.87';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 
@@ -150,7 +150,6 @@ const observer = new MutationObserver(maintain);
 observer.observe(document.documentElement, { childList: true, subtree: true });
 window.addEventListener('shrink:model-opened', maintain);
 
-// Optional features: a failed helper must never prevent the core app from running.
 Promise.allSettled([
   import(`./preview-material-fix.js?v=${VERSION}`),
   import(`./fuse-export.js?v=${VERSION}`),
