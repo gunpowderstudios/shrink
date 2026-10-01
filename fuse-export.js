@@ -1,16 +1,21 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=1.77';
+import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=1.79';
 
-// SHRINK 3D v1.77 — optional print export Boolean union / make-manifold pass.
+// SHRINK 3D v1.79 — optional print export Boolean union / make-manifold pass.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 const say = (msg, error = false) => app()?.setStatus?.(msg, error);
 
+const MANIFOLD_JS = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.js';
+const MANIFOLD_WASM = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.wasm';
 let manifoldPromise = null;
 async function loadManifold() {
   if (!manifoldPromise) {
-    manifoldPromise = import('https://esm.sh/manifold-3d@3.5.1?bundle').then(async mod => {
-      const wasm = await mod.default();
+    manifoldPromise = import(MANIFOLD_JS).then(async mod => {
+      const factory = mod.default;
+      const wasm = await factory({
+        locateFile: path => path.endsWith('.wasm') ? MANIFOLD_WASM : new URL(path, MANIFOLD_JS).href
+      });
       wasm.setup();
       return wasm;
     });
@@ -62,7 +67,6 @@ function meshToSolid(mesh, wasm) {
   }
 
   const mg = new Mesh({ numProp: 3, vertProperties: verts, triVerts: tris });
-  // Best-effort repair for STL-style duplicate/open seams before constructing the solid.
   try { mg.merge(); } catch {}
   const solid = Manifold.ofMesh(mg);
   try { mg.delete?.(); } catch {}
@@ -113,7 +117,6 @@ async function fuseModel(model) {
   let pieces = [];
   try {
     result = solids.length === 1 ? solids[0] : wasm.Manifold.union(solids);
-    // Force evaluation before asking how many disconnected components remain.
     const status = result.status?.();
     if (status && String(status).toLowerCase() !== 'noerror' && String(status) !== '0') {
       console.warn('Manifold status:', status);
@@ -173,7 +176,6 @@ async function fusedExport(kind, evt) {
 
   try {
     say('Fusing overlapping parts and removing internal geometry…');
-    // Let the UI repaint before the WASM Boolean operation starts.
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
     const { root, components } = await fuseModel(model);
     if (components !== 1) {
@@ -212,4 +214,4 @@ function wire() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true });
 else wire();
 
-window.__shrinkFuse = { fuseModel };
+window.__shrinkFuse = { fuseModel, loadManifold };
