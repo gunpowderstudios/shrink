@@ -1,17 +1,16 @@
 import './preview-material-fix.js?v=1.76';
-import './split-print.js?v=1.78';
-import './fuse-export.js?v=1.77';
+import './split-print.js?v=1.79';
+import './fuse-export.js?v=1.79';
 
-// SHRINK 3D v1.78 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.79 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.78';
+  const VERSION = '1.79';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
   const header = document.querySelector('.topbar');
   const dropZone = $('dropZone'), fileInput = $('fileInput'), subtitle = document.querySelector('.subtitle');
 
-  // Load the Matrix background theme after the core styles so it can gently override them.
   if (!document.querySelector('link[data-shrink-matrix-theme]')) {
     const theme = document.createElement('link');
     theme.rel = 'stylesheet';
@@ -20,7 +19,6 @@ import './fuse-export.js?v=1.77';
     document.head.appendChild(theme);
   }
 
-  // Keep visible branding, browser title, social metadata and schema in sync with the app name.
   const h1 = document.querySelector('.title-row h1');
   if (h1) h1.textContent = APP_NAME;
   document.title = `${APP_NAME} — Free 3D Model Optimizer for Games & 3D Printing`;
