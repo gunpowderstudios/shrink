@@ -1,15 +1,17 @@
-import './preview-material-fix.js?v=1.76';
-import './fuse-export.js?v=1.80';
-import './split-print.js?v=1.80';
-
-// SHRINK 3D v1.80 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.81 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.80';
+  const VERSION = '1.81';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
   const header = document.querySelector('.topbar');
   const dropZone = $('dropZone'), fileInput = $('fileInput'), subtitle = document.querySelector('.subtitle');
+
+  // Optional print helpers are isolated from the core UI. If one CDN/helper fails,
+  // SHRINK still loads and the normal save path remains available.
+  import(`./print-export-safety.js?v=${VERSION}`).catch(err =>
+    console.warn(`[SHRINK 3D ${VERSION}] Optional print tools did not load`, err)
+  );
 
   if (!document.querySelector('link[data-shrink-matrix-theme]')) {
     const theme = document.createElement('link');
