@@ -1,8 +1,9 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=1.80';
+import { buildBinaryStl } from './mesh-tools.js?v=1.89';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v1.80 — split tall print models into watertight STL sections with keyed alignment pegs.
+// SHRINK 3D v1.89 — split tall print models into watertight STL sections with keyed alignment pegs.
+// Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 const say = (msg, error = false) => app()?.setStatus?.(msg, error);
@@ -154,10 +155,12 @@ async function splitSolid(solid, wasm, n, withPegs) {
         const r = p===0 ? radiusMain : radiusMain*.76;
         let peg=null,socket=null,newLower=null,newUpper=null;
         try {
-          peg = makeYCylinder(wasm, depth+eps, r, x, y-eps, z);
-          socket = makeYCylinder(wasm, depth+eps*2, r+clearance, x, y-eps, z);
-          newLower = parts[i].add(peg);
-          newUpper = parts[i+1].subtract(socket);
+          // Male peg belongs to the upper section and protrudes downward through the cut plane.
+          peg = makeYCylinder(wasm, depth+eps, r, x, y-depth, z);
+          // Matching socket is cut downward into the lower section, with a little overlap across the plane.
+          socket = makeYCylinder(wasm, depth+eps*2, r+clearance, x, y-depth-eps, z);
+          newLower = parts[i].subtract(socket);
+          newUpper = parts[i+1].add(peg);
           try { parts[i].delete?.(); } catch {} try { parts[i+1].delete?.(); } catch {}
           parts[i]=newLower; parts[i+1]=newUpper; newLower=null; newUpper=null;
         } finally {
@@ -200,7 +203,7 @@ async function exportSplitSTL(evt) {
     }
     const zip = zipSync(files, { level: 0 });
     saveBlob(new Blob([zip], {type:'application/zip'}), `${base}-split-${parts.length}-parts.zip`);
-    say(`Saved ${parts.length} watertight STL sections in one ZIP${withPegs ? ' with keyed alignment pegs' : ''} · ${new Intl.NumberFormat().format(totalTris)} triangles total.`);
+    say(`Saved ${parts.length} watertight STL sections in one ZIP${withPegs ? ' with keyed alignment pegs (upper part pegs into lower sockets)' : ''} · ${new Intl.NumberFormat().format(totalTris)} triangles total.`);
   } catch (err) {
     console.error(err); say(`Split failed: ${err.message}`, true);
   } finally {
