@@ -1,28 +1,11 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=1.79';
+import { buildBinaryStl } from './mesh-tools.js?v=1.80';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v1.79 — split tall print models into watertight STL sections with keyed alignment pegs.
+// SHRINK 3D v1.80 — split tall print models into watertight STL sections with keyed alignment pegs.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 const say = (msg, error = false) => app()?.setStatus?.(msg, error);
-
-const MANIFOLD_JS = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.js';
-const MANIFOLD_WASM = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.wasm';
-let manifoldPromise = null;
-async function loadManifold() {
-  if (!manifoldPromise) {
-    manifoldPromise = import(MANIFOLD_JS).then(async mod => {
-      const factory = mod.default;
-      const wasm = await factory({
-        locateFile: path => path.endsWith('.wasm') ? MANIFOLD_WASM : new URL(path, MANIFOLD_JS).href
-      });
-      wasm.setup();
-      return wasm;
-    });
-  }
-  return manifoldPromise;
-}
 
 function saveBlob(blob, filename) {
   const a = document.createElement('a');
@@ -34,81 +17,7 @@ function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-function sourceModel() {
-  return app()?.optimizedModel || app()?.originalModel || null;
-}
-
-function meshToSolid(mesh, wasm) {
-  const { Mesh, Manifold } = wasm;
-  const g = mesh.geometry, pos = g?.attributes?.position;
-  if (!pos || pos.count < 3) return null;
-  mesh.updateWorldMatrix(true, false);
-  const world = mesh.matrixWorld, v = new THREE.Vector3();
-  const verts = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i).applyMatrix4(world);
-    verts[i * 3] = v.x; verts[i * 3 + 1] = v.y; verts[i * 3 + 2] = v.z;
-  }
-  const count = g.index ? g.index.count : pos.count;
-  const tris = new Uint32Array(Math.floor(count / 3) * 3);
-  const flipped = world.determinant() < 0;
-  for (let i = 0; i < tris.length; i += 3) {
-    const a = g.index ? g.index.getX(i) : i;
-    const b = g.index ? g.index.getX(i + 1) : i + 1;
-    const c = g.index ? g.index.getX(i + 2) : i + 2;
-    tris[i] = a; tris[i + 1] = flipped ? c : b; tris[i + 2] = flipped ? b : c;
-  }
-  const mg = new Mesh({ numProp: 3, vertProperties: verts, triVerts: tris });
-  try { mg.merge(); } catch {}
-  const solid = Manifold.ofMesh(mg);
-  try { mg.delete?.(); } catch {}
-  return solid;
-}
-
-function solidToThree(solid) {
-  const m = solid.getMesh();
-  const n = Math.floor(m.vertProperties.length / m.numProp);
-  const positions = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    positions[i * 3] = m.vertProperties[i * m.numProp];
-    positions[i * 3 + 1] = m.vertProperties[i * m.numProp + 1];
-    positions[i * 3 + 2] = m.vertProperties[i * m.numProp + 2];
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(m.triVerts), 1));
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  try { m.delete?.(); } catch {}
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72 }));
-  const root = new THREE.Group(); root.add(mesh); root.updateMatrixWorld(true);
-  return root;
-}
-
-function disposeThree(root) {
-  root?.traverse?.(o => { if (o.isMesh) { o.geometry?.dispose?.(); const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => m?.dispose?.()); } });
-}
-
-async function modelToSolid(model, wasm) {
-  let fusedRoot = null;
-  if (window.__shrinkFuse?.fuseModel) {
-    const fused = await window.__shrinkFuse.fuseModel(model);
-    if (fused.components !== 1) {
-      disposeThree(fused.root);
-      throw new Error(`The model still has ${fused.components} disconnected solids. Fuse/overlap the parts before splitting.`);
-    }
-    fusedRoot = fused.root;
-  }
-  const root = fusedRoot || model;
-  let solid = null;
-  root.updateMatrixWorld(true);
-  root.traverse(o => { if (!solid && o.isMesh && o.geometry?.attributes?.position) solid = meshToSolid(o, wasm); });
-  if (fusedRoot) disposeThree(fusedRoot);
-  if (!solid) throw new Error('Could not create a watertight solid for splitting.');
-  return solid;
-}
-
+function sourceModel() { return app()?.optimizedModel || app()?.originalModel || null; }
 function finishedHeightMM() { return Math.max(1, Number($('figureHeightMm')?.value) || 75); }
 function mmPerUnit() { return window.__shrinkPrint?.mmPerUnit?.() || 1; }
 
@@ -122,9 +31,7 @@ function partCount() {
   return 1;
 }
 
-function boundsFor(model) {
-  return new THREE.Box3().setFromObject(model);
-}
+function boundsFor(model) { return new THREE.Box3().setFromObject(model); }
 
 let previewGroup = null;
 function clearPreview() {
@@ -143,7 +50,8 @@ function updatePreview() {
     return;
   }
   const box = boundsFor(model), size = box.getSize(new THREE.Vector3());
-  previewGroup = new THREE.Group(); previewGroup.name = 'shrink-split-preview';
+  previewGroup = new THREE.Group();
+  previewGroup.name = 'shrink-split-preview';
   for (let i = 1; i < n; i++) {
     const y = box.min.y + size.y * i / n;
     const geom = new THREE.PlaneGeometry(Math.max(size.x * 1.15, .01), Math.max(size.z * 1.15, .01));
@@ -158,6 +66,30 @@ function updatePreview() {
   if (info) info.textContent = `${n} sections · about ${each.toFixed(0)} mm high each · green planes show the cuts.`;
 }
 
+function solidToThree(solid) {
+  const m = solid.getMesh();
+  const n = Math.floor(m.vertProperties.length / m.numProp);
+  const positions = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    positions[i * 3] = m.vertProperties[i * m.numProp];
+    positions[i * 3 + 1] = m.vertProperties[i * m.numProp + 1];
+    positions[i * 3 + 2] = m.vertProperties[i * m.numProp + 2];
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(m.triVerts), 1));
+  geometry.computeVertexNormals();
+  try { m.delete?.(); } catch {}
+  const root = new THREE.Group();
+  root.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72 })));
+  root.updateMatrixWorld(true);
+  return root;
+}
+
+function disposeThree(root) {
+  root?.traverse?.(o => { if (o.isMesh) { o.geometry?.dispose?.(); const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => m?.dispose?.()); } });
+}
+
 function makeYCylinder(wasm, height, radius, x, y, z, segments = 28) {
   return wasm.Manifold.cylinder(height, radius, radius, segments, false).rotate([-90, 0, 0]).translate([x, y, z]);
 }
@@ -166,15 +98,13 @@ function choosePegPoints(solid, wasm, y, box, r, depth) {
   const min = box.min, max = box.max;
   const cx = (min.x + max.x) / 2, cz = (min.z + max.z) / 2;
   const dx = (max.x - min.x) * .22, dz = (max.z - min.z) * .22;
-  const candidates = [
-    [cx, cz], [cx-dx, cz], [cx+dx, cz], [cx, cz-dz], [cx, cz+dz],
-    [cx-dx, cz-dz], [cx+dx, cz+dz], [cx-dx, cz+dz], [cx+dx, cz-dz]
-  ];
+  const candidates = [[cx,cz],[cx-dx,cz],[cx+dx,cz],[cx,cz-dz],[cx,cz+dz],[cx-dx,cz-dz],[cx+dx,cz+dz],[cx-dx,cz+dz],[cx+dx,cz-dz]];
   const scored = [];
   for (const [x,z] of candidates) {
     let probe = null, hit = null;
     try {
-      probe = makeYCylinder(wasm, Math.max(depth * .35, r * 1.5), r * 1.2, x, y - Math.max(depth * .35, r * 1.5) / 2, z, 18);
+      const h = Math.max(depth * .35, r * 1.5);
+      probe = makeYCylinder(wasm, h, r * 1.2, x, y - h / 2, z, 18);
       hit = solid.intersect(probe);
       const vol = hit.volume?.() || 0;
       if (vol > 0) scored.push({ x, z, vol });
@@ -208,7 +138,7 @@ async function splitSolid(solid, wasm, n, withPegs) {
   try { m.delete?.(); } catch {}
   const box = { min:{x:minX,y:minY,z:minZ}, max:{x:maxX,y:maxY,z:maxZ} };
   const cuts = Array.from({length:n-1}, (_,i) => minY + (maxY-minY)*(i+1)/n);
-  let parts = Array.from({length:n}, (_,i) => sectionSolid(solid, i===0 ? minY-(maxY-minY)*.01 : cuts[i-1], i===n-1 ? maxY+(maxY-minY)*.01 : cuts[i]));
+  const parts = Array.from({length:n}, (_,i) => sectionSolid(solid, i===0 ? minY-(maxY-minY)*.01 : cuts[i-1], i===n-1 ? maxY+(maxY-minY)*.01 : cuts[i]));
 
   if (withPegs) {
     const scale = mmPerUnit();
@@ -216,11 +146,9 @@ async function splitSolid(solid, wasm, n, withPegs) {
     const depth = Math.max(2, Number($('pegDepth')?.value || 6)) / scale;
     const clearance = Math.max(.05, Number($('pegClearance')?.value || .2)) / scale;
     const eps = Math.max(clearance * .25, (maxY-minY)*1e-5);
-
     for (let i=0;i<cuts.length;i++) {
       const y = cuts[i];
       const points = choosePegPoints(solid, wasm, y, box, radiusMain, depth);
-      if (!points.length) continue;
       for (let p=0;p<Math.min(2,points.length);p++) {
         const {x,z} = points[p];
         const r = p===0 ? radiusMain : radiusMain*.76;
@@ -233,8 +161,7 @@ async function splitSolid(solid, wasm, n, withPegs) {
           try { parts[i].delete?.(); } catch {} try { parts[i+1].delete?.(); } catch {}
           parts[i]=newLower; parts[i+1]=newUpper; newLower=null; newUpper=null;
         } finally {
-          try { peg?.delete?.(); } catch {} try { socket?.delete?.(); } catch {}
-          try { newLower?.delete?.(); } catch {} try { newUpper?.delete?.(); } catch {}
+          try { peg?.delete?.(); } catch {} try { socket?.delete?.(); } catch {} try { newLower?.delete?.(); } catch {} try { newUpper?.delete?.(); } catch {}
         }
       }
     }
@@ -251,16 +178,20 @@ async function exportSplitSTL(evt) {
   let solid = null, parts = [];
   try {
     const model = sourceModel(); if (!model) return;
+    if (!window.__shrinkFuse?.modelToSolid) throw new Error('Fuse engine is not ready yet. Reload SHRINK 3D and try again.');
     say('Fusing the model, cutting watertight sections and adding alignment pegs…');
     await new Promise(r => requestAnimationFrame(() => setTimeout(r,0)));
-    const wasm = await loadManifold();
-    solid = await modelToSolid(model, wasm);
+    const built = await window.__shrinkFuse.modelToSolid(model);
+    solid = built.solid;
+    const wasm = built.wasm;
+    if (built.components !== 1) throw new Error(`The model still contains ${built.components} disconnected solids after fusion. Overlap the parts before splitting.`);
     const withPegs = $('splitJoint')?.value !== 'flat';
     parts = await splitSolid(solid, wasm, n, withPegs);
     const files = {}, scale = mmPerUnit(), zUp = $('zUpToggle')?.checked !== false;
     const base = app()?.baseName?.() || 'model';
     let totalTris = 0;
     for (let i=0;i<parts.length;i++) {
+      if (parts[i]?.isEmpty?.()) throw new Error(`Part ${i+1} is empty. Move the cut position or use fewer sections.`);
       const root = solidToThree(parts[i]);
       const out = buildBinaryStl({ THREE, model: root, mmPerUnit: scale, zUp });
       totalTris += out.triangles;
@@ -285,25 +216,14 @@ function injectUI() {
   if (!save || !exportRow) return;
   const box = document.createElement('div');
   box.className = 'split-print-box print-only';
-  box.innerHTML = `
-    <div class="split-title"><strong>Split for printing</strong><small>Cut tall models into separate watertight STLs.</small></div>
-    <label class="field"><span>Sections</span><select id="splitMode"><option value="off">Off — one STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">By maximum part height</option></select></label>
-    <label id="splitMaxWrap" class="field" hidden><span>Maximum part height (mm)</span><input id="splitMaxHeight" type="number" min="20" max="500" step="5" value="80"></label>
-    <label class="field"><span>Joint</span><select id="splitJoint"><option value="pegs" selected>Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label>
-    <div id="splitPegSettings" class="field-grid split-peg-grid"><label class="field"><span>Peg Ø (mm)</span><input id="pegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label class="field"><span>Depth (mm)</span><input id="pegDepth" type="number" min="2" max="30" step="0.5" value="6"></label></div>
-    <label id="splitClearanceWrap" class="field"><span>Socket clearance (mm)</span><input id="pegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label>
-    <div id="splitInfo" class="hint">Off — export one STL.</div>`;
+  box.innerHTML = `<div class="split-title"><strong>Split for printing</strong><small>Cut tall models into separate watertight STLs.</small></div><label class="field"><span>Sections</span><select id="splitMode"><option value="off">Off — one STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">By maximum part height</option></select></label><label id="splitMaxWrap" class="field" hidden><span>Maximum part height (mm)</span><input id="splitMaxHeight" type="number" min="20" max="500" step="5" value="80"></label><label class="field"><span>Joint</span><select id="splitJoint"><option value="pegs" selected>Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label><div id="splitPegSettings" class="field-grid split-peg-grid"><label class="field"><span>Peg Ø (mm)</span><input id="pegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label class="field"><span>Depth (mm)</span><input id="pegDepth" type="number" min="2" max="30" step="0.5" value="6"></label></div><label id="splitClearanceWrap" class="field"><span>Socket clearance (mm)</span><input id="pegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><div id="splitInfo" class="hint">Off — export one STL.</div>`;
   save.insertBefore(box, exportRow);
   const style = document.createElement('style');
   style.textContent = `.split-print-box{margin:12px 0;padding:11px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.018);display:grid;gap:9px}.split-title strong,.split-title small{display:block}.split-title strong{font-size:13px}.split-title small{font-size:11px;color:var(--muted);margin-top:2px}.split-peg-grid{margin:0!important}`;
   document.head.appendChild(style);
-
   const sync = () => {
     const on = $('splitMode').value !== 'off', max = $('splitMode').value === 'max', pegs = $('splitJoint').value === 'pegs';
-    $('splitMaxWrap').hidden = !max;
-    $('splitPegSettings').hidden = !on || !pegs;
-    $('splitClearanceWrap').hidden = !on || !pegs;
-    updatePreview();
+    $('splitMaxWrap').hidden = !max; $('splitPegSettings').hidden = !on || !pegs; $('splitClearanceWrap').hidden = !on || !pegs; updatePreview();
   };
   ['splitMode','splitMaxHeight','splitJoint','pegDiameter','pegDepth','pegClearance','figureHeightMm'].forEach(id => $(id)?.addEventListener('input', sync));
   $('splitMode')?.addEventListener('change', sync); $('splitJoint')?.addEventListener('change', sync);
@@ -313,12 +233,6 @@ function injectUI() {
   sync();
 }
 
-function wire() {
-  injectUI();
-  $('saveStlBtn')?.addEventListener('click', exportSplitSTL, true);
-}
-
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, {once:true});
-else wire();
-
+function wire() { injectUI(); $('saveStlBtn')?.addEventListener('click', exportSplitSTL, true); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, {once:true}); else wire();
 window.__shrinkSplit = { updatePreview, partCount };
