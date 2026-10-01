@@ -1,8 +1,9 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v1.87 — direct triangle-mesh splitter used when solid/Boolean splitting cannot read the source.
+// SHRINK 3D v1.89 — direct triangle-mesh splitter used when solid/Boolean splitting cannot read the source.
 // Clips triangle soup into horizontal slabs, caps each cut, and can add keyed peg/socket joints when
 // the cut outline forms a clean closed loop with enough material around the joint.
+// Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 
 const EPS = 1e-7;
 
@@ -148,24 +149,32 @@ function capLoop(arr, loop, y, normalY, holes=[]) {
   return true;
 }
 
-function addCylinderPeg(arr,x,z,y,r,depth,segments=28){
-  const base=circleLoop(x,z,r,y,segments), top=circleLoop(x,z,r,y+depth,segments);
+function addCylinderPeg(arr,x,z,y,r,depth,dir=-1,segments=28){
+  const base=circleLoop(x,z,r,y,segments), tipY=y+dir*depth, tip=circleLoop(x,z,r,tipY,segments);
   for(let i=0;i<segments;i++){
     const j=(i+1)%segments;
-    pushTri(arr,base[i],base[j],top[j]); pushTri(arr,base[i],top[j],top[i]);
+    if(dir<0){ pushTri(arr,base[i],tip[j],base[j]); pushTri(arr,base[i],tip[i],tip[j]); }
+    else { pushTri(arr,base[i],base[j],tip[j]); pushTri(arr,base[i],tip[j],tip[i]); }
   }
-  const center={x,y:y+depth,z};
-  for(let i=0;i<segments;i++){ const j=(i+1)%segments; pushTri(arr,center,top[i],top[j]); }
+  const center={x,y:tipY,z};
+  for(let i=0;i<segments;i++){
+    const j=(i+1)%segments;
+    if(dir<0) pushTri(arr,center,tip[j],tip[i]); else pushTri(arr,center,tip[i],tip[j]);
+  }
 }
 
-function addSocket(arr,x,z,y,r,depth,segments=28){
-  const mouth=circleLoop(x,z,r,y,segments), floor=circleLoop(x,z,r,y+depth,segments);
+function addSocket(arr,x,z,y,r,depth,dir=-1,segments=28){
+  const mouth=circleLoop(x,z,r,y,segments), floorY=y+dir*depth, floor=circleLoop(x,z,r,floorY,segments);
   for(let i=0;i<segments;i++){
     const j=(i+1)%segments;
-    pushTri(arr,mouth[i],floor[j],mouth[j]); pushTri(arr,mouth[i],floor[i],floor[j]);
+    if(dir<0){ pushTri(arr,mouth[i],mouth[j],floor[j]); pushTri(arr,mouth[i],floor[j],floor[i]); }
+    else { pushTri(arr,mouth[i],floor[j],mouth[j]); pushTri(arr,mouth[i],floor[i],floor[j]); }
   }
-  const center={x,y:y+depth,z};
-  for(let i=0;i<segments;i++){ const j=(i+1)%segments; pushTri(arr,center,floor[j],floor[i]); }
+  const center={x,y:floorY,z};
+  for(let i=0;i<segments;i++){
+    const j=(i+1)%segments;
+    if(dir<0) pushTri(arr,center,floor[i],floor[j]); else pushTri(arr,center,floor[j],floor[i]);
+  }
 }
 
 function choosePegPoints(loop, radius, clearance){
@@ -221,24 +230,26 @@ export function splitModelFlat(model, sections=2, options={}) {
       if (poly.length>=3) triangulateFan(positions,poly);
     }
 
+    // Lower cut face belongs to the upper section: cap it and grow male pegs downward.
     if (Number.isFinite(low)) {
       const cd=cutData[part-1];
+      for(const entry of cd.loops) if(entry.closed) capLoop(positions,entry.points,low,-1,[]);
+      if(withPegs&&cd.pegsSafe) cd.points.slice(0,2).forEach((p,i)=>addCylinderPeg(positions,p.x,p.z,low,i===0?radius:radius*.76,depth,-1));
+    }
+
+    // Upper cut face belongs to the lower section: cut socket mouths into the cap and extend sockets downward.
+    if (Number.isFinite(high)) {
+      const cd=cutData[part];
       const socketHoles=[];
       if(withPegs&&cd.pegsSafe){
-        cd.points.slice(0,2).forEach((p,i)=>{ const r=(i===0?radius:radius*.76)+clearance; socketHoles.push(circleLoop(p.x,p.z,r,low,28,true)); });
+        cd.points.slice(0,2).forEach((p,i)=>{ const r=(i===0?radius:radius*.76)+clearance; socketHoles.push(circleLoop(p.x,p.z,r,high,28,true)); });
       }
       for(const entry of cd.loops){
         if(!entry.closed) continue;
         const holes=(entry.points===cd.outer)?socketHoles:[];
-        capLoop(positions,entry.points,low,-1,holes);
+        capLoop(positions,entry.points,high,1,holes);
       }
-      if(withPegs&&cd.pegsSafe) cd.points.slice(0,2).forEach((p,i)=>addSocket(positions,p.x,p.z,low,(i===0?radius:radius*.76)+clearance,depth));
-    }
-
-    if (Number.isFinite(high)) {
-      const cd=cutData[part];
-      for(const entry of cd.loops) if(entry.closed) capLoop(positions,entry.points,high,1,[]);
-      if(withPegs&&cd.pegsSafe) cd.points.slice(0,2).forEach((p,i)=>addCylinderPeg(positions,p.x,p.z,high,i===0?radius:radius*.76,depth));
+      if(withPegs&&cd.pegsSafe) cd.points.slice(0,2).forEach((p,i)=>addSocket(positions,p.x,p.z,high,(i===0?radius:radius*.76)+clearance,depth,-1));
     }
 
     const geometry=geometryFromPositions(positions);
