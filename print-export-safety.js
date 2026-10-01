@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v1.82 — safety layer around optional Fuse / Split helpers.
-const VERSION = '1.82';
+// SHRINK 3D v1.84 — safety layer around optional Fuse / Split helpers.
+const VERSION = '1.84';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 
