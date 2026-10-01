@@ -1,106 +1,94 @@
-/* Shrink v1.61 — simple Game Model / 3D Print interface */
-.mode-chooser {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: -6px 0 14px;
-}
-.mode-card {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  width: 100%;
-  padding: 15px 17px;
-  text-align: left;
-  color: var(--text);
-  background: rgba(255,255,255,.025);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  cursor: pointer;
-  transition: .16s ease;
-}
+/* Shrink v1.7 — mode chooser, numbered steps, live readout */
+.mode-chooser { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: -6px 0 14px; }
+.mode-card { appearance: none; display: flex; align-items: center; gap: 13px; width: 100%; padding: 14px 16px; text-align: left; color: var(--text); background: rgba(255,255,255,.025); border: 1px solid var(--line); border-radius: 16px; cursor: pointer; transition: .16s ease; font: inherit; }
 .mode-card:hover { border-color: #505866; background: rgba(255,255,255,.04); transform: translateY(-1px); }
 .mode-card.active { border-color: var(--accent); background: rgba(255,75,75,.075); box-shadow: inset 0 0 0 1px rgba(255,75,75,.1); }
-.mode-icon { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 11px; background: #222731; font-size: 20px; font-weight: 900; }
+.mode-icon { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 11px; background: #222731; font-size: 20px; }
 .mode-card.active .mode-icon { background: var(--accent); }
 .mode-card strong { display: block; font-size: 15px; margin-bottom: 2px; }
 .mode-card small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
-.workflow-strip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-height: 40px;
-  margin: 0 0 16px;
-  padding: 9px 14px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(255,255,255,.018);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow-x: auto;
-}
-.workflow-strip b { color: var(--text); }
-.workflow-strip i { color: #5c6471; font-style: normal; }
+.workflow-strip { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 38px; margin: 0 0 16px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.018); color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; overflow-x: auto; }
+.workflow-strip b { color: var(--text); } .workflow-strip i { color: #5c6471; font-style: normal; }
 
-/* Mode visibility. These rules deliberately override the tools' own hidden/show state. */
-.app-mode-game .print-only,
-.app-mode-game .print-only-inline { display: none !important; }
+/* what shows in which mode */
+.app-mode-game .print-only, .app-mode-game .print-only-inline { display: none !important; }
 .app-mode-print .game-only { display: none !important; }
 .app-mode-print .model-paint-controls { display: none !important; }
-.app-mode-print #heatBtn.print-only-inline { display: inline-flex !important; }
+.hidden-legacy { display: none !important; }
+#retouchDetails:has(#textureEditor.hidden) { display: none !important; }
+.chip[hidden], .topo-line[hidden], .custom-detail[hidden] { display: none !important; }
 
-/* Print mode is mesh-first, so texture/compression controls stay out of the way. */
-.app-mode-print #textureEditor { display: none !important; }
-.app-mode-print .advanced-settings { display: none !important; }
+/* steps */
+.step { margin: 0 0 14px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.02); }
+.step-head { display: flex; gap: 11px; align-items: flex-start; margin-bottom: 12px; }
+.step-num { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; font-weight: 900; font-size: 13px; }
+.step-head strong { display: block; font-size: 15px; }
+.step-head small { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; margin-top: 2px; }
 
-/* Make the core left panel read like a short workflow instead of a wall of controls. */
-.geometry-block {
-  padding: 13px;
-  margin: 10px 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(255,255,255,.018);
-}
-.advanced-settings {
-  margin: 12px 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(255,255,255,.015);
-  overflow: hidden;
-}
-.advanced-settings > summary {
-  cursor: pointer;
-  list-style: none;
-  padding: 11px 13px;
-  color: #c8d0db;
-  font-size: 12px;
-  font-weight: 800;
-  user-select: none;
-}
-.advanced-settings > summary::-webkit-details-marker { display: none; }
-.advanced-settings > summary::after { content: '＋'; float: right; color: var(--muted); }
-.advanced-settings[open] > summary::after { content: '−'; }
-.advanced-inner { padding: 0 13px 13px; }
-.advanced-inner .control-block { margin-bottom: 12px; }
-.advanced-inner .toggles { margin-top: 4px; }
+.target-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.target-card { appearance: none; font: inherit; text-align: left; color: var(--text); background: #1d2128; border: 1px solid #343a45; border-radius: 12px; padding: 10px 9px; cursor: pointer; transition: .14s; }
+.target-card:hover { border-color: #5a6372; }
+.target-card.active { border-color: var(--accent); background: rgba(255,75,75,.09); }
+.target-card .t-icon { display: block; font-size: 18px; margin-bottom: 4px; }
+.target-card b { display: block; font-size: 12.5px; margin-bottom: 3px; }
+.target-card small { display: block; color: var(--muted); font-size: 11px; line-height: 1.35; }
 
-.app-mode-print #printPanel {
-  display: block;
-  border-color: #3a4652;
-  background: rgba(255,255,255,.025);
-}
-.app-mode-print #printPanel .label { font-size: 10px; }
-.app-mode-print #printPanel .print-title { font-size: 16px; margin-bottom: 14px; }
+.chip { margin-top: 10px; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.4; border: 1px solid; }
+.chip[data-level="good"], .topo-line[data-level="good"] { color: #9be8b0; background: rgba(75,172,112,.1); border-color: #2f5a40; }
+.chip[data-level="warn"], .topo-line[data-level="warn"] { color: #ffd58a; background: rgba(255,190,60,.08); border-color: #5d4a22; }
+.topo-line { margin-top: 10px; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.4; border: 1px solid; }
 
-/* Cleaner primary actions. */
-.app-mode-game #optimizeBtn::before { content: '2 · '; opacity: .7; }
-.app-mode-print #optimizeBtn::before { content: '3 · '; opacity: .7; }
+.slider-block { margin-bottom: 10px; }
+.slider-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.live-card { padding: 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid #292e37; margin-bottom: 10px; }
+.live-line strong { font-size: 18px; }
+.live-line .dim, .dim { color: var(--muted); font-size: 12px; } .dim2 { opacity: .7; }
+.live-line > .dim { display: block; margin-top: 2px; }
+.verdict { display: flex; gap: 9px; align-items: center; margin-top: 10px; padding: 9px 11px; border-radius: 10px; font-weight: 800; font-size: 13px; border: 1px solid #3a404b; background: #1d2128; }
+.v-dot { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; background: #6b7280; }
+.verdict[data-level="good"] { border-color: #2f5a40; background: rgba(75,172,112,.1); color: #9be8b0; } .verdict[data-level="good"] .v-dot { background: #4bac70; }
+.verdict[data-level="warn"] { border-color: #5d4a22; background: rgba(255,190,60,.08); color: #ffd58a; } .verdict[data-level="warn"] .v-dot { background: #f0b429; }
+.verdict[data-level="bad"] { border-color: #6a2b2b; background: rgba(255,80,80,.09); color: #ff9b9b; } .verdict[data-level="bad"] .v-dot { background: #ff5b5b; }
+.verdict[data-level="busy"] .v-dot { animation: pulse 1s ease-in-out infinite; }
+.verdict-nums { color: var(--muted); font-size: 11.5px; line-height: 1.45; margin-top: 6px; }
+.auto-btn { width: 100%; border: 1px solid var(--accent); background: rgba(255,75,75,.08); color: var(--text); padding: 10px; font-weight: 800; }
+.auto-btn:hover:not(:disabled) { background: rgba(255,75,75,.16); }
+.tri-field { margin: 12px 0 0; }
+.spin { display: inline-block; width: 11px; height: 11px; border: 2px solid #555; border-top-color: #ff8a8a; border-radius: 50%; animation: sp .8s linear infinite; vertical-align: -1px; margin-left: 8px; }
+@keyframes sp { to { transform: rotate(360deg); } } @keyframes pulse { 50% { opacity: .25; } }
 
-@media (max-width: 720px) {
-  .mode-chooser { grid-template-columns: 1fr; }
-  .workflow-strip { justify-content: flex-start; }
-}
+.fold { border: 1px solid var(--line); border-radius: 12px; margin: 10px 0; background: rgba(255,255,255,.015); overflow: hidden; }
+.fold > summary { cursor: pointer; list-style: none; padding: 11px 13px; color: #c8d0db; font-size: 12.5px; font-weight: 800; user-select: none; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '＋'; float: right; color: var(--muted); } .fold[open] > summary::after { content: '−'; }
+.fold-inner { padding: 0 13px 13px; }
+.fold.tiny > summary { font-size: 11.5px; padding: 8px 4px; } .fold.tiny { border: 0; background: none; }
+.fold-inner .texture-editor { border: 0; padding: 0; margin: 0; background: none; }
+.print-setup .field-grid { margin-bottom: 10px; }
+.print-setup select { width: 100%; }
+.export-row { display: flex; gap: 8px; margin-bottom: 10px; } .export-row .button { flex: 1; }
+.kept-line { font-size: 11.5px; color: #c3cad6; line-height: 1.5; margin: 10px 0; padding: 9px 10px; border-radius: 10px; background: rgba(75,172,112,.07); }
+.save-main { margin-top: 6px; }
+.app-mode-print .save-main { background: transparent; border: 1px solid var(--line); color: var(--text); box-shadow: none; font-weight: 700; }
+
+/* the 3D view stays in sight while you work down the steps */
+.viewer-panel { height: calc(100vh - 36px); min-height: 560px; }
+.viewer { min-height: 0; }
+@media (max-width: 900px) { .viewer-panel { height: 70vh; position: relative; top: 0; } .target-cards { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .mode-chooser { grid-template-columns: 1fr; } .workflow-strip { justify-content: flex-start; } }
+
+.step .print-panel { border: 0; padding: 0; margin: 0; background: none; }
+.step .print-panel .protect-box { margin-bottom: 0; }
+
+/* compact header so the 3D view is in sight immediately */
+.workflow-strip { display: none !important; }
+.title-row h1 { font-size: 40px !important; line-height: 1 !important; margin: 0 !important; }
+.subtitle { margin: 4px 0 0 !important; font-size: 13px !important; }
+.mode-chooser { margin: 0 0 12px; gap: 10px; }
+.mode-card { padding: 9px 14px; } .mode-icon { width: 32px; height: 32px; flex-basis: 32px; font-size: 17px; }
+.mode-card small { font-size: 11.5px; }
+.viewer-panel { height: calc(100vh - 28px); top: 14px; }
+
+.export-row { display: grid !important; grid-template-columns: 1fr; gap: 8px; }
+.viewer-panel { height: calc(100vh - 200px) !important; min-height: 520px !important; }
+@media (max-width: 900px) { .viewer-panel { height: 70vh !important; } }
