@@ -1,6 +1,6 @@
-// SHRINK 3D v1.85 — verify that the GLB build matches the live reduced preview.
+// SHRINK 3D v1.86 — verify that the GLB build matches the live reduced preview.
 (() => {
-  const VERSION = '1.85';
+  const VERSION = '1.86';
   const $ = id => document.getElementById(id);
   let previewTriangles = null;
 
@@ -25,10 +25,16 @@
       : null;
   }
 
-  const saveButton = $('optimizeBtn');
-  saveButton?.addEventListener('click', capturePreview, true);
+  function install() {
+    const saveButton = $('optimizeBtn');
+    if (saveButton && !saveButton.dataset.saveGuard186) {
+      saveButton.dataset.saveGuard186 = '1';
+      saveButton.addEventListener('click', capturePreview, true);
+    }
+  }
 
-  window.addEventListener('shrink:model-opened', () => { previewTriangles = null; });
+  install();
+  window.addEventListener('shrink:model-opened', () => { previewTriangles = null; install(); });
   window.addEventListener('shrink:optimized', event => {
     if (!previewTriangles || event.detail?.liveExport) return;
     const saved = Number(event.detail?.triangles || 0);
