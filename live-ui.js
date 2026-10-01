@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { createLiveReducer } from './live-reduce.js?v=1.7';
-import { getMeshBVH } from './bvh-support.js?v=1.7';
-import { computeDetailLoss, analyzeTopology, stlBytes, glbBytesEstimate } from './mesh-tools.js?v=1.7';
+import { createLiveReducer } from './live-reduce.js?v=1.75';
+import { getMeshBVH } from './bvh-support.js?v=1.75';
+import { computeDetailLoss, analyzeTopology, stlBytes, glbBytesEstimate } from './mesh-tools.js?v=1.75';
 
 /* Live UI: drag the slider -> the model updates -> a plain-language verdict says whether it still looks the same. */
 
@@ -239,6 +239,8 @@ window.addEventListener('shrink:live-updated', e => {
 });
 
 window.addEventListener('shrink:model-opened', async e => {
+  // STL files are shown faceted (as slicers show them); only the shading changes, never the mesh itself.
+  if (app()?.sourceKind === 'stl') app().originalModel?.traverse(o => { if (o.isMesh) for (const m of (Array.isArray(o.material) ? o.material : [o.material])) if (m && 'flatShading' in m) { m.flatShading = true; m.needsUpdate = true; } });
   S.tris = e.detail.triangles; S.firstShow = true; S.topoOrig = null; S.lastLive = null;
   setVerdict('busy', 'Preparing the live preview…'); el.live.textContent = 'Preparing…';
   if (el.topo) el.topo.hidden = true;

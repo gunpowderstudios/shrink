@@ -1,9 +1,9 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { ensureBVH, raycasterFor, getMeshBVH } from './bvh-support.js?v=1.5';
+import { ensureBVH, raycasterFor, getMeshBVH } from './bvh-support.js?v=1.75';
 import {
   stlBytes, objBytesEstimate, glbBytesEstimate, computeDetailLoss, heatColorArray, heatColor,
   buildBinaryStl, buildObjBlob, modelHeight
-} from './mesh-tools.js?v=1.5';
+} from './mesh-tools.js?v=1.75';
 
 /* Print & Share: reduce a sculpt while SEEING what you lose, then save STL / OBJ / GLB to send to a printer. */
 
@@ -23,7 +23,7 @@ const app = () => window.__shrinkApp;
 const say = (m, err = false) => app()?.setStatus?.(m, err);
 const fmt = n => new Intl.NumberFormat().format(Math.round(n));
 const fmtBytes = b => b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 1 : 0)} MB`;
-const mmText = v => v >= 1 ? v.toFixed(2) : v >= 0.01 ? v.toFixed(3) : v.toFixed(4);
+const mmText = v => (v >= 1 ? v.toFixed(2) : v >= 0.01 ? v.toFixed(3) : v.toFixed(4)) ;
 
 const P = {
   modelHeightUnits: 0,
@@ -40,32 +40,20 @@ const P = {
 /* ------------------------------------------------------------------ */
 /* Units + estimates                                                    */
 /* ------------------------------------------------------------------ */
+const uiMode = () => window.__shrinkUI?.getMode?.() || 'print';
+const GAME_DETAIL_PCT = 0.2;                      // "looks the same" threshold in game mode: 0.2% of the model's height
 function mmPerUnit() {
+  if (uiMode() === 'game') return P.modelHeightUnits > 0 ? 100 / P.modelHeightUnits : 1;   // 1 "mm" == 1% of height
   const mm = Number(els.height.value);
   return P.modelHeightUnits > 0 && mm > 0 ? mm / P.modelHeightUnits : 1;
 }
-function detailMM() { return Math.max(0.001, Number(els.detail.value) || 0.05); }
+function printMmPerUnit() { const mm = Number(els.height.value); return P.modelHeightUnits > 0 && mm > 0 ? mm / P.modelHeightUnits : 1; }
+function detailMM() { return uiMode() === 'game' ? GAME_DETAIL_PCT : Math.max(0.001, Number(els.detail.value) || 0.05); }
+const unitLabel = () => uiMode() === 'game' ? '%' : ' mm';
 
 function currentModelForExport() { return app()?.optimizedModel || app()?.originalModel; }
 
-function updateEstimates() {
-  const tris = P.originalTriangles;
-  if (!tris) { els.estimate.textContent = '—'; return; }
-  const a = app();
-  const ratio = Number(els.geometry.value) / 100;
-  const target = Math.round(tris * ratio);
-  els.estimate.innerHTML =
-    `Target <strong>${fmt(target)}</strong> triangles · STL ≈ ${fmtBytes(stlBytes(target))} · OBJ ≈ ${fmtBytes(objBytesEstimate(target))} · ` +
-    `GLB ≈ ${fmtBytes(glbBytesEstimate(target, { meshopt: els.meshopt?.checked !== false }))}`;
-  const hasOpt = !!a?.optimizedModel && P.optimizedTriangles;
-  els.actual.classList.toggle('hidden', !hasOpt);
-  if (hasOpt) {
-    const t = P.optimizedTriangles;
-    els.actual.innerHTML = `Reduced model: <strong>${fmt(t)}</strong> triangles (${(100 * t / tris).toFixed(1)}%) · STL ${fmtBytes(stlBytes(t))} · GLB ${a.optimizedBytes ? fmtBytes(a.optimizedBytes.byteLength) : '—'}`;
-  }
-  els.saveStl.textContent = hasOpt ? 'Save STL (reduced)' : 'Save STL (original)';
-  els.saveObj.textContent = hasOpt ? 'Save OBJ (reduced)' : 'Save OBJ (original)';
-}
+function updateEstimates() { /* live size readouts are handled by live-ui.js */ }
 
 function syncTargetFromSlider() {
   if (!P.originalTriangles) return;
@@ -74,6 +62,7 @@ function syncTargetFromSlider() {
 }
 
 els.geometry.addEventListener('input', syncTargetFromSlider);
+els.geometry.addEventListener('change', syncTargetFromSlider);
 els.target.addEventListener('input', () => {
   if (!P.originalTriangles) return;
   const wanted = Math.max(1, Number(els.target.value) || 1);
@@ -189,7 +178,7 @@ function markProtected(cx, cy, cz, r) {
   }
 }
 
-function protectRadiusUnits() { return Number(els.protectRadius.value) / mmPerUnit(); }
+function protectRadiusUnits() { return Number(els.protectRadius.value) / printMmPerUnit(); }
 
 function updateProtectInfo() {
   els.protectInfo.textContent = P.dabs.length
@@ -223,6 +212,7 @@ els.protectClear.addEventListener('click', () => {
   P.dabs = []; P.lastDab = null;
   if (P.protectMeshes) for (const pm of P.protectMeshes) { pm.mask.fill(0); pm.colors.set(pm.base); pm.attr.needsUpdate = true; }
   refreshOverlay(); updateProtectInfo();
+  window.dispatchEvent(new Event('shrink:protect-changed'));
 });
 window.addEventListener('shrink:paint-mode', e => { if (e.detail.mode !== 'navigate' && P.protectActive) setProtectActive(false); });
 
@@ -279,7 +269,7 @@ els.viewer.addEventListener('pointermove', evt => {
   } else ring.style.display = 'none';
   if (protecting && (evt.buttons & 1)) { evt.preventDefault(); evt.stopImmediatePropagation(); protectAt(evt); }
 }, true);
-const endProtect = evt => { if (!protecting) return; protecting = false; P.lastDab = null; evt.stopImmediatePropagation?.(); };
+const endProtect = evt => { if (!protecting) return; protecting = false; P.lastDab = null; evt.stopImmediatePropagation?.(); window.dispatchEvent(new Event('shrink:protect-changed')); };
 els.viewer.addEventListener('pointerup', endProtect, true);
 els.viewer.addEventListener('pointercancel', endProtect, true);
 
@@ -287,15 +277,15 @@ els.viewer.addEventListener('pointercancel', endProtect, true);
 /* Detail-loss heat map                                                 */
 /* ------------------------------------------------------------------ */
 function drawLegend() {
-  const s = P.heat.stats, d = detailMM(), mm = mmPerUnit();
+  const s = P.heat.stats, d = detailMM(), mm = mmPerUnit(), u = unitLabel(), game = uiMode() === 'game';
   const stops = [0, 0.5, 1, 3, 6].map(r => { const c = heatColor(r, [0, 0, 0]); return `rgb(${c.map(x => Math.round(x * 255)).join(',')})`; });
   const above = P.heat.aboveShare != null ? P.heat.aboveShare : 0;
   els.heatLegend.innerHTML =
-    `<div class="legend-title">DETAIL LOSS <span>vs original, in mm</span></div>` +
+    `<div class="legend-title">DETAIL LOSS <span>vs original, ${game ? 'as % of model height' : 'in mm'}</span></div>` +
     `<div class="legend-bar" style="background:linear-gradient(90deg,${stops.join(',')})"></div>` +
-    `<div class="legend-scale"><span>0</span><span>${mmText(d)} (printer detail)</span><span>≥ ${mmText(d * 6)}</span></div>` +
-    `<div class="legend-stats">Average <b>${mmText(s.mean * mm)} mm</b> · 95% of the surface within <b>${mmText(s.p95 * mm)} mm</b> · worst <b>${mmText(s.max * mm)} mm</b> · ` +
-    `<b>${(above * 100).toFixed(1)}%</b> of the surface changed by more than the printer can show</div>`;
+    `<div class="legend-scale"><span>0</span><span>${mmText(d)}${u} (${game ? 'looks the same' : 'printer detail'})</span><span>≥ ${mmText(d * 6)}${u}</span></div>` +
+    `<div class="legend-stats">Average <b>${mmText(s.mean * mm)}${u}</b> · 95% of the surface within <b>${mmText(s.p95 * mm)}${u}</b> · worst <b>${mmText(s.max * mm)}${u}</b> · ` +
+    `<b>${(above * 100).toFixed(1)}%</b> of the surface changed by more than ${game ? 'you would notice' : 'the printer can show'}</div>`;
 }
 
 function applyHeat(silent = false) {
@@ -328,13 +318,13 @@ async function setHeat(on) {
     refreshOverlay();
     return;
   }
-  if (!a?.optimizedModel) { say('Optimize the model first, then Detail loss shows what changed.', true); return; }
+  if (!a?.optimizedModel) { say('Move the detail slider first, then Detail loss shows what changed.', true); return; }
   if (P.protectActive) await setProtectActive(false);
   window.__shrinkPaint?.setMode?.('navigate');
   a.show('original');
   els.heatBtn.classList.add('active');
   P.heat.on = true;
-  if (!P.heat.distances || P.heat.forBytes !== a.optimizedBytes) {
+  if (!P.heat.distances || P.heat.forBytes !== a.reducedVersion) {
     const MeshBVH = await getMeshBVH();
     if (!MeshBVH) { say('Could not load the measuring library (three-mesh-bvh). Check your connection and try again.', true); P.heat.on = false; els.heatBtn.classList.remove('active'); return; }
     P.heat.busy = true;
@@ -344,7 +334,7 @@ async function setHeat(on) {
         THREE, MeshBVH, original: a.originalModel, reduced: a.optimizedModel,
         onProgress: p => say(`Measuring detail loss… ${Math.round(p * 100)}%`)
       });
-      P.heat.distances = results; P.heat.stats = stats; P.heat.forBytes = a.optimizedBytes;
+      P.heat.distances = results; P.heat.stats = stats; P.heat.forBytes = a.reducedVersion;
       say('Detail loss shown on the original: blue = unchanged, green ≈ one printer pixel, yellow/red = visibly changed.');
     } catch (err) {
       console.error(err); say(`Could not measure detail loss: ${err.message}`, true);
@@ -372,7 +362,7 @@ function placeDivider() {
 els.compareBtn.addEventListener('click', async () => {
   const a = app();
   if (a.isCompare()) { a.setCompare(false); return; }
-  if (!a.optimizedModel) { say('Optimize the model first, then Compare shows original and reduced side by side.', true); return; }
+  if (!a.optimizedModel) { say('Move the detail slider first, then Compare shows original and reduced side by side.', true); return; }
   if (P.heat.on) await setHeat(false);
   if (P.protectActive) await setProtectActive(false);
   window.__shrinkPaint?.setMode?.('navigate');
@@ -386,6 +376,7 @@ window.addEventListener('shrink:compare', e => {
     const a = app();
     labelL.textContent = `ORIGINAL · ${fmt(P.originalTriangles)} tris`;
     labelR.textContent = `REDUCED · ${fmt(P.optimizedTriangles)} tris`;
+    window.__shrinkPrintRefreshLabels = () => { labelR.textContent = `REDUCED · ${fmt(P.optimizedTriangles)} tris`; };
     placeDivider();
   }
 });
@@ -413,7 +404,7 @@ function exportModel(kind) {
   const model = currentModelForExport();
   if (!model) return;
   const a = app(), reduced = model === a.optimizedModel;
-  const opts = { THREE, model, mmPerUnit: mmPerUnit(), zUp: els.zUp.checked };
+  const opts = { THREE, model, mmPerUnit: printMmPerUnit(), zUp: els.zUp.checked };
   const heightMM = Number(els.height.value);
   say(`Building ${kind.toUpperCase()}…`);
   setTimeout(() => {
@@ -479,11 +470,23 @@ window.addEventListener('shrink:texture-applied', () => {
   }
 });
 
+let heatTimer = 0;
+window.addEventListener('shrink:reduced', e => {
+  P.optimizedTriangles = e.detail.triangles;
+  els.compareBtn.disabled = false; els.heatBtn.disabled = false;
+  window.__shrinkPrintRefreshLabels?.();
+  // The measurement belongs to the previous slider position: refresh it once the slider settles.
+  if (P.heat.on) { clearTimeout(heatTimer); heatTimer = setTimeout(async () => { if (P.heat.on && !P.heat.busy) { P.heat.distances = null; await setHeat(false); await setHeat(true); } }, 700); }
+  else P.heat = { ...P.heat, distances: null, stats: null, forBytes: null };
+});
+window.addEventListener('shrink:ui-mode', () => { if (P.heat.on) { if (P.heat.distances) applyHeat(true); } });
+
 els.compareBtn.disabled = true;
 els.heatBtn.disabled = true;
 
 window.__shrinkPrint = {
   getReduceOptions() { return { dabs: P.dabs.slice(), protectKeep: Number(els.protectKeep.value) / 100 }; },
-  mmPerUnit,
+  mmPerUnit, printMmPerUnit, detailMM, unitLabel,
+  getLocks() { return P.dabs.length && P.protectMeshes ? P.protectMeshes.map(pm => ({ mesh: pm.mesh, mask: pm.mask })) : []; },
   get state() { return P; }
 };

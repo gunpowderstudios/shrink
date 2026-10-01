@@ -5,7 +5,7 @@ import { WebIO, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt } from '@gltf-transform/functions';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
-import { simplifyWithProtection, smoothNormals } from './mesh-tools.js?v=1.5';
+import { simplifyWithProtection, smoothNormals } from './mesh-tools.js?v=1.75';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -46,6 +46,8 @@ let compareOn = false;
 let compareSplit = 0.5;
 let sourceKind = 'glb';          // glb | stl | obj | ply (what the user opened)
 let lastReduce = null;
+let optimizedIsPreview = false;   // true while optimizedModel is the live preview (shares materials with the original)
+let reducedVersion = 0;
 
 let textureOriginals = [];
 let selectedTextureIndex = 0;
@@ -121,6 +123,27 @@ loader.setMeshoptDecoder(MeshoptDecoder);
 
 async function loadSceneFromURL(url) {
   return await new Promise((resolve, reject) => loader.load(url, g => resolve(g.scene), undefined, reject));
+}
+
+function disposeReduced() {
+  const m = optimizedModel;
+  if (!m) return;
+  if (scene.children.includes(m)) scene.remove(m);
+  if (optimizedIsPreview) m.traverse(o => { if (o.isMesh) o.geometry?.dispose?.(); });   // materials are shared with the original
+  else disposeModel(m);
+  optimizedModel = null; optimizedIsPreview = false;
+}
+
+// Swap in a new reduced model (live preview or a finished build) while keeping whatever the viewer is showing consistent.
+function setReduced(model, isPreview) {
+  const prev = optimizedModel;
+  if (prev === model) { optimizedIsPreview = isPreview; return; }
+  const wasShown = prev && currentModel === prev;
+  disposeReduced();
+  optimizedModel = model; optimizedIsPreview = isPreview; reducedVersion++;
+  els.showOptimizedBtn.disabled = false;
+  if (compareOn) { scene.add(model); applyWireframe(model, wireframeEnabled); }
+  else if (wasShown) { currentModel = model; scene.add(model); applyWireframe(model, wireframeEnabled); }
 }
 
 function disposeModel(model) {
@@ -291,7 +314,16 @@ els.wireframeBtn.addEventListener('click', () => {
   els.wireframeBtn.classList.toggle('active', wireframeEnabled);
   els.wireframeBtn.textContent = wireframeEnabled ? 'Shaded' : 'Wireframe';
 });
-els.optimizeBtn.addEventListener('click', optimizeModel);
+async function buildAndSave() {
+  // Anything painted on the 3D model must be written into the GLB first, or it would silently be left out of the saved file.
+  if (window.__shrinkPaint?.hasEdits?.() || textureDirty) {
+    setStatus('Applying your texture edits first…');
+    await applyTextureToModel();
+  }
+  const ok = await optimizeModel();
+  if (ok && optimizedBytes) downloadOptimized();
+}
+els.optimizeBtn.addEventListener('click', buildAndSave);
 els.downloadBtn.addEventListener('click', downloadOptimized);
 
 const paintCtx = els.textureCanvas.getContext('2d', { willReadFrequently: true });
@@ -524,7 +556,8 @@ async function applyTextureToModel() {
     }
     sourceBytes = await io.writeBinary(doc);
     optimizedBytes = null;
-    disposeModel(optimizedModel); optimizedModel = null;
+    if (compareOn) leaveCompare();
+    disposeReduced();
     if (optimizedURL) { URL.revokeObjectURL(optimizedURL); optimizedURL = null; }
     els.showOptimizedBtn.disabled = true;
     els.resultCard.classList.add('hidden');
@@ -619,7 +652,7 @@ async function openFile(file) {
     if (optimizedURL) URL.revokeObjectURL(optimizedURL);
     originalURL = URL.createObjectURL(new Blob([sourceBytes], { type: 'model/gltf-binary' }));
     optimizedURL = null;
-    disposeModel(originalModel); disposeModel(optimizedModel);
+    disposeModel(originalModel); disposeReduced();
     originalModel = await loadSceneFromURL(originalURL);
     optimizedModel = null;
     const stats = getModelStats(originalModel);
@@ -672,7 +705,8 @@ async function optimizeModel() {
       setProgress(42, 'Keeping original polygon count…');
     }
 
-    if (els.webpToggle.checked) {
+    const printMode = window.__shrinkUI?.getMode?.() === 'print';
+    if (els.webpToggle.checked && !printMode) {
       setProgress(52, 'Resizing and compressing textures…');
       await convertTexturesToWebP(document, Number(els.textureSize.value), Number(els.textureQuality.value) / 100, 52, 72);
     }
@@ -680,7 +714,9 @@ async function optimizeModel() {
     setProgress(76, 'Removing unused data…');
     await document.transform(prune());
 
-    if (els.meshoptToggle.checked) {
+    if (printMode) {
+      setProgress(84, 'Keeping the mesh uncompressed for modelling tools…');
+    } else if (els.meshoptToggle.checked) {
       setProgress(84, 'Applying Meshopt compression…');
       await document.transform(meshopt({ encoder: MeshoptEncoder, level: 'high' }));
     } else if (els.quantizeToggle.checked) {
@@ -694,28 +730,32 @@ async function optimizeModel() {
     setProgress(97, 'Loading optimized preview…');
     if (optimizedURL) URL.revokeObjectURL(optimizedURL);
     optimizedURL = URL.createObjectURL(new Blob([optimizedBytes], { type: 'model/gltf-binary' }));
-    disposeModel(optimizedModel);
-    optimizedModel = await loadSceneFromURL(optimizedURL);
+    const builtModel = await loadSceneFromURL(optimizedURL);
+    const keepLivePreview = !!(optimizedModel && optimizedIsPreview);    // the live preview already shows what will be saved
+    if (!keepLivePreview) setReduced(builtModel, false);
 
-    const optimizedStats = getModelStats(optimizedModel);
+    const optimizedStats = getModelStats(builtModel);
+    if (keepLivePreview) disposeModel(builtModel);
     const saving = 100 * (1 - optimizedBytes.byteLength / sourceBytes.byteLength);
     els.optimizedSize.textContent = formatBytes(optimizedBytes.byteLength);
     els.optimizedTriangleCount.textContent = num(optimizedStats.triangles);
     els.optimizedVertexCount.textContent = num(optimizedStats.vertices);
     els.savingBadge.textContent = saving >= 0 ? `${saving.toFixed(0)}% smaller` : `${Math.abs(saving).toFixed(0)}% larger`;
     els.resultCard.classList.remove('hidden'); els.showOptimizedBtn.disabled = false; els.downloadBtn.disabled = false;
-    showModel(optimizedModel, 'optimized');
+    if (!keepLivePreview) showModel(optimizedModel, 'optimized');
     setProgress(100, 'Finished');
     setStatus('Done — use Compare or Detail loss in the viewer to see exactly what changed.');
     window.dispatchEvent(new CustomEvent('shrink:optimized', { detail: { reduce: lastReduce, bytes: optimizedBytes.byteLength, triangles: optimizedStats.triangles } }));
     setTimeout(hideProgress, 1200);
+    return true;
   } catch (err) {
     console.error(err);
     setProgress(100, 'Stopped');
     setStatus(`Optimization failed: ${err.message}`, true);
+    return false;
   } finally {
     els.optimizeBtn.disabled = false;
-    els.optimizeBtn.textContent = 'Optimize model';
+    els.optimizeBtn.textContent = els.optimizeBtn.dataset.label || 'Optimize model';
   }
 }
 
@@ -798,6 +838,13 @@ window.__shrinkApp = {
     else if (originalModel) showModel(originalModel, 'original', false);
   },
   setCompare,
+  setPreview(root) { setReduced(root, true); if (currentWhich === 'original' && !els.showOriginalBtn.dataset.pinned) { /* stay on the original until the UI asks */ } },
+  clearPreview() { if (optimizedIsPreview) { if (compareOn) leaveCompare(); const was = currentModel === optimizedModel; disposeReduced(); els.showOptimizedBtn.disabled = true; if (was && originalModel) showModel(originalModel, 'original', false); } },
+  notifyReduced(meta) { reducedVersion++; window.dispatchEvent(new CustomEvent('shrink:reduced', { detail: { ...meta, version: reducedVersion } })); },
+  get reducedVersion() { return reducedVersion; },
+  get optimizedIsPreview() { return optimizedIsPreview; },
+  buildAndSave,
+  optimize: optimizeModel,
   isCompare: () => compareOn,
   setCompareSplit(v) { compareSplit = Math.max(0.03, Math.min(0.97, v)); },
   getCompareSplit: () => compareSplit,

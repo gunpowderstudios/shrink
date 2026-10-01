@@ -1,7 +1,7 @@
-import './paint-mode-v08.js?v=1.5';
+import './paint-mode-v08.js?v=1.75';
 import './gltf-texture-index.js';
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { ensureBVH, raycasterFor } from './bvh-support.js?v=1.5';
+import { ensureBVH, raycasterFor } from './bvh-support.js?v=1.75';
 
 /* Shrink 3D paint engine (v1.5)
  *  - fast raycasting (BVH) so painting stays live on very dense meshes
@@ -782,6 +782,6 @@ function resetAfterModelChange() {
 window.addEventListener('shrink:texture-applied', () => { resetAfterModelChange(); setMode('paint'); });
 window.addEventListener('shrink:model-opened', () => { resetAfterModelChange(); state.activeTextureIndex = null; if (state.mode !== 'navigate') setMode('navigate'); });
 
-window.__shrinkPaint = { setMode, getMode: () => state.mode, collectDirtyLayers };
+window.__shrinkPaint = { setMode, getMode: () => state.mode, collectDirtyLayers, hasEdits: () => [...state.layers.values()].some(l => l.dirty) };
 
 setMode('navigate');

@@ -1,7 +1,7 @@
 // Shrink mesh tools — pure algorithms (no DOM). Works in the browser and in Node tests.
 // three / three-mesh-bvh are injected by the caller so this file has no hard dependency on how they are loaded.
 import { compactPrimitive, getPrimitiveVertexCount, weld } from '@gltf-transform/functions';
-import { reduceIndices } from './reduce-core.js?v=1.7';
+import { reduceIndices } from './reduce-core.js?v=1.75';
 
 /* ------------------------------------------------------------------ */
 /* Size estimates                                                      */
@@ -68,7 +68,7 @@ export async function simplifyWithProtection(document, { ratio, error = 0.05, da
 
   for (const mesh of document.getRoot().listMeshes()) {
     const parentNode = mesh.listParents().find(p => p.propertyType === 'Node');
-    const world = parentNode ? parentNode.getWorldMatrix() : [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    const world = parentNode ? parentNode.getWorldMatrix() : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
     for (const prim of mesh.listPrimitives()) {
       if (prim.getMode() !== 4) continue;          // triangles only
