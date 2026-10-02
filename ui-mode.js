@@ -1,6 +1,6 @@
-// SHRINK 3D v2.00 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v2.01 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '2.00';
+  const VERSION = '2.01';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -12,6 +12,7 @@
   import(`./game-protection-fix.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err));
   import(`./viewer-auto-button.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Viewer auto button did not load`, err));
   import(`./print-v2-ui.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
+  import(`./print-upload.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Print upload control did not load`, err));
 
   if (!document.querySelector('link[data-shrink-matrix-theme]')) {
     const theme = document.createElement('link'); theme.rel = 'stylesheet'; theme.href = `./matrix-theme.css?v=${VERSION}`; theme.dataset.shrinkMatrixTheme = 'true'; document.head.appendChild(theme);
@@ -56,7 +57,7 @@
     const s=dropZone?.querySelector('strong'),sp=dropZone?.querySelector('span'); if(s)s.textContent=t.drop[0];if(sp)sp.textContent=t.drop[1];if(fileInput)fileInput.accept=t.accept;
     try{localStorage.setItem('shrink-mode',mode);}catch{}
     window.dispatchEvent(new CustomEvent('shrink:ui-mode',{detail:{mode}}));
-    if(announce) window.__shrinkApp?.setStatus?.(mode==='print'?'Print mode — choose your printer and size, then follow the four big steps.':'Game mode — pick where it will be used, then drag the detail slider.');
+    if(announce) window.__shrinkApp?.setStatus?.(mode==='print'?'Print mode — load a sculpt, choose your printer and size, then follow the four big steps.':'Game mode — pick where it will be used, then drag the detail slider.');
   }
   chooser.addEventListener('click',e=>{const b=e.target.closest('.mode-card');if(b)setMode(b.dataset.mode,true);});
   const sniff=name=>{if(/\.(stl|obj|ply)$/i.test(name||''))setMode('print');};
