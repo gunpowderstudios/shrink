@@ -1,8 +1,8 @@
-// SHRINK 3D v2.09 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.10 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.09';
+  const VERSION = '2.10';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -176,20 +176,38 @@
     }
   }
 
-  async function autoRepair() {
+  async function rebuild() {
     if (S.repairBusy || !S.result?.repair) return;
-    const btn = $('makeWatertightBtn');
     const r = S.result.repair;
-    if (!btn) { r.repairNote = 'The repair tool is not ready yet. Reload the page and try again.'; render(); return; }
-    S.repairBusy = true; r.repairNote = ''; render();
-    const quality = $('remeshQuality'); if (quality) quality.value = 'balanced';
-    btn.click();
-    await waitFor(() => btn.disabled, 3000, 50);
-    await waitFor(() => !btn.disabled, 600000, 250);
-    const title = document.querySelector('#printDiagnosticPanel .print-diagnostic-title')?.textContent || '';
-    if (/^✓/.test(title)) { r.state = 'repaired'; r.repairNote = ''; }
-    else r.repairNote = $('printDiagnosticMessage')?.textContent || 'Auto-repair could not finish.';
-    S.repairBusy = false; render();
+    S.repairBusy = true; r.repairNote = ''; r.progress = 'Starting…';
+    render();
+    try {
+      const { rebuildSolid } = window.__shrinkRebuildSolid ? { rebuildSolid: window.__shrinkRebuildSolid } : await import(`./solid-rebuild.js?v=${VERSION}`);   // the override exists for tests
+      const source = app()?.optimizedModel || app()?.originalModel;
+      const P = window.__shrinkPrint;
+      const mmPerUnit = P?.mmPerUnit?.() || 1;
+      const detailUnits = (P?.detailMM?.() || 0) / mmPerUnit;
+      const tris = countTris(source);
+      const res = await rebuildSolid(source, {
+        detailUnits, maxCells: 12e6, targetTris: Math.min(400000, Math.max(20000, Math.round(tris * 1.5))),
+        onStatus: (text, pct) => { r.progress = `${text}${pct ? ` ${Math.round(pct)}%` : ''}`; const b = card?.querySelector('[data-act="rebuild"]'); if (b) b.textContent = r.progress; }
+      });
+      // show it in the viewer; it becomes the model that gets exported
+      app().setPreview(res.root);
+      app().show('optimized');
+      const after = countTris(res.root), before = S.result.shrink?.before || after;
+      if (S.result.shrink) Object.assign(S.result.shrink, { after, pct: before ? (after / before) * 100 : 100, text: '', rebuilt: true });
+      await doSolidCheck(S.result);
+      const fresh = S.result.repair;
+      fresh.rebuilt = { ...res.stats, mm: res.stats.voxel * mmPerUnit };
+      if (fresh.state === 'ok' || fresh.state === 'pieces') fresh.state = 'rebuilt';
+    } catch (err) {
+      console.warn(`[SHRINK 3D ${VERSION}] Solid rebuild did not work`, err);
+      r.state = 'failed';
+      r.repairNote = err?.message || 'The rebuild could not finish.';
+    } finally {
+      S.repairBusy = false; render();
+    }
   }
 
   function download() {
@@ -199,7 +217,7 @@
     else setNative('splitMode', 'off', 'change');
     setNative('zUpToggle', true, 'change');
     const fuse = $('fuseSolidToggle');
-    if (fuse) { fuse.checked = S.result?.repair?.state === 'ok' && !splitting; fuse.dispatchEvent(new Event('change', { bubbles: true })); }
+    if (fuse) { fuse.checked = S.result?.repair?.state === 'ok' && !splitting; fuse.dispatchEvent(new Event('change', { bubbles: true })); }   // a rebuilt solid is already clean, so it is exported as is
     setStatusLine('Building your file…', false);
     $('saveStlBtn')?.click();
   }
@@ -229,14 +247,23 @@
   function solidRow() {
     const r = S.result?.repair; if (!r) return '';
     if (r.state === 'ok') return row('ok', 'It\u2019s one clean solid', 'Closed and watertight, so any slicer can read it without complaints.');
-    if (r.state === 'repaired') return row('ok', 'Repaired copy saved', `<b>${esc(app()?.baseName?.() || 'model')}-watertight.stl</b> was downloaded. It is rebuilt on a coarse grid, so fine detail will be softened. Look at it in your slicer before printing.`);
+    if (r.state === 'rebuilt') {
+      const b = r.rebuilt || {};
+      const bits = [`${nf.format(b.trisOut || countTris(app()?.optimizedModel))} triangles`];
+      if (b.mm) bits.push(`detail finer than about ${b.mm < 0.1 ? b.mm.toFixed(2) : b.mm.toFixed(1)} mm is softened`);
+      if (b.droppedSpecks) bits.push(`${b.droppedSpecks} tiny stray specks removed`);
+      if (b.simplified === false) bits.push('the file is larger than usual because it could not be simplified');
+      return row('ok', 'Rebuilt as one solid',
+        `${bits.join(' · ')}. <b>Have a look in the viewer</b> (try Compare) before you download. If it looks wrong, undo it and download the original instead.`,
+        '<div class="sc-actions"><button type="button" class="sc-small-btn" data-act="undo">Undo rebuild</button></div>');
+    }
     if (r.state === 'pieces') return row('info', `Made of ${r.components} separate pieces`, 'That\u2019s fine for printing. Pieces that don\u2019t touch will print as separate objects.');
+    if (r.state === 'failed') return row('warn', 'We couldn\u2019t rebuild this model', `${esc(r.repairNote || '')} You can still download it as it is. Most slicers can repair it, or you can close the holes in your modelling software.`);
     if (r.state === 'needs') {
       const busy = S.repairBusy;
-      const extra = r.repairNote ? `<p class="sc-warn-note">${esc(r.repairNote)}</p>` : '';
       return row('warn', 'Needs a quick repair',
-        'We found small holes or overlaps. Most slicers can fix this automatically when you import the file, so you can usually just download. Auto-repair is experimental: it rebuilds the surface on a coarse grid, so fine detail gets softened, and it may refuse if the gaps are too big.',
-        `${extra}<button type="button" class="sc-small-btn" data-act="repair"${busy ? ' disabled' : ''}>${busy ? 'Repairing… this can take a minute' : 'Try auto-repair (experimental)'}</button>`);
+        'We found small holes or overlaps. Most slicers can fix this automatically when you import the file, so you can usually just download. Or rebuild it as one solid shape: this closes small gaps but fills hollow insides and softens very fine detail. You\u2019ll preview it before downloading.',
+        `<button type="button" class="sc-small-btn" data-act="rebuild"${busy ? ' disabled' : ''}>${busy ? esc(r.progress || 'Rebuilding…') : 'Rebuild as one solid (experimental)'}</button>`);
     }
     return row('info', 'Solid check skipped', esc(r.message || 'We couldn\u2019t check this one. You can still download.'));
   }
@@ -320,6 +347,7 @@
     if (r) {
       lines.push(`Solid check: ${r.state}${r.components ? ` (${r.components} part${r.components === 1 ? '' : 's'})` : ''}`);
       if (r.message) lines.push(`Engine message: ${r.message}`);
+      if (r.rebuilt) lines.push(`Rebuild: voxel ${r.rebuilt.voxel?.toPrecision(3)} units · grid ${r.rebuilt.dims?.join('×')} · gap sealing ${r.rebuilt.radius} voxels · ${nf.format(r.rebuilt.trisRaw || 0)} → ${nf.format(r.rebuilt.trisOut || 0)} triangles`);
     }
     try {
       const topo = window.__shrinkPrintSafety?.topologySummary?.(app()?.optimizedModel);
@@ -377,7 +405,8 @@
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (act === 'advanced') setLevel('advanced');
       else if (act === 'back') { S.stage = 'setup'; syncInputs(); render(); }
-      else if (act === 'repair') autoRepair();
+      else if (act === 'rebuild') rebuild();
+      else if (act === 'undo') run();
       else if (act === 'split') { S.fitChoice = 'split'; render(); }
       else if (act === 'scale') {
         const f = S.result?.fit; if (!f) return;

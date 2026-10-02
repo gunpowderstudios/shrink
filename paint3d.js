@@ -1,7 +1,7 @@
-import './paint-mode-v08.js?v=2.09';
+import './paint-mode-v08.js?v=2.10';
 import './gltf-texture-index.js';
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { ensureBVH, raycasterFor } from './bvh-support.js?v=2.09';
+import { ensureBVH, raycasterFor } from './bvh-support.js?v=2.10';
 
 /* Shrink 3D paint engine (v1.5)
  *  - fast raycasting (BVH) so painting stays live on very dense meshes

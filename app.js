@@ -5,7 +5,7 @@ import { WebIO, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt } from '@gltf-transform/functions';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
-import { simplifyWithProtection, smoothNormals } from './mesh-tools.js?v=2.09';
+import { simplifyWithProtection, smoothNormals } from './mesh-tools.js?v=2.10';
 
 const $ = (id) => document.getElementById(id);
 const els = {

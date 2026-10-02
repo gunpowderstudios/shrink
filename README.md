@@ -1,4 +1,4 @@
-# SHRINK 3D v2.09
+# SHRINK 3D v2.10
 
 Browser tool (everything runs locally). v2.09 adds Simple mode (default in 3D print): pick a printer, press one button, download. Advanced mode is the full control panel and is unchanged.
 
@@ -9,8 +9,14 @@ v1.75 = v1.74 (branding, SEO, Matrix theme) on the real v1.7 live-preview core. 
 print-preview-fix.js were removed: the core now provides live preview, build-and-download and game/print units itself.
 After deploying, hard-refresh (Cmd+Shift+R).
 
-Versioning: every ./file.js?v=X import and every VERSION constant must use the same number (currently 2.09).
+Versioning: every ./file.js?v=X import and every VERSION constant must use the same number (currently 2.10).
 A different ?v= string makes the browser load a second, separate copy of that module. Bump all of them together.
+
+## Solid rebuild (v2.10)
+When a model fails the solid check, Simple mode can rebuild it as one watertight solid and preview it before download.
+The surface is traced into a voxel grid (solid-core.js), small gaps are sealed, everything the outside cannot reach becomes solid,
+and Manifold turns it back into a smooth watertight mesh, which is then simplified. It runs in a background worker (remesh-worker.js).
+It closes gaps up to roughly 8 voxels wide, fills hollow insides, softens detail finer than one voxel and refuses models with bigger gaps.
 
 ## Licence
 **SHRINK 3D © 2026 Gunpowder Studios**
