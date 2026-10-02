@@ -1,13 +1,14 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v1.90 — safety layer around optional Fuse / Split helpers.
-const VERSION = '1.90';
+// SHRINK 3D v1.91 — safety layer around optional Fuse / Split helpers.
+const VERSION = '1.91';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
 let lastAttempt = null;
 
 function sourceModel(){ return app()?.optimizedModel || app()?.originalModel || null; }
+
 function topologySummary(model){
   if(!model)return null;
   const edgeCounts=new Map(); let triangles=0,degenerate=0;
@@ -15,22 +16,114 @@ function topologySummary(model){
   const q=v=>`${Math.round(v.x*1e6)},${Math.round(v.y*1e6)},${Math.round(v.z*1e6)}`;
   const addEdge=(u,v)=>{const ku=q(u),kv=q(v),key=ku<kv?`${ku}|${kv}`:`${kv}|${ku}`;edgeCounts.set(key,(edgeCounts.get(key)||0)+1);};
   model.updateMatrixWorld(true);
-  model.traverse(o=>{if(!o.isMesh||!o.geometry?.attributes?.position)return;const g=o.geometry,pos=g.attributes.position,idx=g.index,count=idx?idx.count:pos.count;for(let i=0;i+2<count;i+=3){const i0=idx?idx.getX(i):i,i1=idx?idx.getX(i+1):i+1,i2=idx?idx.getX(i+2):i+2;a.fromBufferAttribute(pos,i0).applyMatrix4(o.matrixWorld);b.fromBufferAttribute(pos,i1).applyMatrix4(o.matrixWorld);c.fromBufferAttribute(pos,i2).applyMatrix4(o.matrixWorld);triangles++;const area2=new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).lengthSq();if(area2<1e-20)degenerate++;addEdge(a,b);addEdge(b,c);addEdge(c,a);}});
-  let openEdges=0,pinchedEdges=0;for(const n of edgeCounts.values()){if(n===1)openEdges++;else if(n>2)pinchedEdges++;}
+  model.traverse(o=>{
+    if(!o.isMesh||!o.geometry?.attributes?.position)return;
+    const g=o.geometry,pos=g.attributes.position,idx=g.index,count=idx?idx.count:pos.count;
+    for(let i=0;i+2<count;i+=3){
+      const i0=idx?idx.getX(i):i,i1=idx?idx.getX(i+1):i+1,i2=idx?idx.getX(i+2):i+2;
+      a.fromBufferAttribute(pos,i0).applyMatrix4(o.matrixWorld);
+      b.fromBufferAttribute(pos,i1).applyMatrix4(o.matrixWorld);
+      c.fromBufferAttribute(pos,i2).applyMatrix4(o.matrixWorld);
+      triangles++;
+      const area2=new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).lengthSq();
+      if(area2<1e-20)degenerate++;
+      addEdge(a,b);addEdge(b,c);addEdge(c,a);
+    }
+  });
+  let openEdges=0,pinchedEdges=0;
+  for(const n of edgeCounts.values()){if(n===1)openEdges++;else if(n>2)pinchedEdges++;}
   return{triangles,openEdges,pinchedEdges,degenerateTriangles:degenerate};
 }
-function logFailure(kind,rawMessage){console.warn(`[SHRINK 3D ${VERSION}] ${kind} helper could not complete`,{libraryStatus:rawMessage,topology:topologySummary(sourceModel())});}
+
+function ensureDiagnosticPanel(){
+  let panel=$('printDiagnosticPanel');
+  if(panel)return panel;
+  const viewerPanel=document.querySelector('.viewer-panel');
+  if(!viewerPanel)return null;
+  panel=document.createElement('div');
+  panel.id='printDiagnosticPanel';
+  panel.className='print-diagnostic-panel';
+  panel.hidden=true;
+  panel.innerHTML=`<div class="print-diagnostic-title">⚠ Model repair issue</div><div id="printDiagnosticMessage"></div><div id="printDiagnosticStats" class="print-diagnostic-stats"></div>`;
+  viewerPanel.appendChild(panel);
+  if(!$('printDiagnosticStyle')){
+    const style=document.createElement('style');
+    style.id='printDiagnosticStyle';
+    style.textContent=`.print-diagnostic-panel{margin:10px 0 0;padding:12px 14px;border:1px solid #ff5b62;border-radius:12px;background:rgba(120,18,24,.22);color:#ffd3d5;font-size:12px;line-height:1.45}.print-diagnostic-title{font-weight:800;color:#ff747a;font-size:13px;margin-bottom:5px}.print-diagnostic-stats{margin-top:6px;color:#ffb5b9}.print-diagnostic-panel[hidden]{display:none!important}`;
+    document.head.appendChild(style);
+  }
+  return panel;
+}
+
+function friendlyReason(kind, raw){
+  const t=String(raw||'');
+  if(/disconnected solids/i.test(t)) return 'The model contains separate pieces that could not be joined into one connected solid.';
+  if(/non-manifold|manifold rejected|no printable solid/i.test(t)) return 'The mesh could not be converted into one closed manifold solid. This is usually caused by holes, overlapping shells, self-intersections or conflicting faces.';
+  if(/boolean union/i.test(t)) return 'The model parts could not be Boolean-unioned cleanly. Overlapping or self-intersecting geometry is a common cause.';
+  if(kind==='Split') return 'The model could not complete the solid split safely, so SHRINK will try its direct capped fallback instead.';
+  return 'The model could not be turned into one reliable closed solid. SHRINK will keep the original geometry rather than pretend the repair succeeded.';
+}
+
+function showDiagnostic(kind, rawMessage){
+  const panel=ensureDiagnosticPanel(); if(!panel)return;
+  const topo=topologySummary(sourceModel());
+  const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats');
+  panel.querySelector('.print-diagnostic-title').textContent=`⚠ ${kind} could not make a clean solid`;
+  if(msg)msg.textContent=friendlyReason(kind,rawMessage);
+  if(stats&&topo){
+    const nf=new Intl.NumberFormat();
+    stats.textContent=`Mesh check: ${nf.format(topo.openEdges)} open edges · ${nf.format(topo.pinchedEdges)} pinched/non-manifold edges · ${nf.format(topo.degenerateTriangles)} degenerate triangles. Exact library reason: ${rawMessage || 'unknown'}`;
+  }
+  panel.hidden=false;
+}
+
+function clearDiagnostic(){const panel=$('printDiagnosticPanel');if(panel)panel.hidden=true;}
+
+function logFailure(kind,rawMessage){
+  const topo=topologySummary(sourceModel());
+  console.warn(`[SHRINK 3D ${VERSION}] ${kind} helper could not complete`,{libraryStatus:rawMessage,topology:topo});
+  showDiagnostic(kind,rawMessage);
+}
+
 function normalExport(kind,message){
   if(fallbackBusy)return; fallbackBusy=true;
   const fuse=$('fuseSolidToggle'),split=$('splitMode'),prevFuse=fuse?.checked,prevSplit=split?.value;
   if(fuse)fuse.checked=false;if(split)split.value='off';
-  setTimeout(()=>{const btn=kind==='obj'?$('saveObjBtn'):$('saveStlBtn');btn?.click();setTimeout(()=>{app()?.setStatus?.(message,false);if(fuse&&prevFuse!=null)fuse.checked=prevFuse;if(split&&prevSplit!=null){split.value=prevSplit;split.dispatchEvent(new Event('change',{bubbles:true}));}fallbackBusy=false;},60);},0);
+  setTimeout(()=>{
+    const btn=kind==='obj'?$('saveObjBtn'):$('saveStlBtn');
+    btn?.click();
+    setTimeout(()=>{
+      app()?.setStatus?.(message,false);
+      if(fuse&&prevFuse!=null)fuse.checked=prevFuse;
+      if(split&&prevSplit!=null){split.value=prevSplit;split.dispatchEvent(new Event('change',{bubbles:true}));}
+      fallbackBusy=false;
+    },60);
+  },0);
 }
+
 function wrapStatus(){
   const a=app();if(!a?.setStatus||a.__safeExportWrapped)return false;const native=a.setStatus.bind(a);
-  a.setStatus=(msg,error=false)=>{const text=String(msg||'');if(!fallbackBusy&&text.startsWith('Fuse failed:')){logFailure('Fuse',text.slice('Fuse failed:'.length).trim());const kind=lastAttempt?.kind==='obj'?'obj':'stl',noun=kind.toUpperCase();native(`Couldn't merge this model into one solid. Saving the normal ${noun} instead…`,false);normalExport(kind,`Couldn't merge this model into one solid. Saved the normal ${noun} instead.`);return;}if(!fallbackBusy&&text.startsWith('Split failed:')){logFailure('Split',text.slice('Split failed:'.length).trim());native("Couldn't split this model safely. Saving one normal STL instead…",false);normalExport('stl',"Couldn't split this model safely. Saved one normal STL instead.");return;}return native(msg,error);};
+  a.setStatus=(msg,error=false)=>{
+    const text=String(msg||'');
+    if(!fallbackBusy&&text.startsWith('Fuse failed:')){
+      const reason=text.slice('Fuse failed:'.length).trim();
+      logFailure('Fuse',reason);
+      const kind=lastAttempt?.kind==='obj'?'obj':'stl',noun=kind.toUpperCase();
+      native(`Couldn't merge this model into one solid. Saving the normal ${noun} instead…`,false);
+      normalExport(kind,`Couldn't merge this model into one solid. Saved the normal ${noun} instead.`);return;
+    }
+    if(!fallbackBusy&&text.startsWith('Split failed:')){
+      const reason=text.slice('Split failed:'.length).trim();
+      logFailure('Split',reason);
+      native("Couldn't split this model safely. Trying the fallback route…",false);
+      return native(msg,error);
+    }
+    if(text.startsWith('Saved fused ')||/Saved \d+ watertight STL sections/i.test(text))clearDiagnostic();
+    return native(msg,error);
+  };
   a.__safeExportWrapped=true;return true;
 }
+
 function enforcePriority(){
   const fuse=$('fuseSolidToggle'),split=$('splitMode');
   if(fuse&&!fuse.dataset.safeDefaultApplied){fuse.checked=false;fuse.dataset.safeDefaultApplied='1';}
@@ -38,14 +131,23 @@ function enforcePriority(){
   if(split&&!split.dataset.safePriority){split.dataset.safePriority='1';split.addEventListener('change',sync);split.addEventListener('input',sync);}
   if(fuse&&!fuse.dataset.safePriority){fuse.dataset.safePriority='1';fuse.addEventListener('change',sync);}sync();
 }
-function trackAttempts(){const stl=$('saveStlBtn'),obj=$('saveObjBtn');if(stl&&!stl.dataset.safeTrack){stl.dataset.safeTrack='1';stl.addEventListener('click',()=>{lastAttempt={kind:'stl',time:Date.now()};},true);}if(obj&&!obj.dataset.safeTrack){obj.dataset.safeTrack='1';obj.addEventListener('click',()=>{lastAttempt={kind:'obj',time:Date.now()};},true);}}
-function maintain(){wrapStatus();enforcePriority();trackAttempts();}
+
+function trackAttempts(){
+  const stl=$('saveStlBtn'),obj=$('saveObjBtn');
+  if(stl&&!stl.dataset.safeTrack){stl.dataset.safeTrack='1';stl.addEventListener('click',()=>{lastAttempt={kind:'stl',time:Date.now()};},true);}
+  if(obj&&!obj.dataset.safeTrack){obj.dataset.safeTrack='1';obj.addEventListener('click',()=>{lastAttempt={kind:'obj',time:Date.now()};},true);}
+}
+
+function maintain(){ensureDiagnosticPanel();wrapStatus();enforcePriority();trackAttempts();}
 maintain();
-const observer=new MutationObserver(maintain);observer.observe(document.documentElement,{childList:true,subtree:true});window.addEventListener('shrink:model-opened',maintain);
+const observer=new MutationObserver(maintain);observer.observe(document.documentElement,{childList:true,subtree:true});
+window.addEventListener('shrink:model-opened',()=>{clearDiagnostic();maintain();});
+
 Promise.allSettled([
   import(`./preview-material-fix.js?v=${VERSION}`),
   import(`./fuse-export.js?v=${VERSION}`),
   import(`./split-print.js?v=${VERSION}`),
   import(`./split-fallback.js?v=${VERSION}`)
 ]).then(results=>{results.forEach((r,i)=>{if(r.status==='rejected')console.warn(`[SHRINK 3D ${VERSION}] Optional print helper ${i+1} did not load`,r.reason);});maintain();});
-window.__shrinkPrintSafety={topologySummary,maintain};
+
+window.__shrinkPrintSafety={topologySummary,maintain,showDiagnostic,clearDiagnostic};
