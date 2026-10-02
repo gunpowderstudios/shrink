@@ -1,8 +1,8 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=2.03';
+import { buildBinaryStl } from './mesh-tools.js?v=2.04';
 
-// SHRINK 3D v2.03 — safety layer around optional Fuse / Split helpers.
-const VERSION = '2.03';
+// SHRINK 3D v2.04 — safety layer around optional Fuse / Split helpers.
+const VERSION = '2.04';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -32,7 +32,7 @@ function ensureDiagnosticPanel(){
       <label class="repair-quality"><span>Keep detail</span><select id="remeshQuality"><option value="high">High</option><option value="balanced" selected>Balanced</option><option value="fast">Fast</option></select></label>
       <button id="makeWatertightBtn" type="button">Make watertight</button>
     </div>
-    <div class="repair-help">Rebuilds a new closed outer skin. Best for troublesome sculpts. Tiny details may soften slightly. Your original file is not changed.</div>
+    <div class="repair-help">Rebuilds the sculpt as a new voxel-style closed outer skin. Best for overlapping or troublesome parts. Tiny details may soften slightly. Your original file is not changed.</div>
     <details class="repair-advanced"><summary>Advanced details</summary><div id="printDiagnosticStats" class="print-diagnostic-stats"></div></details>`;
   viewerPanel.appendChild(panel);
   const style=document.createElement('style'); style.id='printDiagnosticStyle';
@@ -42,7 +42,7 @@ function ensureDiagnosticPanel(){
   return panel;
 }
 
-function friendlyReason(kind,raw){const t=String(raw||'');if(/disconnected solids/i.test(t))return 'SHRINK found separate pieces that are not joined together.';if(/non-manifold|manifold rejected|no printable solid/i.test(t))return 'SHRINK found a mesh problem it cannot safely repair with the quick method. A watertight remesh is the next thing to try.';if(/boolean union/i.test(t))return 'Some overlapping parts could not be joined cleanly.';if(kind==='Split')return 'The clean-solid route failed, so SHRINK can still try the direct split fallback.';return 'SHRINK could not turn this into one reliable closed solid.';}
+function friendlyReason(kind,raw){const t=String(raw||'');if(/disconnected solids/i.test(t))return 'SHRINK found separate pieces that are not joined together.';if(/non-manifold|manifold rejected|no printable solid/i.test(t))return 'SHRINK found a mesh problem the quick repair cannot safely fix. Make watertight will try a voxel-style rebuild.';if(/boolean union/i.test(t))return 'Some overlapping parts could not be joined cleanly.';if(kind==='Split')return 'The clean-solid route failed, so SHRINK can still try the direct split fallback.';return 'SHRINK could not turn this into one reliable closed solid.';}
 
 function showDiagnostic(kind,rawMessage){
   const panel=ensureDiagnosticPanel();if(!panel)return;const topo=topologySummary(sourceModel());
@@ -66,14 +66,14 @@ async function makeWatertightCopy(){
     if(pre&&!pre.safe){
       const nf=new Intl.NumberFormat();
       const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats'),help=ensureDiagnosticPanel()?.querySelector('.repair-help');
-      if(msg)msg.textContent=`This model is too heavy to remesh safely in your browser. SHRINK it first, then try Make watertight again.`;
+      if(msg)msg.textContent=`This model is too heavy to rebuild safely in your browser. SHRINK it first, then try Make watertight again.`;
       if(help)help.textContent='This safety limit prevents Chrome from running out of memory. Your original model is unchanged.';
-      if(stats)stats.textContent=`Remesh safety check: ${nf.format(pre.triangles)} triangles · safe limit for ${quality} mode: about ${nf.format(pre.triangleLimit)} triangles · estimated remesh grid: ${nf.format(pre.approxGridSamples)} samples.`;
-      app()?.setStatus?.('Remesh stopped safely — SHRINK the model first, then try Make watertight again.',true);
+      if(stats)stats.textContent=`Voxel safety check: ${nf.format(pre.triangles)} triangles · safe limit for ${quality} mode: about ${nf.format(pre.triangleLimit)} triangles · estimated voxel grid: ${nf.format(pre.approxGridSamples)} samples.`;
+      app()?.setStatus?.('Watertight rebuild stopped safely — SHRINK the model first, then try again.',true);
       return;
     }
-    btn.textContent='Repairing…';
-    app()?.setStatus?.('Making a watertight copy. This can take a little while…',false);
+    btn.textContent='Voxelising…';
+    app()?.setStatus?.('Rebuilding the sculpt as one watertight voxel skin. This can take a little while…',false);
     const result=await mod.makeWatertight(model,quality,msg=>app()?.setStatus?.(msg,false));
     const scale=window.__shrinkPrint?.mmPerUnit?.()||1; const zUp=$('zUpToggle')?.checked!==false;
     const out=buildBinaryStl({THREE,model:result.root,mmPerUnit:scale,zUp});
@@ -81,16 +81,16 @@ async function makeWatertightCopy(){
     saveBlob(new Blob([out.buffer],{type:'model/stl'}),`${base}-watertight.stl`);
     result.root.traverse(o=>{if(o.isMesh){o.geometry?.dispose?.();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m?.dispose?.());}});
     const panel=ensureDiagnosticPanel();
-    if(panel){panel.querySelector('.print-diagnostic-title').textContent='✓ Watertight copy created';const msg=$('printDiagnosticMessage');if(msg)msg.textContent='The repaired STL has been downloaded. Drop that new file back into SHRINK, then use Fuse / Split as normal.';const help=panel.querySelector('.repair-help');if(help)help.textContent='Your original file was left untouched.';}
+    if(panel){panel.querySelector('.print-diagnostic-title').textContent='✓ Watertight voxel copy created';const msg=$('printDiagnosticMessage');if(msg)msg.textContent='The rebuilt STL has been downloaded. Drop that new file back into SHRINK, then use Fuse / Split as normal.';const help=panel.querySelector('.repair-help');if(help)help.textContent='Your original file was left untouched. Advanced: voxel parity union was used instead of triangle-normal signing.';}
     app()?.setStatus?.(`Saved ${base}-watertight.stl. Re-open that repaired file to fuse or split it.`,false);
   }catch(err){
-    console.error(`[SHRINK 3D ${VERSION}] Watertight remesh failed`,err);
+    console.error(`[SHRINK 3D ${VERSION}] Watertight voxel rebuild failed`,err);
     const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats'),help=ensureDiagnosticPanel()?.querySelector('.repair-help');
     if(err?.code==='REMESH_TOO_HEAVY'){
-      if(msg)msg.textContent='This model is too heavy to remesh safely in your browser. SHRINK it first, then try Make watertight again.';
-      if(help)help.textContent='SHRINK stopped before the heavy remesh stage so your browser should stay responsive.';
-      if(stats&&err.preflight){const nf=new Intl.NumberFormat();stats.textContent=`Remesh safety check: ${nf.format(err.preflight.triangles)} triangles · safe limit: about ${nf.format(err.preflight.triangleLimit)} triangles.`;}
-      app()?.setStatus?.('Remesh stopped safely — reduce the model first.',true);
+      if(msg)msg.textContent='This model is too heavy to rebuild safely in your browser. SHRINK it first, then try Make watertight again.';
+      if(help)help.textContent='SHRINK stopped before the heavy voxel stage so your browser should stay responsive.';
+      if(stats&&err.preflight){const nf=new Intl.NumberFormat();stats.textContent=`Voxel safety check: ${nf.format(err.preflight.triangles)} triangles · safe limit: about ${nf.format(err.preflight.triangleLimit)} triangles.`;}
+      app()?.setStatus?.('Watertight rebuild stopped safely — reduce the model first.',true);
     } else {
       app()?.setStatus?.(`Watertight repair failed: ${err.message}`,true);
       if(msg)msg.textContent='SHRINK could not rebuild this model automatically. Try Fast detail, or repair/remesh it in your modelling software.';
