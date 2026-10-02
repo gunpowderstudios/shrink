@@ -1,11 +1,11 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { loadBVH } from './bvh-support.js?v=2.08';
+import { loadBVH } from './bvh-support.js?v=2.09';
 
-// SHRINK 3D v2.08 — watertight voxel/level-set repair.
+// SHRINK 3D v2.09 — watertight voxel/level-set repair.
 // Unlike the old nearest-normal sign test, this version decides inside/outside
 // by ray parity per mesh/subtool, then unions those volumes. This is much more
 // tolerant of flipped faces and overlapping sculpt subtools.
-const VERSION = '2.08';
+const VERSION = '2.09';
 const MAX_REBUILD_PIECES = 12;
 
 function disposeRoot(root) {

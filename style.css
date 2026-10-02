@@ -146,3 +146,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 9px 0 4p
 .legend-scale { display: flex; justify-content: space-between; font-size: 10px; color: #b6bfcc; margin: 4px 0 8px; }
 .legend-stats { font-size: 11px; line-height: 1.5; color: #d3d9e3; }
 .legend-stats b { color: #fff; }
+
+/* footer */
+.site-footer { margin: 28px 0 0; padding: 16px 0 0; text-align: center; color: var(--muted); font-size: 13px; letter-spacing: .02em; text-shadow: 0 2px 12px rgba(0,0,0,.85); }
+.site-footer a { display: inline-block; min-height: 24px; color: #b9d8c6; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(94,145,113,.55); }
+.site-footer a:hover { color: #7dffbb; border-bottom-color: #7dffbb; }
+.site-footer a:focus-visible { outline: 3px solid #7dffbb; outline-offset: 3px; border-radius: 3px; }

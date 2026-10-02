@@ -1,8 +1,8 @@
-// SHRINK 3D v2.08 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.09 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.08';
+  const VERSION = '2.09';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
