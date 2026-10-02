@@ -1,8 +1,11 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { loadBVH } from './bvh-support.js?v=2.03';
+import { loadBVH } from './bvh-support.js?v=2.04';
 
-// SHRINK 3D v2.03 — on-demand watertight remesh with browser safety preflight.
-const VERSION = '2.03';
+// SHRINK 3D v2.04 — watertight voxel/level-set repair.
+// Unlike the old nearest-normal sign test, this version decides inside/outside
+// by ray parity per mesh/subtool, then unions those volumes. This is much more
+// tolerant of flipped faces and overlapping sculpt subtools.
+const VERSION = '2.04';
 
 function disposeRoot(root) {
   root?.traverse?.(o => {
@@ -15,9 +18,9 @@ function disposeRoot(root) {
 }
 
 function qualityDivisor(quality) {
-  if (quality === 'high') return 105;
-  if (quality === 'fast') return 55;
-  return 75; // balanced — intentionally conservative in-browser
+  if (quality === 'high') return 64;
+  if (quality === 'fast') return 40;
+  return 52; // balanced — intentionally conservative for browser voxel work
 }
 
 function countTriangles(model) {
@@ -31,9 +34,9 @@ function countTriangles(model) {
 }
 
 function browserBudget(quality) {
-  if (quality === 'high') return 250000;
-  if (quality === 'fast') return 700000;
-  return 450000;
+  if (quality === 'high') return 220000;
+  if (quality === 'fast') return 650000;
+  return 400000;
 }
 
 export function remeshPreflight(model, quality = 'balanced') {
@@ -45,45 +48,133 @@ export function remeshPreflight(model, quality = 'balanced') {
   return { triangles, triangleLimit, approxGridSamples, quality, safe };
 }
 
-async function bakeWorldGeometry(model) {
-  const lib = await loadBVH();
-  if (!lib?.StaticGeometryGenerator) throw new Error('The remesh helper could not load in this browser.');
-  model.updateMatrixWorld(true);
-  const generator = new lib.StaticGeometryGenerator(model);
-  generator.attributes = ['position'];
-  generator.applyWorldTransforms = true;
-  generator.useGroups = false;
-  const geometry = generator.generate();
-  if (!geometry?.attributes?.position?.count) throw new Error('No printable surface was found in this model.');
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  geometry.computeBoundsTree({ targetLeafSize: 16 });
-  return { geometry, lib };
+function transformedGeometry(mesh) {
+  const src = mesh.geometry;
+  const g = src.clone();
+  g.applyMatrix4(mesh.matrixWorld);
+  g.deleteAttribute('normal');
+  g.deleteAttribute('uv');
+  g.deleteAttribute('uv1');
+  g.deleteAttribute('color');
+  g.computeBoundingBox();
+  g.computeBoundingSphere();
+  return g;
 }
 
-function signedDistanceFactory(geometry) {
-  const pos = geometry.attributes.position;
-  const idx = geometry.index;
-  const tree = geometry.boundsTree;
-  const p = new THREE.Vector3();
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
-  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3(), delta = new THREE.Vector3();
-  const hit = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 };
+async function buildVoxelSources(model, onStatus = () => {}) {
+  const lib = await loadBVH();
+  if (!lib?.MeshBVH) throw new Error('The voxel repair helper could not load in this browser.');
 
-  return point => {
-    p.set(point[0], point[1], point[2]);
-    const found = tree.closestPointToPoint(p, hit);
-    if (!found || !Number.isFinite(hit.distance)) return -1e9;
-    const base = Math.max(0, hit.faceIndex | 0) * 3;
-    const ia = idx ? idx.getX(base) : base;
-    const ib = idx ? idx.getX(base + 1) : base + 1;
-    const ic = idx ? idx.getX(base + 2) : base + 2;
-    a.fromBufferAttribute(pos, ia); b.fromBufferAttribute(pos, ib); c.fromBufferAttribute(pos, ic);
-    ab.subVectors(b, a); ac.subVectors(c, a); n.crossVectors(ab, ac);
-    if (n.lengthSq() < 1e-20) return -hit.distance;
-    n.normalize();
-    delta.subVectors(p, hit.point);
-    return n.dot(delta) <= 0 ? hit.distance : -hit.distance;
+  model.updateMatrixWorld(true);
+  const sourceMeshes = [];
+  model.traverse(o => {
+    if (o.isMesh && o.geometry?.attributes?.position?.count >= 3) sourceMeshes.push(o);
+  });
+  if (!sourceMeshes.length) throw new Error('No printable surface was found in this model.');
+
+  const components = [];
+  const overall = new THREE.Box3();
+  overall.makeEmpty();
+
+  for (let i = 0; i < sourceMeshes.length; i++) {
+    onStatus(`Preparing part ${i + 1} of ${sourceMeshes.length} for voxel repair…`);
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+
+    const geometry = transformedGeometry(sourceMeshes[i]);
+    try {
+      geometry.computeBoundsTree({ targetLeafSize: 20 });
+    } catch (err) {
+      geometry.dispose?.();
+      throw new Error(`Could not prepare mesh part ${i + 1} for voxel repair: ${err.message}`);
+    }
+
+    const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+    const proxy = new THREE.Mesh(geometry, material);
+    proxy.updateMatrixWorld(true);
+    const box = geometry.boundingBox.clone();
+    overall.union(box);
+    components.push({ geometry, material, proxy, box, tree: geometry.boundsTree });
+  }
+
+  return { components, overall };
+}
+
+function disposeVoxelSources(components = []) {
+  for (const c of components) {
+    c.geometry?.disposeBoundsTree?.();
+    c.geometry?.dispose?.();
+    c.material?.dispose?.();
+  }
+}
+
+function boxDistanceToPoint(box, p) {
+  const x = Math.max(box.min.x - p.x, 0, p.x - box.max.x);
+  const y = Math.max(box.min.y - p.y, 0, p.y - box.max.y);
+  const z = Math.max(box.min.z - p.z, 0, p.z - box.max.z);
+  return Math.hypot(x, y, z);
+}
+
+function makeVoxelSignedDistance(components, edgeLength) {
+  const point = new THREE.Vector3();
+  const hit = { point: new THREE.Vector3(), distance: Infinity, faceIndex: 0 };
+  const raycaster = new THREE.Raycaster();
+  raycaster.firstHitOnly = false;
+  // Non-axis-aligned direction reduces ambiguous edge/vertex hits.
+  const rayDir = new THREE.Vector3(1, 0.37139068, 0.17320508).normalize();
+  const ray = new THREE.Ray();
+  const dedupeTol = Math.max(edgeLength * 0.025, 1e-7);
+
+  function nearestDistance() {
+    let best = Infinity;
+    for (const c of components) {
+      if (boxDistanceToPoint(c.box, point) > best) continue;
+      hit.distance = Infinity;
+      const found = c.tree?.closestPointToPoint?.(point, hit);
+      if (found && Number.isFinite(hit.distance) && hit.distance < best) best = hit.distance;
+    }
+    return best;
+  }
+
+  function insideComponent(c) {
+    ray.origin.copy(point);
+    ray.direction.copy(rayDir);
+    if (!ray.intersectsBox(c.box)) return false;
+
+    raycaster.ray.copy(ray);
+    raycaster.near = 0;
+    raycaster.far = Infinity;
+    let hits;
+    try {
+      hits = raycaster.intersectObject(c.proxy, false);
+    } catch {
+      return false;
+    }
+    if (!hits?.length) return false;
+
+    // Adjacent triangles can report the same crossing. Count distinct distances.
+    let crossings = 0;
+    let last = -Infinity;
+    for (const h of hits) {
+      if (!Number.isFinite(h.distance) || h.distance <= dedupeTol) continue;
+      if (Math.abs(h.distance - last) <= dedupeTol) continue;
+      crossings++;
+      last = h.distance;
+    }
+    return (crossings & 1) === 1;
+  }
+
+  return xyz => {
+    point.set(xyz[0], xyz[1], xyz[2]);
+    const d = nearestDistance();
+    if (!Number.isFinite(d)) return -1e9;
+
+    // Union semantics: a point is inside when it is inside ANY source part.
+    // This prevents overlapping sculpt subtools from cancelling each other out.
+    let inside = false;
+    for (const c of components) {
+      if (insideComponent(c)) { inside = true; break; }
+    }
+    return inside ? d : -d;
   };
 }
 
@@ -99,47 +190,45 @@ export async function makeWatertight(model, quality = 'balanced', onStatus = () 
     throw err;
   }
 
-  onStatus(`Preparing ${new Intl.NumberFormat().format(preflight.triangles)} triangles for watertight repair…`);
+  onStatus(`Preparing ${new Intl.NumberFormat().format(preflight.triangles)} triangles for voxel repair…`);
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 
-  const { geometry } = await bakeWorldGeometry(model);
+  const { components, overall } = await buildVoxelSources(model, onStatus);
   try {
-    const box = geometry.boundingBox.clone();
-    const size = box.getSize(new THREE.Vector3());
+    const size = overall.getSize(new THREE.Vector3());
     const longest = Math.max(size.x, size.y, size.z, 1e-6);
     const divisor = qualityDivisor(quality);
     const edgeLength = longest / divisor;
-    const pad = edgeLength * 3;
-    box.expandByScalar(pad);
+    const box = overall.clone().expandByScalar(edgeLength * 3);
 
     onStatus(quality === 'high'
-      ? 'Making a watertight copy — High detail uses more memory…'
-      : 'Making a watertight copy…');
+      ? 'Voxelising the sculpt — High detail can take a while…'
+      : 'Voxelising the sculpt into one watertight skin…');
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 
     const wasm = await window.__shrinkFuse?.loadManifold?.();
     if (!wasm?.Manifold?.levelSet) throw new Error('The watertight repair engine is not available.');
 
-    const sdf = signedDistanceFactory(geometry);
+    const sdf = makeVoxelSignedDistance(components, edgeLength);
     const bounds = { min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z] };
     const solid = wasm.Manifold.levelSet(sdf, bounds, edgeLength, 0, -1);
     try {
       const status = solid?.status?.();
-      if (solid?.isEmpty?.()) throw new Error(`Remesh produced no solid${status ? ` (${status})` : ''}.`);
+      if (solid?.isEmpty?.()) throw new Error(`Voxel remesh produced no solid${status ? ` (${status})` : ''}.`);
       const root = window.__shrinkFuse?.solidToThree?.(solid);
       if (!root) throw new Error('The repaired solid could not be converted back to a model.');
-      root.name = 'SHRINK watertight repair';
+      root.name = 'SHRINK voxel watertight repair';
       root.userData.shrinkWatertight = true;
+      root.userData.remeshMethod = 'voxel-parity-union';
       root.userData.remeshQuality = quality;
       root.userData.edgeLength = edgeLength;
       root.updateMatrixWorld(true);
-      return { root, edgeLength, quality, preflight };
+      return { root, edgeLength, quality, preflight, method: 'voxel-parity-union' };
     } finally {
       try { solid?.delete?.(); } catch {}
     }
   } finally {
-    geometry.disposeBoundsTree?.();
-    geometry.dispose?.();
+    disposeVoxelSources(components);
   }
 }
 
