@@ -1,6 +1,6 @@
-// SHRINK 3D v2.06 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v2.07 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '2.06';
+  const VERSION = '2.07';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -12,6 +12,7 @@
   import(`./game-protection-fix.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err));
   import(`./viewer-auto-button.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Viewer auto button did not load`, err));
   import(`./print-v2-ui.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
+  import(`./simple-mode.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Simple mode did not load`, err));
   import(`./print-upload.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Print upload control did not load`, err));
   import(`./mobile-warning.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Mobile warning did not load`, err));
 

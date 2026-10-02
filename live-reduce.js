@@ -1,5 +1,5 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { reduceIndices } from './reduce-core.js?v=2.06';
+import { reduceIndices } from './reduce-core.js?v=2.07';
 
 /* Live reduction: keeps a lightweight "preview" copy of the model whose index buffers are re-simplified in a
  * background worker whenever the slider moves. Vertices/attributes are copied once; only triangle lists change,
@@ -19,7 +19,7 @@ export function createLiveReducer(app) {
   function ensureWorker() {
     if (R.worker || R.workerFailed) return R.worker;
     try {
-      R.worker = new Worker(new URL('./live-worker.js?v=2.06', import.meta.url), { type: 'module' });
+      R.worker = new Worker(new URL('./live-worker.js?v=2.07', import.meta.url), { type: 'module' });
       R.worker.onmessage = e => {
         const m = e.data, w = R.waiting.get(m.id ?? 'load');
         if (m.type === 'loaded') { const p = R.waiting.get('load'); R.waiting.delete('load'); p?.resolve(m); return; }

@@ -1,0 +1,134 @@
+/* SHRINK 3D v2.07 — Simple mode (Matrix glass look: dark panels, green terminal accents) */
+:root {
+  --sc-green: #39e58c;
+  --sc-green-hi: #7dffbb;
+  --sc-glow: rgba(57, 229, 140, .32);
+  --sc-line: rgba(94, 145, 113, .46);
+  --sc-amber: #f2b04a;
+  --sc-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---- topbar: Simple / Advanced switch (only meaningful in 3D print mode) ---- */
+.topbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.ui-level-toggle { display: inline-flex; padding: 3px; border: 1px solid var(--sc-line); border-radius: 999px; background: rgba(7, 12, 10, .62); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.ui-level-toggle button { appearance: none; min-height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 800; cursor: pointer; }
+.ui-level-toggle button:hover { color: var(--text); }
+.ui-level-toggle button.on { background: var(--sc-green); color: #03170d; box-shadow: 0 0 16px var(--sc-glow); }
+.ui-level-toggle button:focus-visible, .sc-chip:focus-visible, .sc-go:focus-visible, .sc-small-btn:focus-visible, .sc-link-btn:focus-visible, .sc-tech summary:focus-visible, .sc-input input:focus-visible { outline: 3px solid var(--sc-green-hi); outline-offset: 2px; }
+.app-mode-game .ui-level-toggle { display: none; }
+
+/* ---- what Simple mode hides (everything stays in the page, so Advanced is untouched) ---- */
+.app-mode-print.ui-simple .v2-progress,
+.app-mode-print.ui-simple .v2-setup-card,
+.app-mode-print.ui-simple .v2-action-grid,
+.app-mode-print.ui-simple .workflow-strip,
+.app-mode-print.ui-simple .print-diagnostic-panel { display: none !important; }
+.app-mode-print.ui-simple .v2-top-grid { grid-template-columns: minmax(0, 1fr) minmax(380px, 470px); }
+
+/* ---- the card ---- */
+.simple-card { display: none; }
+.app-mode-print.ui-simple .simple-card {
+  display: flex; flex-direction: column; min-width: 0; padding: 22px;
+  border: 1px solid var(--sc-line); border-radius: 18px;
+  background: linear-gradient(180deg, rgba(18, 21, 24, .91), rgba(10, 13, 16, .87));
+  backdrop-filter: blur(12px) saturate(.92); -webkit-backdrop-filter: blur(12px) saturate(.92);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .46), inset 0 1px rgba(255, 255, 255, .025), 0 0 40px rgba(57, 229, 140, .05);
+}
+.sc-stage { display: none; flex-direction: column; gap: 14px; flex: 1; }
+.simple-card[data-stage="setup"] .sc-setup,
+.simple-card[data-stage="working"] .sc-working,
+.simple-card[data-stage="result"] .sc-result { display: flex; }
+.simple-card h2 { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; }
+.sc-eyebrow { font-family: var(--sc-mono); font-size: 12px; font-weight: 700; letter-spacing: .16em; color: var(--sc-green-hi); text-shadow: 0 0 12px var(--sc-glow); }
+.sc-sub { margin: -4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.sc-fine { margin: 0; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+/* printer chips */
+.sc-printers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sc-chip { appearance: none; min-height: 84px; padding: 12px 14px; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  border: 1px solid var(--sc-line); border-radius: 12px; background: rgba(7, 12, 10, .58); transition: border-color .14s, box-shadow .14s, transform .14s; }
+.sc-chip:hover { border-color: var(--sc-green); transform: translateY(-1px); }
+.sc-chip.on { border-color: var(--sc-green); background: rgba(0, 255, 125, .07); box-shadow: inset 0 0 0 1px rgba(57, 229, 140, .4), 0 0 20px rgba(57, 229, 140, .13); }
+.sc-chip-ico { display: block; font-size: 20px; margin-bottom: 4px; }
+.sc-chip strong { display: block; font-size: 15px; font-weight: 800; line-height: 1.2; }
+.sc-chip small { display: block; margin-top: 3px; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+
+/* fields */
+.sc-field { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid var(--sc-line); border-radius: 12px; background: rgba(7, 12, 10, .58); }
+.sc-field[hidden] { display: none; }
+.sc-field label { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.sc-field label em { color: var(--muted); font-style: normal; font-weight: 500; }
+.sc-input { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.sc-input input { width: 92px; min-height: 44px; padding: 0 12px; border: 1px solid rgba(94, 145, 113, .6); border-radius: 10px; background: rgba(2, 6, 5, .8); color: var(--text); font-size: 18px; font-weight: 800; text-align: right; }
+.sc-input span { color: var(--muted); font-size: 15px; }
+.sc-fit { min-height: 22px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.sc-fit[data-level="ok"] { color: var(--sc-green); }
+.sc-fit[data-level="warn"] { color: var(--sc-amber); }
+.sc-error { padding: 10px 12px; border: 1px solid rgba(255, 91, 98, .5); border-radius: 10px; background: rgba(120, 18, 24, .25); color: #ffc2c5; font-size: 14px; line-height: 1.45; }
+.sc-error[hidden] { display: none; }
+
+/* big buttons */
+.sc-go { appearance: none; min-height: 64px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: auto;
+  border: 0; border-radius: 14px; font: inherit; font-size: 19px; font-weight: 900; letter-spacing: -.1px; cursor: pointer; color: #03170d;
+  background: linear-gradient(180deg, #55f5a5, #22c874);
+  box-shadow: 0 0 28px var(--sc-glow), inset 0 1px rgba(255, 255, 255, .38); transition: transform .13s, filter .13s; }
+.sc-go:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.07); }
+.sc-go:disabled { opacity: .5; cursor: default; }
+.sc-link-btn { appearance: none; align-self: center; min-height: 44px; padding: 0 14px; border: 0; background: transparent; color: #b8c6bf; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; border-radius: 10px; }
+.sc-link-btn:hover { color: var(--sc-green-hi); }
+.sc-small-btn { appearance: none; min-height: 44px; padding: 0 18px; border: 1px solid var(--sc-line); border-radius: 10px; background: rgba(7, 12, 10, .6); color: var(--text); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+.sc-small-btn:hover:not(:disabled) { border-color: var(--sc-green); }
+.sc-small-btn.on { border-color: var(--sc-green); background: rgba(0, 255, 125, .1); color: var(--sc-green-hi); }
+.sc-small-btn:disabled { opacity: .6; cursor: default; }
+.sc-row-warn .sc-small-btn:not(.on) { background: var(--sc-amber); border-color: var(--sc-amber); color: #2a1c05; }
+.sc-row-warn .sc-small-btn:not(.on):disabled { background: rgba(242, 176, 74, .35); color: var(--text); }
+.sc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* working: terminal-style progress */
+.sc-steps { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sc-steps li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--sc-line); border-radius: 12px; background: rgba(2, 6, 5, .62); font-size: 16px; font-weight: 700; }
+.sc-tag { font-family: var(--sc-mono); font-size: 13px; font-weight: 800; letter-spacing: .04em; color: var(--muted); min-width: 52px; }
+.sc-steps li[data-state="pending"] .sc-tag::before { content: "[ .. ]"; }
+.sc-steps li[data-state="running"] { border-color: var(--sc-green); box-shadow: 0 0 18px rgba(57, 229, 140, .14); }
+.sc-steps li[data-state="running"] .sc-tag { color: var(--sc-green-hi); animation: sc-blink 1s steps(2, start) infinite; }
+.sc-steps li[data-state="running"] .sc-tag::before { content: "[ >> ]"; }
+.sc-steps li[data-state="done"] .sc-tag { color: var(--sc-green); }
+.sc-steps li[data-state="done"] .sc-tag::before { content: "[ OK ]"; }
+.sc-steps li[data-state="warn"] .sc-tag { color: var(--sc-amber); }
+.sc-steps li[data-state="warn"] .sc-tag::before { content: "[ !! ]"; }
+@keyframes sc-blink { to { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .sc-steps li[data-state="running"] .sc-tag { animation: none; } .sc-chip, .sc-go { transition: none; } }
+
+/* result rows */
+.sc-rows { display: flex; flex-direction: column; gap: 10px; }
+.sc-row { display: flex; gap: 13px; align-items: flex-start; padding: 14px; border: 1px solid var(--sc-line); border-radius: 12px; background: rgba(7, 12, 10, .6); }
+.sc-row-main { flex: 1; min-width: 0; }
+.sc-row-main strong { display: block; font-size: 16px; font-weight: 800; }
+.sc-row-main p { margin: 4px 0 0; color: #c2cdc7; font-size: 14px; line-height: 1.5; }
+.sc-row-main p.sc-warn-note { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(0, 0, 0, .35); color: #ffd9a3; font-size: 13px; }
+.sc-ico { flex: 0 0 22px; margin-top: 1px; }
+.sc-ico-ok { color: var(--sc-green); }
+.sc-ico-info { color: #8fd0ff; }
+.sc-ico-warn { color: var(--sc-amber); }
+.sc-row-warn { border-color: rgba(242, 176, 74, .5); background: rgba(48, 34, 9, .5); }
+.sc-row-main button.sc-small-btn { margin-top: 12px; }
+.sc-actions .sc-small-btn { margin-top: 0; }
+.sc-status { min-height: 20px; margin: 0; text-align: center; color: var(--sc-green); font-size: 13px; line-height: 1.45; }
+.sc-status[data-error="true"] { color: #ff9ca0; }
+.sc-result .sc-go { margin-top: 6px; }
+
+/* technical details */
+.sc-tech { border: 1px solid var(--sc-line); border-radius: 12px; background: rgba(255, 255, 255, .015); }
+.sc-tech summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; padding: 0 14px; color: #b8c6bf; font-size: 14px; font-weight: 700; }
+.sc-tech-body { padding: 0 14px 14px; font-family: var(--sc-mono); font-size: 12px; line-height: 1.7; color: #b8c6bf; word-break: break-word; }
+.sc-tech-body .sc-small-btn { margin-top: 10px; font-family: inherit; }
+
+@media (max-width: 900px) {
+  .app-mode-print.ui-simple .v2-top-grid { grid-template-columns: 1fr; }
+  .simple-card h2 { font-size: 24px; }
+}
+@media (max-width: 520px) {
+  .sc-printers { grid-template-columns: 1fr; }
+  .sc-field { flex-direction: column; align-items: stretch; }
+  .sc-input { justify-content: flex-end; }
+}
