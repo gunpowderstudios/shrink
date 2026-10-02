@@ -1,6 +1,6 @@
-// SHRINK 3D v1.92 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.93 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.92';
+  const VERSION = '1.93';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -10,6 +10,7 @@
   import(`./print-export-safety.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Optional print tools did not load`, err));
   import(`./game-save-guard.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game save verification did not load`, err));
   import(`./game-protection-fix.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err));
+  import(`./viewer-auto-button.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Viewer auto button did not load`, err));
 
   if (!document.querySelector('link[data-shrink-matrix-theme]')) {
     const theme = document.createElement('link'); theme.rel = 'stylesheet'; theme.href = `./matrix-theme.css?v=${VERSION}`; theme.dataset.shrinkMatrixTheme = 'true'; document.head.appendChild(theme);
