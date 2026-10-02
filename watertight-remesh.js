@@ -1,9 +1,9 @@
-import { rebuildSolid } from './solid-rebuild.js?v=2.11';
+import { rebuildSolid } from './solid-rebuild.js?v=2.12';
 
-// SHRINK 3D v2.11 — "Make watertight": rebuild the model as one closed solid.
+// SHRINK 3D v2.12 — "Make watertight": rebuild the model as one closed solid.
 // The surface is traced into a voxel grid, small gaps are sealed, everything the outside cannot reach becomes solid,
 // and the result is turned back into a smooth, guaranteed-watertight mesh. See solid-core.js.
-const VERSION = '2.11';
+const VERSION = '2.12';
 
 function disposeRoot(root) {
   root?.traverse?.(o => {

@@ -4,9 +4,9 @@
   if (!viewer) return;
 
   const badge = document.querySelector('.version-badge');
-  if (badge) badge.textContent = 'v2.11';
+  if (badge) badge.textContent = 'v2.12';
 
-  import('./multi-undo.js?v=2.11').catch(err => console.warn('Could not load multi-step undo:', err));
+  import('./multi-undo.js?v=2.12').catch(err => console.warn('Could not load multi-step undo:', err));
 
   const nativeAdd = viewer.addEventListener.bind(viewer);
   const paintHandlers = new Set(['handlePointerDown', 'handlePointerMove', 'stopPaint']);
@@ -41,7 +41,7 @@
   function syncModifier(event) {
     const on = !!(event?.metaKey || event?.ctrlKey);
     viewer.classList.toggle('modifier-rotate', on);
-    setOrbitLeftButton(on && viewer.classList.contains('direct-paint'));
+    setOrbitLeftButton(on && (viewer.classList.contains('direct-paint') || viewer.classList.contains('direct-protect')));
     const help = document.querySelector('.viewer-help');
     if (help && viewer.classList.contains('direct-paint')) help.textContent = on ? 'ROTATE · release Cmd / Ctrl to continue' : normalHelpText();
   }

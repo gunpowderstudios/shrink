@@ -1,7 +1,7 @@
-// SHRINK 3D v2.11 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
+// SHRINK 3D v2.12 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-const VERSION = '2.11';
+const VERSION = '2.12';
 
 function gatherWorldMesh(model) {
   model.updateMatrixWorld(true);
@@ -52,12 +52,14 @@ function buildRoot(positions, indices, stats) {
   return root;
 }
 
-function runInWorker(job, onStatus) {
+function runInWorker(job, onStatus, signal) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(Object.assign(new Error('Cancelled.'), { code: 'CANCELLED' })); return; }
     let worker;
     try { worker = new Worker(new URL(`./remesh-worker.js?v=${VERSION}`, import.meta.url), { type: 'module' }); }
     catch (e) { reject(Object.assign(new Error('worker-unavailable'), { code: 'WORKER_UNAVAILABLE' })); return; }
     const done = () => { try { worker.terminate(); } catch {} };
+    signal?.addEventListener?.('abort', () => { done(); reject(Object.assign(new Error('Cancelled.'), { code: 'CANCELLED' })); }, { once: true });
     worker.onmessage = e => {
       const m = e.data;
       if (m.type === 'progress') onStatus?.(m.text, m.pct);
@@ -79,11 +81,11 @@ async function runOnMainThread(job, onStatus) {
 }
 
 // Returns { root, stats }. `detailUnits` is the smallest detail to keep, in model units (0 = automatic).
-export async function rebuildSolid(model, { detailUnits = 0, maxCells = 30e6, maxTris = 300000, onStatus } = {}) {
+export async function rebuildSolid(model, { detailUnits = 0, maxCells = 30e6, maxTris = 300000, onStatus, signal } = {}) {
   const { positions, indices } = gatherWorldMesh(model);
   const job = { data: { positions, indices, detailUnits, maxCells, maxTris }, transfer: [positions.buffer, indices.buffer] };
   let result;
-  try { result = await runInWorker(job, onStatus); }
+  try { result = await runInWorker(job, onStatus, signal); }
   catch (err) {
     if (err?.code !== 'WORKER_UNAVAILABLE') throw err;
     const again = gatherWorldMesh(model);   // the first copy was handed to the worker
