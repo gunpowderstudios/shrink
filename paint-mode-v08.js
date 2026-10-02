@@ -4,9 +4,9 @@
   if (!viewer) return;
 
   const badge = document.querySelector('.version-badge');
-  if (badge) badge.textContent = 'v1.90';
+  if (badge) badge.textContent = 'v1.91';
 
-  import('./multi-undo.js?v=1.90').catch(err => console.warn('Could not load multi-step undo:', err));
+  import('./multi-undo.js?v=1.91').catch(err => console.warn('Could not load multi-step undo:', err));
 
   const nativeAdd = viewer.addEventListener.bind(viewer);
   const paintHandlers = new Set(['handlePointerDown', 'handlePointerMove', 'stopPaint']);
