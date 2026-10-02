@@ -1,5 +1,5 @@
-// SHRINK 3D v2.10 — background worker for the solid rebuild (keeps the page responsive while it works).
-import { rebuildSolidCore } from './solid-core.js?v=2.10';
+// SHRINK 3D v2.11 — background worker for the solid rebuild (keeps the page responsive while it works).
+import { rebuildSolidCore } from './solid-core.js?v=2.11';
 import { MeshoptSimplifier } from 'https://esm.sh/meshoptimizer@0.24.0';
 
 const MANIFOLD_JS = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.js';
@@ -25,7 +25,7 @@ self.onmessage = async e => {
     try { wasm = await loadWasm(); }
     catch (e) { self.postMessage({ type: 'error', code: 'WORKER_UNAVAILABLE', message: `The solid builder could not start in the background: ${e?.message || e}` }); return; }
     const r = await rebuildSolidCore({
-      positions: m.positions, indices: m.indices, detailUnits: m.detailUnits, maxCells: m.maxCells, maxRadius: m.maxRadius, targetTris: m.targetTris,
+      positions: m.positions, indices: m.indices, detailUnits: m.detailUnits, maxCells: m.maxCells, maxTris: m.maxTris,
       wasm, simplifier: MeshoptSimplifier,
       onProgress: (pct, text) => self.postMessage({ type: 'progress', pct, text })
     });

@@ -1,8 +1,8 @@
-// SHRINK 3D v2.10 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.11 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.10';
+  const VERSION = '2.11';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -183,13 +183,14 @@
     render();
     try {
       const { rebuildSolid } = window.__shrinkRebuildSolid ? { rebuildSolid: window.__shrinkRebuildSolid } : await import(`./solid-rebuild.js?v=${VERSION}`);   // the override exists for tests
-      const source = app()?.optimizedModel || app()?.originalModel;
+      // Rebuild from the ORIGINAL file when it is not huge: it still has all the fine detail that shrinking trims away.
+      const original = app()?.originalModel, shrunk = app()?.optimizedModel;
+      const source = original && countTris(original) <= 1500000 ? original : (shrunk || original);
       const P = window.__shrinkPrint;
       const mmPerUnit = P?.mmPerUnit?.() || 1;
       const detailUnits = (P?.detailMM?.() || 0) / mmPerUnit;
-      const tris = countTris(source);
       const res = await rebuildSolid(source, {
-        detailUnits, maxCells: 12e6, targetTris: Math.min(400000, Math.max(20000, Math.round(tris * 1.5))),
+        detailUnits, maxCells: 30e6, maxTris: 300000,
         onStatus: (text, pct) => { r.progress = `${text}${pct ? ` ${Math.round(pct)}%` : ''}`; const b = card?.querySelector('[data-act="rebuild"]'); if (b) b.textContent = r.progress; }
       });
       // show it in the viewer; it becomes the model that gets exported
@@ -262,7 +263,7 @@
     if (r.state === 'needs') {
       const busy = S.repairBusy;
       return row('warn', 'Needs a quick repair',
-        'We found small holes or overlaps. Most slicers can fix this automatically when you import the file, so you can usually just download. Or rebuild it as one solid shape: this closes small gaps but fills hollow insides and softens very fine detail. You\u2019ll preview it before downloading.',
+        'We found small holes or overlaps. Most slicers can fix this automatically when you import the file, so you can usually just download. Or rebuild it as one solid shape: this closes small gaps but fills hollow insides and softens the very finest detail. It takes about 10 seconds, and you\u2019ll preview it before downloading.',
         `<button type="button" class="sc-small-btn" data-act="rebuild"${busy ? ' disabled' : ''}>${busy ? esc(r.progress || 'Rebuilding…') : 'Rebuild as one solid (experimental)'}</button>`);
     }
     return row('info', 'Solid check skipped', esc(r.message || 'We couldn\u2019t check this one. You can still download.'));

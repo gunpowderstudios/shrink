@@ -1,6 +1,6 @@
 // SHRINK 3D v1.86 — print protection must never affect Game model saves.
 (() => {
-  const VERSION = '2.10';
+  const VERSION = '2.11';
   let wrappedApi = null;
 
   function install() {

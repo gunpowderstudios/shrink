@@ -1,7 +1,7 @@
-// SHRINK 3D v2.10 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
+// SHRINK 3D v2.11 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-const VERSION = '2.10';
+const VERSION = '2.11';
 
 function gatherWorldMesh(model) {
   model.updateMatrixWorld(true);
@@ -79,15 +79,15 @@ async function runOnMainThread(job, onStatus) {
 }
 
 // Returns { root, stats }. `detailUnits` is the smallest detail to keep, in model units (0 = automatic).
-export async function rebuildSolid(model, { detailUnits = 0, maxCells = 12e6, maxRadius = 4, targetTris = 0, onStatus } = {}) {
+export async function rebuildSolid(model, { detailUnits = 0, maxCells = 30e6, maxTris = 300000, onStatus } = {}) {
   const { positions, indices } = gatherWorldMesh(model);
-  const job = { data: { positions, indices, detailUnits, maxCells, maxRadius, targetTris }, transfer: [positions.buffer, indices.buffer] };
+  const job = { data: { positions, indices, detailUnits, maxCells, maxTris }, transfer: [positions.buffer, indices.buffer] };
   let result;
   try { result = await runInWorker(job, onStatus); }
   catch (err) {
     if (err?.code !== 'WORKER_UNAVAILABLE') throw err;
     const again = gatherWorldMesh(model);   // the first copy was handed to the worker
-    result = await runOnMainThread({ data: { positions: again.positions, indices: again.indices, detailUnits, maxCells, maxRadius, targetTris } }, onStatus);
+    result = await runOnMainThread({ data: { positions: again.positions, indices: again.indices, detailUnits, maxCells, maxTris } }, onStatus);
   }
   return { root: buildRoot(result.positions, result.indices, result.stats), stats: result.stats };
 }

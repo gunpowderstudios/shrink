@@ -1,9 +1,9 @@
-import { rebuildSolid } from './solid-rebuild.js?v=2.10';
+import { rebuildSolid } from './solid-rebuild.js?v=2.11';
 
-// SHRINK 3D v2.10 — "Make watertight": rebuild the model as one closed solid.
+// SHRINK 3D v2.11 — "Make watertight": rebuild the model as one closed solid.
 // The surface is traced into a voxel grid, small gaps are sealed, everything the outside cannot reach becomes solid,
 // and the result is turned back into a smooth, guaranteed-watertight mesh. See solid-core.js.
-const VERSION = '2.10';
+const VERSION = '2.11';
 
 function disposeRoot(root) {
   root?.traverse?.(o => {
@@ -25,9 +25,9 @@ function countTriangles(model) {
 }
 
 function cellBudget(quality) {
-  if (quality === 'high') return 30e6;
-  if (quality === 'fast') return 6e6;
-  return 12e6;
+  if (quality === 'high') return 48e6;
+  if (quality === 'fast') return 12e6;
+  return 30e6;
 }
 
 const TRIANGLE_LIMIT = 1500000;
@@ -39,7 +39,10 @@ export function remeshPreflight(model, quality = 'balanced') {
 
 export async function makeWatertight(model, quality = 'balanced', onStatus = () => {}) {
   if (!model) throw new Error('No model is loaded.');
-  const preflight = remeshPreflight(model, quality);
+  // Rebuild from the original file when we can: it still has all the fine detail the shrink step trimmed away.
+  const original = window.__shrinkApp?.originalModel;
+  const source = original && countTriangles(original) <= TRIANGLE_LIMIT ? original : model;
+  const preflight = remeshPreflight(source, quality);
   if (!preflight.safe) {
     const err = new Error(`This model is too heavy to rebuild safely in your browser (${new Intl.NumberFormat().format(preflight.triangles)} triangles). SHRINK it first, then try again.`);
     err.code = 'REMESH_TOO_HEAVY';
@@ -49,8 +52,7 @@ export async function makeWatertight(model, quality = 'balanced', onStatus = () 
   const P = window.__shrinkPrint;
   const mmPerUnit = P?.mmPerUnit?.() || 1;
   const detailUnits = (P?.detailMM?.() || 0) / mmPerUnit;
-  const targetTris = Math.min(400000, Math.max(20000, Math.round(preflight.triangles * 1.5)));
-  const { root, stats } = await rebuildSolid(model, { detailUnits, maxCells: cellBudget(quality), targetTris, onStatus: (text, pct) => onStatus(`${text}${pct ? ` ${Math.round(pct)}%` : ''}`) });
+  const { root, stats } = await rebuildSolid(source, { detailUnits, maxCells: cellBudget(quality), maxTris: 300000, onStatus: (text, pct) => onStatus(`${text}${pct ? ` ${Math.round(pct)}%` : ''}`) });
   root.name = 'SHRINK watertight rebuild';
   root.userData.shrinkWatertight = true;
   root.userData.remeshMethod = 'voxel-flood-closing';

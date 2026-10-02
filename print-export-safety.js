@@ -1,8 +1,8 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=2.10';
+import { buildBinaryStl } from './mesh-tools.js?v=2.11';
 
-// SHRINK 3D v2.10 — safety layer around optional Fuse / Split helpers.
-const VERSION = '2.10';
+// SHRINK 3D v2.11 — safety layer around optional Fuse / Split helpers.
+const VERSION = '2.11';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
