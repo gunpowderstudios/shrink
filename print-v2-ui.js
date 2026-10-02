@@ -12,7 +12,7 @@
   let fuseReady = false;
   let shrinkReady = false;
 
-  function sourceModel() { return app()?.optimizedModel || app()?.originalModel || null; }
+  function sourceModel() { return app()?.originalModel || app()?.optimizedModel || null; }
 
   function setNative(id, value, event = 'change') {
     const el = $(id);
@@ -304,11 +304,15 @@
   }
 
   function activate() {
+    const workspace = $('workspace');
+    if (!workspace || workspace.classList.contains('hidden') || !app()?.originalModel) {
+      if (dashboard) dashboard.hidden = true;
+      return;
+    }
     createDashboard();
     if (!dashboard || !viewerPanel) return;
     dashboard.hidden = false;
-    const workspace = $('workspace');
-    if (workspace) workspace.classList.add('print-v2-native-hidden');
+    workspace.classList.add('print-v2-native-hidden');
     document.body.classList.add('print-v2-active');
     syncSplitControls();
   }
@@ -328,5 +332,6 @@
   }
 
   window.addEventListener('shrink:ui-mode', onMode);
+  window.addEventListener('shrink:model-opened', () => setTimeout(onMode, 0));
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onMode, { once: true }); else onMode();
 })();
