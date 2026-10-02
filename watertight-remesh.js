@@ -1,11 +1,12 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { loadBVH } from './bvh-support.js?v=2.07';
+import { loadBVH } from './bvh-support.js?v=2.08';
 
-// SHRINK 3D v2.07 — watertight voxel/level-set repair.
+// SHRINK 3D v2.08 — watertight voxel/level-set repair.
 // Unlike the old nearest-normal sign test, this version decides inside/outside
 // by ray parity per mesh/subtool, then unions those volumes. This is much more
 // tolerant of flipped faces and overlapping sculpt subtools.
-const VERSION = '2.07';
+const VERSION = '2.08';
+const MAX_REBUILD_PIECES = 12;
 
 function disposeRoot(root) {
   root?.traverse?.(o => {
@@ -215,6 +216,17 @@ export async function makeWatertight(model, quality = 'balanced', onStatus = () 
     try {
       const status = solid?.status?.();
       if (solid?.isEmpty?.()) throw new Error(`Voxel remesh produced no solid${status ? ` (${status})` : ''}.`);
+      // Safety check: when the surface has gaps the inside/outside test breaks down and the rebuild
+      // comes out as a cloud of scattered specks. Never hand that back as if it were a repair.
+      const pieces = solid?.decompose?.() || [];
+      const pieceCount = pieces.length;
+      for (const piece of pieces) { try { piece.delete?.(); } catch {} }
+      if (pieceCount > MAX_REBUILD_PIECES) {
+        const err = new Error(`The rebuild came out as ${pieceCount} scattered pieces, which means this model has too many gaps to rebuild safely. Nothing was downloaded and your model is unchanged.`);
+        err.code = 'REMESH_MESSY';
+        err.pieces = pieceCount;
+        throw err;
+      }
       const root = window.__shrinkFuse?.solidToThree?.(solid);
       if (!root) throw new Error('The repaired solid could not be converted back to a model.');
       root.name = 'SHRINK voxel watertight repair';

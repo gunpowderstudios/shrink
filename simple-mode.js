@@ -1,8 +1,8 @@
-// SHRINK 3D v2.07 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.08 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.07';
+  const VERSION = '2.08';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -14,17 +14,15 @@
     set(key, value) { try { localStorage.setItem(key, value); } catch {} }
   };
 
-  // Bed sizes are the printable cube in mm. Bambu A1 mini is 180; the A1, P1 and X1 families are 256.
+  // Two kinds of printer. The printer's biggest printable size is optional and typed in by the user.
   const PRINTERS = [
-    { id: 'a1mini', name: 'Bambu Lab A1 mini', short: 'A1 mini', note: 'Prints up to 180 mm', type: 'fdm', bed: 180, icon: '🧱' },
-    { id: 'bambu', name: 'Bambu A1 · P1 · X1', short: 'Bambu printer', note: 'Prints up to 256 mm', type: 'fdm', bed: 256, icon: '🧱' },
-    { id: 'fdm', name: 'Other filament printer', short: 'printer', note: 'Standard 0.4 mm nozzle', type: 'fdm', bed: 0, icon: '🔧' },
-    { id: 'resin', name: 'Resin printer', short: 'resin printer', note: 'Very fine detail', type: 'resin', bed: 0, icon: '💧' }
+    { id: 'fdm', name: 'FDM printer', short: 'FDM printer', note: 'Filament · standard 0.4 mm nozzle', type: 'fdm', icon: '🧱' },
+    { id: 'resin', name: 'Resin printer', short: 'resin printer', note: 'Very fine detail', type: 'resin', icon: '💧' }
   ];
 
   const S = {
     level: store.get('shrink-ui-level', 'simple') === 'advanced' ? 'advanced' : 'simple',
-    printer: PRINTERS.some(p => p.id === store.get('shrink-simple-printer')) ? store.get('shrink-simple-printer') : 'a1mini',
+    printer: PRINTERS.some(p => p.id === store.get('shrink-simple-printer')) ? store.get('shrink-simple-printer') : 'fdm',
     bed: Number(store.get('shrink-simple-bed', 0)) || 0,
     stage: 'setup',
     busy: false,
@@ -36,7 +34,7 @@
 
   let card = null;
   const printer = () => PRINTERS.find(p => p.id === S.printer) || PRINTERS[0];
-  const bedSize = () => printer().bed || S.bed || 0;
+  const bedSize = () => S.bed || 0;
 
   /* ------------------------------ small helpers ------------------------------ */
   function setNative(id, value, event = 'change') {
@@ -231,14 +229,14 @@
   function solidRow() {
     const r = S.result?.repair; if (!r) return '';
     if (r.state === 'ok') return row('ok', 'It\u2019s one clean solid', 'Closed and watertight, so any slicer can read it without complaints.');
-    if (r.state === 'repaired') return row('ok', 'Repaired copy saved', `<b>${esc(app()?.baseName?.() || 'model')}-watertight.stl</b> was downloaded. Use that file for printing. Very fine detail may be slightly softened.`);
+    if (r.state === 'repaired') return row('ok', 'Repaired copy saved', `<b>${esc(app()?.baseName?.() || 'model')}-watertight.stl</b> was downloaded. It is rebuilt on a coarse grid, so fine detail will be softened. Look at it in your slicer before printing.`);
     if (r.state === 'pieces') return row('info', `Made of ${r.components} separate pieces`, 'That\u2019s fine for printing. Pieces that don\u2019t touch will print as separate objects.');
     if (r.state === 'needs') {
       const busy = S.repairBusy;
       const extra = r.repairNote ? `<p class="sc-warn-note">${esc(r.repairNote)}</p>` : '';
       return row('warn', 'Needs a quick repair',
-        'We found small holes or overlaps. Bambu Studio and OrcaSlicer can often fix this when you import the file. Or try our auto-repair, which rebuilds the surface and can soften very fine detail.',
-        `${extra}<button type="button" class="sc-small-btn" data-act="repair"${busy ? ' disabled' : ''}>${busy ? 'Repairing… this can take a minute' : 'Try auto-repair'}</button>`);
+        'We found small holes or overlaps. Most slicers can fix this automatically when you import the file, so you can usually just download. Auto-repair is experimental: it rebuilds the surface on a coarse grid, so fine detail gets softened, and it may refuse if the gaps are too big.',
+        `${extra}<button type="button" class="sc-small-btn" data-act="repair"${busy ? ' disabled' : ''}>${busy ? 'Repairing… this can take a minute' : 'Try auto-repair (experimental)'}</button>`);
     }
     return row('info', 'Solid check skipped', esc(r.message || 'We couldn\u2019t check this one. You can still download.'));
   }
@@ -247,7 +245,7 @@
     const f = S.result?.fit, p = printer();
     if (!f) return row('info', 'Size check skipped', 'We couldn\u2019t measure the model.');
     if (f.state === 'fits') return row('ok', `Fits your ${esc(p.short)}`, `It will print about ${f.dims}. Your printer fits up to ${f.B} mm.`);
-    if (f.state === 'unknown') return row('info', `It will print about ${f.dims}`, 'Tell us your printer\u2019s biggest size (under Change printer or size) and we\u2019ll check it fits.');
+    if (f.state === 'unknown') return row('info', `It will print about ${f.dims}`, 'Add your printer\u2019s biggest size (under Change printer or size) and we\u2019ll check it fits.');
     const scaleBtn = `<button type="button" class="sc-small-btn${S.fitChoice === 'scale' ? ' on' : ''}" data-act="scale" aria-pressed="${S.fitChoice === 'scale'}">Scale to ${f.scaleH} mm tall</button>`;
     if (f.state === 'tall') {
       const splitBtn = `<button type="button" class="sc-small-btn${S.fitChoice === 'split' ? ' on' : ''}" data-act="split" aria-pressed="${S.fitChoice === 'split'}">Split into ${f.parts} parts</button>`;
@@ -260,7 +258,7 @@
   function renderPrinters() {
     const wrap = $('scPrinters'); if (!wrap) return;
     wrap.innerHTML = PRINTERS.map(p => `<button type="button" class="sc-chip${p.id === S.printer ? ' on' : ''}" data-printer="${p.id}" aria-pressed="${p.id === S.printer}"><span class="sc-chip-ico" aria-hidden="true">${p.icon}</span><strong>${esc(p.name)}</strong><small>${esc(p.note)}</small></button>`).join('');
-    $('scBedField').hidden = !!printer().bed;
+    $('scBedField').hidden = false;
   }
 
   function renderFitLine() {
@@ -288,7 +286,7 @@
     const f = S.result.fit;
     const splitting = S.fitChoice === 'split' && f?.state === 'tall';
     $('scDownload').innerHTML = `<span aria-hidden="true">⬇</span> ${splitting ? `Download ${f.parts} parts (ZIP)` : 'Download STL'}`;
-    $('scDlNote').textContent = p.type === 'resin' ? 'Opens in Lychee, Chitubox and most slicers.' : 'Opens in Bambu Studio, OrcaSlicer and most slicers.';
+    $('scDlNote').textContent = p.type === 'resin' ? 'Opens in Lychee, Chitubox and most slicers.' : 'Opens in Cura, PrusaSlicer, OrcaSlicer and most slicers.';
   }
 
   function render() {
@@ -342,7 +340,7 @@
         <p class="sc-sub">Pick the closest one. We\u2019ll choose sensible settings for it.</p>
         <div id="scPrinters" class="sc-printers" role="group" aria-label="Printer"></div>
         <div class="sc-field"><label for="scHeight">How tall should it print?</label><div class="sc-input"><input id="scHeight" type="number" inputmode="decimal" min="1" max="500" step="1"><span>mm</span></div></div>
-        <div id="scBedField" class="sc-field" hidden><label for="scBed">Biggest size your printer can print <em>(optional)</em></label><div class="sc-input"><input id="scBed" type="number" inputmode="decimal" min="20" max="1000" step="5" placeholder="e.g. 220"><span>mm</span></div></div>
+        <div id="scBedField" class="sc-field" hidden><label for="scBed">Biggest size your printer can print <em>(optional)</em></label><div class="sc-input"><input id="scBed" type="number" inputmode="decimal" min="20" max="1000" step="5" placeholder="e.g. 220" list="scBedList"><datalist id="scBedList"><option value="180"></option><option value="220"></option><option value="256"></option><option value="300"></option><option value="350"></option></datalist><span>mm</span></div></div>
         <div id="scFitLine" class="sc-fit" aria-live="polite"></div>
         <div id="scError" class="sc-error" role="alert" hidden></div>
         <button id="scGo" class="sc-go" type="button">✨ SHRINK IT — make it print-ready</button>

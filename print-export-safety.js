@@ -1,8 +1,8 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=2.07';
+import { buildBinaryStl } from './mesh-tools.js?v=2.08';
 
-// SHRINK 3D v2.07 — safety layer around optional Fuse / Split helpers.
-const VERSION = '2.07';
+// SHRINK 3D v2.08 — safety layer around optional Fuse / Split helpers.
+const VERSION = '2.08';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -91,6 +91,10 @@ async function makeWatertightCopy(){
       if(help)help.textContent='SHRINK stopped before the heavy voxel stage so your browser should stay responsive.';
       if(stats&&err.preflight){const nf=new Intl.NumberFormat();stats.textContent=`Voxel safety check: ${nf.format(err.preflight.triangles)} triangles · safe limit: about ${nf.format(err.preflight.triangleLimit)} triangles.`;}
       app()?.setStatus?.('Watertight rebuild stopped safely — reduce the model first.',true);
+    } else if(err?.code==='REMESH_MESSY'){
+      app()?.setStatus?.('Watertight rebuild stopped: the result would have been messy, so nothing was downloaded.',true);
+      if(msg)msg.textContent=err.message;
+      if(help)help.textContent='Models with big gaps cannot be rebuilt this way. Use your slicer\'s repair, or close the holes in your modelling software.';
     } else {
       app()?.setStatus?.(`Watertight repair failed: ${err.message}`,true);
       if(msg)msg.textContent='SHRINK could not rebuild this model automatically. Try Fast detail, or repair/remesh it in your modelling software.';
