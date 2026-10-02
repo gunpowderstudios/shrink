@@ -1,8 +1,8 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=1.92';
+import { buildBinaryStl } from './mesh-tools.js?v=2.03';
 
-// SHRINK 3D v1.92 — safety layer around optional Fuse / Split helpers.
-const VERSION = '1.92';
+// SHRINK 3D v2.03 — safety layer around optional Fuse / Split helpers.
+const VERSION = '2.03';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -59,10 +59,21 @@ function saveBlob(blob,filename){const a=document.createElement('a');a.href=URL.
 
 async function makeWatertightCopy(){
   const btn=$('makeWatertightBtn'),model=sourceModel(); if(!btn||!model)return;
-  const quality=$('remeshQuality')?.value||'balanced'; const old=btn.textContent; btn.disabled=true; btn.textContent='Repairing…';
+  const quality=$('remeshQuality')?.value||'balanced'; const old=btn.textContent; btn.disabled=true; btn.textContent='Checking…';
   try{
-    app()?.setStatus?.('Making a watertight copy. This can take a little while…',false);
     const mod=await import(`./watertight-remesh.js?v=${VERSION}`);
+    const pre=mod.remeshPreflight?.(model,quality);
+    if(pre&&!pre.safe){
+      const nf=new Intl.NumberFormat();
+      const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats'),help=ensureDiagnosticPanel()?.querySelector('.repair-help');
+      if(msg)msg.textContent=`This model is too heavy to remesh safely in your browser. SHRINK it first, then try Make watertight again.`;
+      if(help)help.textContent='This safety limit prevents Chrome from running out of memory. Your original model is unchanged.';
+      if(stats)stats.textContent=`Remesh safety check: ${nf.format(pre.triangles)} triangles · safe limit for ${quality} mode: about ${nf.format(pre.triangleLimit)} triangles · estimated remesh grid: ${nf.format(pre.approxGridSamples)} samples.`;
+      app()?.setStatus?.('Remesh stopped safely — SHRINK the model first, then try Make watertight again.',true);
+      return;
+    }
+    btn.textContent='Repairing…';
+    app()?.setStatus?.('Making a watertight copy. This can take a little while…',false);
     const result=await mod.makeWatertight(model,quality,msg=>app()?.setStatus?.(msg,false));
     const scale=window.__shrinkPrint?.mmPerUnit?.()||1; const zUp=$('zUpToggle')?.checked!==false;
     const out=buildBinaryStl({THREE,model:result.root,mmPerUnit:scale,zUp});
@@ -72,7 +83,19 @@ async function makeWatertightCopy(){
     const panel=ensureDiagnosticPanel();
     if(panel){panel.querySelector('.print-diagnostic-title').textContent='✓ Watertight copy created';const msg=$('printDiagnosticMessage');if(msg)msg.textContent='The repaired STL has been downloaded. Drop that new file back into SHRINK, then use Fuse / Split as normal.';const help=panel.querySelector('.repair-help');if(help)help.textContent='Your original file was left untouched.';}
     app()?.setStatus?.(`Saved ${base}-watertight.stl. Re-open that repaired file to fuse or split it.`,false);
-  }catch(err){console.error(`[SHRINK 3D ${VERSION}] Watertight remesh failed`,err);app()?.setStatus?.(`Watertight repair failed: ${err.message}`,true);const msg=$('printDiagnosticMessage');if(msg)msg.textContent='SHRINK could not rebuild this model automatically. Try Fast detail, or repair/remesh it in your modelling software.';}
+  }catch(err){
+    console.error(`[SHRINK 3D ${VERSION}] Watertight remesh failed`,err);
+    const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats'),help=ensureDiagnosticPanel()?.querySelector('.repair-help');
+    if(err?.code==='REMESH_TOO_HEAVY'){
+      if(msg)msg.textContent='This model is too heavy to remesh safely in your browser. SHRINK it first, then try Make watertight again.';
+      if(help)help.textContent='SHRINK stopped before the heavy remesh stage so your browser should stay responsive.';
+      if(stats&&err.preflight){const nf=new Intl.NumberFormat();stats.textContent=`Remesh safety check: ${nf.format(err.preflight.triangles)} triangles · safe limit: about ${nf.format(err.preflight.triangleLimit)} triangles.`;}
+      app()?.setStatus?.('Remesh stopped safely — reduce the model first.',true);
+    } else {
+      app()?.setStatus?.(`Watertight repair failed: ${err.message}`,true);
+      if(msg)msg.textContent='SHRINK could not rebuild this model automatically. Try Fast detail, or repair/remesh it in your modelling software.';
+    }
+  }
   finally{btn.disabled=false;btn.textContent=old;}
 }
 
