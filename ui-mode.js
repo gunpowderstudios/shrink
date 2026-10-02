@@ -1,6 +1,6 @@
-// SHRINK 3D v2.01 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v2.02 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '2.01';
+  const VERSION = '2.02';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -13,6 +13,7 @@
   import(`./viewer-auto-button.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Viewer auto button did not load`, err));
   import(`./print-v2-ui.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
   import(`./print-upload.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Print upload control did not load`, err));
+  import(`./mobile-warning.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Mobile warning did not load`, err));
 
   if (!document.querySelector('link[data-shrink-matrix-theme]')) {
     const theme = document.createElement('link'); theme.rel = 'stylesheet'; theme.href = `./matrix-theme.css?v=${VERSION}`; theme.dataset.shrinkMatrixTheme = 'true'; document.head.appendChild(theme);
