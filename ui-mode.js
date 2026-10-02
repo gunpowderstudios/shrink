@@ -1,6 +1,6 @@
-// SHRINK 3D v1.90 — mode chooser + plain-language wording for each destination (Game / 3D Print).
+// SHRINK 3D v1.91 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
-  const VERSION = '1.90';
+  const VERSION = '1.91';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -36,7 +36,7 @@
 
   const TEXT = {
     game: { subtitle:'Make a model light enough for a game — and see exactly what you gave up.', steps:'<b>Game model</b><span>1&nbsp; Target</span><i>→</i><span>2&nbsp; Detail</span><i>→</i><span>3&nbsp; Touch up</span><i>→</i><span>4&nbsp; Save</span>', setupTitle:'Where will it be used?', setupSub:'Pick one — it sets sensible limits for you.', detailSub:'Drag the slider — the model on the right updates live.', extraNum:'3', extraTitle:'Touch up (optional)', extraSub:'Paint out stickers, plates or marks on the textures.', saveNum:'4', saveTitle:'Save', saveSub:'Builds the final GLB (resized textures, compressed mesh) and downloads it.', btn:'Save game GLB', drop:['Drop a model here','GLB for games · STL, OBJ or PLY also work'], accept:'.glb,.stl,.obj,.ply,model/gltf-binary' },
-    print: { subtitle:'Shrink a heavy sculpt to a size that is easy to send, without losing detail your printer can show.', steps:'<b>3D print</b><span>1&nbsp; Size</span><i>→</i><span>2&nbsp; Detail</span><i>→</i><span>3&nbsp; Protect</span><i>→</i><span>4&nbsp; Check</span><i>→</i><span>5&nbsp; Save</span>', setupTitle:'How big will it be printed?', setupSub:'Height and printer decide how much detail is actually visible.', detailSub:'Drag the slider — the model updates live. Then use Compare and Detail loss above the model.', extraNum:'3', extraTitle:'Protect key details (optional)', extraSub:'Paint faces or fine ornament so they keep their detail.', saveNum:'4', saveTitle:'Save for printing', saveSub:'STL works in every slicer. OBJ is a fallback.', btn:'Also save GLB (keeps colours)', drop:['Drop a sculpt here','STL, OBJ, PLY or GLB — from ShapeLab, Cinema 4D, Blender…'], accept:'.stl,.obj,.ply,.glb,model/gltf-binary' }
+    print: { subtitle:'Shrink a heavy sculpt to a size that is easy to send, without losing detail your printer can show.', steps:'<b>3D print</b><span>1&nbsp; Size</span><i>→</i><span>2&nbsp; Detail</span><i>→</i><span>3&nbsp; Protect</span><i>→</i><span>4&nbsp; Check</span><i>→</i><span>5&nbsp; Save</span>', setupTitle:'How big will it be printed?', setupSub:'Height and printer decide how much detail is actually visible.', detailSub:'Drag the slider — the model updates live. Then use Compare and Detail loss above the model.', extraNum:'3', extraTitle:'Protect key details (optional)', extraSub:'Paint faces or fine ornament you want to keep sharp. Everything else is reduced first.', saveNum:'4', saveTitle:'Save for printing', saveSub:'STL works in every slicer. OBJ is a fallback.', btn:'Also save GLB (keeps colours)', drop:['Drop a sculpt here','STL, OBJ, PLY or GLB — from ShapeLab, Cinema 4D, Blender…'], accept:'.stl,.obj,.ply,.glb,model/gltf-binary' }
   };
 
   const setText = (id,v) => { const el=$(id); if(el) el.textContent=v; };
