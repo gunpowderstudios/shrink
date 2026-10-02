@@ -1,8 +1,8 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=2.04';
+import { buildBinaryStl } from './mesh-tools.js?v=2.06';
 
-// SHRINK 3D v2.04 — safety layer around optional Fuse / Split helpers.
-const VERSION = '2.04';
+// SHRINK 3D v2.06 — safety layer around optional Fuse / Split helpers.
+const VERSION = '2.06';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -104,6 +104,6 @@ function wrapStatus(){const a=app();if(!a?.setStatus||a.__safeExportWrapped)retu
 function enforcePriority(){const fuse=$('fuseSolidToggle'),split=$('splitMode');if(fuse&&!fuse.dataset.safeDefaultApplied){fuse.checked=false;fuse.dataset.safeDefaultApplied='1';}const sync=()=>{if(split?.value&&split.value!=='off'&&fuse?.checked)fuse.checked=false;};if(split&&!split.dataset.safePriority){split.dataset.safePriority='1';split.addEventListener('change',sync);split.addEventListener('input',sync);}if(fuse&&!fuse.dataset.safePriority){fuse.dataset.safePriority='1';fuse.addEventListener('change',sync);}sync();}
 function trackAttempts(){const stl=$('saveStlBtn'),obj=$('saveObjBtn');if(stl&&!stl.dataset.safeTrack){stl.dataset.safeTrack='1';stl.addEventListener('click',()=>{lastAttempt={kind:'stl',time:Date.now()};},true);}if(obj&&!obj.dataset.safeTrack){obj.dataset.safeTrack='1';obj.addEventListener('click',()=>{lastAttempt={kind:'obj',time:Date.now()};},true);}}
 function maintain(){ensureDiagnosticPanel();wrapStatus();enforcePriority();trackAttempts();}
-maintain();const observer=new MutationObserver(maintain);observer.observe(document.documentElement,{childList:true,subtree:true});window.addEventListener('shrink:model-opened',()=>{clearDiagnostic();maintain();});
+maintain();const observer=new MutationObserver(maintain);observer.observe(document.documentElement,{childList:true,subtree:true});window.addEventListener('shrink:model-opened',()=>{clearDiagnostic();maintain();});window.addEventListener('shrink:reduced',clearDiagnostic);
 Promise.allSettled([import(`./preview-material-fix.js?v=${VERSION}`),import(`./fuse-export.js?v=${VERSION}`),import(`./split-print.js?v=${VERSION}`),import(`./split-fallback.js?v=${VERSION}`)]).then(results=>{results.forEach((r,i)=>{if(r.status==='rejected')console.warn(`[SHRINK 3D ${VERSION}] Optional print helper ${i+1} did not load`,r.reason);});maintain();});
 window.__shrinkPrintSafety={topologySummary,maintain,showDiagnostic,clearDiagnostic};

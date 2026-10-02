@@ -1,5 +1,5 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=1.88';
+import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=2.06';
 
 // SHRINK 3D v1.88 — optional print export Boolean union / make-manifold pass,
 // with a best-effort cleanup repair before Manifold gives up.

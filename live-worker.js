@@ -1,6 +1,6 @@
 // Background worker: keeps the heavy mesh data and answers "reduce to X%" requests without freezing the page.
 import { MeshoptSimplifier } from 'https://esm.sh/meshoptimizer@0.24.0';
-import { reduceIndices } from './reduce-core.js?v=1.75';
+import { reduceIndices } from './reduce-core.js?v=2.06';
 
 const meshes = new Map();
 let ready = null;

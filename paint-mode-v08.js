@@ -4,9 +4,9 @@
   if (!viewer) return;
 
   const badge = document.querySelector('.version-badge');
-  if (badge) badge.textContent = 'v2.04';
+  if (badge) badge.textContent = 'v2.06';
 
-  import('./multi-undo.js?v=2.04').catch(err => console.warn('Could not load multi-step undo:', err));
+  import('./multi-undo.js?v=2.06').catch(err => console.warn('Could not load multi-step undo:', err));
 
   const nativeAdd = viewer.addEventListener.bind(viewer);
   const paintHandlers = new Set(['handlePointerDown', 'handlePointerMove', 'stopPaint']);
@@ -30,9 +30,18 @@
     return 'PAINT · drag on model · hold Cmd / Ctrl to rotate · scroll to zoom';
   }
 
+  // OrbitControls treats ctrl/meta/shift + left-drag as PAN when LEFT is ROTATE, and as ROTATE when LEFT is PAN.
+  // So while Cmd/Ctrl is held in paint mode we swap LEFT to PAN, which makes Cmd/Ctrl + drag really rotate.
+  const MOUSE_ROTATE = 0, MOUSE_PAN = 2;
+  function setOrbitLeftButton(rotateWithModifier) {
+    const c = window.__shrinkViewer?.controls;
+    if (c?.mouseButtons) c.mouseButtons.LEFT = rotateWithModifier ? MOUSE_PAN : MOUSE_ROTATE;
+  }
+
   function syncModifier(event) {
     const on = !!(event?.metaKey || event?.ctrlKey);
     viewer.classList.toggle('modifier-rotate', on);
+    setOrbitLeftButton(on && viewer.classList.contains('direct-paint'));
     const help = document.querySelector('.viewer-help');
     if (help && viewer.classList.contains('direct-paint')) help.textContent = on ? 'ROTATE · release Cmd / Ctrl to continue' : normalHelpText();
   }
@@ -47,7 +56,7 @@
   viewer.addEventListener('pointerdown', syncModifier, true);
   viewer.addEventListener('pointermove', syncModifier, true);
   viewer.addEventListener('pointerup', syncModifier, true);
-  window.addEventListener('blur', () => viewer.classList.remove('modifier-rotate'));
+  window.addEventListener('blur', () => { viewer.classList.remove('modifier-rotate'); setOrbitLeftButton(false); });
 
   const tidyControls = () => {
     const paint = document.getElementById('paintModelBtn');
