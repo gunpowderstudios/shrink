@@ -1,10 +1,8 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { loadBVH } from './bvh-support.js?v=1.92';
+import { loadBVH } from './bvh-support.js?v=2.03';
 
-// SHRINK 3D v1.92 — on-demand watertight remesh.
-// This deliberately loads only when the user asks for it: rebuilding an SDF surface is heavier than quick repair.
-
-const VERSION = '1.92';
+// SHRINK 3D v2.03 — on-demand watertight remesh with browser safety preflight.
+const VERSION = '2.03';
 
 function disposeRoot(root) {
   root?.traverse?.(o => {
@@ -17,9 +15,34 @@ function disposeRoot(root) {
 }
 
 function qualityDivisor(quality) {
-  if (quality === 'high') return 130;
-  if (quality === 'fast') return 65;
-  return 90; // balanced
+  if (quality === 'high') return 105;
+  if (quality === 'fast') return 55;
+  return 75; // balanced — intentionally conservative in-browser
+}
+
+function countTriangles(model) {
+  let triangles = 0;
+  model?.traverse?.(o => {
+    if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    const g = o.geometry;
+    triangles += Math.floor((g.index?.count || g.attributes.position.count) / 3);
+  });
+  return triangles;
+}
+
+function browserBudget(quality) {
+  if (quality === 'high') return 250000;
+  if (quality === 'fast') return 700000;
+  return 450000;
+}
+
+export function remeshPreflight(model, quality = 'balanced') {
+  const triangles = countTriangles(model);
+  const divisor = qualityDivisor(quality);
+  const approxGridSamples = divisor ** 3;
+  const triangleLimit = browserBudget(quality);
+  const safe = triangles <= triangleLimit;
+  return { triangles, triangleLimit, approxGridSamples, quality, safe };
 }
 
 async function bakeWorldGeometry(model) {
@@ -34,7 +57,7 @@ async function bakeWorldGeometry(model) {
   if (!geometry?.attributes?.position?.count) throw new Error('No printable surface was found in this model.');
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  geometry.computeBoundsTree({ targetLeafSize: 10 });
+  geometry.computeBoundsTree({ targetLeafSize: 16 });
   return { geometry, lib };
 }
 
@@ -60,14 +83,23 @@ function signedDistanceFactory(geometry) {
     if (n.lengthSq() < 1e-20) return -hit.distance;
     n.normalize();
     delta.subVectors(p, hit.point);
-    // Most sculpt meshes have outward-facing triangles. Positive is inside for Manifold.levelSet.
     return n.dot(delta) <= 0 ? hit.distance : -hit.distance;
   };
 }
 
 export async function makeWatertight(model, quality = 'balanced', onStatus = () => {}) {
   if (!model) throw new Error('No model is loaded.');
-  onStatus('Preparing the model for watertight repair…');
+
+  const preflight = remeshPreflight(model, quality);
+  if (!preflight.safe) {
+    const nf = new Intl.NumberFormat();
+    const err = new Error(`This model is too heavy to remesh safely in your browser (${nf.format(preflight.triangles)} triangles). SHRINK it first, then try Make watertight again.`);
+    err.code = 'REMESH_TOO_HEAVY';
+    err.preflight = preflight;
+    throw err;
+  }
+
+  onStatus(`Preparing ${new Intl.NumberFormat().format(preflight.triangles)} triangles for watertight repair…`);
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 
   const { geometry } = await bakeWorldGeometry(model);
@@ -81,7 +113,7 @@ export async function makeWatertight(model, quality = 'balanced', onStatus = () 
     box.expandByScalar(pad);
 
     onStatus(quality === 'high'
-      ? 'Making a watertight copy — High detail can take a while…'
+      ? 'Making a watertight copy — High detail uses more memory…'
       : 'Making a watertight copy…');
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 
@@ -89,11 +121,7 @@ export async function makeWatertight(model, quality = 'balanced', onStatus = () 
     if (!wasm?.Manifold?.levelSet) throw new Error('The watertight repair engine is not available.');
 
     const sdf = signedDistanceFactory(geometry);
-    const bounds = {
-      min: [box.min.x, box.min.y, box.min.z],
-      max: [box.max.x, box.max.y, box.max.z]
-    };
-
+    const bounds = { min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z] };
     const solid = wasm.Manifold.levelSet(sdf, bounds, edgeLength, 0, -1);
     try {
       const status = solid?.status?.();
@@ -105,7 +133,7 @@ export async function makeWatertight(model, quality = 'balanced', onStatus = () 
       root.userData.remeshQuality = quality;
       root.userData.edgeLength = edgeLength;
       root.updateMatrixWorld(true);
-      return { root, edgeLength, quality };
+      return { root, edgeLength, quality, preflight };
     } finally {
       try { solid?.delete?.(); } catch {}
     }
