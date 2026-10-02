@@ -21,7 +21,7 @@
       };
       return nativeAdd(type, wrapped, options);
     }
-    return nativeAdd(type, wrapped, options);
+    return nativeAdd(type, listener, options);
   };
 
   function normalHelpText() {
