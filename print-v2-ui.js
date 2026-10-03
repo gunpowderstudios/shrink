@@ -1,6 +1,6 @@
 // SHRINK 3D v2.00 — simplified home-user print workflow.
 (() => {
-  const VERSION = '2.13';
+  const VERSION = '2.14';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));

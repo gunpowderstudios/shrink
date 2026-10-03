@@ -184,3 +184,16 @@
 .sc-check { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; cursor: pointer; font-size: 13px; color: #b8c6bf; }
 .sc-check input { width: 22px; height: 22px; margin-top: 0; accent-color: var(--sc-green); flex: 0 0 auto; }
 .sc-check b { color: var(--text); }
+
+/* ---- v2.14: clearer "settings loaded" message ---- */
+.sc-loaded { padding: 12px 14px; }
+.sc-loaded-title { font-size: 18px; font-weight: 900; color: var(--sc-green-hi); text-shadow: 0 0 14px var(--sc-glow); }
+.sc-loaded-sub { margin-top: 2px; color: #cfe0d6; }
+.sc-loaded-next { margin-top: 6px; color: var(--text); font-weight: 700; }
+.sc-loaded-next b { color: var(--sc-green-hi); }
+.sc-more { margin-top: 8px; }
+.sc-more summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; color: #b8c6bf; font-size: 13px; font-weight: 700; }
+.sc-more summary:focus-visible { outline: 3px solid var(--sc-green-hi); outline-offset: 2px; border-radius: 6px; }
+.sc-go.sc-pulse { animation: sc-pulse 1.1s ease-in-out 4; }
+@keyframes sc-pulse { 0%, 100% { box-shadow: 0 0 28px var(--sc-glow), inset 0 1px rgba(255,255,255,.38); } 50% { box-shadow: 0 0 0 4px rgba(125,255,187,.55), 0 0 44px var(--sc-glow), inset 0 1px rgba(255,255,255,.38); } }
+@media (prefers-reduced-motion: reduce) { .sc-go.sc-pulse { animation: none; box-shadow: 0 0 0 4px rgba(125,255,187,.55), 0 0 28px var(--sc-glow); } }

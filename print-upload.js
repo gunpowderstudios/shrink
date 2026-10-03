@@ -1,6 +1,6 @@
 // SHRINK 3D v2.01 — dedicated upload/change-model control for 3D print mode.
 (() => {
-  const VERSION = '2.13';
+  const VERSION = '2.14';
   const $ = id => document.getElementById(id);
   const body = document.body;
   const chooser = document.querySelector('.mode-chooser');

@@ -1,8 +1,8 @@
-// SHRINK 3D v2.13 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.14 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.13';
+  const VERSION = '2.14';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -414,7 +414,7 @@
     S.savedReduction = kp >= 1 && kp <= 100 ? { keepPercent: Math.round(kp * 10) / 10, triangles: Number(data.reduction?.triangles) || 0, ofTriangles: Number(data.reduction?.ofTriangles) || 0, tuned: !!data.reduction?.tuned } : null;
     S.usePercent = false; S.loadedFromFile = true;
     S.result = null; S.fitChoice = null;
-    applyPrinter(); S.stage = 'setup'; goSetupView(); syncInputs(); render(); renderLoaded();
+    applyPrinter(); S.stage = 'setup'; goSetupView(); syncInputs(); render(); renderLoaded(); celebrateLoaded();
   }
 
   function loadSettingsFile(file) {
@@ -429,16 +429,30 @@
     reader.readAsText(file);
   }
 
+  function detailLabel() {
+    if (S.detail === 'custom') return `Saved detail ${S.customMm} mm`;
+    const d = DETAILS.find(x => x.id === S.detail) || DETAILS[0];
+    return `${d.name} (${d.mm} mm)`;
+  }
+
   function renderLoaded() {
     const box = $('scLoaded'); if (!box) return;
-    const sr = S.savedReduction, p = printer();
-    box.hidden = !S.loadedFromFile && !sr;
+    const sr = S.savedReduction, p = printer(), fresh = !!S.loadedFromFile;
+    box.hidden = !fresh && !sr;
     if (box.hidden) return;
-    $('scLoadedText').hidden = !S.loadedFromFile;
-    $('scLoadedText').textContent = `Saved settings loaded: ${p.type === 'resin' ? 'resin' : 'FDM'} printer · keep detail down to ${detailMm()} mm${S.bed ? ` · bed ${S.bed} mm` : ''}.`;
+    for (const id of ['scLoadedTitle', 'scLoadedText', 'scLoadedNext']) $(id).hidden = !fresh;
+    $('scLoadedText').textContent = `${p.type === 'resin' ? 'Resin' : 'FDM'} printer · ${detailLabel()}${S.bed ? ` · bed ${S.bed} mm` : ''}`;
     const row = $('scPercentRow');
     row.hidden = !sr;
     if (sr) { $('scLoadedPct').textContent = `${sr.keepPercent}%`; $('scUsePercent').checked = S.usePercent; }
+  }
+
+  // Tell the person clearly that loading worked and what to do next.
+  function celebrateLoaded() {
+    const box = $('scLoaded'); box?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    const go = $('scGo'); if (!go) return;
+    go.classList.remove('sc-pulse'); void go.offsetWidth; go.classList.add('sc-pulse');
+    setTimeout(() => go.classList.remove('sc-pulse'), 5000);
   }
 
   /* ---- protect fine detail (paint areas the reducer must not touch) ---- */
@@ -600,9 +614,14 @@
         <div class="sc-group-title">How much detail should we keep?</div>
         <div id="scDetails" class="sc-details" role="group" aria-label="Detail level"></div>
         ${protectHtml()}
-        <div id="scLoaded" class="sc-loaded" hidden>
-          <div id="scLoadedText"></div>
-          <label id="scPercentRow" class="sc-check" hidden><input id="scUsePercent" type="checkbox"><span>Keep the same percentage (<b id="scLoadedPct"></b> of the triangles) instead of finding the best automatically. Best for models of a similar size.</span></label>
+        <div id="scLoaded" class="sc-loaded" role="status" hidden>
+          <div id="scLoadedTitle" class="sc-loaded-title">✓ Settings loaded!</div>
+          <div id="scLoadedText" class="sc-loaded-sub"></div>
+          <div id="scLoadedNext" class="sc-loaded-next">Now press <b>SHRINK IT</b> below to use them.</div>
+          <details id="scPercentRow" class="sc-more" hidden>
+            <summary>Use the same percentage instead</summary>
+            <label class="sc-check"><input id="scUsePercent" type="checkbox"><span>Keep <b id="scLoadedPct"></b> of the triangles instead of finding the best automatically (best for models of a similar size).</span></label>
+          </details>
         </div>
         <div id="scError" class="sc-error" role="alert" hidden></div>
         <button id="scGo" class="sc-go" type="button">✨ SHRINK IT — make it print-ready</button>
