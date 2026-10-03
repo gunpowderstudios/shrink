@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { createLiveReducer } from './live-reduce.js?v=2.14';
-import { getMeshBVH } from './bvh-support.js?v=2.14';
-import { computeDetailLoss, analyzeTopology, stlBytes, glbBytesEstimate } from './mesh-tools.js?v=2.14';
+import { createLiveReducer } from './live-reduce.js?v=2.15';
+import { getMeshBVH } from './bvh-support.js?v=2.15';
+import { computeDetailLoss, analyzeTopology, stlBytes, glbBytesEstimate } from './mesh-tools.js?v=2.15';
 
 /* Live UI: drag the slider -> the model updates -> a plain-language verdict says whether it still looks the same. */
 

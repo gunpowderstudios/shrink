@@ -1,8 +1,8 @@
-// SHRINK 3D v2.14 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.15 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.14';
+  const VERSION = '2.15';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -375,6 +375,7 @@
     return {
       type: SETTINGS_TYPE, schema: 1, appVersion: VERSION, savedAt: new Date().toISOString(),
       printer: { kind: printer().type, ...(S.bed > 0 ? { biggestSizeMm: S.bed } : {}) },
+      print: { heightMm: Math.round(heightMm() * 100) / 100 },
       detail: { level: S.detail, mm: detailMm() },
       reduction: {
         keepPercent: g || null,
@@ -382,7 +383,7 @@
         ofTriangles: live?.tris || null,
         tuned: !!S.tuned
       },
-      notes: 'Detail (mm) is the size of change SHRINK may not exceed, so it carries over to any model. keepPercent is the share of triangles kept on the model it was saved from.'
+      notes: 'Detail (mm) is the size of change SHRINK may not exceed, so it carries over to any model. print.heightMm is how tall the model was printed. keepPercent is the share of triangles kept on the model it was saved from.'
     };
   }
 
@@ -413,8 +414,12 @@
     const kp = Number(data.reduction?.keepPercent);
     S.savedReduction = kp >= 1 && kp <= 100 ? { keepPercent: Math.round(kp * 10) / 10, triangles: Number(data.reduction?.triangles) || 0, ofTriangles: Number(data.reduction?.ofTriangles) || 0, tuned: !!data.reduction?.tuned } : null;
     S.usePercent = false; S.loadedFromFile = true;
+    const ph = Number(data.print?.heightMm);
+    S.loadedHeight = ph >= 1 && ph <= 500 ? ph : 0;
     S.result = null; S.fitChoice = null;
-    applyPrinter(); S.stage = 'setup'; goSetupView(); syncInputs(); render(); renderLoaded(); celebrateLoaded();
+    applyPrinter();
+    if (S.loadedHeight) applyHeight(S.loadedHeight);
+    S.stage = 'setup'; goSetupView(); syncInputs(); render(); renderLoaded(); celebrateLoaded();
   }
 
   function loadSettingsFile(file) {
@@ -441,7 +446,7 @@
     box.hidden = !fresh && !sr;
     if (box.hidden) return;
     for (const id of ['scLoadedTitle', 'scLoadedText', 'scLoadedNext']) $(id).hidden = !fresh;
-    $('scLoadedText').textContent = `${p.type === 'resin' ? 'Resin' : 'FDM'} printer · ${detailLabel()}${S.bed ? ` · bed ${S.bed} mm` : ''}`;
+    $('scLoadedText').textContent = `${p.type === 'resin' ? 'Resin' : 'FDM'} printer · ${detailLabel()}${S.loadedHeight ? ` · ${S.loadedHeight} mm tall` : ''}${S.bed ? ` · bed ${S.bed} mm` : ''}`;
     const row = $('scPercentRow');
     row.hidden = !sr;
     if (sr) { $('scLoadedPct').textContent = `${sr.keepPercent}%`; $('scUsePercent').checked = S.usePercent; }
@@ -619,8 +624,9 @@
           <div id="scLoadedText" class="sc-loaded-sub"></div>
           <div id="scLoadedNext" class="sc-loaded-next">Now press <b>SHRINK IT</b> below to use them.</div>
           <details id="scPercentRow" class="sc-more" hidden>
-            <summary>Use the same percentage instead</summary>
-            <label class="sc-check"><input id="scUsePercent" type="checkbox"><span>Keep <b id="scLoadedPct"></b> of the triangles instead of finding the best automatically (best for models of a similar size).</span></label>
+            <summary>Reduce by the same amount instead</summary>
+            <p class="sc-more-text">Normally SHRINK works out the best amount for each new model. Your saved file kept <b id="scLoadedPct"></b> of the triangles on the model it came from. Tick the box to keep that same share of this model's triangles instead. Only worth it for models very like the one you saved from.</p>
+            <label class="sc-check"><input id="scUsePercent" type="checkbox"><span>Use the same amount</span></label>
           </details>
         </div>
         <div id="scError" class="sc-error" role="alert" hidden></div>
@@ -701,7 +707,7 @@
     $('scDownload').addEventListener('click', download);
     $('scHeight').addEventListener('input', () => {
       const v = Number($('scHeight').value); if (!(v >= 1)) return;
-      applyHeight(v); S.result = null; renderFitLine(); render();
+      applyHeight(v); S.loadedHeight = 0; S.result = null; renderFitLine(); render();
     });
     $('scBed').addEventListener('input', () => {
       S.bed = Math.max(0, Number($('scBed').value) || 0); store.set('shrink-simple-bed', S.bed);

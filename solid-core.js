@@ -1,4 +1,4 @@
-// SHRINK 3D v2.14 — solid rebuild core (no imports, so it runs in a Web Worker, on the main thread and in Node tests).
+// SHRINK 3D v2.15 — solid rebuild core (no imports, so it runs in a Web Worker, on the main thread and in Node tests).
 //
 // Idea: a messy sculpt (holes, flipped faces, overlapping parts) cannot be trusted to say what is inside.
 // Instead of asking the surface, we

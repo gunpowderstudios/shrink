@@ -1,9 +1,9 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { ensureBVH, raycasterFor, getMeshBVH } from './bvh-support.js?v=2.14';
+import { ensureBVH, raycasterFor, getMeshBVH } from './bvh-support.js?v=2.15';
 import {
   stlBytes, objBytesEstimate, glbBytesEstimate, computeDetailLoss, heatColorArray, heatColor,
   buildBinaryStl, buildObjBlob, modelHeight
-} from './mesh-tools.js?v=2.14';
+} from './mesh-tools.js?v=2.15';
 
 /* Print & Share: reduce a sculpt while SEEING what you lose, then save STL / OBJ / GLB to send to a printer. */
 

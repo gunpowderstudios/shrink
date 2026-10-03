@@ -1,7 +1,7 @@
 // Shrink mesh tools — pure algorithms (no DOM). Works in the browser and in Node tests.
 // three / three-mesh-bvh are injected by the caller so this file has no hard dependency on how they are loaded.
 import { compactPrimitive, getPrimitiveVertexCount, weld } from '@gltf-transform/functions';
-import { reduceIndices } from './reduce-core.js?v=2.14';
+import { reduceIndices } from './reduce-core.js?v=2.15';
 
 /* ------------------------------------------------------------------ */
 /* Size estimates                                                      */
