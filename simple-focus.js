@@ -65,7 +65,8 @@
   }
 
   async function runSimpleFast(e) {
-    if (!active() || e.target?.id !== 'scGo') return;
+    const button = e.target?.closest?.('#scGo');
+    if (!active() || !button) return;
     const api = simple();
     const s = api?.state;
     const live = window.__shrinkLiveUI;
@@ -101,7 +102,8 @@
   }
 
   function downloadSimple(e) {
-    if (!active() || e.target?.id !== 'scDownload') return;
+    const button = e.target?.closest?.('#scDownload');
+    if (!active() || !button) return;
     const s = simple()?.state;
     if (!s?.result) return;
     e.preventDefault();
