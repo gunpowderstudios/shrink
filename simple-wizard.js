@@ -7,6 +7,7 @@
   const body = document.body;
   let installed = false;
   let syncing = false;
+  let reductionReady = false;
 
   import(`./simple-preflight.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Model preflight did not load`, err));
 
@@ -101,12 +102,15 @@
   function syncViewer() {
     if (!active()) {
       body.classList.remove('simple-reduction-ready');
+      reductionReady = false;
       return;
     }
     const stage = simple()?.state?.stage || 'setup';
     const ready = stage === 'result' && !!app()?.optimizedModel;
     body.classList.toggle('simple-reduction-ready', ready);
-    if (!ready && app()?.originalModel && !body.classList.contains('simple-preflight-blocked')) app()?.show?.('original');
+    if (ready && !reductionReady) app()?.show?.('optimized');
+    else if (!ready && app()?.originalModel && !body.classList.contains('simple-preflight-blocked')) app()?.show?.('original');
+    reductionReady = ready;
   }
 
   function removeOldGoals() {
@@ -138,11 +142,11 @@
       installed = true;
       const obs = new MutationObserver(() => requestAnimationFrame(sync));
       obs.observe(card, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-stage'] });
-      window.addEventListener('shrink:model-opened', () => setTimeout(sync, 120));
+      window.addEventListener('shrink:model-opened', () => { reductionReady = false; setTimeout(sync, 120); });
       window.addEventListener('shrink:ui-level', () => setTimeout(sync, 70));
       window.addEventListener('shrink:ui-mode', () => setTimeout(sync, 70));
       window.addEventListener('shrink:preflight-ready', () => setTimeout(sync, 30));
-      window.addEventListener('shrink:preflight-continued', () => { app()?.show?.('original'); setTimeout(sync, 30); });
+      window.addEventListener('shrink:preflight-continued', () => { reductionReady = false; app()?.show?.('original'); setTimeout(sync, 30); });
       window.addEventListener('shrink:live-updated', () => {
         if (active() && simple()?.state?.stage !== 'result') app()?.show?.('original');
       });
