@@ -33,7 +33,6 @@
   setMeta('meta[name="twitter:title"]', `${APP_NAME} — 3D Model Optimizer`);
   const schema = document.querySelector('script[type="application/ld+json"]');
   if (schema) { try { const data = JSON.parse(schema.textContent); data.name = APP_NAME; schema.textContent = JSON.stringify(data); } catch {} }
-  const badge = document.querySelector('.version-badge'); if (badge) badge.textContent = `v${VERSION}`;
 
   const chooser = document.createElement('section'); chooser.className = 'mode-chooser';
   chooser.innerHTML = `
