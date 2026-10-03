@@ -29,6 +29,8 @@
 
   function api() { return window.__shrinkSimple; }
   function card() { return $('simpleCard'); }
+  function text(el, value) { if (el && el.textContent !== value) el.textContent = value; }
+  function html(el, value) { if (el && el.innerHTML !== value) el.innerHTML = value; }
 
   function addCss() {
     if (document.querySelector('link[data-shrink-simple-goals]')) return;
@@ -73,11 +75,11 @@
       : goal === 'smaller'
         ? ['Making it smaller', 'Checking the mesh', 'Checking it fits your printer']
         : ['Making it smaller safely', 'Checking / fusing the solid', 'Checking it fits your printer'];
-    spans.forEach((el, i) => { if (labels[i] && el.textContent !== labels[i]) el.textContent = labels[i]; });
+    spans.forEach((el, i) => { if (labels[i]) text(el, labels[i]); });
     const h = document.querySelector('#simpleCard .sc-working h2');
-    if (h) h.textContent = goal === 'solid' ? 'Making it one solid' : goal === 'smaller' ? 'Making it smaller' : 'Making it print-ready';
+    text(h, goal === 'solid' ? 'Making it one solid' : goal === 'smaller' ? 'Making it smaller' : 'Making it print-ready');
     const note = $('scWorkNote');
-    if (goal === 'solid' && /^Keeping 100% of the triangles/i.test(note?.textContent || '')) note.textContent = 'Keeping all original detail…';
+    if (goal === 'solid' && /^Keeping 100% of the triangles/i.test(note?.textContent || '')) text(note, 'Keeping all original detail…');
   }
 
   function syncResultNotes() {
@@ -85,17 +87,17 @@
     if (!rows || !a?.state?.result) return;
     let note = $('scGoalResultNote');
     const r = a.state.result.repair;
-    let text = '';
+    let value = '';
     if (goal === 'smaller' && r && ['needs', 'repairFailed', 'pieces'].includes(r.state)) {
-      text = 'You chose Make it smaller, so SHRINK will not automatically fuse or rebuild this model. The solid check above is just a warning unless you choose one of its repair buttons.';
+      value = 'You chose Make it smaller, so SHRINK will not automatically fuse or rebuild this model. The solid check above is just a warning unless you choose one of its repair buttons.';
     } else if ((goal === 'solid' || goal === 'both') && r?.state === 'pieces') {
-      text = 'These pieces do not touch. SHRINK will not invent bridges between separate objects, so they stay separate unless you use a stronger rebuild that changes the surface.';
+      value = 'These pieces do not touch. SHRINK will not invent bridges between separate objects, so they stay separate unless you use a stronger rebuild that changes the surface.';
     }
-    if (!text) { note?.remove(); return; }
+    if (!value) { note?.remove(); return; }
     if (!note) {
       note = document.createElement('div'); note.id = 'scGoalResultNote'; note.className = 'sc-goal-note'; rows.appendChild(note);
     }
-    note.textContent = text;
+    text(note, value);
   }
 
   function sync() {
@@ -103,28 +105,28 @@
     syncing = true;
     try {
       const c = card(); if (!c) return;
-      c.dataset.goal = goal;
+      if (c.dataset.goal !== goal) c.dataset.goal = goal;
       c.querySelectorAll('[data-goal]').forEach(b => {
         const on = b.dataset.goal === goal;
-        b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+        b.classList.toggle('on', on);
+        if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on));
       });
       const g = GOALS[goal];
-      if ($('scGoalHelp')) $('scGoalHelp').innerHTML = g.help;
-      if ($('scGo')) $('scGo').textContent = g.button;
+      html($('scGoalHelp'), g.help);
+      text($('scGo'), g.button);
       const fine = $('scGo')?.nextElementSibling;
       if (fine?.classList.contains('sc-fine')) {
-        fine.textContent = goal === 'solid'
+        text(fine, goal === 'solid'
           ? 'Keeps the original triangle count, checks/fuses the mesh and checks it fits. Your original file is never changed.'
           : goal === 'smaller'
             ? 'Reduces the file and checks it fits. The mesh is not fused during a normal one-piece download.'
-            : 'Makes the file smaller, checks/repairs the solid and checks it fits. Your original file is never changed.';
+            : 'Makes the file smaller, checks/repairs the solid and checks it fits. Your original file is never changed.');
       }
       const loadedNext = $('scLoadedNext');
-      if (loadedNext) loadedNext.innerHTML = `Now press <b>${goal === 'solid' ? 'FUSE IT' : goal === 'smaller' ? 'SHRINK IT' : 'FUSE + SHRINK'}</b> below to use them.`;
+      html(loadedNext, `Now press <b>${goal === 'solid' ? 'FUSE IT' : goal === 'smaller' ? 'SHRINK IT' : 'FUSE + SHRINK'}</b> below to use them.`);
       syncWorkingLabels();
       syncResultNotes();
-      const badge = document.querySelector('.version-badge');
-      if (badge) badge.textContent = `v${RELEASE}`;
+      text(document.querySelector('.version-badge'), `v${RELEASE}`);
     } finally { syncing = false; }
   }
 
