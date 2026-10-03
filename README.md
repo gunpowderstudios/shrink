@@ -1,4 +1,4 @@
-# SHRINK 3D v2.23
+# SHRINK 3D v2.24
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; Advanced mode keeps the full control panel.
 
@@ -6,7 +6,7 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.23 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.24 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
 
 ## What SHRINK 3D does
@@ -17,12 +17,12 @@ Simple Print is organised around three jobs:
 
 Fuse is therefore a preparation tool, not a decision a home user has to understand before they start.
 
-## Simple Print wizard — v2.23
-The Simple workflow is now:
+## Simple Print wizard — v2.24
+The Simple workflow is:
 1. **Check / Repair** — every upload is checked immediately. If the mesh is healthy, SHRINK says so. If it needs repair, the next stage remains locked until the conservative repair succeeds or the stronger watertight rebuild succeeds.
 2. **Printer & size** — choose Resin/FDM, finished height, optional printer size and desired detail.
-3. **Reduce** — press **SHRINK MY MODEL**. SHRINK finds the smallest version that still looks the same at the intended print size, then runs its solid/fit safety checks.
-4. **Prepare & Download** — SHRINK fuses a clean one-piece export where appropriate, offers splitting if the model is too tall, and downloads the STL.
+3. **Reduce** — press **SHRINK MY MODEL**. SHRINK finds the smallest version that still looks the same at the intended print size.
+4. **Prepare & Download** — SHRINK verifies the reduced mesh, checks fit, fuses where appropriate, offers splitting when needed, then downloads the STL.
 
 ### Repair checkpoint
 After a successful repair/rebuild, SHRINK deliberately pauses before reduction. The user can either:
@@ -31,12 +31,19 @@ After a successful repair/rebuild, SHRINK deliberately pauses before reduction. 
 
 A clean upload gets **Continue to printer & size** without an unnecessary repair step.
 
-### Automatic final mesh tidy
-A mesh that passed the upload repair check can occasionally pick up tiny topology faults during aggressive triangle reduction. Simple mode keeps the second safety check, but no longer asks the user to repair the model again immediately.
+### Topology-aware reduction safety
+A mesh that passed the upload repair gate should not be repaired over and over after reduction. v2.24 changes the final safety step:
 
-If the reduced copy fails that final check, v2.23 automatically runs the conservative detail-preserving repair on the **reduced copy**. If that succeeds, the workflow continues and shows a green confirmation. Only if the automatic tidy cannot make the reduced copy reliable are the stronger/manual repair options shown.
+- SHRINK first finds the smallest visually acceptable reduction.
+- If that reduction is no longer a valid printable solid, SHRINK automatically backs off and keeps more triangles.
+- It tries progressively safer reductions until the reduced copy passes the solid check.
+- If, for example, 15% is too aggressive but 34% stays clean, SHRINK keeps 34% and tells the user why.
+- Only if no reduced candidate can pass does Simple mode show **Needs attention** and expose the stronger repair/rebuild options.
 
-This keeps the user-facing journey simple: **repair once → reduce → download**, while retaining a final print-safety check underneath.
+This keeps the visible workflow simple: **repair once → reduce safely → download**.
+
+### Preview shading
+Heavy triangle reduction changes the mesh connectivity. v2.24 recalculates the reduced print preview's vertex normals after reduction so the model does not appear artificially dark merely because it is being shown with stale normals.
 
 ### Viewer logic
 Before any reduction has actually been run, Simple mode shows only the model. **Original / Reduced**, **Compare** and **Detail loss** stay hidden because there is not yet a meaningful reduced result. They appear once the Reduce stage has produced a result.
