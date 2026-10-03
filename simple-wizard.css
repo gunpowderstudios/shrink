@@ -1,0 +1,57 @@
+/* SHRINK 3D v2.22 — Simple Print wizard polish */
+
+/* Four clear stages: check -> printer/size -> reduce -> download. */
+.app-mode-print.ui-simple #simpleCard .sc-stepper{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+}
+.app-mode-print.ui-simple #simpleCard .sc-wizard-step{
+  cursor:default!important;
+  pointer-events:none;
+}
+.app-mode-print.ui-simple #simpleCard .sc-wizard-step.done{
+  border-color:rgba(57,229,140,.42)!important;
+  color:var(--sc-green-hi)!important;
+  background:rgba(0,255,125,.055)!important;
+}
+.app-mode-print.ui-simple #simpleCard .sc-wizard-step.on{
+  border-color:var(--sc-green)!important;
+  color:var(--text)!important;
+  background:rgba(0,255,125,.085)!important;
+  box-shadow:inset 0 0 0 1px rgba(57,229,140,.22)!important;
+}
+
+/* v2.21 goal chooser is retired in Simple mode. */
+.app-mode-print.ui-simple .sc-goal-block{display:none!important}
+
+/* Until the user has actually run Reduce, there is no meaningful Original/Reduced choice. */
+.app-mode-print.ui-simple:not(.simple-reduction-ready) .viewer-panel .segmented,
+.app-mode-print.ui-simple:not(.simple-reduction-ready) #compareBtn,
+.app-mode-print.ui-simple:not(.simple-reduction-ready) #heatBtn{
+  display:none!important;
+}
+
+/* Keep the action focused and visually distinct. */
+.app-mode-print.ui-simple #scGo{
+  margin-top:10px!important;
+}
+.app-mode-print.ui-simple #scPreflightOk{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.app-mode-print.ui-simple #scPreflightOk:before{
+  content:'✓';
+  display:grid;
+  place-items:center;
+  flex:0 0 24px;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  background:rgba(57,229,140,.16);
+  color:var(--sc-green-hi);
+  font-weight:900;
+}
+
+@media(max-width:760px){
+  .app-mode-print.ui-simple #simpleCard .sc-stepper{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
