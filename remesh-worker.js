@@ -1,5 +1,5 @@
-// SHRINK 3D v2.16 — background worker for the solid rebuild (keeps the page responsive while it works).
-import { rebuildSolidCore } from './solid-core.js?v=2.16';
+// SHRINK 3D v2.17 — background worker for the solid rebuild (keeps the page responsive while it works).
+import { rebuildSolidCore } from './solid-core.js?v=2.17';
 import { MeshoptSimplifier } from 'https://esm.sh/meshoptimizer@0.24.0';
 
 const MANIFOLD_JS = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.js';

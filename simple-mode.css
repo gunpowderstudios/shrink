@@ -213,3 +213,9 @@
 .sc-size-pct { text-align: right; color: var(--sc-green-hi); font-size: 13px; font-weight: 800; }
 @media (prefers-reduced-motion: reduce) { .sc-size-bar span { transition: none; } }
 @media (max-width: 520px) { .sc-size-nums strong { font-size: 20px; } }
+
+/* ---- v2.17: repair first, stronger rebuild second ---- */
+.sc-small-btn.sc-quiet { background: transparent; border-color: var(--sc-line); color: var(--text); font-weight: 700; }
+.sc-row-warn .sc-small-btn.sc-quiet:not(.on) { background: transparent; border-color: var(--sc-line); color: var(--text); }
+.sc-row-warn .sc-small-btn.sc-quiet:not(.on):disabled { background: transparent; opacity: .6; color: var(--text); }
+.sc-row-main p.sc-warn-note b { color: #ffe3b8; }

@@ -1,4 +1,4 @@
-# SHRINK 3D v2.16
+# SHRINK 3D v2.17
 
 Browser tool (everything runs locally). v2.09 adds Simple mode (default in 3D print): pick a printer, press one button, download. Advanced mode is the full control panel and is unchanged.
 
@@ -9,7 +9,7 @@ v1.75 = v1.74 (branding, SEO, Matrix theme) on the real v1.7 live-preview core. 
 print-preview-fix.js were removed: the core now provides live preview, build-and-download and game/print units itself.
 After deploying, hard-refresh (Cmd+Shift+R).
 
-Versioning: every ./file.js?v=X import and every VERSION constant must use the same number (currently 2.16).
+Versioning: every ./file.js?v=X import and every VERSION constant must use the same number (currently 2.17).
 A different ?v= string makes the browser load a second, separate copy of that module. Bump all of them together.
 
 ## Simple mode controls
@@ -18,6 +18,11 @@ A different ?v= string makes the browser load a second, separate copy of that mo
 - **Fine-tune:** after the result, a size strip shows Original vs Now in MB and how much you save (estimated binary-STL sizes, the same figure the Download button shows), above a live slider that changes the detail kept, with Compare next to it. The solid check re-runs when you stop moving it.
 - **Save / load settings:** "Save these settings" (under the fine-tune slider) downloads a small JSON file with your printer type, bed size, print height, detail size and the percentage you settled on. Settings files saved before v2.15 do not contain the height, so save them again. "Load saved settings" (step 1) applies it to any other model. Loading shows "Settings loaded!" and the SHRINK IT button pulses: press it to use them. By default the detail size is reused and the best reduction is found automatically; open "Reduce by the same amount instead" to keep the same share of triangles.
 - **Steps:** the two step buttons at the top of the card go back and forward without reloading. Cancel stops a run or a rebuild.
+
+## Repair (keeps all detail) and the stronger rebuild
+When the solid check fails, Simple mode offers two fixes, in this order:
+1. **Repair (repair-core.js)** touches only the trouble spots: it joins loose points, removes duplicate or empty triangles, keeps the two triangles that continue the surface where three or more meet on an edge, turns flipped triangles round, closes each hole with a small patch and makes sure every closed part faces outward. The rest of the surface is not changed, so no detail is lost. The result is checked with Manifold before it replaces the preview, and Undo re-runs the shrink.
+2. **Stronger fix: voxel rebuild** (see below) for models that repair cannot clean. It softens detail finer than one voxel, and the button says how big that is for the current model (about 0.55 mm on a 200 mm tall model).
 
 ## Solid rebuild
 When a model fails the solid check, Simple mode can rebuild it as one watertight solid and preview it before download.

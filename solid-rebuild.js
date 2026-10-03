@@ -1,9 +1,9 @@
-// SHRINK 3D v2.16 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
+// SHRINK 3D v2.17 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-const VERSION = '2.16';
+const VERSION = '2.17';
 
-function gatherWorldMesh(model) {
+export function gatherWorldMesh(model) {
   model.updateMatrixWorld(true);
   const meshes = [];
   let vertTotal = 0, idxTotal = 0;
@@ -36,7 +36,7 @@ function gatherWorldMesh(model) {
   return { positions, indices: indices.subarray(0, io) };
 }
 
-function buildRoot(positions, indices, stats) {
+export function buildRoot(positions, indices, stats) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));

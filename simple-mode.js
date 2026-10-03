@@ -1,8 +1,8 @@
-// SHRINK 3D v2.16 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.17 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.16';
+  const VERSION = '2.17';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -90,6 +90,13 @@
     const k = heightMm() / s.y;                       // viewer Y is the vertical axis; STL export maps it to Z
     return { w: s.x * k, d: s.z * k, h: s.y * k };
   }
+
+  // How fine can the voxel rebuild be on this model? (it uses a grid of about 30 million cells)
+  function predictVoxelMm() {
+    const e = extents(); if (!e) return 0;
+    return Math.max(detailMm() / 3, Math.cbrt((e.w * e.d * e.h) / 30e6));
+  }
+  const fmtMm = v => (v < 0.1 ? v.toFixed(2) : v.toPrecision(2)).replace(/\.?0+$/, '');
 
   function fitInfo() {
     const e = extents();
@@ -240,10 +247,52 @@
     S.stage = 'result'; app()?.show?.('optimized'); render(); renderTune();
   }
 
-  async function rebuild() {
+  async function loadRepairModules() {
+    if (window.__shrinkRepairModules) return window.__shrinkRepairModules;
+    const [rebuildMod, repairMod] = await Promise.all([import(`./solid-rebuild.js?v=${VERSION}`), import(`./repair-core.js?v=${VERSION}`)]);
+    return { gatherWorldMesh: rebuildMod.gatherWorldMesh, buildRoot: rebuildMod.buildRoot, repairMesh: repairMod.repairMesh };
+  }
+
+  // Detail-preserving repair: weld, de-duplicate, orient, close holes. The surface is not rebuilt, so nothing is softened.
+  async function repair() {
     if (S.repairBusy || !S.result?.repair) return;
     const r = S.result.repair;
+    S.repairBusy = true; r.repairNote = ''; r.progress = 'Repairing…';
+    render();
+    try {
+      const { gatherWorldMesh, buildRoot, repairMesh } = await loadRepairModules();
+      await wait(40);                                   // let the button repaint before the work starts
+      const source = app()?.optimizedModel || app()?.originalModel;
+      const mesh = gatherWorldMesh(source);
+      const res = repairMesh({ positions: mesh.positions, indices: mesh.indices });
+      const root = buildRoot(res.positions, res.indices, {});
+      // only swap the model in if it really is a clean solid now
+      let built = null, components = 0, failure = '';
+      try { built = await window.__shrinkFuse.modelToSolid(root); components = built.components; }
+      catch (err) { failure = err?.message || String(err); }
+      finally { try { built?.solid?.delete?.(); } catch {} }
+      if (failure || components < 1) {
+        r.state = 'repairFailed'; r.fixed = res.stats;
+        r.repairNote = failure || 'The repaired surface still was not a clean solid.';
+      } else {
+        app().setPreview(root); app().show('optimized');
+        const after = countTris(root), before = S.result.shrink?.before || after;
+        if (S.result.shrink) Object.assign(S.result.shrink, { after, pct: before ? (after / before) * 100 : 100, text: '', repaired: true });
+        r.state = 'repaired'; r.components = components; r.fixed = res.stats; r.message = '';
+      }
+    } catch (err) {
+      console.warn(`[SHRINK 3D ${VERSION}] Repair did not work`, err);
+      r.state = 'repairFailed'; r.repairNote = err?.message || 'The repair could not finish.';
+    } finally {
+      S.repairBusy = false; render(); renderTune();
+    }
+  }
+
+  async function rebuild() {
+    if (S.repairBusy || !S.result?.repair) return;
+    const r = S.result.repair, prevState = r.state;
     S.repairBusy = true; r.repairNote = ''; r.progress = 'Starting…';
+    S.abort = new AbortController();                  // set before the first paint so the Cancel button shows straight away
     render();
     try {
       const { rebuildSolid } = window.__shrinkRebuildSolid ? { rebuildSolid: window.__shrinkRebuildSolid } : await import(`./solid-rebuild.js?v=${VERSION}`);   // the override exists for tests
@@ -253,7 +302,6 @@
       const P = window.__shrinkPrint;
       const mmPerUnit = P?.mmPerUnit?.() || 1;
       const detailUnits = (P?.detailMM?.() || 0) / mmPerUnit;
-      S.abort = new AbortController();
       const res = await rebuildSolid(source, {
         detailUnits, maxCells: 30e6, maxTris: 300000, signal: S.abort.signal,
         onStatus: (text, pct) => { r.progress = `${text}${pct ? ` ${Math.round(pct)}%` : ''}`; const b = card?.querySelector('[data-act="rebuild"]'); if (b) b.textContent = r.progress; }
@@ -268,7 +316,7 @@
       fresh.rebuilt = { ...res.stats, mm: res.stats.voxel * mmPerUnit };
       if (fresh.state === 'ok' || fresh.state === 'pieces') fresh.state = 'rebuilt';
     } catch (err) {
-      if (err?.code === 'CANCELLED') { r.state = 'needs'; r.repairNote = ''; }
+      if (err?.code === 'CANCELLED') { r.state = prevState; r.repairNote = r.repairNote || ''; }
       else {
         console.warn(`[SHRINK 3D ${VERSION}] Solid rebuild did not work`, err);
         r.state = 'failed';
@@ -326,13 +374,30 @@
         `${bits.join(' · ')}. <b>Have a look in the viewer</b> (try Compare) before you download. If it looks wrong, undo it and download the original instead.`,
         '<div class="sc-actions"><button type="button" class="sc-small-btn" data-act="undo">Undo rebuild</button></div>');
     }
+    if (r.state === 'repaired') {
+      const f = r.fixed || {}, bits = [];
+      if (f.weldedPoints) bits.push(`joined ${nf.format(f.weldedPoints)} loose points`);
+      if (f.flipped) bits.push(`turned ${nf.format(f.flipped)} flipped triangles round`);
+      if (f.holeLoops) bits.push(`closed ${nf.format(f.holeLoops)} hole${f.holeLoops === 1 ? '' : 's'}`);
+      if (f.tangledRemoved) bits.push(`removed ${nf.format(f.tangledRemoved)} tangled triangles`);
+      if (f.duplicateRemoved || f.degenerateRemoved) bits.push(`cleared ${nf.format((f.duplicateRemoved || 0) + (f.degenerateRemoved || 0))} duplicate or empty triangles`);
+      if (f.shellsTurned) bits.push(`turned ${f.shellsTurned} inside-out part${f.shellsTurned === 1 ? '' : 's'} the right way`);
+      return row('ok', 'Repaired. Detail untouched',
+        `${bits.length ? bits.join(', ') : 'Small fixes only'}. The rest of the surface is exactly as it was. <b>Have a look in the viewer</b> before you download.`,
+        '<div class="sc-actions"><button type="button" class="sc-small-btn" data-act="undo">Undo repair</button></div>');
+    }
     if (r.state === 'pieces') return row('info', `Made of ${r.components} separate pieces`, 'That\u2019s fine for printing. Pieces that don\u2019t touch will print as separate objects.');
     if (r.state === 'failed') return row('warn', 'We couldn\u2019t rebuild this model', `${esc(r.repairNote || '')} You can still download it as it is. Most slicers can repair it, or you can close the holes in your modelling software.`);
-    if (r.state === 'needs') {
-      const busy = S.repairBusy;
-      return row('warn', 'Needs a quick repair',
-        'We found small holes or overlaps. Most slicers can fix this automatically when you import the file, so you can usually just download. Or rebuild it as one solid shape: this closes small gaps but fills hollow insides and softens the very finest detail. It takes about 10 seconds, and you\u2019ll preview it before downloading.',
-        `<div class="sc-actions"><button type="button" class="sc-small-btn" data-act="rebuild"${busy ? ' disabled' : ''}>${busy ? esc(r.progress || 'Rebuilding…') : 'Rebuild as one solid (experimental)'}</button>${busy ? '<button type="button" class="sc-small-btn on" data-act="cancel-rebuild">Cancel</button>' : ''}</div>`);
+    if (r.state === 'needs' || r.state === 'repairFailed') {
+      const busy = S.repairBusy, vox = predictVoxelMm(), coarse = vox > 0.25;
+      const title = r.state === 'repairFailed' ? 'Repair could not make it fully clean' : 'Needs a quick repair';
+      const intro = r.state === 'repairFailed'
+        ? `${esc(r.repairNote || '')} Nothing was changed. Most slicers can still fix this when you import the file, or you can try the stronger fix below.`
+        : 'We found small holes, flipped triangles or tangled edges. <b>Repair</b> closes them and leaves the rest of the surface exactly as it is, so no detail is lost. Most slicers can also do this when you import the file.';
+      const repairBtn = r.state === 'repairFailed' ? '' : `<button type="button" class="sc-small-btn" data-act="repair"${busy ? ' disabled' : ''}>${busy && !S.abort ? 'Repairing…' : 'Repair it (keeps all detail)'}</button>`;
+      const strong = `<button type="button" class="sc-small-btn sc-quiet" data-act="rebuild"${busy ? ' disabled' : ''}>${busy && S.abort ? esc(r.progress || 'Rebuilding…') : 'Stronger fix: rebuild as one solid'}</button>${busy && S.abort ? '<button type="button" class="sc-small-btn on" data-act="cancel-rebuild">Cancel</button>' : ''}`;
+      const warn = `<p class="sc-warn-note">The stronger fix rebuilds the whole surface on a grid, so it softens detail finer than about <b>${fmtMm(vox)} mm</b>${coarse ? ' on a model this big. It will look rounded, so try Repair first' : ''}. It takes about 10 seconds and you preview it before downloading.</p>`;
+      return row('warn', title, intro, `<div class="sc-actions">${repairBtn}</div>${warn}<div class="sc-actions">${strong}</div>`);
     }
     return row('info', 'Solid check skipped', esc(r.message || 'We couldn\u2019t check this one. You can still download.'));
   }
@@ -510,7 +575,7 @@
   // Triangles on the model the person is looking at right now (live estimate while the slider moves).
   function tuneTriangles() {
     const live = window.__shrinkLiveUI?.state?.tris || S.result?.shrink?.before || 0;
-    if (S.result?.repair?.state === 'rebuilt' && app()?.optimizedModel) return { orig: live, now: countTris(app().optimizedModel) };
+    if (['rebuilt', 'repaired'].includes(S.result?.repair?.state) && app()?.optimizedModel) return { orig: live, now: countTris(app().optimizedModel) };
     const pct = Number($('geometry')?.value) || 0;
     return { orig: live, now: live ? Math.max(1, Math.round(live * pct / 100)) : 0 };
   }
@@ -619,6 +684,7 @@
     if (r) {
       lines.push(`Solid check: ${r.state}${r.components ? ` (${r.components} part${r.components === 1 ? '' : 's'})` : ''}`);
       if (r.message) lines.push(`Engine message: ${r.message}`);
+      if (r.fixed) lines.push(`Repair: ${r.fixed.weldedPoints} points joined · ${r.fixed.flipped} flipped · ${r.fixed.holeLoops} holes closed (${r.fixed.holeTriangles} triangles) · ${r.fixed.tangledRemoved} tangled removed · open edges ${r.fixed.before?.open}→${r.fixed.after?.open}`);
       if (r.rebuilt) lines.push(`Rebuild: voxel ${r.rebuilt.voxel?.toPrecision(3)} units · grid ${r.rebuilt.dims?.join('×')} · gap sealing ${r.rebuilt.radius} voxels · ${nf.format(r.rebuilt.trisRaw || 0)} → ${nf.format(r.rebuilt.trisOut || 0)} triangles`);
     }
     try {
@@ -724,6 +790,7 @@
       else if (act === 'best') run();
       else if (act === 'save-settings') saveSettings();
       else if (act === 'load-settings') $('scSettingsFile')?.click();
+      else if (act === 'repair') repair();
       else if (act === 'rebuild') rebuild();
       else if (act === 'undo') run();
       else if (act === 'split') { S.fitChoice = 'split'; render(); }
