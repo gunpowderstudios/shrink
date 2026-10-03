@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.20 — simple print goal chooser */
+/* SHRINK 3D v2.21 — simple print goal chooser */
 .sc-goal-block{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid rgba(94,145,113,.46);border-radius:14px;background:rgba(2,6,5,.4)}
 .sc-goal-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .sc-goal-head h2{font-size:22px!important;margin:0!important}
@@ -17,7 +17,7 @@
 .sc-goal-note{margin-top:8px;padding:10px 12px;border:1px solid rgba(242,176,74,.45);border-radius:10px;background:rgba(48,34,9,.42);color:#ffd9a3;font-size:12.5px;line-height:1.45}
 .sc-goal:focus-visible{outline:3px solid var(--sc-green-hi);outline-offset:2px}
 
-/* v2.20: do not stretch the Simple card to the viewer's height. Keep controls packed together. */
+/* v2.20+: do not stretch the Simple card to the viewer's height. Keep controls packed together. */
 .app-mode-print.ui-simple .v2-top-grid{align-items:start!important}
 .app-mode-print.ui-simple .simple-card{align-self:start!important;height:auto!important;min-height:0!important}
 .app-mode-print.ui-simple .simple-card .sc-stage{flex:0 0 auto!important}
