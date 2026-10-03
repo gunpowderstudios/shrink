@@ -3,6 +3,7 @@
   const RELEASE = '2.21';
   const $ = id => document.getElementById(id);
   const wait = ms => new Promise(r => setTimeout(r, ms));
+  import(`./simple-preflight.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Model preflight did not load`, err));
   const storeKey = 'shrink-simple-goal';
   const valid = new Set(['smaller', 'solid', 'both']);
   const saved = (() => { try { return localStorage.getItem(storeKey); } catch { return null; } })();
