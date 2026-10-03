@@ -1,6 +1,6 @@
-// SHRINK 3D v2.23 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
+// SHRINK 3D v2.24 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
 (() => {
-  const RELEASE = '2.23';
+  const RELEASE = '2.24';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const simple = () => window.__shrinkSimple;
@@ -100,6 +100,11 @@
     labels.forEach((el, i) => { if (wanted[i]) text(el, wanted[i]); });
   }
 
+  function refreshReducedShading() {
+    if (!active() || simple()?.state?.stage !== 'result') return;
+    window.__shrinkPostReduce?.refreshNormals?.(app()?.optimizedModel);
+  }
+
   function syncViewer() {
     if (!active()) {
       body.classList.remove('simple-reduction-ready');
@@ -109,6 +114,7 @@
     const stage = simple()?.state?.stage || 'setup';
     const ready = stage === 'result' && !!app()?.optimizedModel;
     body.classList.toggle('simple-reduction-ready', ready);
+    if (ready) refreshReducedShading();
     if (ready && !reductionReady) app()?.show?.('optimized');
     else if (!ready && app()?.originalModel && !body.classList.contains('simple-preflight-blocked')) app()?.show?.('original');
     reductionReady = ready;
@@ -150,8 +156,9 @@
       window.addEventListener('shrink:preflight-continued', () => { reductionReady = false; app()?.show?.('original'); setTimeout(sync, 30); });
       window.addEventListener('shrink:live-updated', () => {
         if (active() && simple()?.state?.stage !== 'result') app()?.show?.('original');
+        else if (active()) { refreshReducedShading(); setTimeout(sync, 20); }
       });
-      window.addEventListener('shrink:optimized', () => setTimeout(sync, 30));
+      window.addEventListener('shrink:optimized', () => { refreshReducedShading(); setTimeout(sync, 30); });
     }
     sync();
     return true;
