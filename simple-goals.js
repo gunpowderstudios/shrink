@@ -1,6 +1,6 @@
-// SHRINK 3D v2.20 — plain-English print goals layered over the proven v2.18 Simple engine.
+// SHRINK 3D v2.21 — plain-English print goals layered over the proven v2.18 Simple engine.
 (() => {
-  const RELEASE = '2.20';
+  const RELEASE = '2.21';
   const $ = id => document.getElementById(id);
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const storeKey = 'shrink-simple-goal';
@@ -14,17 +14,17 @@
     smaller: {
       icon: '✂️', title: 'Make it smaller', note: 'Reduce the triangles. Leave the parts as they are.',
       button: '✨ SHRINK IT — make it smaller',
-      help: '<b>Reduce only.</b> SHRINK makes the mesh lighter. It will not fuse parts during a normal one-piece download.'
+      help: '<b>Reduce only.</b> The model has already passed the repair check. SHRINK now makes the mesh lighter without fusing separate parts.'
     },
     solid: {
       icon: '🔗', title: 'Make it one solid', note: 'Join overlapping parts. Keep the original detail.',
       button: '🔗 FUSE IT — make one solid',
-      help: '<b>Fuse only.</b> SHRINK keeps 100% of the triangles, checks the model and automatically tries the safe detail-preserving repair. A stronger rebuild is only offered if needed.'
+      help: '<b>Fuse only.</b> The model has already passed the repair check. SHRINK keeps 100% of the triangles and joins touching/overlapping printable parts where possible.'
     },
     both: {
       icon: '✨', title: 'Do both', note: 'One printable solid and a smaller file.',
       button: '✨ FUSE + SHRINK — make it print-ready',
-      help: '<b>Recommended for sculpts.</b> SHRINK reduces first when that is safer for the browser, then automatically tries the safe repair/fuse. A stronger rebuild stays optional.'
+      help: '<b>Recommended for sculpts.</b> The model is checked and repaired first. SHRINK can then reduce it and fuse touching/overlapping parts before download.'
     }
   };
 
@@ -75,7 +75,7 @@
       ? ['Keeping all original detail', 'Checking / fusing the solid', 'Checking it fits your printer']
       : goal === 'smaller'
         ? ['Making it smaller', 'Checking the mesh', 'Checking it fits your printer']
-        : ['Making it smaller safely', 'Checking / fusing the solid', 'Checking it fits your printer'];
+        : ['Making it smaller', 'Checking / fusing the solid', 'Checking it fits your printer'];
     spans.forEach((el, i) => { if (labels[i]) text(el, labels[i]); });
     const h = document.querySelector('#simpleCard .sc-working h2');
     text(h, goal === 'solid' ? 'Making it one solid' : goal === 'smaller' ? 'Making it smaller' : 'Making it print-ready');
@@ -90,7 +90,7 @@
     const r = a.state.result.repair;
     let value = '';
     if (goal === 'smaller' && r && ['needs', 'repairFailed', 'pieces'].includes(r.state)) {
-      value = 'You chose Make it smaller, so SHRINK will not automatically fuse or rebuild this model. The solid check above is just a warning unless you choose one of its repair buttons.';
+      value = 'The upload passed the initial repair check, but this later check found a problem after reduction. You chose Make it smaller, so SHRINK will not automatically fuse or rebuild it.';
     } else if ((goal === 'solid' || goal === 'both') && (r?.state === 'pieces' || (r?.state === 'repaired' && r.components > 1))) {
       value = 'These pieces do not touch. SHRINK will not invent bridges between separate objects, so they stay separate unless you use a stronger rebuild that changes the surface.';
     }
@@ -118,10 +118,10 @@
       const fine = $('scGo')?.nextElementSibling;
       if (fine?.classList.contains('sc-fine')) {
         text(fine, goal === 'solid'
-          ? 'Keeps the original triangle count, checks/fuses the mesh and checks it fits. Your original file is never changed.'
+          ? 'Keeps the repaired source at its original triangle count, then checks/fuses it and checks it fits.'
           : goal === 'smaller'
-            ? 'Reduces the file and checks it fits. The mesh is not fused during a normal one-piece download.'
-            : 'Makes the file smaller, checks/repairs the solid and checks it fits. Your original file is never changed.');
+            ? 'Reduces the repaired source and checks it fits. Separate parts are left separate.'
+            : 'Reduces the repaired source, checks/fuses the solid and checks it fits.');
       }
       const loadedNext = $('scLoadedNext');
       html(loadedNext, `Now press <b>${goal === 'solid' ? 'FUSE IT' : goal === 'smaller' ? 'SHRINK IT' : 'FUSE + SHRINK'}</b> below to use them.`);
@@ -131,6 +131,7 @@
     } finally { syncing = false; }
   }
 
+  // The upload preflight repairs first. This is only a second safety pass if reduction/fusing later creates a new problem.
   async function safeAutoRepair(a) {
     if (!a?.state?.result || a.state.result.repair?.state !== 'needs') return;
     await wait(30);
@@ -172,8 +173,6 @@
     const dl = e.target.closest?.('#scDownload'); if (!dl) return;
     const a = api(), r = a?.state?.result?.repair;
     const oldState = r?.state;
-    // The v2.18 downloader fuses when repair.state === "ok". Temporarily make that false so
-    // "Make it smaller" really is reduction-only for a normal one-piece export.
     if (r) r.state = 'goal-smaller';
     const fuse = $('fuseSolidToggle'); if (fuse) fuse.checked = false;
     setTimeout(() => { if (r && oldState) r.state = oldState; syncResultNotes(); }, 80);
