@@ -1,5 +1,5 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { buildBinaryStl } from './mesh-tools.js?v=2.15';
+import { buildBinaryStl } from './mesh-tools.js?v=2.16';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
 // SHRINK 3D v1.90 — split tall print models into sections with adjustable two-part cut height.

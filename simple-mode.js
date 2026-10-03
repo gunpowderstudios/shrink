@@ -1,8 +1,8 @@
-// SHRINK 3D v2.15 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.16 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.15';
+  const VERSION = '2.16';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -70,7 +70,8 @@
     return t;
   }
   const stlMb = tris => (84 + 50 * tris) / 1048576;
-  const fmtSize = tris => { const mb = stlMb(tris); return mb >= 10 ? `${Math.round(mb)} MB` : mb >= 0.95 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(mb * 1024))} KB`; };
+  const fmtMbNum = mb => mb >= 10 ? `${Math.round(mb)} MB` : mb >= 0.1 ? `${mb.toFixed(1)} MB` : '<0.1 MB';
+  const fmtSize = tris => fmtMbNum(stlMb(tris));
   async function waitFor(test, ms = 8000, step = 100) {
     for (let t = 0; t < ms; t += step) { const v = test(); if (v) return v; await wait(step); }
     return test() || null;
@@ -274,7 +275,7 @@
         r.repairNote = err?.message || 'The rebuild could not finish.';
       }
     } finally {
-      S.abort = null; S.repairBusy = false; render();
+      S.abort = null; S.repairBusy = false; render(); renderTune();
     }
   }
 
@@ -506,13 +507,41 @@
 
   /* ---- fine-tune slider shown with the result ---- */
   const liveText = el => (el?.innerText ?? el?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  // Triangles on the model the person is looking at right now (live estimate while the slider moves).
+  function tuneTriangles() {
+    const live = window.__shrinkLiveUI?.state?.tris || S.result?.shrink?.before || 0;
+    if (S.result?.repair?.state === 'rebuilt' && app()?.optimizedModel) return { orig: live, now: countTris(app().optimizedModel) };
+    const pct = Number($('geometry')?.value) || 0;
+    return { orig: live, now: live ? Math.max(1, Math.round(live * pct / 100)) : 0 };
+  }
+
+  function renderDownloadLabel() {
+    const btn = $('scDownload'); if (!btn || !S.result) return;
+    const f = S.result.fit, splitting = S.fitChoice === 'split' && f?.state === 'tall', dl = tuneTriangles();
+    btn.innerHTML = `<span aria-hidden="true">⬇</span> ${splitting ? `Download ${f.parts} parts (ZIP)` : `Download STL${dl.now ? ` · ${fmtSize(dl.now)}` : ''}`}`;
+  }
+
+  function renderSize() {
+    const strip = $('scSize'); if (!strip) return;
+    const { orig, now } = tuneTriangles();
+    strip.hidden = !(orig > 0 && now > 0);
+    if (strip.hidden) return;
+    const a = stlMb(orig), b = stlMb(now), saved = Math.max(0, a - b), smaller = a > 0 ? Math.max(0, Math.min(100, (1 - b / a) * 100)) : 0;
+    $('scSizeOrig').textContent = fmtMbNum(a); $('scSizeNow').textContent = fmtMbNum(b); $('scSizeSaved').textContent = fmtMbNum(saved);
+    $('scSizePct').textContent = `${smaller >= 99.5 ? '99+' : Math.round(smaller)}% smaller`;
+    $('scSizeFill').style.width = `${Math.max(1.5, 100 - smaller)}%`;
+    strip.setAttribute('aria-label', `Original about ${fmtMbNum(a)}, now about ${fmtMbNum(b)}, saving ${fmtMbNum(saved)}`);
+  }
+
   function renderTune() {
     const g = $('geometry'); if (!g || !$('scTuneLine')) return;
     const range = $('scDetailRange');
     if (range && document.activeElement !== range) range.value = g.value;
     $('scTuneVal').textContent = `${Number(g.value).toFixed(1)}%`;
     const verdict = $('verdictText')?.textContent || '';
-    const line = $('scTuneLine'); line.textContent = [liveText($('liveLine')), verdict].filter(Boolean).join(' · ');
+    const t = tuneTriangles();
+    const line = $('scTuneLine'); line.textContent = [t.now ? `${nf.format(t.now)} of ${nf.format(t.orig)} triangles (${t.orig ? (100 * t.now / t.orig).toFixed(t.now / t.orig < 0.1 ? 1 : 0) : 0}%)` : liveText($('liveLine')), verdict].filter(Boolean).join(' · ');
+    renderSize(); renderDownloadLabel();
     line.dataset.level = $('verdict')?.dataset.level || '';
     const cmp = card?.querySelector('[data-act="compare"]'); if (cmp) cmp.textContent = app()?.isCompare?.() ? 'Stop comparing' : 'Compare with original';
   }
@@ -547,7 +576,7 @@
     $('scRows').innerHTML = shrinkRow() + solidRow() + fitRow();
     const f = S.result.fit;
     const splitting = S.fitChoice === 'split' && f?.state === 'tall';
-    $('scDownload').innerHTML = `<span aria-hidden="true">⬇</span> ${splitting ? `Download ${f.parts} parts (ZIP)` : 'Download STL'}`;
+    renderDownloadLabel();
     $('scDlNote').textContent = p.type === 'resin' ? 'Opens in Lychee, Chitubox and most slicers.' : 'Opens in Cura, PrusaSlicer, OrcaSlicer and most slicers.';
   }
 
@@ -650,6 +679,16 @@
         <p id="scResultSub" class="sc-sub"></p>
         <div id="scRows" class="sc-rows"></div>
         <div id="scTune" class="sc-tune">
+          <div id="scSize" class="sc-size" role="img" aria-live="polite" hidden>
+            <div class="sc-size-nums">
+              <div><small>Original</small><strong id="scSizeOrig">—</strong></div>
+              <span class="sc-size-arrow" aria-hidden="true">→</span>
+              <div><small>Now</small><strong id="scSizeNow">—</strong></div>
+              <div class="sc-size-saved"><small>You save</small><strong id="scSizeSaved">—</strong></div>
+            </div>
+            <div class="sc-size-bar" aria-hidden="true"><span id="scSizeFill"></span></div>
+            <div id="scSizePct" class="sc-size-pct"></div>
+          </div>
           <div class="sc-tune-head"><label for="scDetailRange">Fine-tune the detail</label><output id="scTuneVal">—</output></div>
           <input id="scDetailRange" type="range" min="1" max="100" step="0.1" value="50">
           <div class="sc-tune-ends"><span>Smaller file</span><span>More detail</span></div>

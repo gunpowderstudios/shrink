@@ -6,7 +6,7 @@ body {
   background:
     linear-gradient(180deg, rgba(1,5,4,.26) 0%, rgba(2,6,5,.45) 45%, rgba(2,5,4,.64) 100%),
     radial-gradient(circle at 50% 30%, rgba(0,0,0,.04) 0%, rgba(0,0,0,.28) 72%),
-    url('./src/shrink-matrix-bg.jpg?v=2.15') center top / cover fixed no-repeat !important;
+    url('./src/shrink-matrix-bg.jpg?v=2.16') center top / cover fixed no-repeat !important;
 }
 .app-shell {
   position: relative;
