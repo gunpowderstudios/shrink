@@ -2,6 +2,7 @@
 (() => {
   const RELEASE = '2.19';
   const $ = id => document.getElementById(id);
+  const wait = ms => new Promise(r => setTimeout(r, ms));
   const storeKey = 'shrink-simple-goal';
   const valid = new Set(['smaller', 'solid', 'both']);
   const saved = (() => { try { return localStorage.getItem(storeKey); } catch { return null; } })();
@@ -18,12 +19,12 @@
     solid: {
       icon: '🔗', title: 'Make it one solid', note: 'Join overlapping parts. Keep the original detail.',
       button: '🔗 FUSE IT — make one solid',
-      help: '<b>Fuse only.</b> SHRINK keeps 100% of the triangles, checks the model, then repairs/fuses it where possible. A stronger rebuild is only offered if needed.'
+      help: '<b>Fuse only.</b> SHRINK keeps 100% of the triangles, checks the model and automatically tries the safe detail-preserving repair. A stronger rebuild is only offered if needed.'
     },
     both: {
       icon: '✨', title: 'Do both', note: 'One printable solid and a smaller file.',
       button: '✨ FUSE + SHRINK — make it print-ready',
-      help: '<b>Recommended for sculpts.</b> SHRINK reduces first when that is safer for the browser, then checks/repairs the solid before download.'
+      help: '<b>Recommended for sculpts.</b> SHRINK reduces first when that is safer for the browser, then automatically tries the safe repair/fuse. A stronger rebuild stays optional.'
     }
   };
 
@@ -90,7 +91,7 @@
     let value = '';
     if (goal === 'smaller' && r && ['needs', 'repairFailed', 'pieces'].includes(r.state)) {
       value = 'You chose Make it smaller, so SHRINK will not automatically fuse or rebuild this model. The solid check above is just a warning unless you choose one of its repair buttons.';
-    } else if ((goal === 'solid' || goal === 'both') && r?.state === 'pieces') {
+    } else if ((goal === 'solid' || goal === 'both') && (r?.state === 'pieces' || (r?.state === 'repaired' && r.components > 1))) {
       value = 'These pieces do not touch. SHRINK will not invent bridges between separate objects, so they stay separate unless you use a stronger rebuild that changes the surface.';
     }
     if (!value) { note?.remove(); return; }
@@ -130,18 +131,38 @@
     } finally { syncing = false; }
   }
 
-  async function runSolidOnly(e) {
+  async function safeAutoRepair(a) {
+    if (!a?.state?.result || a.state.result.repair?.state !== 'needs') return;
+    await wait(30);
+    const btn = card()?.querySelector('[data-act="repair"]');
+    if (!btn || btn.disabled) return;
+    btn.click();
+    for (let i = 0; i < 600; i++) {
+      await wait(50);
+      if (!a.state.repairBusy) break;
+    }
+    sync();
+  }
+
+  async function runSelectedGoal(e) {
     const a = api();
     if (!a?.run || a.state?.busy) return;
     e.preventDefault(); e.stopImmediatePropagation();
+    const solidOnly = goal === 'solid';
     const oldUse = a.state.usePercent;
     const oldSaved = a.state.savedReduction;
-    a.state.usePercent = true;
-    a.state.savedReduction = { keepPercent: 100, triangles: 0, ofTriangles: 0, tuned: false, _goalOnly: true };
-    try { await a.run(); }
-    finally {
-      a.state.usePercent = oldUse;
-      a.state.savedReduction = oldSaved;
+    if (solidOnly) {
+      a.state.usePercent = true;
+      a.state.savedReduction = { keepPercent: 100, triangles: 0, ofTriangles: 0, tuned: false, _goalOnly: true };
+    }
+    try {
+      await a.run();
+      if (goal === 'solid' || goal === 'both') await safeAutoRepair(a);
+    } finally {
+      if (solidOnly) {
+        a.state.usePercent = oldUse;
+        a.state.savedReduction = oldSaved;
+      }
       sync();
     }
   }
@@ -173,7 +194,7 @@
         if (b && c.contains(b)) { e.preventDefault(); setGoal(b.dataset.goal, true); }
       });
       document.addEventListener('click', e => {
-        if (goal === 'solid' && e.target.closest?.('#scGo')) runSolidOnly(e);
+        if ((goal === 'solid' || goal === 'both') && e.target.closest?.('#scGo')) runSelectedGoal(e);
         protectShrinkOnlyDownload(e);
       }, true);
       const obs = new MutationObserver(() => requestAnimationFrame(sync));
