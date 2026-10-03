@@ -72,7 +72,6 @@
     const live = window.__shrinkLiveUI;
     if (!api?.run || !s || s.busy) return;
 
-    // If the user explicitly loaded settings and ticked "use the same amount", honour that.
     const manualSame = !!(s.usePercent && s.savedReduction?.keepPercent > 0);
     if (manualSame) return;
 
@@ -133,7 +132,11 @@
     window.addEventListener('shrink:ui-level', () => setTimeout(markLoaded, 50));
     const note = $('scWorkNote');
     if (note) new MutationObserver(normalizeWorkingText).observe(note, { childList: true, characterData: true, subtree: true });
-    new MutationObserver(renameTools).observe(document.body, { childList: true, subtree: true });
+    const renameTimer = setInterval(() => {
+      renameTools();
+      if (document.querySelector('#uiLevelToggle [data-level="advanced"]')) clearInterval(renameTimer);
+    }, 100);
+    setTimeout(() => clearInterval(renameTimer), 5000);
     markLoaded();
   }
 
