@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.22 — Simple Print wizard polish */
+/* SHRINK 3D v2.25 — Simple Print wizard polish */
 
 /* Four clear stages: check -> printer/size -> reduce -> download. */
 .app-mode-print.ui-simple #simpleCard .sc-stepper{
@@ -20,13 +20,23 @@
   box-shadow:inset 0 0 0 1px rgba(57,229,140,.22)!important;
 }
 
-/* v2.21 goal chooser is retired in Simple mode. */
+/* Old goal chooser is retired in Simple mode. */
 .app-mode-print.ui-simple .sc-goal-block{display:none!important}
 
 /* Until the user has actually run Reduce, there is no meaningful Original/Reduced choice. */
 .app-mode-print.ui-simple:not(.simple-reduction-ready) .viewer-panel .segmented,
 .app-mode-print.ui-simple:not(.simple-reduction-ready) #compareBtn,
 .app-mode-print.ui-simple:not(.simple-reduction-ready) #heatBtn{
+  display:none!important;
+}
+
+/* Simple means simple: these power-user controls still exist in Tools, but do not clutter the normal journey. */
+.app-mode-print.ui-simple #simpleCard .sc-protect,
+.app-mode-print.ui-simple #simpleCard #scTech,
+.app-mode-print.ui-simple #simpleCard .sc-setup-tools [data-act="advanced"]{
+  display:none!important;
+}
+.app-mode-print.ui-simple #simpleCard #scTune > :not(#scSize){
   display:none!important;
 }
 
@@ -50,6 +60,75 @@
   background:rgba(57,229,140,.16);
   color:var(--sc-green-hi);
   font-weight:900;
+}
+
+/* Once a model is loaded, stop wasting vertical space on branding and let the work area own the screen. */
+@media(min-width:901px){
+  .app-mode-print.ui-simple.simple-has-model .topbar{
+    min-height:52px!important;
+    padding-top:6px!important;
+    padding-bottom:6px!important;
+    margin-bottom:6px!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .topbar .eyebrow,
+  .app-mode-print.ui-simple.simple-has-model .topbar .subtitle,
+  .app-mode-print.ui-simple.simple-has-model .topbar .privacy-pill{
+    display:none!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .topbar .title-row h1{
+    font-size:23px!important;
+    line-height:1!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .mode-chooser{
+    gap:8px!important;
+    margin-bottom:6px!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .mode-card{
+    min-height:48px!important;
+    padding:8px 14px!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .mode-card small{
+    display:none!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .print-v2-dashboard{
+    margin-bottom:0!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .v2-top-grid{
+    height:calc(100dvh - 128px)!important;
+    min-height:520px!important;
+    max-height:900px!important;
+    align-items:stretch!important;
+    overflow:hidden;
+  }
+  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot{
+    min-height:0!important;
+    height:100%!important;
+    overflow:hidden;
+  }
+  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot .viewer-panel{
+    display:flex!important;
+    flex-direction:column!important;
+    min-height:0!important;
+    height:100%!important;
+    overflow:hidden!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot .viewer{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    height:auto!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model #simpleCard{
+    min-height:0!important;
+    height:100%!important;
+    max-height:100%!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+    padding:16px!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model #simpleCard .sc-stage{
+    flex:0 0 auto!important;
+  }
 }
 
 @media(max-width:760px){
