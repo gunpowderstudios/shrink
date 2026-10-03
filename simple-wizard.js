@@ -1,6 +1,6 @@
-// SHRINK 3D v2.24 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
+// SHRINK 3D v2.25 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
 (() => {
-  const RELEASE = '2.24';
+  const RELEASE = '2.25';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const simple = () => window.__shrinkSimple;
@@ -11,6 +11,7 @@
 
   import(`./simple-preflight.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Model preflight did not load`, err));
   import(`./simple-postreduce.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Post-reduction mesh check did not load`, err));
+  import(`./simple-focus.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Simple performance/layout layer did not load`, err));
 
   function addCss() {
     if (document.querySelector('link[data-shrink-simple-wizard]')) return;
@@ -84,7 +85,7 @@
     text(go, '✨ SHRINK MY MODEL');
     const fine = go?.nextElementSibling;
     if (fine?.classList.contains('sc-fine')) {
-      text(fine, 'Finds the smallest version that still looks the same at this print size, then checks fit and prepares the download.');
+      text(fine, 'Makes a sensible smaller print mesh, checks it stays clean, then checks it fits.');
     }
     const loaded = $('scLoadedNext');
     if (loaded) loaded.innerHTML = 'Now press <b>SHRINK MY MODEL</b> below to use them.';
@@ -96,7 +97,7 @@
     const h = card.querySelector('.sc-working h2');
     text(h, 'Reducing the model');
     const labels = card.querySelectorAll('#scSteps li > span:last-child');
-    const wanted = ['Reducing while keeping visible detail', 'Preparing printable geometry', 'Checking it fits your printer'];
+    const wanted = ['Making a sensible smaller mesh', 'Keeping the mesh structurally clean', 'Checking it fits your printer'];
     labels.forEach((el, i) => { if (wanted[i]) text(el, wanted[i]); });
   }
 
