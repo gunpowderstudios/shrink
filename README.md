@@ -1,4 +1,4 @@
-# SHRINK 3D v2.22
+# SHRINK 3D v2.23
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; Advanced mode keeps the full control panel.
 
@@ -6,7 +6,7 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.22 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.23 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
 
 ## What SHRINK 3D does
@@ -17,7 +17,7 @@ Simple Print is organised around three jobs:
 
 Fuse is therefore a preparation tool, not a decision a home user has to understand before they start.
 
-## Simple Print wizard — v2.22
+## Simple Print wizard — v2.23
 The Simple workflow is now:
 1. **Check / Repair** — every upload is checked immediately. If the mesh is healthy, SHRINK says so. If it needs repair, the next stage remains locked until the conservative repair succeeds or the stronger watertight rebuild succeeds.
 2. **Printer & size** — choose Resin/FDM, finished height, optional printer size and desired detail.
@@ -31,12 +31,19 @@ After a successful repair/rebuild, SHRINK deliberately pauses before reduction. 
 
 A clean upload gets **Continue to printer & size** without an unnecessary repair step.
 
+### Automatic final mesh tidy
+A mesh that passed the upload repair check can occasionally pick up tiny topology faults during aggressive triangle reduction. Simple mode keeps the second safety check, but no longer asks the user to repair the model again immediately.
+
+If the reduced copy fails that final check, v2.23 automatically runs the conservative detail-preserving repair on the **reduced copy**. If that succeeds, the workflow continues and shows a green confirmation. Only if the automatic tidy cannot make the reduced copy reliable are the stronger/manual repair options shown.
+
+This keeps the user-facing journey simple: **repair once → reduce → download**, while retaining a final print-safety check underneath.
+
 ### Viewer logic
 Before any reduction has actually been run, Simple mode shows only the model. **Original / Reduced**, **Compare** and **Detail loss** stay hidden because there is not yet a meaningful reduced result. They appear once the Reduce stage has produced a result.
 
 ### Failure ladder
 1. Conservative repair (`repair-core.js`) first — welds coincident points, removes bad triangles, orients faces and closes holes while preserving the original surface wherever possible.
-2. If that fails, **Stronger fix — rebuild watertight** uses `solid-rebuild.js` / the worker. It recreates the outer surface and can soften tiny detail, so it is never automatic.
+2. If that fails, **Stronger fix — rebuild watertight** uses `solid-rebuild.js` / the worker. It recreates the outer surface and can soften tiny detail, so it is never automatic during upload repair.
 3. If the stronger rebuild also fails, Simple mode stops and offers **Download original**, **Try Advanced**, and **Re-upload repaired file** instead of reducing a broken mesh.
 
 Separate closed printable pieces are allowed through the health check; they do not have to be fused merely to continue.
