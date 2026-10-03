@@ -146,7 +146,7 @@
 .sc-step:focus-visible { outline: 3px solid var(--sc-green-hi); outline-offset: 2px; }
 
 .sc-group-title { margin: 4px 0 -6px; font-size: 15px; font-weight: 800; }
-.sc-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sc-details { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .sc-chip.sc-mini { min-height: 68px; padding: 10px 12px; }
 .sc-chip.sc-mini small { font-size: 12px; }
 
@@ -219,3 +219,7 @@
 .sc-row-warn .sc-small-btn.sc-quiet:not(.on) { background: transparent; border-color: var(--sc-line); color: var(--text); }
 .sc-row-warn .sc-small-btn.sc-quiet:not(.on):disabled { background: transparent; opacity: .6; color: var(--text); }
 .sc-row-main p.sc-warn-note b { color: #ffe3b8; }
+
+/* ---- v2.18: what the quality check measured ---- */
+.sc-tune-nums { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.sc-tune-nums:empty { display: none; }

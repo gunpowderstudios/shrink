@@ -1,6 +1,6 @@
 // SHRINK 3D v1.86 — verify that the GLB build matches the live reduced preview.
 (() => {
-  const VERSION = '2.17';
+  const VERSION = '2.18';
   const $ = id => document.getElementById(id);
   let previewTriangles = null;
 

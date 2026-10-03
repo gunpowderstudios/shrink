@@ -1,4 +1,4 @@
-// SHRINK 3D v2.17 — detail-preserving mesh repair (pure JS, no imports: runs on the main thread, in a worker and in Node tests).
+// SHRINK 3D v2.18 — detail-preserving mesh repair (pure JS, no imports: runs on the main thread, in a worker and in Node tests).
 //
 // The voxel rebuild fixes anything but softens detail. Most "needs repair" models only have small, local problems, so this
 // repair leaves the surface exactly as it is and only touches the trouble spots:

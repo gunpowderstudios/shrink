@@ -1,7 +1,7 @@
 // Shrink mesh tools — pure algorithms (no DOM). Works in the browser and in Node tests.
 // three / three-mesh-bvh are injected by the caller so this file has no hard dependency on how they are loaded.
 import { compactPrimitive, getPrimitiveVertexCount, weld } from '@gltf-transform/functions';
-import { reduceIndices } from './reduce-core.js?v=2.17';
+import { reduceIndices } from './reduce-core.js?v=2.18';
 
 /* ------------------------------------------------------------------ */
 /* Size estimates                                                      */
@@ -195,7 +195,7 @@ export async function computeDetailLoss({ THREE, MeshBVH, original, reduced, onP
   }
   sample.sort((a, b) => a - b);
   const pct = p => sample.length ? sample[Math.min(sample.length - 1, Math.floor(p * sample.length))] : 0;
-  return { results, stats: { count: n, mean: n ? sum / n : 0, max, p50: pct(0.5), p95: pct(0.95), p99: pct(0.99) } };
+  return { results, stats: { count: n, mean: n ? sum / n : 0, max, p50: pct(0.5), p95: pct(0.95), p99: pct(0.99), p995: pct(0.995) } };
 }
 
 const RAMP = [

@@ -1,8 +1,8 @@
-// SHRINK 3D v2.17 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.18 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.17';
+  const VERSION = '2.18';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -30,7 +30,7 @@
     stage: 'setup',
     busy: false,
     repairBusy: false,
-    runToken: 0, abort: null, pending: null, tuneTimer: 0,
+    runToken: 0, abort: null, pending: null, tuneTimer: 0, dragging: false,
     result: null,
     fitChoice: null,
     steps: { shrink: 'pending', repair: 'pending', fit: 'pending' }
@@ -38,12 +38,13 @@
 
   // How much detail to keep. "Best detail" matches the strict setting the resin preset always used.
   const DETAILS = [
-    { id: 'best', name: 'Best detail', note: 'Crisp, bigger file', mm: 0.05 },
-    { id: 'balanced', name: 'Balanced', note: 'Good for most prints', mm: 0.1 },
-    { id: 'small', name: 'Smallest file', note: 'Softer detail', mm: 0.2 }
+    { id: 'max', name: 'Maximum detail', note: 'Every strand, big file', mm: 0.02, strict: 'p995' },
+    { id: 'best', name: 'Best detail', note: 'Keeps faces and fine detail', mm: 0.05, strict: 'p995' },
+    { id: 'balanced', name: 'Balanced', note: 'Good for most prints', mm: 0.1, strict: 'p99' },
+    { id: 'small', name: 'Smallest file', note: 'Softer detail', mm: 0.2, strict: 'p95' }
   ];
 
-  S.detail = (() => { const v = store.get('shrink-simple-detail'); return ['best', 'balanced', 'small'].includes(v) || (v === 'custom' && S.customMm > 0) ? v : 'best'; })();
+  S.detail = (() => { const v = store.get('shrink-simple-detail'); return ['max', 'best', 'balanced', 'small'].includes(v) || (v === 'custom' && S.customMm > 0) ? v : 'best'; })();
   const detailMm = () => S.detail === 'custom' ? S.customMm : (DETAILS.find(x => x.id === S.detail) || DETAILS[0]).mm;
 
   let card = null;
@@ -126,6 +127,8 @@
 
   function applyDetail() {
     const mm = detailMm();
+    // how much of the surface has to stay within that detail: the stricter, the more the faces and hands are protected
+    window.__shrinkStrict = (DETAILS.find(x => x.id === S.detail) || {}).strict || 'p99';
     setNative('printerPreset', 'custom', 'change');
     setNative('printerDetailMm', mm, 'input');
     const v2 = $('v2PrinterDetail'); if (v2) v2.value = String(mm);
@@ -576,6 +579,8 @@
   function tuneTriangles() {
     const live = window.__shrinkLiveUI?.state?.tris || S.result?.shrink?.before || 0;
     if (['rebuilt', 'repaired'].includes(S.result?.repair?.state) && app()?.optimizedModel) return { orig: live, now: countTris(app().optimizedModel) };
+    // once the slider has settled, report what is really on screen (the reducer can stop above its target on open or locked edges)
+    if (!S.dragging && $('verdict')?.dataset.level !== 'busy' && app()?.optimizedModel) { const n = countTris(app().optimizedModel); if (n > 0) return { orig: live, now: n }; }
     const pct = Number($('geometry')?.value) || 0;
     return { orig: live, now: live ? Math.max(1, Math.round(live * pct / 100)) : 0 };
   }
@@ -608,14 +613,16 @@
     const line = $('scTuneLine'); line.textContent = [t.now ? `${nf.format(t.now)} of ${nf.format(t.orig)} triangles (${t.orig ? (100 * t.now / t.orig).toFixed(t.now / t.orig < 0.1 ? 1 : 0) : 0}%)` : liveText($('liveLine')), verdict].filter(Boolean).join(' · ');
     renderSize(); renderDownloadLabel();
     line.dataset.level = $('verdict')?.dataset.level || '';
+    const nums = $('scTuneNums'); if (nums) nums.textContent = $('verdictNums')?.textContent || '';
     const cmp = card?.querySelector('[data-act="compare"]'); if (cmp) cmp.textContent = app()?.isCompare?.() ? 'Stop comparing' : 'Compare with original';
   }
 
   function scheduleTuneRefresh() {
     clearTimeout(S.tuneTimer);
     S.tuneTimer = setTimeout(async () => {
-      if (S.stage !== 'result' || S.busy || !S.result) return;
+      if (S.stage !== 'result' || S.busy || !S.result) { S.dragging = false; return; }
       await waitFor(() => $('verdict')?.dataset.level !== 'busy', 15000, 150);
+      S.dragging = false;
       if (S.stage !== 'result' || S.busy) return;
       const reduced = app()?.optimizedModel; if (!reduced) return;
       const before = window.__shrinkLiveUI?.state?.tris || S.result.shrink?.before || 0, after = countTris(reduced);
@@ -759,6 +766,7 @@
           <input id="scDetailRange" type="range" min="1" max="100" step="0.1" value="50">
           <div class="sc-tune-ends"><span>Smaller file</span><span>More detail</span></div>
           <p id="scTuneLine" class="sc-tune-line" aria-live="polite"></p>
+          <p id="scTuneNums" class="sc-tune-nums"></p>
           <div class="sc-actions"><button type="button" class="sc-small-btn" data-act="compare">Compare with original</button><button type="button" class="sc-small-btn" data-act="best">✨ Find the best again</button><button type="button" class="sc-small-btn" data-act="save-settings">💾 Save these settings</button></div>
         </div>
         <button id="scDownload" class="sc-go sc-download" type="button"></button>
@@ -804,7 +812,7 @@
     card.addEventListener('input', onProtectInput);
     $('scSettingsFile').addEventListener('change', () => { const f = $('scSettingsFile').files?.[0]; loadSettingsFile(f); $('scSettingsFile').value = ''; });
     $('scUsePercent').addEventListener('change', () => { S.usePercent = $('scUsePercent').checked; });
-    $('scDetailRange').addEventListener('input', () => { S.tuned = true; setNative('geometry', $('scDetailRange').value, 'input'); renderTune(); scheduleTuneRefresh(); });
+    $('scDetailRange').addEventListener('input', () => { S.tuned = true; S.dragging = true; setNative('geometry', $('scDetailRange').value, 'input'); renderTune(); scheduleTuneRefresh(); });
     ['liveLine', 'verdictText', 'verdict'].forEach(id => { const n = $(id); if (n) new MutationObserver(renderTune).observe(n, { childList: true, characterData: true, subtree: true, attributes: true }); });
     window.addEventListener('shrink:compare', renderTune);
     window.addEventListener('shrink:protect-changed', renderProtect);

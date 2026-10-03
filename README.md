@@ -1,4 +1,4 @@
-# SHRINK 3D v2.17
+# SHRINK 3D v2.18
 
 Browser tool (everything runs locally). v2.09 adds Simple mode (default in 3D print): pick a printer, press one button, download. Advanced mode is the full control panel and is unchanged.
 
@@ -9,11 +9,11 @@ v1.75 = v1.74 (branding, SEO, Matrix theme) on the real v1.7 live-preview core. 
 print-preview-fix.js were removed: the core now provides live preview, build-and-download and game/print units itself.
 After deploying, hard-refresh (Cmd+Shift+R).
 
-Versioning: every ./file.js?v=X import and every VERSION constant must use the same number (currently 2.17).
+Versioning: every ./file.js?v=X import and every VERSION constant must use the same number (currently 2.18).
 A different ?v= string makes the browser load a second, separate copy of that module. Bump all of them together.
 
 ## Simple mode controls
-- **Detail level:** Best detail (0.05 mm, the default), Balanced (0.1 mm) or Smallest file (0.2 mm). The automatic shrink keeps every change below that size.
+- **Detail level:** Maximum detail (0.02 mm), Best detail (0.05 mm, the default), Balanced (0.1 mm) or Smallest file (0.2 mm). The automatic shrink keeps the surface within that distance of the original. Best and Maximum check 99.5% of the surface, Balanced 99% and Smallest file 95%, so the small areas with the most detail (faces, hands, beards) are protected. The numbers behind the verdict are shown under the slider.
 - **Protect fine detail:** paint over faces, hands or ornaments (Cmd/Ctrl + drag rotates while painting). Painted areas are not reduced. Also available in Advanced, under the SHRINK card's advanced settings.
 - **Fine-tune:** after the result, a size strip shows Original vs Now in MB and how much you save (estimated binary-STL sizes, the same figure the Download button shows), above a live slider that changes the detail kept, with Compare next to it. The solid check re-runs when you stop moving it.
 - **Save / load settings:** "Save these settings" (under the fine-tune slider) downloads a small JSON file with your printer type, bed size, print height, detail size and the percentage you settled on. Settings files saved before v2.15 do not contain the height, so save them again. "Load saved settings" (step 1) applies it to any other model. Loading shows "Settings loaded!" and the SHRINK IT button pulses: press it to use them. By default the detail size is reused and the best reduction is found automatically; open "Reduce by the same amount instead" to keep the same share of triangles.

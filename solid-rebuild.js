@@ -1,7 +1,7 @@
-// SHRINK 3D v2.17 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
+// SHRINK 3D v2.18 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-const VERSION = '2.17';
+const VERSION = '2.18';
 
 export function gatherWorldMesh(model) {
   model.updateMatrixWorld(true);

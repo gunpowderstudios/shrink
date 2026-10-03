@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { createLiveReducer } from './live-reduce.js?v=2.17';
-import { getMeshBVH } from './bvh-support.js?v=2.17';
-import { computeDetailLoss, analyzeTopology, stlBytes, glbBytesEstimate } from './mesh-tools.js?v=2.17';
+import { createLiveReducer } from './live-reduce.js?v=2.18';
+import { getMeshBVH } from './bvh-support.js?v=2.18';
+import { computeDetailLoss, analyzeTopology, stlBytes, glbBytesEstimate } from './mesh-tools.js?v=2.18';
 
 /* Live UI: drag the slider -> the model updates -> a plain-language verdict says whether it still looks the same. */
 
@@ -34,6 +34,10 @@ window.__shrinkLive = engine;
 /* ---------------- helpers ---------------- */
 const ratio = () => Math.max(0.01, Math.min(1, Number(el.geometry.value) / 100));
 const reduceOpts = () => ({ protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
+// Which slice of the surface must stay within the printer's detail? 95% lets the smallest, most detailed areas (faces, hands,
+// beards) wander off, so 3D print uses 99% by default and Simple mode's "Best detail" uses 99.5%. Game models keep the old 95%.
+const STRICT_LABEL = { p95: '95%', p99: '99%', p995: '99.5%' };
+const strictKey = () => (mode() === 'game' ? 'p95' : (STRICT_LABEL[window.__shrinkStrict] ? window.__shrinkStrict : 'p99'));
 const scale = () => ({ perUnit: window.__shrinkPrint.mmPerUnit(), detail: window.__shrinkPrint.detailMM(), unit: window.__shrinkPrint.unitLabel() });
 
 function setRatio(r, { notify = true } = {}) {
@@ -106,14 +110,14 @@ async function measureLoss() {
   const MeshBVH = await getMeshBVH();
   if (!MeshBVH) return null;
   let total = 0; a.originalModel.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) total += o.geometry.attributes.position.count; });
-  const stride = Math.max(1, Math.floor(total / 20000));
+  const stride = Math.max(1, Math.floor(total / 40000));   // more samples so the 99% / 99.5% tails are meaningful
   const { stats } = await computeDetailLoss({ THREE, MeshBVH, original: a.originalModel, reduced: engine.root, stride, yieldToUi: false });
   return stats;
 }
 
 function judge(stats) {
   const { perUnit, detail, unit } = scale();
-  const p95 = stats.p95 * perUnit, max = stats.max * perUnit;
+  const key = strictKey(), p95 = (stats[key] ?? stats.p95) * perUnit, max = stats.max * perUnit;
   const game = mode() === 'game';
   let level, text;
   if (p95 <= detail * 0.5) { level = 'good'; text = game ? 'Looks the same' : 'Invisible at print size'; }
@@ -121,8 +125,8 @@ function judge(stats) {
   else if (p95 <= detail * 2) { level = 'warn'; text = 'Slight softening of fine detail'; }
   else { level = 'bad'; text = game ? 'Visibly simplified — raise the slider or choose a bigger target' : 'Visible loss — raise the slider or protect the important areas'; }
   const nums = game
-    ? `95% of the surface moved less than ${num(p95)}${unit} of the model's height (worst ${num(max)}${unit}).`
-    : `95% of the surface moved less than ${num(p95)} mm (worst ${num(max)} mm). Your printer shows about ${num(detail)} mm.`;
+    ? `${STRICT_LABEL[key]} of the surface moved less than ${num(p95)}${unit} of the model's height (worst ${num(max)}${unit}).`
+    : `${STRICT_LABEL[key]} of the surface moved less than ${num(p95)} mm (worst ${num(max)} mm). Your printer shows about ${num(detail)} mm.`;
   return { level, text, nums, p95, detail };
 }
 
@@ -209,7 +213,7 @@ async function autoFind() {
       setVerdict('busy', `Trying ${Math.round(mid * 1000) / 10}% …`);
       await engine.runExact(mid, opts); lastApplied = mid;
       const s = await measureLoss();
-      if (s && s.p95 * perUnit <= detail) { hi = mid; best = mid; } else lo = mid;
+      if (s && (s[strictKey()] ?? s.p95) * perUnit <= detail) { hi = mid; best = mid; } else lo = mid;
     }
     // In game mode a chosen budget wins if it is smaller than what "looks the same" needs only when the user asked for it.
     if (lastApplied !== best) await engine.runExact(best, opts);
@@ -270,4 +274,4 @@ window.addEventListener('shrink:optimized', e => {
     : `<b>Kept:</b> textures (resized to ${el.textureSize?.value}px${el.webp?.checked ? ', WebP' : ''}), UV maps and smooth shading. <b>Removed:</b> unused materials and data${el.meshopt?.checked ? ' · mesh compressed (Meshopt)' : ''}.`;
 });
 
-window.__shrinkLiveUI = { autoFind, chooseTarget, setRatio, state: S, measureLoss };
+window.__shrinkLiveUI = { strictKey, autoFind, chooseTarget, setRatio, state: S, measureLoss };
