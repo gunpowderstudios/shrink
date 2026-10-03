@@ -1,6 +1,6 @@
-// SHRINK 3D v2.21 — Simple Print preflight gate: check -> repair -> rebuild fallback -> workflow.
+// SHRINK 3D v2.22 — Simple Print preflight gate: check -> repair -> optional download -> workflow.
 (() => {
-  const RELEASE = '2.21';
+  const RELEASE = '2.22';
   const CORE = '2.18';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
@@ -11,6 +11,7 @@
   let state = 'idle';
   let info = null;
   let busy = false;
+  let proceeded = false;
   let token = 0;
   let abort = null;
   let pendingFix = null;        // repair | rebuild; survives our automatic in-memory re-open
@@ -55,7 +56,7 @@
     el.id = 'simplePreflightCard'; el.className = 'simple-preflight-card'; el.dataset.state = 'checking';
     el.setAttribute('aria-label', 'Model repair check');
     el.innerHTML = `
-      <div class="sp-eyebrow">STEP 1 · MODEL CHECK</div>
+      <div class="sp-eyebrow">STEP 1 · CHECK / REPAIR</div>
       <div class="sp-head"><div id="spIcon" class="sp-icon">⌁</div><div class="sp-copy"><h2 id="spTitle">Checking your model…</h2><p id="spText">Before SHRINK changes anything, we check that the uploaded mesh is safe to work on.</p></div></div>
       <div class="sp-meter" aria-hidden="true"><span id="spMeter"></span></div>
       <div id="spSummary" class="sp-summary"></div>
@@ -83,9 +84,9 @@
     const simple = $('simpleCard'); if (!simple) return;
     let chip = $('scPreflightOk');
     if (!chip) { chip = document.createElement('div'); chip.id = 'scPreflightOk'; chip.className = 'sc-preflight-ok'; const stepper = simple.querySelector('.sc-stepper'); stepper?.insertAdjacentElement('afterend', chip); }
-    chip.textContent = fix === 'repair' ? '✓ Repair complete — model is closed and ready for the next stage.'
-      : fix === 'rebuild' ? '✓ Rebuild complete — the new watertight model is ready for the next stage.'
-      : '✓ Model check passed — the uploaded mesh is closed and ready to work on.';
+    chip.textContent = fix === 'repair' ? 'Repair complete — now working from the repaired model.'
+      : fix === 'rebuild' ? 'Watertight rebuild complete — now working from the rebuilt model.'
+      : 'Model check passed — no repair was needed.';
   }
 
   function clearReadyChip() { $('scPreflightOk')?.remove(); }
@@ -123,6 +124,17 @@
       actions.innerHTML = `<button type="button" class="sp-action warn" data-sp-act="cancel">Cancel</button>`;
       note.textContent = 'This runs in a background worker where the browser supports it.'; tech.textContent = details(info?.before, info?.progress || '');
       if (card) card.style.setProperty('--sp-progress', `${Math.max(5, Math.min(100, info?.pct || 8))}%`);
+    } else if (state === 'ready') {
+      meter?.parentElement?.setAttribute('hidden', '');
+      const fixedBy = info?.fixedBy || null;
+      icon.textContent = '✓';
+      title.textContent = fixedBy === 'repair' ? 'Repair complete — model ready' : fixedBy === 'rebuild' ? 'Watertight rebuild complete' : 'Model check passed';
+      text.textContent = fixedBy ? 'The repaired model passed the same mesh check and is now safe to reduce or prepare for printing.' : 'This model is already closed and healthy, so no repair is needed.';
+      summary.innerHTML = fixedBy ? '<strong>Nothing else has been changed yet.</strong> You can download this repaired STL now, or continue into SHRINK.' : '<strong>Ready for the next stage.</strong> SHRINK has not reduced or changed the model.';
+      actions.innerHTML = button('Continue to printer & size →', 'continue', 'primary');
+      if (fixedBy) actions.innerHTML += button(fixedBy === 'rebuild' ? 'Download rebuilt STL' : 'Download repaired STL', 'download-ready');
+      note.textContent = fixedBy ? 'If all you wanted was a repaired file, download it here. Otherwise continue to reduce and prepare it.' : 'Next: choose the printer, finished size and how much detail to keep.';
+      tech.textContent = details(t, fixedBy ? `${fixedBy} passed` : 'no repair needed');
     } else if (state === 'failed') {
       icon.textContent = '×'; title.textContent = 'SHRINK could not repair this model'; text.textContent = 'The mesh has problems too large or complex to repair safely in the browser. The original file has not been changed.';
       summary.innerHTML = '<strong>Simple mode stops here rather than reducing a broken mesh.</strong>';
@@ -134,6 +146,7 @@
   async function checkModel(fixedBy = null) {
     if (!app()?.originalModel) return;
     const my = ++token;
+    proceeded = false;
     busy = true; state = 'checking'; info = { topology: null, fixedBy }; clearReadyChip(); setBlocked(true); render();
     app()?.show?.('original');
     await waitFor(() => window.__shrinkPrintSafety?.topologySummary, 10000);
@@ -145,11 +158,21 @@
     }
     if (issues(t) === 0) {
       lastCheckedModel = app().originalModel;
-      busy = false; state = 'ready'; setBlocked(false); readyChip(fixedBy); render();
+      busy = false; state = 'ready'; setBlocked(true); render();
       app()?.show?.('original');
+      window.dispatchEvent(new CustomEvent('shrink:preflight-ready', { detail: { fixedBy, topology: t } }));
       return;
     }
     busy = false; state = 'needs'; render(); setBlocked(true);
+  }
+
+  function continueWorkflow() {
+    if (state !== 'ready' || !lastCheckedModel || lastCheckedModel !== app()?.originalModel) return;
+    proceeded = true;
+    setBlocked(false);
+    readyChip(info?.fixedBy || null);
+    app()?.show?.('original');
+    window.dispatchEvent(new CustomEvent('shrink:preflight-continued', { detail: { fixedBy: info?.fixedBy || null } }));
   }
 
   async function reopenRoot(root, suffix, fixKind) {
@@ -214,10 +237,10 @@
     } finally { abort = null; }
   }
 
-  function downloadOriginal() {
+  function downloadSource() {
     const file = app()?.sourceFile; if (!file) return;
     const a = document.createElement('a'), url = URL.createObjectURL(file);
-    a.href = url; a.download = file.name || 'original-model'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+    a.href = url; a.download = file.name || 'model.stl'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
   function wireCard() {
@@ -226,15 +249,16 @@
       if (act === 'repair') repairModel();
       else if (act === 'rebuild') rebuildModel();
       else if (act === 'cancel') abort?.abort?.();
+      else if (act === 'continue') continueWorkflow();
       else if (act === 'advanced') window.__shrinkSimple?.setLevel?.('advanced');
-      else if (act === 'download') downloadOriginal();
+      else if (act === 'download' || act === 'download-ready') downloadSource();
       else if (act === 'reupload') $('fileInput')?.click();
     });
   }
 
   function onModelOpened() {
     const fix = pendingFix; pendingFix = null;
-    lastCheckedModel = null; clearReadyChip(); state = 'checking'; info = null; busy = false; setBlocked(true);
+    proceeded = false; lastCheckedModel = null; clearReadyChip(); state = 'checking'; info = null; busy = false; setBlocked(true);
     setTimeout(() => {
       ensureCard();
       if (active()) checkModel(fix); else setBlocked(false);
@@ -244,7 +268,11 @@
   function syncMode() {
     ensureCard();
     if (!active()) { setBlocked(false); return; }
-    if (lastCheckedModel === app()?.originalModel && state === 'ready') { setBlocked(false); readyChip(info?.fixedBy || null); return; }
+    if (lastCheckedModel === app()?.originalModel && state === 'ready') {
+      if (proceeded) { setBlocked(false); readyChip(info?.fixedBy || null); }
+      else { setBlocked(true); render(); }
+      return;
+    }
     if (!busy) checkModel(null);
   }
 
@@ -257,5 +285,5 @@
   window.addEventListener('shrink:live-updated', () => { if (body.classList.contains('simple-preflight-blocked')) app()?.show?.('original'); });
   if (document.readyState !== 'loading') syncMode(); else document.addEventListener('DOMContentLoaded', syncMode, { once: true });
 
-  window.__shrinkPreflight = { check: checkModel, repair: repairModel, rebuild: rebuildModel, get state() { return state; }, version: RELEASE };
+  window.__shrinkPreflight = { check: checkModel, repair: repairModel, rebuild: rebuildModel, continueWorkflow, get state() { return state; }, version: RELEASE };
 })();
