@@ -1,68 +1,60 @@
-# SHRINK 3D v2.24
+# SHRINK 3D v2.25
 
-Browser tool (everything runs locally). Simple mode is the default in 3D print; Advanced mode keeps the full control panel.
+Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.24 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.25 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
 
 ## What SHRINK 3D does
 Simple Print is organised around three jobs:
 - **Repair** — check the uploaded mesh and fix holes, bad edges and broken geometry before anything else happens.
-- **Reduce** — remove unnecessary triangles while preserving the visible detail appropriate to the chosen printer and finished size.
-- **Prepare for printing** — check fit, fuse touching/overlapping parts when needed, split oversized models when needed, then export.
+- **Reduce** — make an appropriately smaller print mesh without chasing the mathematically smallest possible file.
+- **Prepare for printing** — check fit, split oversized models when needed, then export.
 
-Fuse is therefore a preparation tool, not a decision a home user has to understand before they start.
+Fuse, voxel rebuild, manual percentages, protection painting and the exhaustive smallest-mesh search remain available in **Tools** for people who deliberately want them. Simple mode does not Boolean-fuse every download by default.
 
-## Simple Print wizard — v2.24
+## Simple Print wizard — v2.25
 The Simple workflow is:
-1. **Check / Repair** — every upload is checked immediately. If the mesh is healthy, SHRINK says so. If it needs repair, the next stage remains locked until the conservative repair succeeds or the stronger watertight rebuild succeeds.
+1. **Check / Repair** — every upload is checked immediately. If repair is needed, Simple mode stays locked until the conservative repair or stronger rebuild succeeds.
 2. **Printer & size** — choose Resin/FDM, finished height, optional printer size and desired detail.
-3. **Reduce** — press **SHRINK MY MODEL**. SHRINK finds the smallest version that still looks the same at the intended print size.
-4. **Prepare & Download** — SHRINK verifies the reduced mesh, checks fit, fuses where appropriate, offers splitting when needed, then downloads the STL.
+3. **Reduce** — press **SHRINK MY MODEL**. Simple mode chooses a sensible print target in one pass instead of running the old eight-step exhaustive search.
+4. **Prepare & Download** — SHRINK checks that the reduced topology stayed clean, checks fit, offers splitting when needed, then downloads the STL.
 
 ### Repair checkpoint
-After a successful repair/rebuild, SHRINK deliberately pauses before reduction. The user can either:
-- **Download repaired STL** / **Download rebuilt STL** and stop there, or
-- **Continue to printer & size** and carry on through the SHRINK workflow.
+After a successful repair/rebuild, SHRINK pauses. The user can either download the repaired STL immediately or continue to printer/size and reduction.
 
-A clean upload gets **Continue to printer & size** without an unnecessary repair step.
+### Faster Simple reduction
+The goal in Simple mode is now **small enough, clean and responsive**, not the absolute smallest possible mesh.
 
-### Topology-aware reduction safety
-A mesh that passed the upload repair gate should not be repaired over and over after reduction. v2.24 changes the final safety step:
+Typical starting targets are deliberately conservative:
+- Maximum detail: roughly 450k triangles / at least ~42% of the source.
+- Best detail: roughly 320k / at least ~30%.
+- Balanced: roughly 240k / at least ~22%.
+- Smallest file: roughly 170k / at least ~16%.
 
-- SHRINK first finds the smallest visually acceptable reduction.
-- If that reduction is no longer a valid printable solid, SHRINK automatically backs off and keeps more triangles.
-- It tries progressively safer reductions until the reduced copy passes the solid check.
-- If, for example, 15% is too aggressive but 34% stays clean, SHRINK keeps 34% and tells the user why.
-- Only if no reduced candidate can pass does Simple mode show **Needs attention** and expose the stronger repair/rebuild options.
+Small models that are already sensible are left alone. The old exhaustive visual search remains in Tools.
 
-This keeps the visible workflow simple: **repair once → reduce safely → download**.
+### Lightweight topology backoff
+If the first reduced candidate damages topology, SHRINK no longer runs repeated Manifold/repair/rebuild passes. It makes one safer reduction attempt using a cheap topology check; if that still fails it falls back to the full repaired mesh rather than forcing a broken reduction. The user therefore does not get sent through Repair a second time after Stage 1.
 
-### Preview shading
-Heavy triangle reduction changes the mesh connectivity. v2.24 recalculates the reduced print preview's vertex normals after reduction so the model does not appear artificially dark merely because it is being shown with stale normals.
+### Cleaner Simple UI
+- Once a model is loaded, the branding/header collapses to reclaim vertical space.
+- The viewer stays in the left work area while the right Simple panel scrolls independently.
+- Protect-detail painting, manual fine-tune controls and technical details are hidden from Simple mode and remain available in Tools.
+- **Advanced** is labelled **Tools** in the user-facing switch.
+- Reduced preview normals are recalculated after connectivity changes so print models do not appear artificially dark.
 
 ### Viewer logic
-Before any reduction has actually been run, Simple mode shows only the model. **Original / Reduced**, **Compare** and **Detail loss** stay hidden because there is not yet a meaningful reduced result. They appear once the Reduce stage has produced a result.
+Before reduction, Simple mode shows only the model. **Original / Reduced**, **Compare** and **Detail loss** appear only after a meaningful reduced result exists.
 
-### Failure ladder
-1. Conservative repair (`repair-core.js`) first — welds coincident points, removes bad triangles, orients faces and closes holes while preserving the original surface wherever possible.
-2. If that fails, **Stronger fix — rebuild watertight** uses `solid-rebuild.js` / the worker. It recreates the outer surface and can soften tiny detail, so it is never automatic during upload repair.
-3. If the stronger rebuild also fails, Simple mode stops and offers **Download original**, **Try Advanced**, and **Re-upload repaired file** instead of reducing a broken mesh.
+## Repair and rebuild
+Conservative repair is always tried before the stronger voxel rebuild. The stronger rebuild recreates the outer surface and can soften very fine detail, so it remains a fallback at the upload/repair stage rather than something Simple mode repeatedly invokes after reduction.
 
 Separate closed printable pieces are allowed through the health check; they do not have to be fused merely to continue.
-
-## Other Simple controls
-- **Detail level:** Maximum detail (0.02 mm), Best detail (0.05 mm, default), Balanced (0.1 mm) or Smallest file (0.2 mm).
-- **Protect fine detail:** paint over faces, hands or ornaments so reduction leaves them alone.
-- **Fine-tune:** after reduction, adjust detail live and Compare against the original.
-- **Save / load settings:** reuse printer, size, detail and reduction preferences on another model. The new model still has to pass the repair gate first.
-
-## Solid rebuild
-The stronger rebuild traces the model into a voxel grid, seals manageable gaps, fills enclosed interiors and recreates a watertight mesh. It runs in a background worker where available. Because it recreates the whole surface, detail finer than the chosen voxel size can soften.
 
 ## Licence
 **SHRINK 3D © 2026 Gunpowder Studios**
