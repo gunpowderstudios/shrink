@@ -1,6 +1,6 @@
-// SHRINK 3D v2.19 — plain-English print goals layered over the proven v2.18 Simple engine.
+// SHRINK 3D v2.20 — plain-English print goals layered over the proven v2.18 Simple engine.
 (() => {
-  const RELEASE = '2.19';
+  const RELEASE = '2.20';
   const $ = id => document.getElementById(id);
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const storeKey = 'shrink-simple-goal';
