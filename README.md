@@ -1,4 +1,4 @@
-# SHRINK 3D v2.19
+# SHRINK 3D v2.20
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; Advanced mode keeps the full control panel.
 
@@ -10,14 +10,15 @@ print-preview-fix.js were removed: the core now provides live preview, build-and
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.19 is deliberately a UI/workflow layer (`simple-goals.js` / `simple-goals.css`) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.20 is deliberately a UI/workflow layer (`simple-goals.js` / `simple-goals.css`) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
 
 ## Simple mode controls
-- **What do you want to do?** v2.19 starts with three plain-English choices:
+- **What do you want to do?** v2.20 starts with three plain-English choices:
   - **Make it smaller** — reduces triangles and leaves the mesh parts as they are. A normal one-piece download will not be fused automatically.
   - **Make it one solid** — keeps 100% of the triangle count, checks/fuses the model, and automatically tries the safe detail-preserving repair if needed. The stronger voxel rebuild remains optional because it can soften detail.
   - **Do both** — reduces first when that is safer in the browser, then checks/fuses and automatically tries the safe repair. This is the default/recommended sculpt workflow.
+- **Compact panel layout:** the Simple controls hug their content instead of stretching to the viewer height, so action buttons sit directly below the settings rather than leaving a large empty gap.
 - **Detail level:** Maximum detail (0.02 mm), Best detail (0.05 mm, the default), Balanced (0.1 mm) or Smallest file (0.2 mm). The automatic shrink keeps the surface within that distance of the original. Best and Maximum check 99.5% of the surface, Balanced 99% and Smallest file 95%, so the small areas with the most detail (faces, hands, beards) are protected. The numbers behind the verdict are shown under the slider.
 - **Protect fine detail:** paint over faces, hands or ornaments (Cmd/Ctrl + drag rotates while painting). Painted areas are not reduced. Also available in Advanced, under the SHRINK card's advanced settings. This is hidden for Fuse-only because that mode keeps 100% of the mesh.
 - **Fine-tune:** after the result, a size strip shows Original vs Now in MB and how much you save (estimated binary-STL sizes, the same figure the Download button shows), above a live slider that changes the detail kept, with Compare next to it. The solid check re-runs when you stop moving it. Fine-tune is hidden for Fuse-only.
