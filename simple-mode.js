@@ -1,8 +1,8 @@
-// SHRINK 3D v2.12 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.13 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.12';
+  const VERSION = '2.13';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -24,7 +24,9 @@
     level: store.get('shrink-ui-level', 'simple') === 'advanced' ? 'advanced' : 'simple',
     printer: PRINTERS.some(p => p.id === store.get('shrink-simple-printer')) ? store.get('shrink-simple-printer') : 'fdm',
     bed: Number(store.get('shrink-simple-bed', 0)) || 0,
-    detail: ['best', 'balanced', 'small'].includes(store.get('shrink-simple-detail')) ? store.get('shrink-simple-detail') : 'best',
+    customMm: Number(store.get('shrink-simple-detail-mm', 0)) || 0,
+    detail: 'best',
+    tuned: false, savedReduction: null, usePercent: false,
     stage: 'setup',
     busy: false,
     repairBusy: false,
@@ -40,6 +42,9 @@
     { id: 'balanced', name: 'Balanced', note: 'Good for most prints', mm: 0.1 },
     { id: 'small', name: 'Smallest file', note: 'Softer detail', mm: 0.2 }
   ];
+
+  S.detail = (() => { const v = store.get('shrink-simple-detail'); return ['best', 'balanced', 'small'].includes(v) || (v === 'custom' && S.customMm > 0) ? v : 'best'; })();
+  const detailMm = () => S.detail === 'custom' ? S.customMm : (DETAILS.find(x => x.id === S.detail) || DETAILS[0]).mm;
 
   let card = null;
   const printer = () => PRINTERS.find(p => p.id === S.printer) || PRINTERS[0];
@@ -105,16 +110,17 @@
   /* ------------------------------ engine drivers ------------------------------ */
   function applyPrinter() {
     const p = printer();
-    const v2 = document.querySelector(`.print-v2-dashboard [data-printer="${p.type}"]`);
+    // the dashboard's own printer button (never our own chip, which shares the attribute)
+    const v2 = [...document.querySelectorAll(`.print-v2-dashboard [data-printer="${p.type}"]`)].find(el => !card?.contains(el));
     if (v2) v2.click(); else setNative('printerPreset', p.type === 'fdm' ? '0.2' : '0.05', 'change');
     applyDetail();
   }
 
   function applyDetail() {
-    const d = DETAILS.find(x => x.id === S.detail) || DETAILS[0];
+    const mm = detailMm();
     setNative('printerPreset', 'custom', 'change');
-    setNative('printerDetailMm', d.mm, 'input');
-    const v2 = $('v2PrinterDetail'); if (v2) v2.value = String(d.mm);
+    setNative('printerDetailMm', mm, 'input');
+    const v2 = $('v2PrinterDetail'); if (v2) v2.value = String(mm);
   }
 
   function applyHeight(v) {
@@ -131,8 +137,16 @@
     await waitFor(() => live.state?.tris > 0, 12000);
     if (!(live.state?.tris > 0)) throw new Error('Your model is still being prepared. Give it a moment and try again.');
     note('Looking for the smallest version that still looks the same…');
-    S.pending = live.autoFind();
-    try { await S.pending; } finally { S.pending = null; }
+    if (S.usePercent && S.savedReduction?.keepPercent > 0) {
+      await waitFor(() => window.__shrinkLive?.ready !== false, 12000);
+      const pct = Math.max(1, Math.min(100, S.savedReduction.keepPercent));
+      note(`Keeping ${pct}% of the triangles, as in your saved settings…`);
+      setNative('geometry', pct, 'input');
+      await wait(250);
+    } else {
+      S.pending = live.autoFind();
+      try { await S.pending; } finally { S.pending = null; }
+    }
     await waitFor(() => $('verdict')?.dataset.level !== 'busy', 20000, 150);
     const reduced = app()?.optimizedModel;
     if (!reduced) throw new Error('The live preview is not ready. Reload the page and try again.');
@@ -174,6 +188,7 @@
     showSetupError('');
     protectOff();
     if (app()?.isCompare?.()) app().setCompare?.(false);
+    S.tuned = false;
     const token = ++S.runToken;
     S.busy = true; S.stage = 'working'; S.result = {}; S.fitChoice = null;
     S.steps = { shrink: 'running', repair: 'pending', fit: 'pending' };
@@ -350,6 +365,82 @@
     else { el.dataset.level = 'warn'; el.textContent = `⚠ About ${f.dims} is bigger than your printer fits (${f.B} mm). We\u2019ll offer a fix after shrinking.`; }
   }
 
+  /* ---- save / load settings (JSON) ---- */
+  const SETTINGS_TYPE = 'shrink-3d-settings';
+
+  function settingsSnapshot() {
+    const g = Number($('geometry')?.value) || 0;
+    const live = window.__shrinkLiveUI?.state;
+    const reduced = app()?.optimizedModel;
+    return {
+      type: SETTINGS_TYPE, schema: 1, appVersion: VERSION, savedAt: new Date().toISOString(),
+      printer: { kind: printer().type, ...(S.bed > 0 ? { biggestSizeMm: S.bed } : {}) },
+      detail: { level: S.detail, mm: detailMm() },
+      reduction: {
+        keepPercent: g || null,
+        triangles: reduced ? countTris(reduced) : null,
+        ofTriangles: live?.tris || null,
+        tuned: !!S.tuned
+      },
+      notes: 'Detail (mm) is the size of change SHRINK may not exceed, so it carries over to any model. keepPercent is the share of triangles kept on the model it was saved from.'
+    };
+  }
+
+  function saveSettings() {
+    const data = settingsSnapshot();
+    const blob = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' });
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    a.href = url; a.download = `shrink-settings-${data.printer.kind}-${data.detail.mm}mm.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    setStatusLine(`Saved ${a.download}`, false);
+  }
+
+  function applySettings(data) {
+    if (!data || typeof data !== 'object' || data.type !== SETTINGS_TYPE) throw new Error('That does not look like a SHRINK 3D settings file.');
+    const kind = data.printer?.kind === 'resin' ? 'resin' : data.printer?.kind === 'fdm' ? 'fdm' : null;
+    if (!kind) throw new Error('The settings file does not say which kind of printer it is for.');
+    const mm = Number(data.detail?.mm);
+    if (!(mm >= 0.005 && mm <= 5)) throw new Error('The settings file has no usable detail size.');
+    S.printer = kind; store.set('shrink-simple-printer', kind);
+    const bed = Number(data.printer?.biggestSizeMm);
+    S.bed = bed >= 20 && bed <= 1000 ? Math.round(bed) : 0; store.set('shrink-simple-bed', S.bed);
+    const known = DETAILS.find(d => d.id === data.detail?.level && Math.abs(d.mm - mm) < 1e-9);
+    if (known) { S.detail = known.id; }
+    else { S.detail = 'custom'; S.customMm = Math.round(mm * 1000) / 1000; store.set('shrink-simple-detail-mm', S.customMm); }
+    store.set('shrink-simple-detail', S.detail);
+    const kp = Number(data.reduction?.keepPercent);
+    S.savedReduction = kp >= 1 && kp <= 100 ? { keepPercent: Math.round(kp * 10) / 10, triangles: Number(data.reduction?.triangles) || 0, ofTriangles: Number(data.reduction?.ofTriangles) || 0, tuned: !!data.reduction?.tuned } : null;
+    S.usePercent = false; S.loadedFromFile = true;
+    S.result = null; S.fitChoice = null;
+    applyPrinter(); S.stage = 'setup'; goSetupView(); syncInputs(); render(); renderLoaded();
+  }
+
+  function loadSettingsFile(file) {
+    if (!file) return;
+    showSetupError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try { applySettings(JSON.parse(String(reader.result))); }
+      catch (err) { showSetupError(err instanceof SyntaxError ? 'That file is not valid JSON.' : (err?.message || 'Could not read that settings file.')); }
+    };
+    reader.onerror = () => showSetupError('Could not read that file.');
+    reader.readAsText(file);
+  }
+
+  function renderLoaded() {
+    const box = $('scLoaded'); if (!box) return;
+    const sr = S.savedReduction, p = printer();
+    box.hidden = !S.loadedFromFile && !sr;
+    if (box.hidden) return;
+    $('scLoadedText').hidden = !S.loadedFromFile;
+    $('scLoadedText').textContent = `Saved settings loaded: ${p.type === 'resin' ? 'resin' : 'FDM'} printer · keep detail down to ${detailMm()} mm${S.bed ? ` · bed ${S.bed} mm` : ''}.`;
+    const row = $('scPercentRow');
+    row.hidden = !sr;
+    if (sr) { $('scLoadedPct').textContent = `${sr.keepPercent}%`; $('scUsePercent').checked = S.usePercent; }
+  }
+
   /* ---- protect fine detail (paint areas the reducer must not touch) ---- */
   const protectHtml = () => `
     <div class="sc-protect">
@@ -389,7 +480,9 @@
   /* ---- detail level chips ---- */
   function renderDetails() {
     const wrap = $('scDetails'); if (!wrap) return;
-    wrap.innerHTML = DETAILS.map(d => `<button type="button" class="sc-chip sc-mini${d.id === S.detail ? ' on' : ''}" data-detail="${d.id}" aria-pressed="${d.id === S.detail}"><strong>${esc(d.name)}</strong><small>${esc(d.note)}</small></button>`).join('');
+    const list = S.customMm > 0 && S.detail === 'custom' ? [...DETAILS, { id: 'custom', name: `Saved: ${S.customMm} mm`, note: 'From your settings file' }] : DETAILS;
+    wrap.dataset.count = String(list.length);
+    wrap.innerHTML = list.map(d => `<button type="button" class="sc-chip sc-mini${d.id === S.detail ? ' on' : ''}" data-detail="${d.id}" aria-pressed="${d.id === S.detail}"><strong>${esc(d.name)}</strong><small>${esc(d.note)}</small></button>`).join('');
   }
 
   /* ---- fine-tune slider shown with the result ---- */
@@ -452,7 +545,7 @@
       one.disabled = S.busy; two.disabled = S.busy || !S.result;
       one.setAttribute('aria-current', S.stage === 'setup' ? 'step' : 'false'); two.setAttribute('aria-current', S.stage === 'result' ? 'step' : 'false');
     }
-    renderDetails(); renderProtect();
+    renderDetails(); renderProtect(); renderLoaded();
   }
 
   function showSetupError(msg) {
@@ -507,10 +600,18 @@
         <div class="sc-group-title">How much detail should we keep?</div>
         <div id="scDetails" class="sc-details" role="group" aria-label="Detail level"></div>
         ${protectHtml()}
+        <div id="scLoaded" class="sc-loaded" hidden>
+          <div id="scLoadedText"></div>
+          <label id="scPercentRow" class="sc-check" hidden><input id="scUsePercent" type="checkbox"><span>Keep the same percentage (<b id="scLoadedPct"></b> of the triangles) instead of finding the best automatically. Best for models of a similar size.</span></label>
+        </div>
         <div id="scError" class="sc-error" role="alert" hidden></div>
         <button id="scGo" class="sc-go" type="button">✨ SHRINK IT — make it print-ready</button>
         <p class="sc-fine">Shrinks the file, checks it\u2019s a solid and checks it fits. Your original file is never changed.</p>
-        <button type="button" class="sc-link-btn" data-act="advanced">Advanced settings ›</button>
+        <div class="sc-setup-tools">
+          <button type="button" class="sc-link-btn" data-act="load-settings">📂 Load saved settings</button>
+          <button type="button" class="sc-link-btn" data-act="advanced">Advanced settings ›</button>
+          <input id="scSettingsFile" type="file" accept="application/json,.json" hidden>
+        </div>
       </div>
       <div class="sc-stage sc-working">
         <div class="sc-eyebrow">&gt;_ WORKING…</div>
@@ -528,7 +629,7 @@
           <input id="scDetailRange" type="range" min="1" max="100" step="0.1" value="50">
           <div class="sc-tune-ends"><span>Smaller file</span><span>More detail</span></div>
           <p id="scTuneLine" class="sc-tune-line" aria-live="polite"></p>
-          <div class="sc-actions"><button type="button" class="sc-small-btn" data-act="compare">Compare with original</button><button type="button" class="sc-small-btn" data-act="best">✨ Find the best again</button></div>
+          <div class="sc-actions"><button type="button" class="sc-small-btn" data-act="compare">Compare with original</button><button type="button" class="sc-small-btn" data-act="best">✨ Find the best again</button><button type="button" class="sc-small-btn" data-act="save-settings">💾 Save these settings</button></div>
         </div>
         <button id="scDownload" class="sc-go sc-download" type="button"></button>
         <p id="scDlNote" class="sc-fine"></p>
@@ -544,10 +645,10 @@
       const chip = e.target.closest('[data-printer]');
       if (chip && card.contains(chip)) {
         S.printer = chip.dataset.printer; store.set('shrink-simple-printer', S.printer);
-        S.result = null; applyPrinter(); renderPrinters(); renderFitLine(); render(); return;
+        S.loadedFromFile = false; S.result = null; applyPrinter(); renderPrinters(); renderFitLine(); render(); return;
       }
       const dchip = e.target.closest('[data-detail]');
-      if (dchip && card.contains(dchip)) { S.detail = dchip.dataset.detail; store.set('shrink-simple-detail', S.detail); S.result = null; applyDetail(); renderDetails(); render(); return; }
+      if (dchip && card.contains(dchip)) { S.detail = dchip.dataset.detail; store.set('shrink-simple-detail', S.detail); S.result = null; S.loadedFromFile = false; applyDetail(); renderDetails(); render(); return; }
       onProtectClick(e);
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (act === 'advanced') setLevel('advanced');
@@ -557,6 +658,8 @@
       else if (act === 'cancel-rebuild') S.abort?.abort?.();
       else if (act === 'compare') { $('compareBtn')?.click(); setTimeout(renderTune, 80); }
       else if (act === 'best') run();
+      else if (act === 'save-settings') saveSettings();
+      else if (act === 'load-settings') $('scSettingsFile')?.click();
       else if (act === 'rebuild') rebuild();
       else if (act === 'undo') run();
       else if (act === 'split') { S.fitChoice = 'split'; render(); }
@@ -568,7 +671,9 @@
       }
     });
     card.addEventListener('input', onProtectInput);
-    $('scDetailRange').addEventListener('input', () => { setNative('geometry', $('scDetailRange').value, 'input'); renderTune(); scheduleTuneRefresh(); });
+    $('scSettingsFile').addEventListener('change', () => { const f = $('scSettingsFile').files?.[0]; loadSettingsFile(f); $('scSettingsFile').value = ''; });
+    $('scUsePercent').addEventListener('change', () => { S.usePercent = $('scUsePercent').checked; });
+    $('scDetailRange').addEventListener('input', () => { S.tuned = true; setNative('geometry', $('scDetailRange').value, 'input'); renderTune(); scheduleTuneRefresh(); });
     ['liveLine', 'verdictText', 'verdict'].forEach(id => { const n = $(id); if (n) new MutationObserver(renderTune).observe(n, { childList: true, characterData: true, subtree: true, attributes: true }); });
     window.addEventListener('shrink:compare', renderTune);
     window.addEventListener('shrink:protect-changed', renderProtect);
