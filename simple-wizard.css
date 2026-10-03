@@ -33,7 +33,10 @@
 /* Simple means simple: these power-user controls still exist in Tools, but do not clutter the normal journey. */
 .app-mode-print.ui-simple #simpleCard .sc-protect,
 .app-mode-print.ui-simple #simpleCard #scTech,
-.app-mode-print.ui-simple #simpleCard .sc-setup-tools [data-act="advanced"]{
+.app-mode-print.ui-simple #simpleCard .sc-setup-tools [data-act="advanced"],
+.app-mode-print.ui-simple .simple-preflight-card .sp-tech,
+.app-mode-print.ui-simple #heatBtn,
+.app-mode-print.ui-simple #wireframeBtn{
   display:none!important;
 }
 .app-mode-print.ui-simple #simpleCard #scTune > :not(#scSize){
