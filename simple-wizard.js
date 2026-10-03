@@ -1,6 +1,6 @@
-// SHRINK 3D v2.22 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
+// SHRINK 3D v2.23 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
 (() => {
-  const RELEASE = '2.22';
+  const RELEASE = '2.23';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const simple = () => window.__shrinkSimple;
@@ -10,6 +10,7 @@
   let reductionReady = false;
 
   import(`./simple-preflight.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Model preflight did not load`, err));
+  import(`./simple-postreduce.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Post-reduction mesh check did not load`, err));
 
   function addCss() {
     if (document.querySelector('link[data-shrink-simple-wizard]')) return;
