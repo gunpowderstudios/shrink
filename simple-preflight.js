@@ -1,6 +1,6 @@
-// SHRINK 3D v2.22 — Simple Print preflight gate: check -> repair -> optional download -> workflow.
+// SHRINK 3D v2.37 — Simple Print preflight gate: check -> repair -> optional download -> workflow.
 (() => {
-  const RELEASE = '2.36';
+  const RELEASE = '2.37';
   const CORE = '2.18';           // engine graph (mesh-tools)
   const FIX = '2.27';            // repair graph: repair-core.js, repair-worker.js, solid-rebuild.js. Bump these three + their importers together.
   const $ = id => document.getElementById(id);
