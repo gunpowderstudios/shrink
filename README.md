@@ -1,4 +1,4 @@
-# SHRINK 3D v2.29
+# SHRINK 3D v2.30
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
@@ -6,8 +6,11 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.29 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.30 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
+
+## v2.30 full-height repair module
+The Step 1 Check/Repair card now explicitly stretches to the full desktop module height, matching the 3D viewer. Its controls stay at the top and the card scrolls internally if needed. This removes the old `align-self:start` rule that could make the repair panel stop halfway down the workspace.
 
 ## v2.29 viewport-filling workspace
 On desktop, SHRINK measures the space from the workspace's actual top edge to the bottom of the browser window and stretches both main modules to that height. Controls scroll internally when needed; the 3D viewer expands to use the rest. Fixed 900px height caps are removed. Mobile rules are unchanged.
