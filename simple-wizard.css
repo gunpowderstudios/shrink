@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.29 — Simple Print wizard polish */
+/* SHRINK 3D v2.32 — Simple Print wizard polish */
 
 /* Four clear stages: check -> printer/size -> reduce -> download. */
 .app-mode-print.ui-simple #simpleCard .sc-stepper{
@@ -51,6 +51,16 @@
   display:flex;
   align-items:center;
   gap:8px;
+}
+.app-mode-print.ui-simple #scPreflightOk[data-warning="true"]{
+  color:#ffe0ad;
+  border-color:rgba(242,176,74,.42);
+  background:rgba(78,53,10,.28);
+}
+.app-mode-print.ui-simple #scPreflightOk[data-warning="true"]:before{
+  content:'!';
+  background:rgba(242,176,74,.16);
+  color:#ffd28a;
 }
 .app-mode-print.ui-simple #scPreflightOk:before{
   content:'✓';
