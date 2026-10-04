@@ -2,6 +2,30 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.34 — Layout reset
+
+### Removed
+- Removed the v2.28+ draggable/dockable panel system.
+- Deleted `panel-layout.js` and `panel-layout.css`.
+- Removed drag handles, saved left/right panel preference and JavaScript workspace-height recalculation.
+
+### Restored
+- Returned desktop Simple mode to the fixed pre-v2.28 two-column layout:
+  - Controls / Check-Repair on the left
+  - 3D viewer on the right
+- Workspace sizing is CSS-only again.
+- Both columns use the same browser-relative height.
+- Controls and preflight cards scroll internally when their content is taller than the workspace.
+- The 3D viewer fills the remaining column height.
+
+### Preserved
+- v2.33 orientation fix and camera/view-state preservation.
+- Stable live reduced preview during reduction.
+- v2.31/v2.32 reliability, shared mesh-health, reduction and repair improvements.
+- No geometry algorithm was rolled back.
+
+---
+
 ## v2.33 — Viewer stability
 
 ### Orientation / camera
