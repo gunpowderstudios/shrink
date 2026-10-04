@@ -1,8 +1,9 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
+import { healthOfModel } from './repair-core.js?v=2.27';
 
-// SHRINK 3D v2.18 — safety layer around optional Fuse / Split helpers.
-const VERSION = '2.18';
+// SHRINK 3D v2.31 — safety layer around optional Fuse / Split helpers.
+const VERSION = '2.31';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -11,14 +12,15 @@ let lastAttempt = null;
 function sourceModel(){ return app()?.optimizedModel || app()?.originalModel || null; }
 function topologySummary(model){
   if(!model)return null;
-  const edgeCounts=new Map(); let triangles=0,degenerate=0;
-  const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
-  const q=v=>`${Math.round(v.x*1e6)},${Math.round(v.y*1e6)},${Math.round(v.z*1e6)}`;
-  const addEdge=(u,v)=>{const ku=q(u),kv=q(v),key=ku<kv?`${ku}|${kv}`:`${kv}|${ku}`;edgeCounts.set(key,(edgeCounts.get(key)||0)+1);};
-  model.updateMatrixWorld(true);
-  model.traverse(o=>{if(!o.isMesh||!o.geometry?.attributes?.position)return;const g=o.geometry,pos=g.attributes.position,idx=g.index,count=idx?idx.count:pos.count;for(let i=0;i+2<count;i+=3){const i0=idx?idx.getX(i):i,i1=idx?idx.getX(i+1):i+1,i2=idx?idx.getX(i+2):i+2;a.fromBufferAttribute(pos,i0).applyMatrix4(o.matrixWorld);b.fromBufferAttribute(pos,i1).applyMatrix4(o.matrixWorld);c.fromBufferAttribute(pos,i2).applyMatrix4(o.matrixWorld);triangles++;const area2=new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).lengthSq();if(area2<1e-20)degenerate++;addEdge(a,b);addEdge(b,c);addEdge(c,a);}});
-  let openEdges=0,pinchedEdges=0;for(const n of edgeCounts.values()){if(n===1)openEdges++;else if(n>2)pinchedEdges++;}
-  return{triangles,openEdges,pinchedEdges,degenerateTriangles:degenerate};
+  const h=healthOfModel(THREE,model);
+  return{
+    triangles:h.triangles,
+    openEdges:h.openEdges,
+    pinchedEdges:h.pinchedEdges,
+    flippedEdges:h.flippedEdges,
+    degenerateTriangles:h.degenerateTriangles,
+    clean:h.clean
+  };
 }
 
 function ensureDiagnosticPanel(){
@@ -33,7 +35,7 @@ function ensureDiagnosticPanel(){
       <button id="makeWatertightBtn" type="button">Make watertight</button>
     </div>
     <div class="repair-help">Rebuilds the sculpt as a new voxel-style closed outer skin. Best for overlapping or troublesome parts. Tiny details may soften slightly. Your original file is not changed.</div>
-    <details class="repair-advanced"><summary>Advanced details</summary><div id="printDiagnosticStats" class="print-diagnostic-stats"></div></details>`;
+    <details class="repair-advanced"><summary>Technical details</summary><div id="printDiagnosticStats" class="print-diagnostic-stats"></div></details>`;
   viewerPanel.appendChild(panel);
   const style=document.createElement('style'); style.id='printDiagnosticStyle';
   style.textContent=`.print-diagnostic-panel{margin:10px 0 0;padding:13px 14px;border:1px solid #ff5b62;border-radius:12px;background:rgba(120,18,24,.22);color:#ffd3d5;font-size:12px;line-height:1.45}.print-diagnostic-title{font-weight:800;color:#ff747a;font-size:14px;margin-bottom:5px}.repair-actions{display:flex;gap:8px;align-items:end;margin-top:10px;flex-wrap:wrap}.repair-quality{display:grid;gap:4px;min-width:130px}.repair-quality span{font-size:11px;font-weight:700;color:#ffc2c5}.repair-quality select{background:#20242c;color:#fff;border:1px solid #4a515d;border-radius:8px;padding:8px}.repair-actions button{border:0;border-radius:9px;padding:9px 14px;background:#ff4f57;color:#fff;font-weight:800;cursor:pointer}.repair-actions button:disabled{opacity:.55;cursor:wait}.repair-help{margin-top:7px;color:#e9b9bc}.repair-advanced{margin-top:8px}.repair-advanced summary{cursor:pointer;color:#ffb5b9;font-weight:700}.print-diagnostic-stats{margin-top:6px;color:#ffb5b9}.print-diagnostic-panel[hidden]{display:none!important}`;
@@ -49,7 +51,7 @@ function showDiagnostic(kind,rawMessage){
   const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats');
   panel.querySelector('.print-diagnostic-title').textContent=`⚠ This model isn't one clean printable solid`;
   if(msg)msg.textContent=friendlyReason(kind,rawMessage);
-  if(stats&&topo){const nf=new Intl.NumberFormat();stats.textContent=`Mesh check: ${nf.format(topo.openEdges)} open edges · ${nf.format(topo.pinchedEdges)} pinched/non-manifold edges · ${nf.format(topo.degenerateTriangles)} degenerate triangles. Exact engine message: ${rawMessage||'unknown'}`;}
+  if(stats&&topo){const nf=new Intl.NumberFormat();stats.textContent=`Mesh check: ${nf.format(topo.openEdges)} open edges · ${nf.format(topo.pinchedEdges)} pinched/non-manifold edges · ${nf.format(topo.flippedEdges||0)} flipped edges · ${nf.format(topo.degenerateTriangles)} degenerate triangles. Exact engine message: ${rawMessage||'unknown'}`;}
   panel.hidden=false;
 }
 function clearDiagnostic(){const p=$('printDiagnosticPanel');if(p)p.hidden=true;}
