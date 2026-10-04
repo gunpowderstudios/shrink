@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.35 — natural-height controls + tall viewer */
+/* SHRINK 3D v2.36 — Simple Print wizard polish */
 
 /* Four clear stages: check -> printer/size -> reduce -> download. */
 .app-mode-print.ui-simple #simpleCard .sc-stepper{
@@ -30,7 +30,7 @@
   display:none!important;
 }
 
-/* Simple means simple: power-user controls remain in Tools. */
+/* Simple means simple: these power-user controls still exist in Tools, but do not clutter the normal journey. */
 .app-mode-print.ui-simple #simpleCard .sc-protect,
 .app-mode-print.ui-simple #simpleCard #scTech,
 .app-mode-print.ui-simple #simpleCard .sc-setup-tools [data-act="advanced"],
@@ -43,6 +43,7 @@
   display:none!important;
 }
 
+/* Keep the action focused and visually distinct. */
 .app-mode-print.ui-simple #scGo{
   margin-top:10px!important;
 }
@@ -50,16 +51,6 @@
   display:flex;
   align-items:center;
   gap:8px;
-}
-.app-mode-print.ui-simple #scPreflightOk[data-warning="true"]{
-  color:#ffe0ad;
-  border-color:rgba(242,176,74,.42);
-  background:rgba(78,53,10,.28);
-}
-.app-mode-print.ui-simple #scPreflightOk[data-warning="true"]:before{
-  content:'!';
-  background:rgba(242,176,74,.16);
-  color:#ffd28a;
 }
 .app-mode-print.ui-simple #scPreflightOk:before{
   content:'✓';
@@ -74,7 +65,7 @@
   font-weight:900;
 }
 
-/* Desktop: natural controls, large viewer. Normal document flow; no equal-height modules. */
+/* Once a model is loaded, stop wasting vertical space on branding and let the work area own the screen. */
 @media(min-width:901px){
   .app-mode-print.ui-simple.simple-has-model .topbar{
     min-height:52px!important;
@@ -103,53 +94,25 @@
     display:none!important;
   }
   .app-mode-print.ui-simple.simple-has-model .print-v2-dashboard{
-    margin-bottom:18px!important;
+    margin-bottom:0!important;
   }
-
-  /* Match the cleaner pre-dock composition: compact controls left, generous viewer right. */
   .app-mode-print.ui-simple.simple-has-model .v2-top-grid{
-    grid-template-columns:minmax(360px,32%) minmax(0,1fr)!important;
-    gap:14px!important;
-    height:auto!important;
-    min-height:0!important;
-    max-height:none!important;
-    align-items:start!important;
-    overflow:visible!important;
+    height:calc(100dvh - 128px)!important;
+    min-height:520px!important;
+    max-height:900px!important;
+    align-items:stretch!important;
+    overflow:hidden;
   }
-
-  /* Left side grows only as much as its current stage needs. */
-  .app-mode-print.ui-simple.simple-has-model #simpleCard,
-  .app-mode-print.ui-simple.simple-has-model .simple-preflight-card{
-    align-self:start!important;
-    width:100%!important;
-    height:auto!important;
-    min-height:0!important;
-    max-height:none!important;
-    overflow:visible!important;
-  }
-  .app-mode-print.ui-simple.simple-has-model #simpleCard{
-    padding:16px!important;
-  }
-  .app-mode-print.ui-simple.simple-has-model #simpleCard .sc-stage{
-    flex:0 0 auto!important;
-  }
-
-  /* The viewer is the visual anchor and can be much deeper than the controls. */
   .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot{
-    align-self:start!important;
     min-height:0!important;
-    height:auto!important;
-    overflow:visible!important;
+    height:100%!important;
+    overflow:hidden;
   }
   .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot .viewer-panel{
     display:flex!important;
     flex-direction:column!important;
-    position:relative!important;
-    top:0!important;
-    width:100%!important;
-    height:clamp(560px,calc(100dvh - 128px),900px)!important;
-    min-height:560px!important;
-    max-height:900px!important;
+    min-height:0!important;
+    height:100%!important;
     overflow:hidden!important;
   }
   .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot .viewer{
@@ -157,8 +120,33 @@
     min-height:0!important;
     height:auto!important;
   }
+  .app-mode-print.ui-simple.simple-has-model #simpleCard{
+    min-height:0!important;
+    height:100%!important;
+    max-height:100%!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+    padding:16px!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model #simpleCard .sc-stage{
+    flex:0 0 auto!important;
+  }
 }
 
 @media(max-width:760px){
   .app-mode-print.ui-simple #simpleCard .sc-stepper{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+
+/* v2.36: retain the newer Continue-anyway warning colour without changing yesterday's layout. */
+.app-mode-print.ui-simple #scPreflightOk[data-warning="true"]{
+  color:#ffe0ad;
+  border-color:rgba(242,176,74,.42);
+  background:rgba(78,53,10,.28);
+}
+.app-mode-print.ui-simple #scPreflightOk[data-warning="true"]:before{
+  content:'!';
+  background:rgba(242,176,74,.16);
+  color:#ffd28a;
 }
