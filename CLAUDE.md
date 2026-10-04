@@ -4,11 +4,23 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.34**
+- Current user-facing release: **v2.35**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## v2.35 layout target
+The desired desktop Simple layout is the cleaner pre-dock visual composition:
+
+- fixed columns: Controls / Check-Repair left, Viewer right
+- approximately 32% / 68% width
+- left card uses natural content height and must **not** stretch to viewer depth
+- right viewer is intentionally much taller than the left card
+- normal page/document scrolling is allowed
+- no JavaScript viewport sizing or equal-height module forcing
+- do not reintroduce draggable/dockable panels
+- keep v2.33 orientation/camera/viewer-stability fixes independent of layout
 
 ## v2.34 fixed layout rules
 The draggable/dockable panel experiment from v2.28–v2.33 has been removed.
@@ -17,8 +29,7 @@ The draggable/dockable panel experiment from v2.28–v2.33 has been removed.
 - Do not reintroduce drag bars, panel-side localStorage, body-wide layout observers or JavaScript viewport-height managers without a new explicit design decision.
 - Desktop Simple mode is fixed two-column: Controls/Check-Repair left, Viewer right.
 - `simple-wizard.css` owns desktop workspace sizing using CSS only.
-- Both columns share the same browser-relative height.
-- Controls/preflight may scroll internally; the page should remain ordinary document flow rather than being force-locked by JavaScript.
+- Controls/preflight use natural height; the page remains ordinary document flow.
 - Keep v2.33 camera/view preservation and orientation fixes independent of layout.
 
 ## v2.33 viewer stability rules
@@ -212,7 +223,7 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 ## Desktop layout
 - Fixed desktop two-column layout only.
 - Controls / Check-Repair are on the left; Viewer is on the right.
-- `simple-wizard.css` sizes the loaded Simple workspace with CSS (`100dvh` relative), with an internal scroll on control cards.
+- `simple-wizard.css` keeps the controls natural-height and gives only the viewer a tall browser-relative height.
 - No JavaScript should continuously calculate workspace height.
 - No user-reorderable dock system is currently supported.
 
@@ -228,7 +239,7 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - Reduced print preview normals must be recomputed after connectivity changes so the model does not appear artificially dark.
 - Once a model is loaded on desktop, the header/branding should collapse to reclaim height.
 - Viewer stays in the fixed right-hand desktop column in Simple Print mode.
-- Simple control/preflight cards scroll internally within the fixed left-hand column when needed.
+- Simple control/preflight cards use natural height in the fixed left-hand column.
 - Avoid large dead vertical gaps.
 - Mobile warning is intentionally cheeky but non-blocking.
 
