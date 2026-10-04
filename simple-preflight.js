@@ -1,7 +1,8 @@
 // SHRINK 3D v2.22 — Simple Print preflight gate: check -> repair -> optional download -> workflow.
 (() => {
   const RELEASE = '2.22';
-  const CORE = '2.18';
+  const CORE = '2.18';           // engine graph (mesh-tools)
+  const FIX = '2.27';            // repair graph: repair-core.js, repair-worker.js, solid-rebuild.js. Bump these three + their importers together.
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -14,7 +15,7 @@
   let proceeded = false;
   let token = 0;
   let abort = null;
-  let pendingFix = null;        // repair | rebuild; survives our automatic in-memory re-open
+  let pendingFix = null;
   let lastCheckedModel = null;
 
   function active() {
@@ -27,16 +28,19 @@
   }
 
   const nf = n => new Intl.NumberFormat().format(Math.max(0, Number(n) || 0));
-  const issues = t => (t?.openEdges || 0) + (t?.pinchedEdges || 0) + (t?.degenerateTriangles || 0);
+  const issues = t => (t?.openEdges || 0) + (t?.pinchedEdges || 0) + (t?.flippedEdges || 0);
 
-  function topology(model) {
-    try { return window.__shrinkPrintSafety?.topologySummary?.(model) || null; }
-    catch (err) { console.warn(`[SHRINK 3D ${RELEASE}] Preflight topology check failed`, err); return null; }
+  async function topology(model, signal) {
+    try {
+      const mod = await import(`./solid-rebuild.js?v=${FIX}`);
+      const h = await mod.healthAsync(model, { signal });
+      return { ...h, openEdges: h.open, pinchedEdges: h.tangled, flippedEdges: h.flipped, degenerateTriangles: h.degenerate };
+    } catch (err) { if (err?.code === 'CANCELLED') throw err; console.warn(`[SHRINK 3D ${RELEASE}] Preflight health check failed`, err); return null; }
   }
 
   function details(t, extra = '') {
     if (!t) return extra || 'No topology report was available.';
-    return `Triangles: ${nf(t.triangles)} · open edges: ${nf(t.openEdges)} · pinched/non-manifold edges: ${nf(t.pinchedEdges)} · degenerate triangles: ${nf(t.degenerateTriangles)}${extra ? ` · ${extra}` : ''}`;
+    return `Triangles: ${nf(t.triangles)} · open edges: ${nf(t.openEdges)} · pinched/non-manifold edges: ${nf(t.pinchedEdges)} · flipped edges: ${nf(t.flippedEdges)} · empty triangles (harmless): ${nf(t.degenerateTriangles)}${extra ? ` · ${extra}` : ''}`;
   }
 
   function disposeRoot(root) {
@@ -107,21 +111,24 @@
       summary.innerHTML = '<strong>Nothing has been changed.</strong> This usually only takes a moment.'; note.textContent = 'The next stage stays locked until this check passes.'; tech.textContent = details(t);
     } else if (state === 'needs') {
       icon.textContent = '⚠'; title.textContent = 'This model needs repairing first'; text.textContent = 'SHRINK found geometry that should be fixed before we reduce, fuse or split the model.';
-      summary.innerHTML = `<strong>${nf(t?.openEdges)} open edges · ${nf(t?.pinchedEdges)} pinched edges · ${nf(t?.degenerateTriangles)} broken/empty triangles.</strong>`;
+      summary.innerHTML = `<strong>${nf(t?.openEdges)} open edges · ${nf(t?.pinchedEdges)} pinched edges · ${nf(t?.flippedEdges)} flipped edges.</strong>`;
       actions.innerHTML = button('Repair model — keep the detail', 'repair', 'primary') + button('Open Advanced', 'advanced');
       note.textContent = 'Repair only changes problem areas. Separate clean printable pieces are allowed and do not have to be fused.'; tech.textContent = details(t);
     } else if (state === 'repairing') {
-      icon.textContent = '↻'; title.textContent = 'Repairing the model…'; text.textContent = 'Joining loose points, removing bad triangles, correcting face direction and closing holes.';
+      icon.textContent = '↻'; title.textContent = 'Repairing the model…'; text.textContent = info?.progress || 'Joining loose points, removing bad triangles, correcting face direction and closing holes.';
+      actions.innerHTML = '<button type="button" class="sp-action warn" data-sp-act="cancel">Cancel</button>';
+      if (card) card.style.setProperty('--sp-progress', `${Math.max(5, Math.min(100, info?.pct || 8))}%`);
       summary.innerHTML = '<strong>Keeping the existing surface wherever possible.</strong>'; note.textContent = 'When repair finishes SHRINK will automatically check the model again.'; tech.textContent = details(info?.before, 'detail-preserving repair running');
     } else if (state === 'repair-failed') {
       icon.textContent = '⚠'; title.textContent = 'Normal repair could not make it clean'; text.textContent = 'Nothing has been accepted yet. You can try the stronger watertight rebuild, which recreates the outer surface.';
-      summary.innerHTML = `<strong>The stronger fix can soften very small detail.</strong> You will get the rebuilt model in the viewer before any shrinking happens.`;
+      summary.innerHTML = '<strong>The stronger fix can soften very small detail.</strong> You will get the rebuilt model in the viewer before any shrinking happens.';
       actions.innerHTML = button('Stronger fix — rebuild watertight', 'rebuild', 'primary') + button('Try Advanced', 'advanced');
-      note.textContent = 'The next stage remains locked until the rebuilt model passes the same check.'; tech.textContent = `${details(info?.before)}\nAfter repair: ${details(info?.after, info?.message || '')}`;
+      note.textContent = 'The next stage remains locked until the rebuilt model passes the same check.'; tech.textContent = `${details(info?.before)}
+After repair: ${details(info?.after, info?.message || '')}`;
     } else if (state === 'rebuilding') {
       icon.textContent = '◫'; title.textContent = 'Rebuilding a watertight surface…'; text.textContent = info?.progress || 'Starting the background rebuild…';
       summary.innerHTML = '<strong>This is the stronger fallback.</strong> SHRINK is making a new closed outer skin from the uploaded shape.';
-      actions.innerHTML = `<button type="button" class="sp-action warn" data-sp-act="cancel">Cancel</button>`;
+      actions.innerHTML = '<button type="button" class="sp-action warn" data-sp-act="cancel">Cancel</button>';
       note.textContent = 'This runs in a background worker where the browser supports it.'; tech.textContent = details(info?.before, info?.progress || '');
       if (card) card.style.setProperty('--sp-progress', `${Math.max(5, Math.min(100, info?.pct || 8))}%`);
     } else if (state === 'ready') {
@@ -139,7 +146,8 @@
       icon.textContent = '×'; title.textContent = 'SHRINK could not repair this model'; text.textContent = 'The mesh has problems too large or complex to repair safely in the browser. The original file has not been changed.';
       summary.innerHTML = '<strong>Simple mode stops here rather than reducing a broken mesh.</strong>';
       actions.innerHTML = button('Download original', 'download') + button('Try Advanced', 'advanced') + button('Re-upload repaired file', 'reupload', 'primary');
-      note.textContent = 'You can also repair the file in your slicer or modelling software, then drop the repaired version back into SHRINK.'; tech.textContent = `${details(info?.before)}\n${info?.message || ''}`;
+      note.textContent = 'You can also repair the file in your slicer or modelling software, then drop the repaired version back into SHRINK.'; tech.textContent = `${details(info?.before)}
+${info?.message || ''}`;
     }
   }
 
@@ -149,9 +157,10 @@
     proceeded = false;
     busy = true; state = 'checking'; info = { topology: null, fixedBy }; clearReadyChip(); setBlocked(true); render();
     app()?.show?.('original');
-    await waitFor(() => window.__shrinkPrintSafety?.topologySummary, 10000);
+    await wait(30);
     if (my !== token) return;
-    const t = topology(app().originalModel);
+    const t = await topology(app().originalModel).catch(() => null);
+    if (my !== token) return;
     info.topology = t;
     if (!t) {
       busy = false; state = 'failed'; info.message = 'The topology checker did not become available.'; render(); setBlocked(true); return;
@@ -190,51 +199,60 @@
 
   async function repairModel() {
     if (busy || !app()?.originalModel) return;
-    const before = topology(app().originalModel);
-    busy = true; state = 'repairing'; info = { before }; render();
+    const before = info?.topology || info?.before || null;
+    const ctl = abort = new AbortController(), my = token; busy = true; state = 'repairing'; info = { before, progress: 'Starting…', pct: 4 }; render();
     app()?.clearPreview?.(); app()?.show?.('original');
     await wait(35);
     let root = null;
     try {
-      const [rebuildMod, repairMod] = await Promise.all([import(`./solid-rebuild.js?v=${CORE}`), import(`./repair-core.js?v=${CORE}`)]);
-      const mesh = rebuildMod.gatherWorldMesh(app().originalModel);
-      const res = repairMod.repairMesh({ positions: mesh.positions, indices: mesh.indices });
-      root = rebuildMod.buildRoot(res.positions, res.indices, res.stats);
-      const after = topology(root);
+      if (my !== token) return;
+      const mod = await import(`./solid-rebuild.js?v=${FIX}`);
+      const res = await mod.repairAsync(app().originalModel, {
+        signal: ctl.signal,
+        onStatus: (text, pct) => { if (state !== 'repairing') return; info.progress = text || 'Repairing…'; info.pct = pct || info.pct; render(); }
+      });
+      root = res.root;
+      if (my !== token) { disposeRoot(root); root = null; return; }
+      const h = res.stats.after;
+      const after = h && { ...h, openEdges: h.open, pinchedEdges: h.tangled, flippedEdges: h.flipped, degenerateTriangles: h.degenerate };
       if (!after || issues(after) !== 0) {
         info = { before, after, stats: res.stats, message: 'The detail-preserving repair still left topology problems.' };
         disposeRoot(root); root = null; busy = false; state = 'repair-failed'; render(); return;
       }
       await reopenRoot(root, 'repaired', 'repair'); root = null;
     } catch (err) {
-      console.warn(`[SHRINK 3D ${RELEASE}] Preflight repair failed`, err);
       disposeRoot(root);
+      if (my !== token) return;
+      if (err?.code === 'CANCELLED') { busy = false; state = 'needs'; info = { before }; render(); return; }
+      console.warn(`[SHRINK 3D ${RELEASE}] Preflight repair failed`, err);
       busy = false; state = 'repair-failed'; info = { before, after: null, message: err?.message || String(err) }; render();
-    }
+    } finally { if (abort === ctl) abort = null; }
   }
 
   async function rebuildModel() {
     if (busy || !app()?.originalModel) return;
-    const before = topology(app().originalModel);
-    abort = new AbortController(); busy = true; state = 'rebuilding'; info = { before, progress: 'Starting…', pct: 5 }; render();
+    const before = info?.topology || info?.before || null;
+    const ctl = abort = new AbortController(), my = token; busy = true; state = 'rebuilding'; info = { before, progress: 'Starting…', pct: 5 }; render();
     app()?.clearPreview?.(); app()?.show?.('original');
     let root = null;
     try {
-      const { rebuildSolid } = await import(`./solid-rebuild.js?v=${CORE}`);
+      const { rebuildSolid } = await import(`./solid-rebuild.js?v=${FIX}`);
       const res = await rebuildSolid(app().originalModel, {
-        detailUnits: 0, maxCells: 24e6, maxTris: 350000, signal: abort.signal,
+        detailUnits: 0, maxCells: 24e6, maxTris: 350000, signal: ctl.signal,
         onStatus: (text, pct) => { if (state !== 'rebuilding') return; info.progress = text || 'Rebuilding…'; info.pct = pct || info.pct; render(); }
       });
       root = res.root;
-      const after = topology(root);
+      if (my !== token) { disposeRoot(root); root = null; return; }
+      const after = await topology(root).catch(() => null);
       if (!after || issues(after) !== 0) throw new Error('The rebuilt surface still did not pass the watertight mesh check.');
       await reopenRoot(root, 'watertight', 'rebuild'); root = null;
     } catch (err) {
       disposeRoot(root);
+      if (my !== token) return;
       if (err?.code === 'CANCELLED') { busy = false; state = 'repair-failed'; info = { before, after: null, message: 'Rebuild cancelled.' }; render(); return; }
       console.warn(`[SHRINK 3D ${RELEASE}] Preflight rebuild failed`, err);
       busy = false; state = 'failed'; info = { before, message: err?.message || String(err) }; render(); setBlocked(true);
-    } finally { abort = null; }
+    } finally { if (abort === ctl) abort = null; }
   }
 
   function downloadSource() {
@@ -256,10 +274,13 @@
     });
   }
 
+  let openTimer = 0;
   function onModelOpened() {
     const fix = pendingFix; pendingFix = null;
+    token++; abort?.abort?.();
+    clearTimeout(openTimer);
     proceeded = false; lastCheckedModel = null; clearReadyChip(); state = 'checking'; info = null; busy = false; setBlocked(true);
-    setTimeout(() => {
+    openTimer = setTimeout(() => {
       ensureCard();
       if (active()) checkModel(fix); else setBlocked(false);
     }, 120);
