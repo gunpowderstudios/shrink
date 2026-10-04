@@ -2,6 +2,26 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.36 — Restore actual Oct 3 layout
+
+### Restored from history
+- Restored `simple-wizard.css` from the last Oct 3 build, commit `67ce3c` (v2.25).
+- Restored `simple-preflight.css` from the same historical commit.
+- This is the real pre-movable-panel layout rather than a new approximation.
+
+### Preserved
+- Current v2.31–v2.33 repair/reduction/shared-health reliability work.
+- v2.32 Download as it is / Continue anyway behaviour.
+- v2.33 STL orientation and camera/view preservation.
+- v2.33 stable live reduced preview.
+- New amber warning colour for a bypassed mesh remains, but no newer layout rules remain.
+
+### Scope
+- No engine or geometry algorithm rollback.
+- `simple-mode.css`, `print-v2-ui.css`, and `style.css` were already identical to the Oct 3 state.
+
+---
+
 ## v2.35 — Natural-height controls
 
 ### Layout
