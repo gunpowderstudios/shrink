@@ -4,11 +4,22 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.35**
+- Current user-facing release: **v2.36**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## v2.36 historical layout baseline
+The current Simple desktop layout is intentionally restored from the final Oct 3 v2.25 commit `67ce3c`.
+
+- `simple-wizard.css` comes from that historical commit.
+- `simple-preflight.css` comes from that historical commit.
+- Do not add new viewport/dock/equal-height layout systems on top without an explicit new decision.
+- The only post-Oct-3 CSS retained in the Simple wizard layer is the amber visual state for **Continue anyway**.
+- `simple-mode.css`, `print-v2-ui.css`, and `style.css` already matched the Oct 3 state and were not rewritten.
+- Engine/workflow logic remains current; this was layout-only.
+- Keep v2.33 camera/orientation/stable-preview fixes independent of the historical layout CSS.
 
 ## v2.35 layout target
 The desired desktop Simple layout is the cleaner pre-dock visual composition:
