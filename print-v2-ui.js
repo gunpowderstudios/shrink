@@ -1,6 +1,6 @@
-// SHRINK 3D v2.39 — 3D print multitool workflow.
+// SHRINK 3D v2.40 — 3D print multitool workflow.
 (() => {
-  const VERSION = '2.39';
+  const VERSION = '2.40';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -262,6 +262,16 @@
 
         <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
           <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
+          <div class="v2-protect">
+            <div class="v2-protect-head">
+              <div><strong>Protect detail <em>(optional)</em></strong><small>Paint over faces, hands or fine ornament you don't want reduced.</small></div>
+              <button id="v2ProtectBtn" class="v2-protect-btn" type="button" aria-pressed="false">PROTECT DETAIL</button>
+            </div>
+            <div id="v2ProtectTools" class="v2-protect-tools" hidden>
+              <label>Brush size <input id="v2ProtectRadius" type="range" min="0.5" max="20" step="0.5" value="3"><output id="v2ProtectRadiusValue">3.0 mm</output></label>
+              <button id="v2ProtectClear" class="v2-protect-clear" type="button">CLEAR PAINT</button>
+            </div>
+          </div>
           <button id="v2ShrinkBtn" class="v2-mega v2-green" type="button">SHRINK IT</button>
           <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
           <div id="v2ShrinkResult" class="v2-result">SHRINK compares the reduced model with the original and stops before the difference should be visible.</div>
@@ -286,6 +296,23 @@
     $('v2HeightRange').addEventListener('input', () => { $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });
     $('v2FuseBtn').addEventListener('click', fuseCheck);
+    $('v2ProtectBtn').addEventListener('click', () => {
+      const native = $('protectBtn');
+      native?.click();
+      setTimeout(() => {
+        const on = !!native?.classList.contains('active');
+        $('v2ProtectBtn').classList.toggle('active', on);
+        $('v2ProtectBtn').setAttribute('aria-pressed', String(on));
+        $('v2ProtectBtn').textContent = on ? 'PAINTING ON' : 'PROTECT DETAIL';
+        $('v2ProtectTools').hidden = !on;
+      }, 30);
+    });
+    $('v2ProtectRadius').addEventListener('input', () => {
+      const v = $('v2ProtectRadius').value;
+      setNative('protectRadius', v, 'input');
+      $('v2ProtectRadiusValue').textContent = `${Number(v).toFixed(1)} mm`;
+    });
+    $('v2ProtectClear').addEventListener('click', () => $('protectClearBtn')?.click());
     $('v2ShrinkBtn').addEventListener('click', shrinkModel);
     $('v2SplitMode').addEventListener('change', chooseSplit);
     $('v2Joint').addEventListener('change', syncAdvancedToNative);
