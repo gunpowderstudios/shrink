@@ -1,9 +1,17 @@
-# SHRINK 3D v2.38
+# SHRINK 3D v2.39
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.39 — 3D Print multitool
+
+- **Printer & size** remains the setup step.
+- Fuse, SHRINK and Download are now presented as independent tools with no 2 / 3 / 4 sequence.
+- The interface says **USE ANY TOOL YOU NEED** so users can use one, two or all three actions in any order.
+- Underlying repair, reduction and export engines are unchanged.
+
 
 ## v2.38 — one 3D Print interface
 
