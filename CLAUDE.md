@@ -4,11 +4,27 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.31**
+- Current user-facing release: **v2.32**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## v2.32 P1 state
+The follow-up tidy-up after the v2.31 reliability work is complete.
+
+- Simple quality presets are triangle-target presets, not millimetre guarantees.
+- Compare/Tools may run the real surface-loss measurement; ordinary Simple does not.
+- `simple-mode.js` owns Simple reduction. Do not recreate click interception or fake saved-percentage state.
+- `simple-focus.js` was deleted.
+- Fine-tune must perform only one awaited reduction per settled change.
+- Clean models may exit immediately via **Download as it is**.
+- Failed automatic repair is a warning, not a prison: offer stronger repair, continue anyway, download as-is and Tools as appropriate.
+- A bypass must remain visibly warned; never relabel it as a passed health check.
+- Simple must not auto-Fuse on download.
+- `viewer-auto-button.js` is loaded only once from the page.
+
+The next architectural change should be the recipe/job-state flow behind a feature flag, not another Simple overlay. Browser-test Duric before switching the default flow.
 
 ## v2.31 P0 state
 The v2.30 review P0 cleanup is complete. Before adding a new workflow:
@@ -79,9 +95,9 @@ If conservative repair fails:
 - do not silently rebuild
 
 If stronger rebuild fails:
-- stop Simple mode
-- offer original download / Tools / re-upload
-- do not reduce a mesh SHRINK considers broken
+- warn clearly
+- offer **Continue anyway**, **Download as it is**, Tools and re-upload
+- if the user continues, keep the warning visible through the next stage
 
 Separate closed printable pieces are allowed. They do not have to be fused simply to continue.
 
@@ -93,9 +109,10 @@ Clean = no open edges, no tangled (3+) edges, no flipped edges. Empty/degenerate
 Do not reintroduce a second topology check with a different weld tolerance. Heavy repair/health work runs in `repair-worker.js` where supported. The repair graph (`repair-core.js`, `repair-worker.js`, `solid-rebuild.js`) uses cache key **2.27**, independently of the v2.18 engine graph.
 
 ### 2. Repair is also a standalone feature
-After a repair/rebuild succeeds, pause and allow:
+After a check/repair/rebuild completes, pause and allow:
 
-- **Download repaired STL**
+- **Download as it is** for an unchanged clean source
+- **Download repaired/rebuilt STL** after a fix
 - **Continue to printer & size**
 
 Someone should be able to use SHRINK only as a repair tool.
@@ -210,7 +227,6 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - `simple-wizard.css`
 - `simple-preflight.js`
 - `simple-postreduce.js`
-- `simple-focus.js`
 - `simple-mode.js`
 - `simple-mode.css`
 
