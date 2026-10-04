@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.36 — Simple Print preflight / repair gate */
+/* SHRINK 3D v2.37 — Simple Print preflight / repair gate */
 .simple-preflight-card{display:none;align-self:start;min-width:0;padding:22px;border:1px solid var(--sc-line);border-radius:18px;background:linear-gradient(180deg,rgba(18,21,24,.94),rgba(10,13,16,.91));box-shadow:0 22px 70px rgba(0,0,0,.46),inset 0 1px rgba(255,255,255,.025),0 0 40px rgba(57,229,140,.05);backdrop-filter:blur(12px) saturate(.92);-webkit-backdrop-filter:blur(12px) saturate(.92)}
 .app-mode-print.ui-simple.simple-preflight-blocked .simple-preflight-card{display:flex;flex-direction:column;gap:14px}
 .app-mode-print.ui-simple.simple-preflight-blocked #simpleCard{display:none!important}
