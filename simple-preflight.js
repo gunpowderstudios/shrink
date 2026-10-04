@@ -1,6 +1,6 @@
 // SHRINK 3D v2.22 — Simple Print preflight gate: check -> repair -> optional download -> workflow.
 (() => {
-  const RELEASE = '2.32';
+  const RELEASE = '2.33';
   const CORE = '2.18';           // engine graph (mesh-tools)
   const FIX = '2.27';            // repair graph: repair-core.js, repair-worker.js, solid-rebuild.js. Bump these three + their importers together.
   const $ = id => document.getElementById(id);
@@ -16,6 +16,7 @@
   let token = 0;
   let abort = null;
   let pendingFix = null;
+  let pendingView = null;
   let lastCheckedModel = null;
 
   function active() {
@@ -199,7 +200,8 @@ ${info?.message || ''}`;
 
   async function reopenRoot(root, suffix, fixKind) {
     const mod = await import(`./mesh-tools.js?v=${CORE}`);
-    const out = mod.buildBinaryStl({ THREE: app().THREE, model: root, mmPerUnit: 1, zUp: false });
+    pendingView = app()?.getViewState?.() || null;
+    const out = mod.buildBinaryStl({ THREE: app().THREE, model: root, mmPerUnit: 1, zUp: true });
     const file = new File([out.buffer], `${app()?.baseName?.() || 'model'}-${suffix}.stl`, { type: 'model/stl' });
     disposeRoot(root);
     const input = $('fileInput');
@@ -291,6 +293,8 @@ ${info?.message || ''}`;
   let openTimer = 0;
   function onModelOpened() {
     const fix = pendingFix; pendingFix = null;
+    const view = pendingView; pendingView = null;
+    if (view) requestAnimationFrame(() => app()?.restoreViewState?.(view));
     token++; abort?.abort?.();
     clearTimeout(openTimer);
     proceeded = false; lastCheckedModel = null; clearReadyChip(); state = 'checking'; info = null; busy = false; setBlocked(true);
