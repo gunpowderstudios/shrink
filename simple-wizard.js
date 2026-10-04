@@ -1,6 +1,6 @@
-// SHRINK 3D v2.35 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
+// SHRINK 3D v2.36 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
 (() => {
-  const RELEASE = '2.35';
+  const RELEASE = '2.36';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const simple = () => window.__shrinkSimple;
