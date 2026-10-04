@@ -4,11 +4,22 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.33**
+- Current user-facing release: **v2.34**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## v2.34 fixed layout rules
+The draggable/dockable panel experiment from v2.28–v2.33 has been removed.
+
+- `panel-layout.js` and `panel-layout.css` no longer exist.
+- Do not reintroduce drag bars, panel-side localStorage, body-wide layout observers or JavaScript viewport-height managers without a new explicit design decision.
+- Desktop Simple mode is fixed two-column: Controls/Check-Repair left, Viewer right.
+- `simple-wizard.css` owns desktop workspace sizing using CSS only.
+- Both columns share the same browser-relative height.
+- Controls/preflight may scroll internally; the page should remain ordinary document flow rather than being force-locked by JavaScript.
+- Keep v2.33 camera/view preservation and orientation fixes independent of layout.
 
 ## v2.33 viewer stability rules
 The Duric browser video exposed three UI/viewer problems and v2.33 fixes them without changing geometry algorithms.
@@ -198,22 +209,12 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - The outer card stretches to 100% height; content stays top-aligned and scrolls internally when needed.
 - This rule is separate from mobile behaviour.
 
-## Desktop viewport sizing
-- Desktop workspace height is dynamic, not a fixed pixel cap.
-- `panel-layout.js` measures each active workspace's actual `getBoundingClientRect().top` and sets `--shrink-workspace-height` to the remaining viewport height.
-- Simple controls and viewer must both stretch to this height; controls may scroll internally.
-- Do not reintroduce the old `max-height:900px` cap.
-- Resize events recalculate the workspace so different desktop/laptop screens fit neatly.
-- Mobile sizing rules remain separate.
-
-## Dockable panel layout
-- Desktop Controls and Viewer are intentionally user-reorderable via `panel-layout.js` / `panel-layout.css`.
-- Preference key: `shrink-panel-side` with values `left` or `right`.
-- Do not hard-code the viewer or controls permanently to one desktop side.
-- Game mode uses the native `#workspace` grid.
-- Simple Print uses explicit columns in `.v2-top-grid` so dynamically inserted preflight/control cards stay together opposite the viewer.
-- Mobile remains stacked; drag handles are hidden at <=900px.
-- This is UI-only. Do not couple panel placement to repair/reduction state.
+## Desktop layout
+- Fixed desktop two-column layout only.
+- Controls / Check-Repair are on the left; Viewer is on the right.
+- `simple-wizard.css` sizes the loaded Simple workspace with CSS (`100dvh` relative), with an internal scroll on control cards.
+- No JavaScript should continuously calculate workspace height.
+- No user-reorderable dock system is currently supported.
 
 ## Game viewer layout
 - The navigation hint (**Drag to rotate · Scroll to zoom · Right-drag to pan**) belongs inside the 3D viewer canvas.
@@ -226,16 +227,14 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - After a real reduction completes, Original/Reduced and Compare can appear.
 - Reduced print preview normals must be recomputed after connectivity changes so the model does not appear artificially dark.
 - Once a model is loaded on desktop, the header/branding should collapse to reclaim height.
-- Viewer and controls may be on either side according to the saved dock preference.
-- Simple control panel scrolls internally on whichever side the user has docked it; the loaded desktop page itself should not scroll.
+- Viewer stays in the fixed right-hand desktop column in Simple Print mode.
+- Simple control/preflight cards scroll internally within the fixed left-hand column when needed.
 - Avoid large dead vertical gaps.
 - Mobile warning is intentionally cheeky but non-blocking.
 
 ## Important files
 
 ### Current Simple workflow layer
-- `panel-layout.js`
-- `panel-layout.css`
 - `simple-wizard.js`
 - `simple-wizard.css`
 - `simple-preflight.js`
