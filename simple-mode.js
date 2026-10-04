@@ -161,7 +161,7 @@
   async function doShrink(result) {
     const live = window.__shrinkLiveUI;
     const engine = window.__shrinkLive;
-    if (!live?.autoFind || !engine?.runExact) throw new Error('The shrink engine is still loading. Give it a moment and try again.');
+    if (!live || !engine?.runExact) throw new Error('The shrink engine is still loading. Give it a moment and try again.');
     await waitFor(() => live.state?.tris > 0 && engine.ready, 12000);
     if (!(live.state?.tris > 0) || !engine.ready) throw new Error('Your model is still being prepared. Give it a moment and try again.');
 
@@ -477,7 +477,7 @@
     const blob = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' });
     const a = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    a.href = url; a.download = `shrink-settings-${data.printer.kind}-${data.detail.mm}mm.json`;
+    a.href = url; a.download = `shrink-settings-${data.printer.kind}-${S.detail}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     setStatusLine(`Saved ${a.download}`, false);
