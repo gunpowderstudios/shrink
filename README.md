@@ -1,4 +1,4 @@
-# SHRINK 3D v2.34
+# SHRINK 3D v2.35
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
@@ -6,8 +6,18 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.34 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.35 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
+
+## v2.35 natural-height layout
+This release tunes the fixed desktop layout to match the cleaner pre-dock composition.
+
+- Controls / Check-Repair remain on the left but use **natural content height** instead of stretching to the viewer.
+- The 3D viewer remains the large visual area on the right and uses a tall browser-relative height.
+- Desktop split is roughly **32% controls / 68% viewer**.
+- Normal page scrolling is allowed.
+- No JavaScript viewport sizing, draggable modules or equal-height panel forcing.
+- Engine, repair/reduction logic, orientation and camera-preservation behaviour are unchanged.
 
 ## v2.34 layout reset
 The draggable/dockable desktop module experiment introduced in v2.28 has been removed.
