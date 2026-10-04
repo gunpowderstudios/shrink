@@ -1,7 +1,8 @@
 // SHRINK 3D v2.18 — rebuild a messy model as one watertight solid (runs in a worker; main-thread fallback).
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-const VERSION = '2.18';
+const VERSION = '2.18';          // rebuild graph (solid-core.js, remesh-worker.js)
+const FIX = '2.27';              // repair graph (repair-core.js, repair-worker.js, this file)
 
 export function gatherWorldMesh(model) {
   model.updateMatrixWorld(true);
@@ -26,7 +27,7 @@ export function gatherWorldMesh(model) {
       positions[(vo + i) * 3] = v.x; positions[(vo + i) * 3 + 1] = v.y; positions[(vo + i) * 3 + 2] = v.z;
     }
     const count = g.index ? g.index.count : pos.count;
-    const flip = mesh.matrixWorld.determinant() < 0;      // mirrored parts have reversed winding
+    const flip = mesh.matrixWorld.determinant() < 0;
     for (let t = 0; t + 2 < count && io + 2 < indices.length + 0; t += 3) {
       const a = g.index ? g.index.getX(t) : t, b = g.index ? g.index.getX(t + 1) : t + 1, c = g.index ? g.index.getX(t + 2) : t + 2;
       indices[io++] = a + vo; indices[io++] = flip ? c + vo : b + vo; indices[io++] = flip ? b + vo : c + vo;
@@ -80,7 +81,6 @@ async function runOnMainThread(job, onStatus) {
   return { positions: r.positions, indices: r.indices, stats: r.stats };
 }
 
-// Returns { root, stats }. `detailUnits` is the smallest detail to keep, in model units (0 = automatic).
 export async function rebuildSolid(model, { detailUnits = 0, maxCells = 30e6, maxTris = 300000, onStatus, signal } = {}) {
   const { positions, indices } = gatherWorldMesh(model);
   const job = { data: { positions, indices, detailUnits, maxCells, maxTris }, transfer: [positions.buffer, indices.buffer] };
@@ -88,8 +88,53 @@ export async function rebuildSolid(model, { detailUnits = 0, maxCells = 30e6, ma
   try { result = await runInWorker(job, onStatus, signal); }
   catch (err) {
     if (err?.code !== 'WORKER_UNAVAILABLE') throw err;
-    const again = gatherWorldMesh(model);   // the first copy was handed to the worker
+    const again = gatherWorldMesh(model);
     result = await runOnMainThread({ data: { positions: again.positions, indices: again.indices, detailUnits, maxCells, maxTris } }, onStatus);
   }
   return { root: buildRoot(result.positions, result.indices, result.stats), stats: result.stats };
+}
+
+/* ----------------------------- repair + health, off the main thread ----------------------------- */
+function runRepairWorker(message, transfer, { onStatus, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(Object.assign(new Error('Cancelled.'), { code: 'CANCELLED' })); return; }
+    let worker;
+    try { worker = new Worker(new URL(`./repair-worker.js?v=${FIX}`, import.meta.url), { type: 'module' }); }
+    catch { reject(Object.assign(new Error('worker-unavailable'), { code: 'WORKER_UNAVAILABLE' })); return; }
+    const done = () => { try { worker.terminate(); } catch {} };
+    signal?.addEventListener?.('abort', () => { done(); reject(Object.assign(new Error('Cancelled.'), { code: 'CANCELLED' })); }, { once: true });
+    worker.onmessage = e => {
+      const m = e.data;
+      if (m.type === 'progress') onStatus?.(m.text, m.pct);
+      else if (m.type === 'done') { done(); resolve(m); }
+      else if (m.type === 'error') { done(); reject(new Error(m.message)); }
+    };
+    worker.onerror = ev => { done(); reject(Object.assign(new Error(ev?.message || 'The background worker failed to start.'), { code: 'WORKER_UNAVAILABLE' })); };
+    worker.postMessage(message, transfer);
+  });
+}
+
+export async function repairAsync(model, { onStatus, signal } = {}) {
+  const { positions, indices } = gatherWorldMesh(model);
+  let result;
+  try { result = await runRepairWorker({ type: 'repair', positions, indices }, [positions.buffer, indices.buffer], { onStatus, signal }); }
+  catch (err) {
+    if (err?.code !== 'WORKER_UNAVAILABLE') throw err;
+    onStatus?.('Your browser cannot use a background worker, so the page may pause for a moment…', 2);
+    const core = await import(`./repair-core.js?v=${FIX}`);
+    const again = gatherWorldMesh(model);
+    result = core.repairMesh({ positions: again.positions, indices: again.indices, onProgress: (pct, text) => onStatus?.(text, pct) });
+  }
+  return { root: buildRoot(result.positions, result.indices, result.stats), stats: result.stats };
+}
+
+export async function healthAsync(model, { signal } = {}) {
+  const { positions, indices } = gatherWorldMesh(model);
+  try { return (await runRepairWorker({ type: 'health', positions, indices }, [positions.buffer, indices.buffer], { signal })).health; }
+  catch (err) {
+    if (err?.code !== 'WORKER_UNAVAILABLE') throw err;
+    const core = await import(`./repair-core.js?v=${FIX}`);
+    const again = gatherWorldMesh(model);
+    return core.meshHealth(again.positions, again.indices);
+  }
 }
