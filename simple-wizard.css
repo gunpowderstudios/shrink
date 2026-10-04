@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.32 — Simple Print wizard polish */
+/* SHRINK 3D v2.33 — Simple Print wizard polish */
 
 /* Four clear stages: check -> printer/size -> reduce -> download. */
 .app-mode-print.ui-simple #simpleCard .sc-stepper{
@@ -108,7 +108,7 @@
   }
   .app-mode-print.ui-simple.simple-has-model .v2-top-grid{
     height:var(--shrink-workspace-height, calc(100dvh - 128px))!important;
-    min-height:360px!important;
+    min-height:0!important;
     max-height:none!important;
     align-items:stretch!important;
     overflow:hidden;
