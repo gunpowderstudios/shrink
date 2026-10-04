@@ -2,6 +2,16 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.26 — Game viewer controls separated
+
+### Fixed
+- Moved the **Drag to rotate · Scroll to zoom · Right-drag to pan** help pill inside the actual 3D viewer area.
+- Kept the large red **Find the smallest that still looks the same** action in its own row below the viewer.
+- Prevents the help text and action button overlapping in Game mode.
+- Loaded the viewer layout helper with its own v2.26 cache key without retagging the v2.18 core engine graph.
+
+---
+
 ## v2.25 — Simplify and stay responsive
 
 ### Changed
