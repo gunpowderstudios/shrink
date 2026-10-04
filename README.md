@@ -1,4 +1,4 @@
-# SHRINK 3D v2.30
+# SHRINK 3D v2.31
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
@@ -6,8 +6,20 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.30 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.31 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
+
+## v2.31 reliability cleanup
+This release completes the P0 cleanup from the v2.30 architecture review before any new Simple workflow is attempted.
+
+- Restored broad repair regression coverage and added GitHub Actions CI.
+- Simple Print skips the expensive BVH visual-loss measurement during ordinary reductions; Compare remains the explicit exception.
+- Simple waits for the reducer's actual completion instead of polling UI labels.
+- Simple mesh validation uses the shared v2.27 `meshHealth` worker path; Manifold is reserved for deliberate Fuse/Split operations.
+- Export diagnostics now use the same shared mesh-health definition.
+- `index.html` is the sole owner of the visible release badge.
+- User-facing navigation consistently says **Tools**, and the main reduction action says **Make smaller**.
+- The underlying reducer/core engine remains v2.18; the repair graph remains v2.27.
 
 ## v2.30 full-height repair module
 The Step 1 Check/Repair card now explicitly stretches to the full desktop module height, matching the 3D viewer. Its controls stay at the top and the card scrolls internally if needed. This removes the old `align-self:start` rule that could make the repair panel stop halfway down the workspace.
