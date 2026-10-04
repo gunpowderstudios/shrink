@@ -1,4 +1,4 @@
-# SHRINK 3D v2.32
+# SHRINK 3D v2.33
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
@@ -6,8 +6,22 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.32 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.33 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
+
+## v2.33 viewer stability
+This release keeps the 3D workspace calm while repair and reduction run.
+
+- Repaired/rebuilt internal geometry is now exported as a normal Z-up STL before SHRINK reopens it, so the model does not rotate between stages.
+- Camera position, OrbitControls target and zoom are saved before an internal repair/rebuild reopen and restored afterwards.
+- While Simple reduction runs, the live reduced preview stays visible; the wizard no longer switches back to Original between updates.
+- Repeated requests to show the model already on screen are idempotent.
+- Loaded Simple desktop mode is locked to the browser viewport. The page itself does not need vertical scrolling; the controls module scrolls internally.
+- Workspace height is clamped to the visible viewport so previous page scroll cannot make the viewer taller than the browser.
+- Removed the permanent whole-document MutationObserver from the dock/layout layer. Mounting now uses short startup retries plus explicit workflow events.
+- No reducer or repair algorithm changed.
+
+The reducer/core algorithm graph remains v2.18 and the repair graph remains v2.27. `app.js?v=2.33` is a viewer/app-shell cache key for these display changes.
 
 ## v2.32 P1 tidy-up
 This release removes more legacy Simple-mode glue before the proposed recipe/job-state UI is built.
