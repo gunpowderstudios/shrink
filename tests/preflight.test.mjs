@@ -57,7 +57,7 @@ const state = async (want, ms = 4000) => { for (let t = 0; t < ms; t += 25) { if
 current = withEmptyTriangles(messy(false)); w.dispatchEvent(new w.CustomEvent('shrink:model-opened'));
 ok(await state('ready'), 'a clean model that only has empty triangles passes the check (state: ' + pf().state + ')');
 ok($('spTitle').textContent === 'Model check passed' && /empty triangles \(harmless\): [1-9]/.test($('spTech').textContent), 'it says so and lists the empty triangles as harmless: ' + $('spTech').textContent.slice(0, 120));
-ok($('[data-sp-act="download-ready"]')?.textContent === 'Download as it is', 'a clean model can be downloaded unchanged without reducing');
+ok(w.document.querySelector('[data-sp-act="download-ready"]')?.textContent === 'Download as it is', 'a clean model can be downloaded unchanged without reducing');
 
 current = messy(true); w.dispatchEvent(new w.CustomEvent('shrink:model-opened'));
 ok(await state('needs'), 'a messy model is sent to repair (state: ' + pf().state + ')');
