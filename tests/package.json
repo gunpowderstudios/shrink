@@ -1,0 +1,7 @@
+{
+  "name": "shrink-3d-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node run-all.mjs" },
+  "devDependencies": { "jsdom": "^26.0.0", "three": "0.180.0", "manifold-3d": "3.5.4" }
+}
