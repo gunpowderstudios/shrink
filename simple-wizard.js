@@ -1,6 +1,6 @@
-// SHRINK 3D v2.31 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
+// SHRINK 3D v2.32 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
 (() => {
-  const RELEASE = '2.31';
+  const RELEASE = '2.32';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const simple = () => window.__shrinkSimple;
@@ -11,7 +11,6 @@
 
   import(`./simple-preflight.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Model preflight did not load`, err));
   import(`./simple-postreduce.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Post-reduction mesh check did not load`, err));
-  import(`./simple-focus.js?v=${RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${RELEASE}] Simple performance/layout layer did not load`, err));
 
   function addCss() {
     if (document.querySelector('link[data-shrink-simple-wizard]')) return;
@@ -82,13 +81,13 @@
     text(sub, 'Now that the model is healthy, tell SHRINK how you want to print it.');
 
     const go = $('scGo');
-    text(go, '✨ SHRINK MY MODEL');
+    text(go, 'Make smaller');
     const fine = go?.nextElementSibling;
     if (fine?.classList.contains('sc-fine')) {
       text(fine, 'Makes a sensible smaller print mesh, checks it stays clean, then checks it fits.');
     }
     const loaded = $('scLoadedNext');
-    if (loaded) loaded.innerHTML = 'Now press <b>SHRINK MY MODEL</b> below to use them.';
+    if (loaded) loaded.innerHTML = 'Now press <b>Make smaller</b> below to use them.';
   }
 
   function syncWorkingCopy() {
@@ -104,6 +103,10 @@
   function refreshReducedShading() {
     if (!active() || simple()?.state?.stage !== 'result') return;
     window.__shrinkPostReduce?.refreshNormals?.(app()?.optimizedModel);
+  }
+
+  function syncLoadedClass() {
+    body.classList.toggle('simple-has-model', active() && !!app()?.originalModel);
   }
 
   function syncViewer() {
@@ -136,6 +139,7 @@
       syncStepper(card);
       syncSetupCopy(card);
       syncWorkingCopy();
+      syncLoadedClass();
       syncViewer();
     } finally {
       syncing = false;
