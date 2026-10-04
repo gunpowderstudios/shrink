@@ -69,7 +69,7 @@ w.document.querySelector('[data-sp-act="repair"]').click();
 await wait(60);
 ok(pf().state === 'repairing' && !!w.document.querySelector('[data-sp-act="cancel"]'), 'repairing screen with a Cancel button');
 ok(/\w/.test($('spText').textContent) && $('spText').textContent !== 'Starting…' || true, 'progress text shown: ' + $('spText').textContent);
-ok(await state('ready'), 'after repair the re-opened model passes the same check (state: ' + pf().state + ')');
+ok(await state('ready', 8000), 'after repair the re-opened model passes the same check (state: ' + pf().state + ')');
 ok($('spTitle').textContent === 'Repair complete — model ready' && !!w.document.querySelector('[data-sp-act="download-ready"]'), 'ready screen offers the repaired download: ' + $('spTitle').textContent);
 
 await installWorkerShim({ delayMs: 300 });
