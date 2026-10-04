@@ -1,12 +1,21 @@
-# SHRINK 3D v2.36
+# SHRINK 3D v2.38
 
-Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
+Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
 
+## v2.38 — one 3D Print interface
+
+- Removed the Simple / Tools switch.
+- The full print dashboard is now the only 3D Print interface.
+- Keeps the four practical sections: **Printer & size**, **Fuse / repair**, **SHRINK**, and **Download / split**.
+- The Simple-mode controller and wizard are no longer loaded, so they cannot compete with the print dashboard layout.
+- Underlying repair, reduction and export engines are unchanged.
+
+
 ## Versioning
-The current **core engine graph is v2.18**. v2.36 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
+The proven repair, reduction and export engines are unchanged. v2.38 removes the separate Simple/Tools presentation split and uses the full print dashboard as the only 3D Print interface.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
 
 ## v2.36 Oct 3 layout restore
