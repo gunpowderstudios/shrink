@@ -1,6 +1,6 @@
-// SHRINK 3D v2.33 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
+// SHRINK 3D v2.34 — Simple Print wizard: Check/Repair -> Printer & size -> Reduce -> Prepare/Download.
 (() => {
-  const RELEASE = '2.33';
+  const RELEASE = '2.34';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const simple = () => window.__shrinkSimple;
@@ -106,10 +106,7 @@
   }
 
   function syncLoadedClass() {
-    const loaded = active() && !!app()?.originalModel;
-    const changed = body.classList.contains('simple-has-model') !== loaded;
-    body.classList.toggle('simple-has-model', loaded);
-    if (changed) requestAnimationFrame(() => window.__shrinkPanelLayout?.resize?.());
+    body.classList.toggle('simple-has-model', active() && !!app()?.originalModel);
   }
 
   function syncViewer() {
