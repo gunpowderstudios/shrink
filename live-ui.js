@@ -130,7 +130,17 @@ function judge(stats) {
   return { level, text, nums, p95, detail };
 }
 
+function shouldSkipMeasure() {
+  return mode() === 'print' && window.__shrinkSkipMeasure === true && !app()?.isCompare?.();
+}
+
 function scheduleMeasure(delay = 450) {
+  if (shouldSkipMeasure()) {
+    clearTimeout(S.measureTimer);
+    ++S.measureToken; // invalidate an in-flight measurement result
+    setVerdict('good', 'Using the selected print-quality target', '');
+    return;
+  }
   clearTimeout(S.measureTimer);
   setVerdict('busy', 'Checking what changed…');
   S.measureTimer = setTimeout(doMeasure, delay);
@@ -230,6 +240,9 @@ async function autoFind() {
 }
 el.auto?.addEventListener('click', autoFind);
 
+// Simple mode normally skips the expensive BVH quality measurement. Compare is the explicit exception.
+$('compareBtn')?.addEventListener('click', () => setTimeout(() => scheduleMeasure(0), 0));
+
 /* ---------------- engine events ---------------- */
 window.addEventListener('shrink:live-busy', e => { S.busy = !!e.detail.busy; updateLiveLine(S.lastLive?.triangles); });
 window.addEventListener('shrink:live-error', e => say(`Live preview problem: ${e.detail.message}`, true));
@@ -274,4 +287,4 @@ window.addEventListener('shrink:optimized', e => {
     : `<b>Kept:</b> textures (resized to ${el.textureSize?.value}px${el.webp?.checked ? ', WebP' : ''}), UV maps and smooth shading. <b>Removed:</b> unused materials and data${el.meshopt?.checked ? ' · mesh compressed (Meshopt)' : ''}.`;
 });
 
-window.__shrinkLiveUI = { strictKey, autoFind, chooseTarget, setRatio, state: S, measureLoss };
+window.__shrinkLiveUI = { strictKey, autoFind, chooseTarget, setRatio, state: S, measureLoss, scheduleMeasure };
