@@ -1,7 +1,7 @@
-// SHRINK 3D v2.28 — dockable desktop workspace panels.
+// SHRINK 3D v2.33 — dockable desktop workspace panels.
 // Controls/viewer may be swapped left/right. Preference is stored per browser.
 (() => {
-  const RELEASE = '2.29';
+  const RELEASE = '2.33';
   const KEY = 'shrink-panel-side';
   const body = document.body;
   const $ = s => document.querySelector(s);
@@ -16,24 +16,40 @@
     try { localStorage.setItem(KEY, side); } catch {}
   }
 
-  function sizeDesktopWorkspace() {
-    if (window.innerWidth <= 900) return;
+  const heightCache = new WeakMap();
 
-    const simpleGrid = document.querySelector('.app-mode-print.ui-simple .v2-top-grid');
-    if (simpleGrid && !simpleGrid.closest('[hidden]')) {
-      const top = simpleGrid.getBoundingClientRect().top;
-      const available = Math.max(360, Math.floor(window.innerHeight - top - 10));
-      simpleGrid.style.setProperty('--shrink-workspace-height', available + 'px');
-    }
-
-    const native = document.getElementById('workspace');
-    if (native && !native.classList.contains('hidden') && !document.body.classList.contains('print-v2-active')) {
-      const top = native.getBoundingClientRect().top;
-      const available = Math.max(360, Math.floor(window.innerHeight - top - 10));
-      native.style.setProperty('--shrink-workspace-height', available + 'px');
-    }
+  function setWorkspaceHeight(el) {
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const top = Math.max(0, Math.min(window.innerHeight - 1, rect.top));
+    const available = Math.max(220, Math.min(window.innerHeight - 8, Math.floor(window.innerHeight - top - 8)));
+    if (Math.abs((heightCache.get(el) || 0) - available) < 2) return;
+    heightCache.set(el, available);
+    el.style.setProperty('--shrink-workspace-height', available + 'px');
   }
 
+  function sizeDesktopWorkspace() {
+    if (window.innerWidth <= 900) {
+      document.documentElement.classList.remove('shrink-app-locked');
+      return;
+    }
+
+    const simpleLoaded = body.classList.contains('app-mode-print') && body.classList.contains('ui-simple') && body.classList.contains('simple-has-model');
+    document.documentElement.classList.toggle('shrink-app-locked', simpleLoaded);
+    if (simpleLoaded && window.scrollY !== 0) {
+      window.scrollTo(0, 0);
+      requestAnimationFrame(sizeDesktopWorkspace);
+      return;
+    }
+
+    const simpleGrid = document.querySelector('.app-mode-print.ui-simple .v2-top-grid');
+    if (simpleGrid && !simpleGrid.closest('[hidden]')) setWorkspaceHeight(simpleGrid);
+
+    const native = document.getElementById('workspace');
+    if (native && !native.classList.contains('hidden') && !body.classList.contains('print-v2-active')) setWorkspaceHeight(native);
+  }
+
+  let appliedSide = null;
   function apply() {
     body.classList.toggle('panels-controls-left', side === 'left');
     body.classList.toggle('panels-controls-right', side === 'right');
@@ -43,8 +59,11 @@
       bar.title = `${role === 'controls' ? 'Controls' : 'Viewer'} currently on the ${where}. Drag or click to swap sides.`;
       bar.setAttribute('aria-label', bar.title);
     });
-    window.dispatchEvent(new CustomEvent('shrink:panel-layout', { detail: { controls: side } }));
-    requestAnimationFrame(() => { sizeDesktopWorkspace(); window.dispatchEvent(new Event('resize')); });
+    if (appliedSide !== side) {
+      appliedSide = side;
+      window.dispatchEvent(new CustomEvent('shrink:panel-layout', { detail: { controls: side } }));
+    }
+    requestAnimationFrame(sizeDesktopWorkspace);
   }
 
   function swap() {
@@ -54,7 +73,7 @@
   }
 
   function makeBar(host, role) {
-    if (!host || host.querySelector(':scope > .module-dragbar')) return;
+    if (!host || host.querySelector(':scope > .module-dragbar')) return false;
     const bar = document.createElement('button');
     bar.type = 'button';
     bar.className = 'module-dragbar';
@@ -75,6 +94,7 @@
       document.querySelectorAll('.module-drop-target').forEach(x => x.classList.remove('module-drop-target'));
     });
     host.insertBefore(bar, host.firstChild);
+    return true;
   }
 
   function wireDrop(host) {
@@ -99,40 +119,50 @@
   }
 
   function install() {
+    let changed = false;
+
     // Game/Tools native workspace.
     const nativeControls = $('#workspace > .control-panel');
     const nativeViewer = $('#workspace > .viewer-panel');
-    makeBar(nativeControls, 'controls');
-    makeBar(nativeViewer, 'viewer');
+    changed = makeBar(nativeControls, 'controls') || changed;
+    changed = makeBar(nativeViewer, 'viewer') || changed;
     wireDrop(nativeControls);
     wireDrop(nativeViewer);
 
     // Print dashboard viewer.
     const viewerSlot = $('.print-v2-dashboard .v2-viewer-slot');
     const printViewer = viewerSlot?.querySelector('.viewer-panel');
-    makeBar(printViewer, 'viewer');
+    changed = makeBar(printViewer, 'viewer') || changed;
     wireDrop(viewerSlot || printViewer);
 
     // Simple Print controls can be either the normal card or the preflight card.
     const simpleCard = $('#simpleCard');
     const preflight = $('#simplePreflightCard');
-    makeBar(simpleCard, 'controls');
-    makeBar(preflight, 'controls');
+    changed = makeBar(simpleCard, 'controls') || changed;
+    changed = makeBar(preflight, 'controls') || changed;
     wireDrop(simpleCard);
     wireDrop(preflight);
 
-    apply();
-    sizeDesktopWorkspace();
+    if (changed || appliedSide === null) apply();
+    else sizeDesktopWorkspace();
   }
 
   window.addEventListener('resize', () => requestAnimationFrame(sizeDesktopWorkspace));
 
-  const observer = new MutationObserver(() => requestAnimationFrame(install));
-  observer.observe(document.body, { childList: true, subtree: true });
+  // Retry briefly while the async UI modules mount, then stop. Do not observe the
+  // whole DOM forever: status text/result changes must not resize the viewer.
+  let tries = 0;
+  const boot = setInterval(() => {
+    install();
+    if (++tries >= 100) clearInterval(boot);
+  }, 100);
+  setTimeout(() => clearInterval(boot), 10000);
 
   window.addEventListener('shrink:model-opened', () => setTimeout(install, 80));
   window.addEventListener('shrink:ui-mode', () => setTimeout(install, 30));
   window.addEventListener('shrink:ui-level', () => setTimeout(install, 30));
+  window.addEventListener('shrink:preflight-ready', () => setTimeout(install, 30));
+  window.addEventListener('shrink:preflight-continued', () => setTimeout(install, 30));
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true });
   else install();
