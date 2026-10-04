@@ -2,6 +2,22 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.28 — Dockable left/right panels
+
+### Added
+- Desktop **Controls** and **3D viewer** now behave like dockable modules.
+- Drag one module onto the other to swap left/right.
+- Clicking the small ↔ module strip also swaps sides.
+- Layout choice is saved in `localStorage`, so each browser/user can keep a personal preference.
+- Works in Game mode and Simple Print mode.
+- Mobile/tablet layouts remain stacked and ignore the left/right preference.
+
+### Architecture
+- Added `panel-layout.js` and `panel-layout.css`.
+- No repair/reduction engine code changed.
+
+---
+
 ## v2.27 — One definition of "clean", and repair off the main thread
 
 ### Fixed
