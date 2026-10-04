@@ -1,6 +1,6 @@
-// SHRINK 3D v2.00 — simplified home-user print workflow.
+// SHRINK 3D v2.39 — 3D print multitool workflow.
 (() => {
-  const VERSION = '2.18';
+  const VERSION = '2.39';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -216,12 +216,9 @@
     dashboard.dataset.printerType = 'resin';
     dashboard.dataset.quality = 'standard';
     dashboard.innerHTML = `
-      <div class="v2-progress">
-        <div class="v2-progress-line"><i id="v2ProgressFill"></i></div>
-        <div class="v2-progress-step active"><b>1</b><span><strong>Printer & size</strong><small>Tell us what you're making</small></span></div>
-        <div class="v2-progress-step"><b>2</b><span><strong>Fuse it baby!</strong><small>Make one clean solid</small></span></div>
-        <div class="v2-progress-step"><b>3</b><span><strong>SHRINK my model</strong><small>Keep the detail, lose the bulk</small></span></div>
-        <div class="v2-progress-step"><b>4</b><span><strong>Download</strong><small>Split, peg and export</small></span></div>
+      <div class="v2-setup-strip">
+        <span class="v2-setup-badge">1</span>
+        <div><strong>Set up your print</strong><small>Choose the printer, size and quality first.</small></div>
       </div>
 
       <div class="v2-top-grid">
@@ -248,9 +245,15 @@
         <div class="v2-viewer-slot"></div>
       </div>
 
+      <div class="v2-tool-intro">
+        <span>3D PRINT MULTITOOL</span>
+        <strong>USE ANY TOOL YOU NEED</strong>
+        <small>Fuse it, shrink it, download it — use one, two or all three.</small>
+      </div>
+
       <div class="v2-action-grid">
         <section id="v2FuseCard" class="v2-card v2-action-card v2-fuse-card">
-          <div class="v2-card-head"><span class="v2-num">2</span><div><h2>Fuse it baby!</h2><p>Fix common mesh problems and check it can become one printable solid.</p></div></div>
+          <div class="v2-card-head"><div><h2>Fuse it baby!</h2><p>Fix common mesh problems and check it can become one printable solid.</p></div></div>
           <button id="v2FuseBtn" class="v2-mega v2-purple" type="button">🔗 FUSE IT BABY!</button>
           <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
           <div id="v2FuseResult" class="v2-result">SHRINK will try the quick repair first. If the model is stubborn, you'll get a simple Make watertight option.</div>
@@ -258,7 +261,7 @@
         </section>
 
         <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
-          <div class="v2-card-head"><span class="v2-num">3</span><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
+          <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
           <button id="v2ShrinkBtn" class="v2-mega v2-green" type="button">✨ SHRINK MY MODEL</button>
           <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
           <div id="v2ShrinkResult" class="v2-result">SHRINK compares the reduced model with the original and stops before the difference should be visible.</div>
@@ -266,7 +269,7 @@
         </section>
 
         <section class="v2-card v2-action-card v2-download-card">
-          <div class="v2-card-head"><span class="v2-num">4</span><div><h2>Download</h2><p>Save one STL, or split it into printable sections with pegs.</p></div></div>
+          <div class="v2-card-head"><div><h2>Download</h2><p>Save one STL, or split it into printable sections with pegs.</p></div></div>
           <div class="v2-download-options"><label>Split into<select id="v2SplitMode"><option value="off">One STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">Auto by maximum height</option></select></label><label>Joint<select id="v2Joint"><option value="pegs">Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label></div>
           <div id="v2CutWrap" class="v2-cut-row" hidden><div><span>Cut height</span><strong id="v2CutLabel">50%</strong></div><input id="v2Cut" type="range" min="10" max="90" step="0.5" value="50"></div>
           <button id="v2DownloadBtn" class="v2-mega v2-red" type="button">⬇ DOWNLOAD STL</button>
