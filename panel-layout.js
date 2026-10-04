@@ -1,7 +1,7 @@
 // SHRINK 3D v2.28 — dockable desktop workspace panels.
 // Controls/viewer may be swapped left/right. Preference is stored per browser.
 (() => {
-  const RELEASE = '2.28';
+  const RELEASE = '2.29';
   const KEY = 'shrink-panel-side';
   const body = document.body;
   const $ = s => document.querySelector(s);
@@ -16,6 +16,24 @@
     try { localStorage.setItem(KEY, side); } catch {}
   }
 
+  function sizeDesktopWorkspace() {
+    if (window.innerWidth <= 900) return;
+
+    const simpleGrid = document.querySelector('.app-mode-print.ui-simple .v2-top-grid');
+    if (simpleGrid && !simpleGrid.closest('[hidden]')) {
+      const top = simpleGrid.getBoundingClientRect().top;
+      const available = Math.max(360, Math.floor(window.innerHeight - top - 10));
+      simpleGrid.style.setProperty('--shrink-workspace-height', available + 'px');
+    }
+
+    const native = document.getElementById('workspace');
+    if (native && !native.classList.contains('hidden') && !document.body.classList.contains('print-v2-active')) {
+      const top = native.getBoundingClientRect().top;
+      const available = Math.max(360, Math.floor(window.innerHeight - top - 10));
+      native.style.setProperty('--shrink-workspace-height', available + 'px');
+    }
+  }
+
   function apply() {
     body.classList.toggle('panels-controls-left', side === 'left');
     body.classList.toggle('panels-controls-right', side === 'right');
@@ -26,7 +44,7 @@
       bar.setAttribute('aria-label', bar.title);
     });
     window.dispatchEvent(new CustomEvent('shrink:panel-layout', { detail: { controls: side } }));
-    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    requestAnimationFrame(() => { sizeDesktopWorkspace(); window.dispatchEvent(new Event('resize')); });
   }
 
   function swap() {
@@ -104,7 +122,10 @@
     wireDrop(preflight);
 
     apply();
+    sizeDesktopWorkspace();
   }
+
+  window.addEventListener('resize', () => requestAnimationFrame(sizeDesktopWorkspace));
 
   const observer = new MutationObserver(() => requestAnimationFrame(install));
   observer.observe(document.body, { childList: true, subtree: true });
