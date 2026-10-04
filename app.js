@@ -174,14 +174,19 @@ function applyWireframe(model, enabled) {
 }
 
 function showModel(model, which, reframe = true) {
+  if (!model) return;
+  if (!compareOn && currentModel === model && currentWhich === which) {
+    els.showOriginalBtn.classList.toggle('active', which === 'original');
+    els.showOptimizedBtn.classList.toggle('active', which === 'optimized');
+    if (reframe) frameModel(model);
+    return;
+  }
   if (compareOn) leaveCompare();
   if (currentModel) scene.remove(currentModel);
   currentModel = model;
   currentWhich = which;
-  if (currentModel) {
-    applyWireframe(currentModel, wireframeEnabled);
-    scene.add(currentModel);
-  }
+  applyWireframe(currentModel, wireframeEnabled);
+  scene.add(currentModel);
   els.showOriginalBtn.classList.toggle('active', which === 'original');
   els.showOptimizedBtn.classList.toggle('active', which === 'optimized');
   if (reframe) frameModel(model);
@@ -215,6 +220,34 @@ function setCompare(on) {
   leaveCompare();
   showModel(model, which, false);
   return true;
+}
+
+function getViewState() {
+  return {
+    position: camera.position.toArray(),
+    target: controls.target.toArray(),
+    up: camera.up.toArray(),
+    zoom: camera.zoom,
+    near: camera.near,
+    far: camera.far
+  };
+}
+
+function restoreViewState(state) {
+  if (!state?.position || !state?.target) return false;
+  try {
+    camera.position.fromArray(state.position);
+    controls.target.fromArray(state.target);
+    if (state.up) camera.up.fromArray(state.up);
+    if (Number.isFinite(state.zoom)) camera.zoom = state.zoom;
+    if (Number.isFinite(state.near) && state.near > 0) camera.near = state.near;
+    if (Number.isFinite(state.far) && state.far > camera.near) camera.far = state.far;
+    camera.updateProjectionMatrix();
+    controls.update();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function frameModel(model) {
@@ -839,6 +872,8 @@ window.__shrinkApp = {
   },
   setCompare,
   setPreview(root) { setReduced(root, true); if (currentWhich === 'original' && !els.showOriginalBtn.dataset.pinned) { /* stay on the original until the UI asks */ } },
+  getViewState,
+  restoreViewState,
   clearPreview() { if (optimizedIsPreview) { if (compareOn) leaveCompare(); const was = currentModel === optimizedModel; disposeReduced(); els.showOptimizedBtn.disabled = true; if (was && originalModel) showModel(originalModel, 'original', false); } },
   notifyReduced(meta) { reducedVersion++; window.dispatchEvent(new CustomEvent('shrink:reduced', { detail: { ...meta, version: reducedVersion } })); },
   get reducedVersion() { return reducedVersion; },
