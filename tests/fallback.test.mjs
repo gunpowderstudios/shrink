@@ -1,0 +1,14 @@
+import * as THREE from 'three';
+import path from 'path';
+import { build, prepare, ok } from './helpers.mjs';
+prepare();
+delete globalThis.Worker;
+const mod = await import(path.join(build, 'solid-rebuild.mjs'));
+const g = new THREE.BufferGeometry();
+const p = [0,0,0, 1,0,0, 0,1,0,  0,0,0, 0,1,0, 0,0,1,  0,0,0, 0,0,1, 1,0,0];
+g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(p), 3));
+const grp = new THREE.Group(); grp.add(new THREE.Mesh(g)); grp.updateMatrixWorld(true);
+const h = await mod.healthAsync(grp);
+ok(h.open === 3 && !h.clean, 'healthAsync works without a Web Worker (open edges: ' + h.open + ')');
+const r = await mod.repairAsync(grp, { onStatus: () => {} });
+ok(r.stats.after.clean && r.stats.holeLoops === 1, 'repairAsync works without a Web Worker (holes closed: ' + r.stats.holeLoops + ')');
