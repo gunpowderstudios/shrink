@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.30 — dockable, viewport-filling desktop panel layout */
+/* SHRINK 3D v2.33 — dockable, viewport-filling desktop panel layout */
 
 .module-dragbar{
   appearance:none;
@@ -38,6 +38,16 @@
 
 /* Native Game / Tools workspace. */
 @media(min-width:901px){
+  html.shrink-app-locked,
+  html.shrink-app-locked body{
+    height:100%;
+    overflow:hidden!important;
+  }
+  html.shrink-app-locked body.app-mode-print.ui-simple .app-shell{
+    height:100dvh;
+    overflow:hidden!important;
+  }
+
   /* v2.29: use the whole desktop browser workspace. */
   .app-shell{
     width:calc(100vw - 24px)!important;
@@ -76,7 +86,7 @@
 
   .app-mode-print.ui-simple .v2-top-grid{
     height:var(--shrink-workspace-height, calc(100dvh - 128px))!important;
-    min-height:360px!important;
+    min-height:0!important;
     max-height:none!important;
     align-items:stretch!important;
     overflow:hidden!important;
