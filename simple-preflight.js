@@ -1,6 +1,6 @@
 // SHRINK 3D v2.22 — Simple Print preflight gate: check -> repair -> optional download -> workflow.
 (() => {
-  const RELEASE = '2.30';
+  const RELEASE = '2.31';
   const CORE = '2.18';           // engine graph (mesh-tools)
   const FIX = '2.27';            // repair graph: repair-core.js, repair-worker.js, solid-rebuild.js. Bump these three + their importers together.
   const $ = id => document.getElementById(id);
@@ -112,7 +112,7 @@
     } else if (state === 'needs') {
       icon.textContent = '⚠'; title.textContent = 'This model needs repairing first'; text.textContent = 'SHRINK found geometry that should be fixed before we reduce, fuse or split the model.';
       summary.innerHTML = `<strong>${nf(t?.openEdges)} open edges · ${nf(t?.pinchedEdges)} pinched edges · ${nf(t?.flippedEdges)} flipped edges.</strong>`;
-      actions.innerHTML = button('Repair model — keep the detail', 'repair', 'primary') + button('Open Advanced', 'advanced');
+      actions.innerHTML = button('Repair model — keep the detail', 'repair', 'primary') + button('Open Tools', 'advanced');
       note.textContent = 'Repair only changes problem areas. Separate clean printable pieces are allowed and do not have to be fused.'; tech.textContent = details(t);
     } else if (state === 'repairing') {
       icon.textContent = '↻'; title.textContent = 'Repairing the model…'; text.textContent = info?.progress || 'Joining loose points, removing bad triangles, correcting face direction and closing holes.';
@@ -122,7 +122,7 @@
     } else if (state === 'repair-failed') {
       icon.textContent = '⚠'; title.textContent = 'Normal repair could not make it clean'; text.textContent = 'Nothing has been accepted yet. You can try the stronger watertight rebuild, which recreates the outer surface.';
       summary.innerHTML = '<strong>The stronger fix can soften very small detail.</strong> You will get the rebuilt model in the viewer before any shrinking happens.';
-      actions.innerHTML = button('Stronger fix — rebuild watertight', 'rebuild', 'primary') + button('Try Advanced', 'advanced');
+      actions.innerHTML = button('Stronger fix — rebuild watertight', 'rebuild', 'primary') + button('Open Tools', 'advanced');
       note.textContent = 'The next stage remains locked until the rebuilt model passes the same check.'; tech.textContent = `${details(info?.before)}
 After repair: ${details(info?.after, info?.message || '')}`;
     } else if (state === 'rebuilding') {
