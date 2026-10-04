@@ -252,7 +252,7 @@
 
   async function loadRepairModules() {
     if (window.__shrinkRepairModules) return window.__shrinkRepairModules;
-    const [rebuildMod, repairMod] = await Promise.all([import(`./solid-rebuild.js?v=${VERSION}`), import(`./repair-core.js?v=${VERSION}`)]);
+    const [rebuildMod, repairMod] = await Promise.all([import('./solid-rebuild.js?v=2.27'), import('./repair-core.js?v=2.27')]);
     return { gatherWorldMesh: rebuildMod.gatherWorldMesh, buildRoot: rebuildMod.buildRoot, repairMesh: repairMod.repairMesh };
   }
 
@@ -298,7 +298,7 @@
     S.abort = new AbortController();                  // set before the first paint so the Cancel button shows straight away
     render();
     try {
-      const { rebuildSolid } = window.__shrinkRebuildSolid ? { rebuildSolid: window.__shrinkRebuildSolid } : await import(`./solid-rebuild.js?v=${VERSION}`);   // the override exists for tests
+      const { rebuildSolid } = window.__shrinkRebuildSolid ? { rebuildSolid: window.__shrinkRebuildSolid } : await import('./solid-rebuild.js?v=2.27');   // the override exists for tests
       // Rebuild from the ORIGINAL file when it is not huge: it still has all the fine detail that shrinking trims away.
       const original = app()?.originalModel, shrunk = app()?.optimizedModel;
       const source = original && countTris(original) <= 1500000 ? original : (shrunk || original);
