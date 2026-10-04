@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.34 — fixed desktop Simple workspace */
+/* SHRINK 3D v2.35 — natural-height controls + tall viewer */
 
 /* Four clear stages: check -> printer/size -> reduce -> download. */
 .app-mode-print.ui-simple #simpleCard .sc-stepper{
@@ -74,7 +74,7 @@
   font-weight:900;
 }
 
-/* Desktop: fixed two-column app workspace. No dock manager and no JS height rewriting. */
+/* Desktop: natural controls, large viewer. Normal document flow; no equal-height modules. */
 @media(min-width:901px){
   .app-mode-print.ui-simple.simple-has-model .topbar{
     min-height:52px!important;
@@ -103,54 +103,59 @@
     display:none!important;
   }
   .app-mode-print.ui-simple.simple-has-model .print-v2-dashboard{
-    margin-bottom:0!important;
+    margin-bottom:18px!important;
   }
 
+  /* Match the cleaner pre-dock composition: compact controls left, generous viewer right. */
   .app-mode-print.ui-simple.simple-has-model .v2-top-grid{
-    grid-template-columns:minmax(340px,430px) minmax(0,1fr)!important;
-    height:calc(100dvh - 128px)!important;
-    min-height:480px!important;
-    max-height:900px!important;
-    align-items:stretch!important;
-    overflow:hidden!important;
-  }
-
-  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot{
-    min-height:0!important;
-    height:100%!important;
-    overflow:hidden!important;
-  }
-  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot .viewer-panel{
-    display:flex!important;
-    flex-direction:column!important;
-    position:relative!important;
-    top:0!important;
-    min-height:0!important;
-    height:100%!important;
-    max-height:100%!important;
-    overflow:hidden!important;
-  }
-  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot .viewer{
-    flex:1 1 auto!important;
-    min-height:0!important;
+    grid-template-columns:minmax(360px,32%) minmax(0,1fr)!important;
+    gap:14px!important;
     height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    align-items:start!important;
+    overflow:visible!important;
   }
 
+  /* Left side grows only as much as its current stage needs. */
   .app-mode-print.ui-simple.simple-has-model #simpleCard,
   .app-mode-print.ui-simple.simple-has-model .simple-preflight-card{
-    align-self:stretch!important;
+    align-self:start!important;
+    width:100%!important;
+    height:auto!important;
     min-height:0!important;
-    height:100%!important;
-    max-height:100%!important;
-    overflow-y:auto!important;
-    overscroll-behavior:contain;
-    scrollbar-gutter:stable;
+    max-height:none!important;
+    overflow:visible!important;
   }
   .app-mode-print.ui-simple.simple-has-model #simpleCard{
     padding:16px!important;
   }
   .app-mode-print.ui-simple.simple-has-model #simpleCard .sc-stage{
     flex:0 0 auto!important;
+  }
+
+  /* The viewer is the visual anchor and can be much deeper than the controls. */
+  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot{
+    align-self:start!important;
+    min-height:0!important;
+    height:auto!important;
+    overflow:visible!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot .viewer-panel{
+    display:flex!important;
+    flex-direction:column!important;
+    position:relative!important;
+    top:0!important;
+    width:100%!important;
+    height:clamp(560px,calc(100dvh - 128px),900px)!important;
+    min-height:560px!important;
+    max-height:900px!important;
+    overflow:hidden!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .v2-viewer-slot .viewer{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    height:auto!important;
   }
 }
 
