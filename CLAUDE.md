@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.27**
+- Current user-facing release: **v2.28**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -148,6 +148,15 @@ Prefer:
 
 A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. Do not spend 40 seconds proving that 160,000 might also work.
 
+## Dockable panel layout
+- Desktop Controls and Viewer are intentionally user-reorderable via `panel-layout.js` / `panel-layout.css`.
+- Preference key: `shrink-panel-side` with values `left` or `right`.
+- Do not hard-code the viewer or controls permanently to one desktop side.
+- Game mode uses the native `#workspace` grid.
+- Simple Print uses explicit columns in `.v2-top-grid` so dynamically inserted preflight/control cards stay together opposite the viewer.
+- Mobile remains stacked; drag handles are hidden at <=900px.
+- This is UI-only. Do not couple panel placement to repair/reduction state.
+
 ## Game viewer layout
 - The navigation hint (**Drag to rotate · Scroll to zoom · Right-drag to pan**) belongs inside the 3D viewer canvas.
 - The large red **Find the smallest that still looks the same** button belongs below the viewer in its own row.
@@ -167,6 +176,8 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 ## Important files
 
 ### Current Simple workflow layer
+- `panel-layout.js`
+- `panel-layout.css`
 - `simple-wizard.js`
 - `simple-wizard.css`
 - `simple-preflight.js`
