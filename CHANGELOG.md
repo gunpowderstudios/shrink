@@ -2,6 +2,34 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.31 — P0 reliability cleanup
+
+### Reliability
+- Restored the missing repair regression cases: flipped triangles, tangled edges, duplicates, inside-out shells, overlapping clean parts, large holes, degenerate triangles and pre-weld equivalence.
+- Added GitHub Actions CI to run the regression suite on every push/PR plus the dense-mesh performance smoke test.
+- Simple Print now skips the expensive BVH visual-loss measurement during normal operation; Compare can still request it explicitly.
+- Simple reduction now awaits `live-reduce.runExact()` / the reducer promise rather than polling `#verdict`.
+- Removed the remaining Simple-mode verdict polling from fine tuning.
+- Replaced Simple's post-reduction Manifold validation with the shared v2.27 mesh-health worker.
+- Removed the remaining legacy Simple repair Manifold validation; Manifold is now reserved for deliberate Fuse/Split work.
+- `print-export-safety.js` now reports topology through the same `healthOfModel/meshHealth` definition used by preflight and repair.
+
+### Consistency
+- `index.html` owns the visible app version; `simple-wizard.js` no longer writes the badge.
+- The Simple shell and its helper imports use a single v2.31 cache key.
+- User-facing navigation uses **Tools** consistently; old **Advanced** wording has been removed.
+- Main Simple reduction action is now **Make smaller** rather than **SHRINK IT**.
+
+### Version boundaries
+- User-facing Simple/UI release: **v2.31**.
+- Repair graph remains **v2.27**.
+- Underlying reducer/core engine remains **v2.18**; no reducer algorithm rewrite was made in this release.
+
+### Next
+Stop here for a real-browser Duric test before beginning the proposed recipe/state-machine Simple workflow.
+
+---
+
 ## v2.30 — Full-height repair module
 
 ### Fixed
