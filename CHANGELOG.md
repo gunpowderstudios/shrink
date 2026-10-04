@@ -2,6 +2,26 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.27 — One definition of "clean", and repair off the main thread
+
+### Fixed
+- Preflight, post-reduction guard and repair now share one mesh-health check (open, tangled and flipped edges fail; empty triangles are reported but never block). Removes the "repaired, then could not confirm a clean mesh" loop.
+- Repair is substantially faster and lighter on dense meshes and now runs in a Web Worker with progress and Cancel where supported.
+- A new upload now cancels any running repair/rebuild; stale timers and results from an older upload are ignored.
+- A reduced mesh that already passes the shared check is accepted as it is instead of being sent through needless back-off/repair.
+- Reduced-model normals are recomputed once per connectivity change rather than on every UI change.
+
+### Removed
+- Unused `simple-goals.js` / `simple-goals.css`.
+
+### Cache keys
+- Repair graph (`repair-core.js`, `repair-worker.js`, `solid-rebuild.js`) is on key **2.27**; the core engine graph stays on **2.18**.
+
+### Testing note
+- Claude's supplied regression suite reports 51 checks passing on the handoff pack. Browser/Duric acceptance testing is still required.
+
+---
+
 ## v2.26 — Game viewer controls separated
 
 ### Fixed
