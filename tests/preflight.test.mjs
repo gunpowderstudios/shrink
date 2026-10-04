@@ -36,7 +36,19 @@ function withEmptyTriangles(grp) {
 }
 
 let current = null;
-const app = { THREE, get originalModel() { return current; }, sourceFile: new w.File(['x'], 'm.stl'), show() {}, clearPreview() {}, baseName: () => 'dwarf', setPreview() {}, get optimizedModel() { return null; } };
+const savedView = { position: [4,3,6], target: [0,1,0], up: [0,1,0], zoom: 1, near: 0.1, far: 1000 };
+const app = {
+  THREE,
+  get originalModel() { return current; },
+  sourceFile: new w.File(['x'], 'm.stl'),
+  show() {},
+  clearPreview() {},
+  baseName: () => 'dwarf',
+  setPreview() {},
+  get optimizedModel() { return null; },
+  getViewState: () => savedView,
+  restoreViewState: v => { globalThis.__restoredView = v; return true; }
+};
 w.__shrinkApp = app;
 const files = { 'solid-rebuild.js': path.join(build, 'solid-rebuild.mjs'), 'repair-core.js': path.join(build, 'repair-core.js'), 'mesh-tools.js': path.join(build, 'mesh-tools-stub.mjs') };
 w.__imp = spec => import(files[spec.split('?')[0].replace('./', '')] || spec);
@@ -79,6 +91,9 @@ ok(pf().state === 'repairing' && !!w.document.querySelector('[data-sp-act="cance
 ok(/\w/.test($('spText').textContent) && $('spText').textContent !== 'Starting…' || true, 'progress text shown: ' + $('spText').textContent);
 ok(await state('ready', 8000), 'after repair the re-opened model passes the same check (state: ' + pf().state + ')');
 ok($('spTitle').textContent === 'Repair complete — model ready' && !!w.document.querySelector('[data-sp-act="download-ready"]'), 'ready screen offers the repaired download: ' + $('spTitle').textContent);
+await wait(20);
+ok(globalThis.__lastZUp === true, 'repaired STL is reopened as Z-up so orientation is preserved');
+ok(globalThis.__restoredView === savedView, 'camera/view state is restored after the repaired model reopens');
 
 await installWorkerShim({ delayMs: 300 });
 current = messy(true); w.dispatchEvent(new w.CustomEvent('shrink:model-opened'));
