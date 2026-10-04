@@ -223,3 +223,110 @@
 /* ---- v2.18: what the quality check measured ---- */
 .sc-tune-nums { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .sc-tune-nums:empty { display: none; }
+
+/* ---- v2.37: one owner for the Simple Print layout ----
+   The print-v2 shell supplies the viewer container only.
+   Simple mode owns the visible workflow; old dashboard cards stay hidden. */
+.app-mode-print.ui-simple .print-v2-dashboard{
+  margin:0 0 14px!important;
+}
+.app-mode-print.ui-simple .v2-top-grid{
+  display:grid!important;
+  grid-template-columns:minmax(0,1.55fr) minmax(360px,440px)!important;
+  gap:14px!important;
+  align-items:start!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+}
+.app-mode-print.ui-simple .v2-viewer-slot{
+  grid-column:1!important;
+  grid-row:1!important;
+  min-width:0!important;
+  min-height:0!important;
+  height:auto!important;
+  overflow:visible!important;
+}
+.app-mode-print.ui-simple .v2-viewer-slot .viewer-panel{
+  position:relative!important;
+  top:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  width:100%!important;
+  height:clamp(540px,68vh,760px)!important;
+  min-height:540px!important;
+  overflow:hidden!important;
+}
+.app-mode-print.ui-simple .v2-viewer-slot .viewer{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  height:auto!important;
+}
+.app-mode-print.ui-simple #simpleCard,
+.app-mode-print.ui-simple .simple-preflight-card{
+  grid-column:2!important;
+  grid-row:1!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+  align-self:start!important;
+}
+.app-mode-print.ui-simple #simpleCard{
+  padding:18px!important;
+}
+.app-mode-print.ui-simple #simpleCard .sc-stage{
+  flex:0 0 auto!important;
+}
+
+/* Keep the page compact after a model is open without turning the workspace
+   into a fixed-height viewport. */
+@media(min-width:901px){
+  .app-mode-print.ui-simple.simple-has-model .topbar{
+    min-height:52px!important;
+    padding-top:6px!important;
+    padding-bottom:6px!important;
+    margin-bottom:6px!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .topbar .eyebrow,
+  .app-mode-print.ui-simple.simple-has-model .topbar .subtitle,
+  .app-mode-print.ui-simple.simple-has-model .topbar .privacy-pill{
+    display:none!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .topbar .title-row h1{
+    font-size:23px!important;
+    line-height:1!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .mode-chooser{
+    gap:8px!important;
+    margin-bottom:8px!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .mode-card{
+    min-height:48px!important;
+    padding:8px 14px!important;
+  }
+  .app-mode-print.ui-simple.simple-has-model .mode-card small{
+    display:none!important;
+  }
+}
+
+@media(max-width:900px){
+  .app-mode-print.ui-simple .v2-top-grid{
+    grid-template-columns:1fr!important;
+  }
+  .app-mode-print.ui-simple .v2-viewer-slot{
+    grid-column:1!important;
+    grid-row:1!important;
+  }
+  .app-mode-print.ui-simple #simpleCard,
+  .app-mode-print.ui-simple .simple-preflight-card{
+    grid-column:1!important;
+    grid-row:2!important;
+  }
+  .app-mode-print.ui-simple .v2-viewer-slot .viewer-panel{
+    height:62vh!important;
+    min-height:440px!important;
+  }
+}
