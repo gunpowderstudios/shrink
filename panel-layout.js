@@ -174,6 +174,7 @@
       if (value !== 'left' && value !== 'right') return;
       side = value; save(); apply();
     },
-    swap
+    swap,
+    resize: sizeDesktopWorkspace
   };
 })();
