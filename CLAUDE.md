@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.26**
+- Current user-facing release: **v2.27**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -70,6 +70,13 @@ If stronger rebuild fails:
 - do not reduce a mesh SHRINK considers broken
 
 Separate closed printable pieces are allowed. They do not have to be fused simply to continue.
+
+### Mesh health: one definition
+`repair-core.js` owns it via `meshHealth`. Preflight, post-reduction guard and repair results must all use that definition.
+
+Clean = no open edges, no tangled (3+) edges, no flipped edges. Empty/degenerate triangles are reported but do not block the Simple workflow.
+
+Do not reintroduce a second topology check with a different weld tolerance. Heavy repair/health work runs in `repair-worker.js` where supported. The repair graph (`repair-core.js`, `repair-worker.js`, `solid-rebuild.js`) uses cache key **2.27**, independently of the v2.18 engine graph.
 
 ### 2. Repair is also a standalone feature
 After a repair/rebuild succeeds, pause and allow:
@@ -170,6 +177,7 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 
 ### Print geometry / repair
 - `repair-core.js`
+- `repair-worker.js`
 - `solid-core.js`
 - `solid-rebuild.js`
 - `remesh-worker.js`
