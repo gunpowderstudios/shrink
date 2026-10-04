@@ -1,8 +1,8 @@
-// SHRINK 3D v2.18 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.31 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
 // so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
 (() => {
-  const VERSION = '2.18';
+  const VERSION = '2.31';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -144,49 +144,50 @@
 
   async function doShrink(result) {
     const live = window.__shrinkLiveUI;
-    if (!live?.autoFind) throw new Error('The shrink engine is still loading. Give it a moment and try again.');
-    await waitFor(() => live.state?.tris > 0, 12000);
-    if (!(live.state?.tris > 0)) throw new Error('Your model is still being prepared. Give it a moment and try again.');
-    note('Looking for the smallest version that still looks the same…');
+    const engine = window.__shrinkLive;
+    if (!live?.autoFind || !engine?.runExact) throw new Error('The shrink engine is still loading. Give it a moment and try again.');
+    await waitFor(() => live.state?.tris > 0 && engine.ready, 12000);
+    if (!(live.state?.tris > 0) || !engine.ready) throw new Error('Your model is still being prepared. Give it a moment and try again.');
+
+    let applied = null;
     if (S.usePercent && S.savedReduction?.keepPercent > 0) {
-      await waitFor(() => window.__shrinkLive?.ready !== false, 12000);
       const pct = Math.max(1, Math.min(100, S.savedReduction.keepPercent));
-      note(`Keeping ${pct}% of the triangles, as in your saved settings…`);
-      setNative('geometry', pct, 'input');
-      await wait(250);
+      note(`Keeping ${pct}% of the triangles for the selected print quality…`);
+      live.setRatio?.(pct / 100, { notify: false });
+      applied = await engine.runExact(pct / 100, { protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
     } else {
+      note('Looking for a sensible smaller version…');
       S.pending = live.autoFind();
       try { await S.pending; } finally { S.pending = null; }
+      applied = engine.last;
     }
-    await waitFor(() => $('verdict')?.dataset.level !== 'busy', 20000, 150);
-    const reduced = app()?.optimizedModel;
-    if (!reduced) throw new Error('The live preview is not ready. Reload the page and try again.');
-    const before = live.state.tris, after = countTris(reduced);
+
+    const reduced = app()?.optimizedModel || engine.root;
+    if (!reduced) throw new Error('The reduced preview is not ready. Reload the page and try again.');
+    const before = live.state.tris, after = applied?.triangles || countTris(reduced);
     result.shrink = {
       before, after, pct: before ? (after / before) * 100 : 100,
-      level: $('verdict')?.dataset.level || 'none',
-      text: $('verdictText')?.textContent || '',
-      nums: $('verdictNums')?.textContent || ''
+      level: 'good',
+      text: after < before ? 'Reduced for the selected print quality' : 'Full detail kept',
+      nums: ''
     };
   }
 
   async function doSolidCheck(result) {
     const r = result.repair = { state: 'skipped', message: '', components: 0 };
-    note('Checking it is one clean solid…');
-    const fuse = await waitFor(() => window.__shrinkFuse?.modelToSolid, 10000);
-    if (!fuse) { r.message = 'The solid checker did not load, so this step was skipped.'; return; }
+    note('Checking the reduced mesh…');
     const model = app()?.optimizedModel || app()?.originalModel;
-    let built = null;
+    if (!model) { r.message = 'There is no model to check.'; return; }
     try {
-      await new Promise(res => requestAnimationFrame(() => setTimeout(res, 0)));
-      built = await window.__shrinkFuse.modelToSolid(model);
-      r.components = built.components;
-      r.state = built.components === 1 ? 'ok' : 'pieces';
+      const mod = await import('./solid-rebuild.js?v=2.27');
+      const h = await mod.healthAsync(model, { signal: S.abort?.signal });
+      r.topology = { ...h, openEdges: h.open, pinchedEdges: h.tangled, flippedEdges: h.flipped, degenerateTriangles: h.degenerate };
+      r.state = h.clean ? 'ok' : 'needs';
+      if (!h.clean) r.message = `${nf.format(h.open)} open edges · ${nf.format(h.tangled)} pinched edges · ${nf.format(h.flipped)} flipped edges`;
     } catch (err) {
+      if (err?.code === 'CANCELLED') throw err;
       r.state = 'needs';
       r.message = err?.message || String(err);
-    } finally {
-      try { built?.solid?.delete?.(); } catch {}
     }
   }
 
@@ -854,6 +855,7 @@
     store.set('shrink-ui-level', S.level);
     body.classList.toggle('ui-simple', S.level === 'simple');
     body.classList.toggle('ui-advanced', S.level === 'advanced');
+    window.__shrinkSkipMeasure = S.level === 'simple';
     document.querySelectorAll('#uiLevelToggle [data-level]').forEach(b => { const on = b.dataset.level === S.level; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
     if (S.level === 'simple' && card) { applyPrinter(); syncInputs(); S.result = null; if (S.stage !== 'working') S.stage = 'setup'; render(); }
     window.dispatchEvent(new CustomEvent('shrink:ui-level', { detail: { level: S.level } }));
