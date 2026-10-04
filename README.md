@@ -1,4 +1,4 @@
-# SHRINK 3D v2.28
+# SHRINK 3D v2.29
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
@@ -6,8 +6,11 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.28 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.29 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
+
+## v2.29 viewport-filling workspace
+On desktop, SHRINK measures the space from the workspace's actual top edge to the bottom of the browser window and stretches both main modules to that height. Controls scroll internally when needed; the 3D viewer expands to use the rest. Fixed 900px height caps are removed. Mobile rules are unchanged.
 
 ## v2.28 dockable panels
 On desktop, the **Controls** and **3D viewer** are dockable left/right modules in Game mode and Simple Print mode. Drag one module onto the other, or click its small ↔ strip, to swap sides. The preference is stored locally in that browser, so different users can keep different layouts. Mobile remains stacked.
