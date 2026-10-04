@@ -1,0 +1,13 @@
+import { JSDOM } from 'jsdom'; import * as THREE from 'three'; import fs from 'fs'; import path from 'path';
+import { root, prepare, ok } from './helpers.mjs';
+prepare();
+const dom = new JSDOM('<!doctype html><body class="app-mode-print ui-simple"><section id="simpleCard"><div class="sc-result"><div id="scRows"></div></div></section></body>', { runScripts: 'outside-only', url: 'https://example.test/' });
+const w = dom.window; w.requestAnimationFrame = cb => setTimeout(cb, 0);
+const g = new THREE.BoxGeometry(1, 1, 1); let calls = 0; const orig = g.computeVertexNormals.bind(g); g.computeVertexNormals = () => { calls++; orig(); };
+const model = new THREE.Group(); model.add(new THREE.Mesh(g));
+w.__shrinkApp = { THREE, originalModel: model, optimizedModel: model, sourceKind: 'stl', show() {} }; w.__shrinkSimple = { state: { stage: 'setup' } };
+w.eval(fs.readFileSync(path.join(root, 'simple-postreduce.js'), 'utf8').replace(/\bimport\(/g, '__imp('));
+const rn = w.__shrinkPostReduce.refreshNormals; rn(model); rn(model); rn(model);
+ok(calls === 1, 'normals computed once for three calls on an unchanged mesh (' + calls + ')');
+g.index.array[0] = g.index.array[0]; g.index.needsUpdate = true; rn(model);
+ok(calls === 2, 'recomputed after the index buffer changed (' + calls + ')');
