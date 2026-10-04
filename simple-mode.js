@@ -699,7 +699,7 @@
       const topo = window.__shrinkPrintSafety?.topologySummary?.(app()?.optimizedModel);
       if (topo) lines.push(`Mesh check: ${nf.format(topo.openEdges)} open edges · ${nf.format(topo.pinchedEdges)} pinched edges · ${nf.format(topo.degenerateTriangles)} degenerate triangles`);
     } catch {}
-    el.innerHTML = lines.map(l => `<div>${esc(l)}</div>`).join('') + '<button type="button" class="sc-small-btn" data-act="advanced">Open Advanced view</button>';
+    el.innerHTML = lines.map(l => `<div>${esc(l)}</div>`).join('') + '<button type="button" class="sc-small-btn" data-act="advanced">Open Tools</button>';
   }
 
   /* ------------------------------ building the card ------------------------------ */
@@ -725,7 +725,7 @@
         <div id="scLoaded" class="sc-loaded" role="status" hidden>
           <div id="scLoadedTitle" class="sc-loaded-title">✓ Settings loaded!</div>
           <div id="scLoadedText" class="sc-loaded-sub"></div>
-          <div id="scLoadedNext" class="sc-loaded-next">Now press <b>SHRINK IT</b> below to use them.</div>
+          <div id="scLoadedNext" class="sc-loaded-next">Now press <b>Make smaller</b> below to use them.</div>
           <details id="scPercentRow" class="sc-more" hidden>
             <summary>Reduce by the same amount instead</summary>
             <p class="sc-more-text">Normally SHRINK works out the best amount for each new model. Your saved file kept <b id="scLoadedPct"></b> of the triangles on the model it came from. Tick the box to keep that same share of this model's triangles instead. Only worth it for models very like the one you saved from.</p>
@@ -733,11 +733,11 @@
           </details>
         </div>
         <div id="scError" class="sc-error" role="alert" hidden></div>
-        <button id="scGo" class="sc-go" type="button">✨ SHRINK IT — make it print-ready</button>
+        <button id="scGo" class="sc-go" type="button">Make smaller</button>
         <p class="sc-fine">Shrinks the file, checks it\u2019s a solid and checks it fits. Your original file is never changed.</p>
         <div class="sc-setup-tools">
           <button type="button" class="sc-link-btn" data-act="load-settings">📂 Load saved settings</button>
-          <button type="button" class="sc-link-btn" data-act="advanced">Advanced settings ›</button>
+          <button type="button" class="sc-link-btn" data-act="advanced">Tools ›</button>
           <input id="scSettingsFile" type="file" accept="application/json,.json" hidden>
         </div>
       </div>
@@ -837,7 +837,7 @@
     renderPrinters(); renderFitLine();
   }
 
-  /* ------------------------------ Simple / Advanced switch ------------------------------ */
+  /* ------------------------------ Simple / Tools switch ------------------------------ */
   function installToggle() {
     if ($('uiLevelToggle')) return;
     const header = document.querySelector('.topbar'); if (!header) return;
@@ -845,7 +845,7 @@
     const right = document.createElement('div'); right.className = 'topbar-right';
     const toggle = document.createElement('div'); toggle.id = 'uiLevelToggle'; toggle.className = 'ui-level-toggle';
     toggle.setAttribute('role', 'group'); toggle.setAttribute('aria-label', 'Interface level');
-    toggle.innerHTML = '<button type="button" data-level="simple">Simple</button><button type="button" data-level="advanced">Advanced</button>';
+    toggle.innerHTML = '<button type="button" data-level="simple">Simple</button><button type="button" data-level="advanced">Tools</button>';
     toggle.addEventListener('click', e => { const b = e.target.closest('[data-level]'); if (b) setLevel(b.dataset.level); });
     header.appendChild(right); right.append(toggle); if (pill) right.append(pill);
   }
