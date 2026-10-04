@@ -4,6 +4,7 @@
 (() => {
   const RELEASE = '2.25';
   const CORE = '2.18';
+  const FIX = '2.27';            // repair graph key (repair-core.js)
   const $ = id => document.getElementById(id);
   const body = document.body;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -20,21 +21,25 @@
 
   async function topology(model) {
     if (!model) return null;
-    topologyMod = topologyMod || await import(`./mesh-tools.js?v=${CORE}`);
-    return topologyMod.analyzeTopology(app()?.THREE, model);
+    topologyMod = topologyMod || await import(`./repair-core.js?v=${FIX}`);
+    return topologyMod.healthOfModel(app()?.THREE, model);
   }
 
   function isClean(t) {
-    return !!t && t.openEdges === 0 && t.nonManifold === 0 && t.degenerate === 0;
+    return !!t && t.clean === true;
   }
 
+  const normalsDone = new WeakMap();
   function refreshNormals(model) {
     model?.traverse?.(o => {
       const g = o?.isMesh ? o.geometry : null;
       if (!g?.attributes?.position) return;
+      const key = `${g.index?.version ?? 0}:${g.index?.count ?? g.attributes.position.count}`;
+      if (normalsDone.get(g) === key) return;
       try {
         g.computeVertexNormals();
         if (g.attributes.normal) g.attributes.normal.needsUpdate = true;
+        normalsDone.set(g, key);
       } catch {}
       for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
         if (m && 'flatShading' in m && app()?.sourceKind === 'stl') { m.flatShading = true; m.needsUpdate = true; }
@@ -138,8 +143,10 @@
       $('scRows')?.appendChild(clean);
     }
     const cleanP = clean.querySelector('p');
+    const backedOff = finalRatio > startPct / 100 + 0.005;
     if (cleanP) cleanP.textContent = finalRatio >= 0.999
       ? 'The repaired source is clean, so SHRINK kept it rather than forcing an unsafe reduction.'
+      : !backedOff ? 'The reduced mesh passed the same health check as your uploaded model.'
       : `The first ${Math.round(startPct)}% target was too aggressive structurally, so SHRINK kept ${Math.round(pct)}% instead.`;
 
     refreshNormals(model);
@@ -199,7 +206,15 @@
 
     let passed = false;
     try {
-      for (const ratio of candidates(startRatio)) {
+      const current = app()?.optimizedModel || window.__shrinkLive?.root;
+      refreshNormals(current);
+      const t0 = await topology(current);
+      if (isClean(t0)) {
+        updateResult(result, startPct, startRatio, t0);
+        banner('ok', `✓ Final mesh check passed at ${Math.round(result.shrink?.pct || startPct)}% — small enough, clean and ready to slice.`);
+        passed = true;
+      }
+      for (const ratio of passed ? [] : candidates(startRatio)) {
         if (!active() || a.state?.stage !== 'result') return;
         passed = await tryRatio(result, ratio, startPct);
         if (passed) break;
