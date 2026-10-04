@@ -270,19 +270,15 @@
       const mesh = gatherWorldMesh(source);
       const res = repairMesh({ positions: mesh.positions, indices: mesh.indices });
       const root = buildRoot(res.positions, res.indices, {});
-      // only swap the model in if it really is a clean solid now
-      let built = null, components = 0, failure = '';
-      try { built = await window.__shrinkFuse.modelToSolid(root); components = built.components; }
-      catch (err) { failure = err?.message || String(err); }
-      finally { try { built?.solid?.delete?.(); } catch {} }
-      if (failure || components < 1) {
+      if (!res.stats?.after?.clean) {
         r.state = 'repairFailed'; r.fixed = res.stats;
-        r.repairNote = failure || 'The repaired surface still was not a clean solid.';
+        r.repairNote = 'The repaired surface still has mesh-health problems.';
+        try { root?.traverse?.(o => { if (o.isMesh) o.geometry?.dispose?.(); }); } catch {}
       } else {
         app().setPreview(root); app().show('optimized');
         const after = countTris(root), before = S.result.shrink?.before || after;
         if (S.result.shrink) Object.assign(S.result.shrink, { after, pct: before ? (after / before) * 100 : 100, text: '', repaired: true });
-        r.state = 'repaired'; r.components = components; r.fixed = res.stats; r.message = '';
+        r.state = 'repaired'; r.components = 0; r.fixed = res.stats; r.message = '';
       }
     } catch (err) {
       console.warn(`[SHRINK 3D ${VERSION}] Repair did not work`, err);
@@ -367,7 +363,7 @@
 
   function solidRow() {
     const r = S.result?.repair; if (!r) return '';
-    if (r.state === 'ok') return row('ok', 'It\u2019s one clean solid', 'Closed and watertight, so any slicer can read it without complaints.');
+    if (r.state === 'ok') return row('ok', 'Mesh check passed', 'No open, pinched or flipped edges were found. Separate clean pieces are allowed.');
     if (r.state === 'rebuilt') {
       const b = r.rebuilt || {};
       const bits = [`${nf.format(b.trisOut || countTris(app()?.optimizedModel))} triangles`];
@@ -403,7 +399,7 @@
       const warn = `<p class="sc-warn-note">The stronger fix rebuilds the whole surface on a grid, so it softens detail finer than about <b>${fmtMm(vox)} mm</b>${coarse ? ' on a model this big. It will look rounded, so try Repair first' : ''}. It takes about 10 seconds and you preview it before downloading.</p>`;
       return row('warn', title, intro, `<div class="sc-actions">${repairBtn}</div>${warn}<div class="sc-actions">${strong}</div>`);
     }
-    return row('info', 'Solid check skipped', esc(r.message || 'We couldn\u2019t check this one. You can still download.'));
+    return row('info', 'Mesh check skipped', esc(r.message || 'We couldn\u2019t check this one. You can still download.'));
   }
 
   function fitRow() {
@@ -622,20 +618,34 @@
     clearTimeout(S.tuneTimer);
     S.tuneTimer = setTimeout(async () => {
       if (S.stage !== 'result' || S.busy || !S.result) { S.dragging = false; return; }
-      await waitFor(() => $('verdict')?.dataset.level !== 'busy', 15000, 150);
-      S.dragging = false;
-      if (S.stage !== 'result' || S.busy) return;
-      const reduced = app()?.optimizedModel; if (!reduced) return;
-      const before = window.__shrinkLiveUI?.state?.tris || S.result.shrink?.before || 0, after = countTris(reduced);
-      S.result.shrink = { before, after, pct: before ? (after / before) * 100 : 100, level: $('verdict')?.dataset.level || 'none', text: $('verdictText')?.textContent || '', nums: $('verdictNums')?.textContent || '' };
-      await doSolidCheck(S.result);
-      S.result.fit = fitInfo();
-      render(); renderTune();
+      const engine = window.__shrinkLive;
+      if (!engine?.runExact) { S.dragging = false; return; }
+      const ratio = Math.max(0.01, Math.min(1, Number($('geometry')?.value || 100) / 100));
+      try {
+        const applied = await engine.runExact(ratio, { protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
+        S.dragging = false;
+        if (S.stage !== 'result' || S.busy) return;
+        const reduced = app()?.optimizedModel || engine.root; if (!reduced) return;
+        const before = window.__shrinkLiveUI?.state?.tris || S.result.shrink?.before || 0;
+        const after = applied?.triangles || countTris(reduced);
+        S.result.shrink = {
+          before, after, pct: before ? (after / before) * 100 : 100,
+          level: 'good',
+          text: after < before ? 'Reduced for the selected print quality' : 'Full detail kept',
+          nums: ''
+        };
+        await doSolidCheck(S.result);
+        S.result.fit = fitInfo();
+        render(); renderTune();
+      } catch (err) {
+        S.dragging = false;
+        console.warn(`[SHRINK 3D ${VERSION}] Fine-tune update failed`, err);
+      }
     }, 900);
   }
 
   function renderSteps() {
-    const labels = { shrink: 'Making it smaller', repair: 'Checking it\u2019s a solid', fit: 'Checking it fits your printer' };
+    const labels = { shrink: 'Making it smaller', repair: 'Checking the mesh', fit: 'Checking it fits your printer' };
     const list = $('scSteps'); if (!list) return;
     list.innerHTML = Object.keys(labels).map(k => `<li data-state="${S.steps[k]}"><span class="sc-tag" aria-hidden="true"></span><span>${labels[k]}</span></li>`).join('');
   }
@@ -690,7 +700,7 @@
     }
     if (f?.dims) lines.push(`Print size: ${f.dims}`);
     if (r) {
-      lines.push(`Solid check: ${r.state}${r.components ? ` (${r.components} part${r.components === 1 ? '' : 's'})` : ''}`);
+      lines.push(`Mesh health: ${r.state}${r.components ? ` (${r.components} part${r.components === 1 ? '' : 's'})` : ''}`);
       if (r.message) lines.push(`Engine message: ${r.message}`);
       if (r.fixed) lines.push(`Repair: ${r.fixed.weldedPoints} points joined · ${r.fixed.flipped} flipped · ${r.fixed.holeLoops} holes closed (${r.fixed.holeTriangles} triangles) · ${r.fixed.tangledRemoved} tangled removed · open edges ${r.fixed.before?.open}→${r.fixed.after?.open}`);
       if (r.rebuilt) lines.push(`Rebuild: voxel ${r.rebuilt.voxel?.toPrecision(3)} units · grid ${r.rebuilt.dims?.join('×')} · gap sealing ${r.rebuilt.radius} voxels · ${nf.format(r.rebuilt.trisRaw || 0)} → ${nf.format(r.rebuilt.trisOut || 0)} triangles`);
@@ -734,7 +744,7 @@
         </div>
         <div id="scError" class="sc-error" role="alert" hidden></div>
         <button id="scGo" class="sc-go" type="button">Make smaller</button>
-        <p class="sc-fine">Shrinks the file, checks it\u2019s a solid and checks it fits. Your original file is never changed.</p>
+        <p class="sc-fine">Makes the file smaller, checks the mesh and checks it fits. Your original file is never changed.</p>
         <div class="sc-setup-tools">
           <button type="button" class="sc-link-btn" data-act="load-settings">📂 Load saved settings</button>
           <button type="button" class="sc-link-btn" data-act="advanced">Tools ›</button>
