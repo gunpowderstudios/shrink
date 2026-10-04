@@ -1,18 +1,17 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const SIMPLE_RELEASE = '2.37';
+  const PRINT_RELEASE = '2.38';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
   const header = document.querySelector('.topbar');
   const dropZone = $('dropZone'), fileInput = $('fileInput'), subtitle = document.querySelector('.subtitle');
 
-  import(`./print-export-safety.js?v=${SIMPLE_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Optional print tools did not load`, err));
+  import(`./print-export-safety.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Optional print tools did not load`, err));
   import(`./game-save-guard.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game save verification did not load`, err));
   import(`./game-protection-fix.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err));
-  import(`./print-v2-ui.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
-  import(`./simple-mode.js?v=${SIMPLE_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Simple mode did not load`, err));
+  import(`./print-v2-ui.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
   import(`./print-upload.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Print upload control did not load`, err));
   import(`./mobile-warning.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Mobile warning did not load`, err));
 
