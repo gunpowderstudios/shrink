@@ -2,6 +2,16 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.30 — Full-height repair module
+
+### Fixed
+- Step 1 **Check / Repair** now stretches to the same full desktop module height as the 3D viewer.
+- Removed the old `align-self:start` behaviour from the preflight card.
+- Repair/preflight content scrolls internally if it exceeds the available height.
+- Preflight CSS gets a fresh v2.30 cache key so browsers do not retain the older short-card layout.
+
+---
+
 ## v2.29 — Fill the desktop window
 
 ### Changed
