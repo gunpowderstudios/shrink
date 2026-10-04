@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.28**
+- Current user-facing release: **v2.29**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -148,6 +148,14 @@ Prefer:
 
 A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. Do not spend 40 seconds proving that 160,000 might also work.
 
+## Desktop viewport sizing
+- Desktop workspace height is dynamic, not a fixed pixel cap.
+- `panel-layout.js` measures each active workspace's actual `getBoundingClientRect().top` and sets `--shrink-workspace-height` to the remaining viewport height.
+- Simple controls and viewer must both stretch to this height; controls may scroll internally.
+- Do not reintroduce the old `max-height:900px` cap.
+- Resize events recalculate the workspace so different desktop/laptop screens fit neatly.
+- Mobile sizing rules remain separate.
+
 ## Dockable panel layout
 - Desktop Controls and Viewer are intentionally user-reorderable via `panel-layout.js` / `panel-layout.css`.
 - Preference key: `shrink-panel-side` with values `left` or `right`.
@@ -168,7 +176,7 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - After a real reduction completes, Original/Reduced and Compare can appear.
 - Reduced print preview normals must be recomputed after connectivity changes so the model does not appear artificially dark.
 - Once a model is loaded on desktop, the header/branding should collapse to reclaim height.
-- Viewer stays on the left.
+- Viewer and controls may be on either side according to the saved dock preference.
 - Simple control panel scrolls independently on the right.
 - Avoid large dead vertical gaps.
 - Mobile warning is intentionally cheeky but non-blocking.
