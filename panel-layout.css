@@ -1,4 +1,4 @@
-/* SHRINK 3D v2.28 — dockable desktop panel layout */
+/* SHRINK 3D v2.29 — dockable, viewport-filling desktop panel layout */
 
 .module-dragbar{
   appearance:none;
@@ -38,6 +38,64 @@
 
 /* Native Game / Tools workspace. */
 @media(min-width:901px){
+  /* v2.29: use the whole desktop browser workspace. */
+  .app-shell{
+    width:calc(100vw - 24px)!important;
+    max-width:none!important;
+    padding-top:12px!important;
+    padding-bottom:10px!important;
+  }
+
+  #workspace.workspace:not(.print-v2-native-hidden){
+    height:var(--shrink-workspace-height, calc(100dvh - 150px));
+    min-height:360px;
+    align-items:stretch;
+    overflow:hidden;
+  }
+  #workspace.workspace:not(.print-v2-native-hidden)>.control-panel,
+  #workspace.workspace:not(.print-v2-native-hidden)>.viewer-panel{
+    min-height:0!important;
+    height:100%!important;
+    max-height:100%!important;
+  }
+  #workspace.workspace:not(.print-v2-native-hidden)>.control-panel{
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+  }
+  #workspace.workspace:not(.print-v2-native-hidden)>.viewer-panel{
+    position:relative!important;
+    top:0!important;
+    overflow:hidden!important;
+  }
+  #workspace.workspace:not(.print-v2-native-hidden)>.viewer-panel>.viewer{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    height:auto!important;
+  }
+
+  .app-mode-print.ui-simple .v2-top-grid{
+    height:var(--shrink-workspace-height, calc(100dvh - 128px))!important;
+    min-height:360px!important;
+    max-height:none!important;
+    align-items:stretch!important;
+    overflow:hidden!important;
+  }
+  .app-mode-print.ui-simple .v2-top-grid>.v2-viewer-slot,
+  .app-mode-print.ui-simple .v2-top-grid>.simple-card,
+  .app-mode-print.ui-simple .v2-top-grid>.simple-preflight-card{
+    min-height:0!important;
+    height:100%!important;
+    max-height:100%!important;
+  }
+  .app-mode-print.ui-simple .v2-top-grid>.simple-card,
+  .app-mode-print.ui-simple .v2-top-grid>.simple-preflight-card{
+    align-self:stretch!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+  }
+
   body.panels-controls-left #workspace.workspace{
     grid-template-columns:minmax(330px,420px) minmax(0,1fr);
   }
@@ -78,7 +136,7 @@
 
   body.app-mode-print.ui-simple .v2-top-grid>.simple-card,
   body.app-mode-print.ui-simple .v2-top-grid>.simple-preflight-card{
-    align-self:start;
+    align-self:stretch!important;
   }
 }
 
