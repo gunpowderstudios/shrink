@@ -4,11 +4,25 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.30**
+- Current user-facing release: **v2.31**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## v2.31 P0 state
+The v2.30 review P0 cleanup is complete. Before adding a new workflow:
+- run the real Duric browser acceptance test
+- do not add another Simple override layer
+- keep ordinary Simple reduction free of BVH quality measurement
+- Compare may opt into the visual-loss measurement
+- Simple/preflight/post-reduction/export diagnostics must use the shared v2.27 `meshHealth` definition
+- Manifold belongs to explicit Fuse/Split operations, not ordinary Simple validation
+- Simple must await reducer promises/events, never poll status labels
+- `index.html` alone owns the visible release badge
+- user-facing navigation says **Tools**, not Advanced
+
+The next architectural step, only after Tim approves the browser test, is to prototype the recipe/job-state workflow beside the old Simple layers rather than adding another overlay.
 
 ## Product direction
 
