@@ -2,6 +2,21 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.35 — Natural-height controls
+
+### Layout
+- Controls / Check-Repair on the left now use natural content height instead of being forced to match the viewer depth.
+- The viewer remains the dominant right-hand panel with a tall browser-relative height.
+- Desktop grid is roughly 32% controls / 68% viewer.
+- Returned to normal document flow and normal page scrolling.
+- Removed the remaining equal-height assumptions from the v2.34 CSS reset.
+
+### Scope
+- CSS/layout only.
+- No repair, reduction, mesh-health, camera or orientation logic changed.
+
+---
+
 ## v2.34 — Layout reset
 
 ### Removed
