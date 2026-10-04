@@ -1,8 +1,8 @@
-// SHRINK 3D v2.32 — Simple mode: a one-button, plain-English print workflow for home printers.
+// SHRINK 3D v2.37 — Simple mode: a one-button, plain-English print workflow for home printers.
 // It is a thin layer over the existing reducer/repair/export engines.
  // Tools mode keeps the technical controls. Simple owns one conservative reduction, one shared mesh-health check and export.
 (() => {
-  const VERSION = '2.32';
+  const VERSION = '2.37';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
