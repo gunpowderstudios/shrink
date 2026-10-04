@@ -2,6 +2,19 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.29 — Fill the desktop window
+
+### Changed
+- Desktop workspace height is calculated from its real top position to the bottom of the current browser viewport.
+- Controls and Viewer now stretch to the same available height.
+- Controls scroll internally when their content is taller than the screen.
+- Viewer expands to fill the available workspace instead of stopping at a fixed maximum height.
+- Removed the old 900px Simple-workspace height cap.
+- Dockable left/right panel preference from v2.28 is preserved.
+- Mobile layout is unchanged.
+
+---
+
 ## v2.28 — Dockable left/right panels
 
 ### Added
