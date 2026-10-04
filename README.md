@@ -1,4 +1,4 @@
-# SHRINK 3D v2.35
+# SHRINK 3D v2.36
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
@@ -6,8 +6,19 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.35 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.36 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
+
+## v2.36 Oct 3 layout restore
+The Simple desktop layout has been restored from the **actual final Oct 3 v2.25 commit** (`67ce3c`), rather than approximated.
+
+- Restored `simple-wizard.css` from Oct 3.
+- Restored `simple-preflight.css` from Oct 3.
+- Kept only the newer amber **Continue anyway** warning colour as a non-layout addition.
+- `simple-mode.css`, `print-v2-ui.css` and `style.css` were already unchanged from Oct 3, so they did not need reverting.
+- Current repair, reduction, mesh-health, orientation and camera-preservation code remains untouched.
+
+This is a layout rollback only.
 
 ## v2.35 natural-height layout
 This release tunes the fixed desktop layout to match the cleaner pre-dock composition.
