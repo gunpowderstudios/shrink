@@ -1,4 +1,4 @@
-# SHRINK 3D v2.31
+# SHRINK 3D v2.32
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
@@ -6,8 +6,20 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.31 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.32 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js`, `simple-focus.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
+
+## v2.32 P1 tidy-up
+This release removes more legacy Simple-mode glue before the proposed recipe/job-state UI is built.
+
+- Simple quality presets now say what they really do: conservative triangle targets (~450k / 320k / 240k / 170k on dense models), not measured millimetre guarantees.
+- Real surface-loss measurement remains available when **Compare** is opened and in Tools.
+- The old `simple-focus.js` click-hijack layer has been removed. `simple-mode.js` now owns the Simple reduction target directly.
+- Fine-tune now schedules one exact reduction rather than also triggering the native slider reducer.
+- The duplicate `viewer-auto-button.js` import was removed.
+- A clean model can **Download as it is** without reducing.
+- After automatic repair/rebuild failure, the user can **Continue anyway**, **Download as it is**, or open **Tools**; continuing keeps an amber mesh warning visible.
+- Simple downloads do not automatically Fuse. Fuse remains an explicit Tools operation.
 
 ## v2.31 reliability cleanup
 This release completes the P0 cleanup from the v2.30 architecture review before any new Simple workflow is attempted.
