@@ -1,6 +1,6 @@
 // SHRINK 3D v2.22 — Simple Print preflight gate: check -> repair -> optional download -> workflow.
 (() => {
-  const RELEASE = '2.31';
+  const RELEASE = '2.32';
   const CORE = '2.18';           // engine graph (mesh-tools)
   const FIX = '2.27';            // repair graph: repair-core.js, repair-worker.js, solid-rebuild.js. Bump these three + their importers together.
   const $ = id => document.getElementById(id);
@@ -88,8 +88,10 @@
     const simple = $('simpleCard'); if (!simple) return;
     let chip = $('scPreflightOk');
     if (!chip) { chip = document.createElement('div'); chip.id = 'scPreflightOk'; chip.className = 'sc-preflight-ok'; const stepper = simple.querySelector('.sc-stepper'); stepper?.insertAdjacentElement('afterend', chip); }
+    chip.dataset.warning = fix === 'warning' ? 'true' : 'false';
     chip.textContent = fix === 'repair' ? 'Repair complete — now working from the repaired model.'
       : fix === 'rebuild' ? 'Watertight rebuild complete — now working from the rebuilt model.'
+      : fix === 'warning' ? 'Continuing with mesh warnings — your slicer may still need to repair this file.'
       : 'Model check passed — no repair was needed.';
   }
 
@@ -122,8 +124,8 @@
     } else if (state === 'repair-failed') {
       icon.textContent = '⚠'; title.textContent = 'Normal repair could not make it clean'; text.textContent = 'Nothing has been accepted yet. You can try the stronger watertight rebuild, which recreates the outer surface.';
       summary.innerHTML = '<strong>The stronger fix can soften very small detail.</strong> You will get the rebuilt model in the viewer before any shrinking happens.';
-      actions.innerHTML = button('Stronger fix — rebuild watertight', 'rebuild', 'primary') + button('Open Tools', 'advanced');
-      note.textContent = 'The next stage remains locked until the rebuilt model passes the same check.'; tech.textContent = `${details(info?.before)}
+      actions.innerHTML = button('Stronger fix — rebuild watertight', 'rebuild', 'primary') + button('Continue anyway', 'continue-anyway') + button('Download as it is', 'download') + button('Open Tools', 'advanced');
+      note.textContent = 'Continuing may still work because many slicers can repair mesh faults. SHRINK will keep the warning visible.'; tech.textContent = `${details(info?.before)}
 After repair: ${details(info?.after, info?.message || '')}`;
     } else if (state === 'rebuilding') {
       icon.textContent = '◫'; title.textContent = 'Rebuilding a watertight surface…'; text.textContent = info?.progress || 'Starting the background rebuild…';
@@ -139,14 +141,14 @@ After repair: ${details(info?.after, info?.message || '')}`;
       text.textContent = fixedBy ? 'The repaired model passed the same mesh check and is now safe to reduce or prepare for printing.' : 'This model is already closed and healthy, so no repair is needed.';
       summary.innerHTML = fixedBy ? '<strong>Nothing else has been changed yet.</strong> You can download this repaired STL now, or continue into SHRINK.' : '<strong>Ready for the next stage.</strong> SHRINK has not reduced or changed the model.';
       actions.innerHTML = button('Continue to printer & size →', 'continue', 'primary');
-      if (fixedBy) actions.innerHTML += button(fixedBy === 'rebuild' ? 'Download rebuilt STL' : 'Download repaired STL', 'download-ready');
-      note.textContent = fixedBy ? 'If all you wanted was a repaired file, download it here. Otherwise continue to reduce and prepare it.' : 'Next: choose the printer, finished size and how much detail to keep.';
+      actions.innerHTML += button(fixedBy ? (fixedBy === 'rebuild' ? 'Download rebuilt STL' : 'Download repaired STL') : 'Download as it is', 'download-ready');
+      note.textContent = fixedBy ? 'If all you wanted was a repaired file, download it here. Otherwise continue to reduce and prepare it.' : 'You can download the unchanged model now, or continue to reduce and prepare it.';
       tech.textContent = details(t, fixedBy ? `${fixedBy} passed` : 'no repair needed');
     } else if (state === 'failed') {
-      icon.textContent = '×'; title.textContent = 'SHRINK could not repair this model'; text.textContent = 'The mesh has problems too large or complex to repair safely in the browser. The original file has not been changed.';
-      summary.innerHTML = '<strong>Simple mode stops here rather than reducing a broken mesh.</strong>';
-      actions.innerHTML = button('Download original', 'download') + button('Try Advanced', 'advanced') + button('Re-upload repaired file', 'reupload', 'primary');
-      note.textContent = 'You can also repair the file in your slicer or modelling software, then drop the repaired version back into SHRINK.'; tech.textContent = `${details(info?.before)}
+      icon.textContent = '×'; title.textContent = 'SHRINK could not make this model clean automatically'; text.textContent = 'The mesh still has problems. Your original file has not been changed.';
+      summary.innerHTML = '<strong>You can still continue if your slicer is good at repairing meshes.</strong>';
+      actions.innerHTML = button('Continue anyway', 'continue-anyway', 'primary') + button('Download as it is', 'download') + button('Open Tools', 'advanced') + button('Re-upload repaired file', 'reupload');
+      note.textContent = 'Continuing keeps a warning visible. For the safest result, repair it in your slicer or modelling software first.'; tech.textContent = `${details(info?.before)}
 ${info?.message || ''}`;
     }
   }
@@ -181,7 +183,18 @@ ${info?.message || ''}`;
     setBlocked(false);
     readyChip(info?.fixedBy || null);
     app()?.show?.('original');
-    window.dispatchEvent(new CustomEvent('shrink:preflight-continued', { detail: { fixedBy: info?.fixedBy || null } }));
+    window.dispatchEvent(new CustomEvent('shrink:preflight-continued', { detail: { fixedBy: info?.fixedBy || null, bypassed: false } }));
+  }
+
+  function continueAnyway() {
+    if (busy || !app()?.originalModel) return;
+    proceeded = true;
+    lastCheckedModel = app().originalModel;
+    state = 'bypassed';
+    setBlocked(false);
+    readyChip('warning');
+    app()?.show?.('original');
+    window.dispatchEvent(new CustomEvent('shrink:preflight-continued', { detail: { fixedBy: null, bypassed: true, topology: info?.after || info?.before || info?.topology || null } }));
   }
 
   async function reopenRoot(root, suffix, fixKind) {
@@ -268,6 +281,7 @@ ${info?.message || ''}`;
       else if (act === 'rebuild') rebuildModel();
       else if (act === 'cancel') abort?.abort?.();
       else if (act === 'continue') continueWorkflow();
+      else if (act === 'continue-anyway') continueAnyway();
       else if (act === 'advanced') window.__shrinkSimple?.setLevel?.('advanced');
       else if (act === 'download' || act === 'download-ready') downloadSource();
       else if (act === 'reupload') $('fileInput')?.click();
@@ -289,8 +303,8 @@ ${info?.message || ''}`;
   function syncMode() {
     ensureCard();
     if (!active()) { setBlocked(false); return; }
-    if (lastCheckedModel === app()?.originalModel && state === 'ready') {
-      if (proceeded) { setBlocked(false); readyChip(info?.fixedBy || null); }
+    if (lastCheckedModel === app()?.originalModel && (state === 'ready' || state === 'bypassed')) {
+      if (proceeded) { setBlocked(false); readyChip(state === 'bypassed' ? 'warning' : (info?.fixedBy || null)); }
       else { setBlocked(true); render(); }
       return;
     }
@@ -306,5 +320,5 @@ ${info?.message || ''}`;
   window.addEventListener('shrink:live-updated', () => { if (body.classList.contains('simple-preflight-blocked')) app()?.show?.('original'); });
   if (document.readyState !== 'loading') syncMode(); else document.addEventListener('DOMContentLoaded', syncMode, { once: true });
 
-  window.__shrinkPreflight = { check: checkModel, repair: repairModel, rebuild: rebuildModel, continueWorkflow, get state() { return state; }, version: RELEASE };
+  window.__shrinkPreflight = { check: checkModel, repair: repairModel, rebuild: rebuildModel, continueWorkflow, continueAnyway, get state() { return state; }, version: RELEASE };
 })();
