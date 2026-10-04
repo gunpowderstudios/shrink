@@ -1,0 +1,29 @@
+name: SHRINK regression tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package.json
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run regression suite
+        run: npm test
+      - name: Run dense-mesh performance smoke test
+        run: node perf.mjs
