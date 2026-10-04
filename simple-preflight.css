@@ -1,5 +1,5 @@
-/* SHRINK 3D v2.30 — Simple Print preflight / repair gate */
-.simple-preflight-card{display:none;align-self:stretch;min-width:0;padding:22px;border:1px solid var(--sc-line);border-radius:18px;background:linear-gradient(180deg,rgba(18,21,24,.94),rgba(10,13,16,.91));box-shadow:0 22px 70px rgba(0,0,0,.46),inset 0 1px rgba(255,255,255,.025),0 0 40px rgba(57,229,140,.05);backdrop-filter:blur(12px) saturate(.92);-webkit-backdrop-filter:blur(12px) saturate(.92)}
+/* SHRINK 3D v2.34 — Simple Print preflight / repair gate */
+.simple-preflight-card{display:none;align-self:start;min-width:0;padding:22px;border:1px solid var(--sc-line);border-radius:18px;background:linear-gradient(180deg,rgba(18,21,24,.94),rgba(10,13,16,.91));box-shadow:0 22px 70px rgba(0,0,0,.46),inset 0 1px rgba(255,255,255,.025),0 0 40px rgba(57,229,140,.05);backdrop-filter:blur(12px) saturate(.92);-webkit-backdrop-filter:blur(12px) saturate(.92)}
 .app-mode-print.ui-simple.simple-preflight-blocked .simple-preflight-card{display:flex;flex-direction:column;gap:14px}
 .app-mode-print.ui-simple.simple-preflight-blocked #simpleCard{display:none!important}
 .sp-eyebrow{font-family:var(--sc-mono);font-size:12px;font-weight:800;letter-spacing:.15em;color:var(--sc-green-hi)}
@@ -17,17 +17,3 @@
 @keyframes sp-pulse{50%{box-shadow:0 0 30px var(--sc-glow);transform:scale(1.03)}}@keyframes sp-scan{0%{transform:translateX(-130%)}100%{transform:translateX(560%)}}
 @media(prefers-reduced-motion:reduce){.simple-preflight-card .sp-icon,.sp-meter span{animation:none!important;transition:none!important}}
 @media(max-width:520px){.sp-actions{flex-direction:column}.sp-action{width:100%}}
-
-
-/* v2.30 desktop module fill */
-@media(min-width:901px){
-  .app-mode-print.ui-simple.simple-preflight-blocked .simple-preflight-card{
-    align-self:stretch!important;
-    min-height:0!important;
-    height:100%!important;
-    max-height:100%!important;
-    overflow-y:auto!important;
-    overscroll-behavior:contain;
-    scrollbar-gutter:stable;
-  }
-}
