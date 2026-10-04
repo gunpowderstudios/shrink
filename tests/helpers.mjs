@@ -15,7 +15,7 @@ export function prepare() {
     .replace(/'\.\/solid-core\.js\?v=[0-9.]+'/g, "'./solid-core.js'")
     .replace(/\.\/repair-core\.js\?v=\$\{(VERSION|FIX)\}/g, './repair-core.js');
   fs.writeFileSync(path.join(build, 'solid-rebuild.mjs'), sr);
-  fs.writeFileSync(path.join(build, 'mesh-tools-stub.mjs'), 'export function buildBinaryStl({ model }) { globalThis.__lastModel = model; return { buffer: new ArrayBuffer(84) }; }\n');
+  fs.writeFileSync(path.join(build, 'mesh-tools-stub.mjs'), 'export function buildBinaryStl({ model, zUp }) { globalThis.__lastModel = model; globalThis.__lastZUp = zUp; return { buffer: new ArrayBuffer(84) }; }\n');
   const link = path.join(build, 'node_modules');
   if (!fs.existsSync(link)) { try { fs.symlinkSync(path.join(root, 'tests', 'node_modules'), link, 'dir'); } catch {} }
 }
