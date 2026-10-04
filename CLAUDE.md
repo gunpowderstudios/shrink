@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.25**
+- Current user-facing release: **v2.26**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -140,6 +140,11 @@ Prefer:
 - keeping more triangles when that produces a reliable result quickly
 
 A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. Do not spend 40 seconds proving that 160,000 might also work.
+
+## Game viewer layout
+- The navigation hint (**Drag to rotate · Scroll to zoom · Right-drag to pan**) belongs inside the 3D viewer canvas.
+- The large red **Find the smallest that still looks the same** button belongs below the viewer in its own row.
+- Do not position both relative to the full viewer panel; that caused them to overlap.
 
 ## Viewer/UI rules
 
