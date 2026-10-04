@@ -106,7 +106,10 @@
   }
 
   function syncLoadedClass() {
-    body.classList.toggle('simple-has-model', active() && !!app()?.originalModel);
+    const loaded = active() && !!app()?.originalModel;
+    const changed = body.classList.contains('simple-has-model') !== loaded;
+    body.classList.toggle('simple-has-model', loaded);
+    if (changed) requestAnimationFrame(() => window.__shrinkPanelLayout?.resize?.());
   }
 
   function syncViewer() {
