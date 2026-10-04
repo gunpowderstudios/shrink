@@ -4,11 +4,24 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.32**
+- Current user-facing release: **v2.33**
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## v2.33 viewer stability rules
+The Duric browser video exposed three UI/viewer problems and v2.33 fixes them without changing geometry algorithms.
+
+- Internal STL reopen rule: SHRINK stores print geometry Y-up internally but STL import assumes Z-up. Any repaired/rebuilt model exported only for SHRINK to reopen must use `buildBinaryStl(... zUp:true)`.
+- Preserve view state across internal model replacement/reopen: camera position, OrbitControls target, up/zoom/near/far.
+- Simple reduction must keep the live reduced preview visible while stage === `working`; do not switch Original/Reduced back and forth on live events.
+- Model display should be idempotent when the requested model is already shown.
+- Loaded Simple desktop mode owns the viewport. Page scrolling is locked; the Controls module scrolls internally.
+- Workspace-height calculation must clamp the measured top to the visible viewport so negative values from scroll cannot create an oversized viewer.
+- Do not restore a permanent body-wide MutationObserver in `panel-layout.js`. UI text/result mutations must not trigger layout resize.
+- `panel-layout.js` uses short startup retries plus explicit workflow events and exposes `resize()`.
+- `app.js?v=2.33` is a viewer/app-shell cache key only; reducer/core algorithm modules are still v2.18.
 
 ## v2.32 P1 state
 The follow-up tidy-up after the v2.31 reliability work is complete.
@@ -214,7 +227,7 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - Reduced print preview normals must be recomputed after connectivity changes so the model does not appear artificially dark.
 - Once a model is loaded on desktop, the header/branding should collapse to reclaim height.
 - Viewer and controls may be on either side according to the saved dock preference.
-- Simple control panel scrolls independently on the right.
+- Simple control panel scrolls internally on whichever side the user has docked it; the loaded desktop page itself should not scroll.
 - Avoid large dead vertical gaps.
 - Mobile warning is intentionally cheeky but non-blocking.
 
