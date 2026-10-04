@@ -1,4 +1,4 @@
-import { rebuildSolid } from './solid-rebuild.js?v=2.18';
+import { rebuildSolid } from './solid-rebuild.js?v=2.27';
 
 // SHRINK 3D v2.18 — "Make watertight": rebuild the model as one closed solid.
 // The surface is traced into a voxel grid, small gaps are sealed, everything the outside cannot reach becomes solid,
