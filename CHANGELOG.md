@@ -2,6 +2,45 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.32 — P1 Simple-mode tidy-up
+
+### Simple quality presets
+- Removed misleading millimetre claims from the home-user quality choices.
+- Simple presets are now described as what they actually are: conservative triangle targets for dense models:
+  - Maximum detail: ~450k
+  - Best detail: ~320k
+  - Balanced: ~240k
+  - Smallest file: ~170k
+- The internal mm values remain only for explicit Compare/Tools measurements and rebuild-detail estimates.
+- Compare still opts into the real BVH surface-loss measurement.
+
+### Reduction ownership
+- Deleted `simple-focus.js`.
+- Moved its target-selection logic into `simple-mode.js`, so one controller owns Simple reduction.
+- Removed the click interception / temporary fake “saved percentage” state.
+- Fine-tune now updates the target silently and performs one awaited `runExact()` reduction instead of two overlapping reductions.
+- Simple exports keep Fuse off unless the user deliberately chooses it in Tools.
+
+### User choice
+- A clean model now offers **Download as it is** before any reduction.
+- If normal repair fails, choices are **Stronger fix**, **Continue anyway**, **Download as it is**, or **Tools**.
+- If the stronger rebuild also fails, the user can still **Continue anyway** or **Download as it is**.
+- Continuing with known mesh faults keeps an amber warning visible; SHRINK does not pretend the model passed.
+
+### Cleanup
+- Removed the duplicate `viewer-auto-button.js` dynamic import; the helper now loads once.
+- Added regression assertions for unchanged download and preflight bypass.
+
+### Version boundaries
+- User-facing Simple/UI release: **v2.32**.
+- Repair graph remains **v2.27**.
+- Core reducer remains **v2.18**.
+
+### Next
+Browser-test Duric again. If stable, prototype the new recipe/job-state flow beside the existing UI behind a flag rather than adding another override layer.
+
+---
+
 ## v2.31 — P0 reliability cleanup
 
 ### Reliability
