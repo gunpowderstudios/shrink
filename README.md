@@ -1,4 +1,4 @@
-# SHRINK 3D v2.33
+# SHRINK 3D v2.34
 
 Browser tool (everything runs locally). Simple mode is the default in 3D print; **Tools** keeps the full technical control panel.
 
@@ -6,8 +6,20 @@ Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## Versioning
-The current **core engine graph is v2.18**. v2.33 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
+The current **core engine graph is v2.18**. v2.34 is deliberately a Simple-mode UI/workflow layer (`simple-wizard.js`, `simple-preflight.js`, `simple-postreduce.js` and their CSS) loaded on top of that proven engine.
 Do not retag individual core modules one by one. When the core engine changes again, bump all of its `./file.js?v=X` imports and VERSION constants together so the browser never loads two copies of the same module.
+
+## v2.34 layout reset
+The draggable/dockable desktop module experiment introduced in v2.28 has been removed.
+
+- Deleted `panel-layout.js` and `panel-layout.css`.
+- Removed drag bars, left/right swapping, saved panel-side state and JavaScript viewport-height management.
+- Restored the fixed pre-v2.28 two-column desktop structure: Controls on the left, 3D viewer on the right.
+- Desktop sizing is CSS-only again. Both columns share one browser-relative height; Controls/Check-Repair scroll internally if needed while the Viewer fills its column.
+- Kept all current v2.31–v2.33 repair/reduction/health-check logic.
+- Kept the v2.33 STL orientation fix, camera/view preservation and stable live-reduced preview.
+
+This is a layout rollback only, not an engine rollback.
 
 ## v2.33 viewer stability
 This release keeps the 3D workspace calm while repair and reduction run.
