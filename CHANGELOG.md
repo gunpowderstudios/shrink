@@ -2,6 +2,32 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.33 — Viewer stability
+
+### Orientation / camera
+- Fixed repaired/rebuilt STL reopen orientation: internal Y-up geometry is exported with `zUp:true` before re-import, matching SHRINK's STL importer.
+- Added camera/view-state capture and restore around the repair/rebuild reopen.
+- User rotation, zoom and OrbitControls target now survive that internal reopen.
+
+### Flicker
+- During Simple reduction the live reduced preview remains on screen instead of the wizard switching back to Original between updates.
+- Showing the same model repeatedly is now idempotent, avoiding scene remove/add churn.
+
+### Desktop viewport
+- Loaded Simple mode is locked to the desktop browser viewport; controls scroll internally instead of forcing page scroll.
+- Workspace height is capped to the visible viewport even if the page had previously been scrolled.
+- Removed the permanent body-wide MutationObserver from `panel-layout.js`.
+- Layout mounts via a short startup retry and explicit SHRINK events instead of reacting to every text/result DOM mutation.
+- The layout module exposes an explicit resize hook and the Simple wizard calls it when model-loaded state changes.
+
+### Scope
+- No reduction algorithm, repair algorithm or mesh-health rule changed.
+- User-facing release: **v2.33**.
+- Repair graph remains **v2.27**.
+- Reducer/core algorithm graph remains **v2.18**; `app.js?v=2.33` is a viewer-shell cache key only.
+
+---
+
 ## v2.32 — P1 Simple-mode tidy-up
 
 ### Simple quality presets
