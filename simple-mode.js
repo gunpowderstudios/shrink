@@ -1,8 +1,8 @@
-// SHRINK 3D v2.31 — Simple mode: a one-button, plain-English print workflow for home printers.
-// It is a thin layer over the existing engine (live reducer, Fuse/Manifold check, Make watertight, STL/split export),
-// so Advanced mode keeps working exactly as before. Flow: shrink first -> check it is a solid -> check it fits -> download.
+// SHRINK 3D v2.32 — Simple mode: a one-button, plain-English print workflow for home printers.
+// It is a thin layer over the existing reducer/repair/export engines.
+ // Tools mode keeps the technical controls. Simple owns one conservative reduction, one shared mesh-health check and export.
 (() => {
-  const VERSION = '2.31';
+  const VERSION = '2.32';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -36,16 +36,32 @@
     steps: { shrink: 'pending', repair: 'pending', fit: 'pending' }
   };
 
-  // How much detail to keep. "Best detail" matches the strict setting the resin preset always used.
+  // Simple quality presets are conservative triangle targets, not measured print-resolution guarantees.
+  // mm/strict are retained only for Compare, Tools and rebuild estimates.
   const DETAILS = [
-    { id: 'max', name: 'Maximum detail', note: 'Every strand, big file', mm: 0.02, strict: 'p995' },
-    { id: 'best', name: 'Best detail', note: 'Keeps faces and fine detail', mm: 0.05, strict: 'p995' },
-    { id: 'balanced', name: 'Balanced', note: 'Good for most prints', mm: 0.1, strict: 'p99' },
-    { id: 'small', name: 'Smallest file', note: 'Softer detail', mm: 0.2, strict: 'p95' }
+    { id: 'max', name: 'Maximum detail', note: 'Least reduction · aims around 450k triangles on dense models', target: 450000, floor: 0.42, mm: 0.02, strict: 'p995' },
+    { id: 'best', name: 'Best detail', note: 'Good default for minis · aims around 320k', target: 320000, floor: 0.30, mm: 0.05, strict: 'p995' },
+    { id: 'balanced', name: 'Balanced', note: 'Smaller file · aims around 240k', target: 240000, floor: 0.22, mm: 0.1, strict: 'p99' },
+    { id: 'small', name: 'Smallest file', note: 'Most reduction · aims around 170k', target: 170000, floor: 0.16, mm: 0.2, strict: 'p95' }
   ];
 
   S.detail = (() => { const v = store.get('shrink-simple-detail'); return ['max', 'best', 'balanced', 'small'].includes(v) || (v === 'custom' && S.customMm > 0) ? v : 'best'; })();
   const detailMm = () => S.detail === 'custom' ? S.customMm : (DETAILS.find(x => x.id === S.detail) || DETAILS[0]).mm;
+
+  function suggestedKeep(triangles) {
+    if (!(triangles > 0)) return 100;
+    let preset = DETAILS.find(x => x.id === S.detail);
+    if (!preset && S.detail === 'custom') {
+      const mm = Number(S.customMm) || 0.05;
+      preset = mm <= 0.03 ? DETAILS[0] : mm <= 0.075 ? DETAILS[1] : mm <= 0.15 ? DETAILS[2] : DETAILS[3];
+    }
+    preset ||= DETAILS[1];
+    if (triangles <= preset.target * 1.12) return 100;
+    let ratio = Math.max(preset.floor, preset.target / triangles);
+    if (ratio > 0.86) return 100;
+    ratio = Math.min(0.86, Math.max(0.08, ratio));
+    return Math.round(ratio * 1000) / 10;
+  }
 
   let card = null;
   const printer = () => PRINTERS.find(p => p.id === S.printer) || PRINTERS[0];
@@ -156,10 +172,13 @@
       live.setRatio?.(pct / 100, { notify: false });
       applied = await engine.runExact(pct / 100, { protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
     } else {
-      note('Looking for a sensible smaller version…');
-      S.pending = live.autoFind();
-      try { await S.pending; } finally { S.pending = null; }
-      applied = engine.last;
+      const keep = suggestedKeep(live.state.tris);
+      const ratio = keep / 100;
+      live.setRatio?.(ratio, { notify: false });
+      note(keep >= 99.5
+        ? 'This model is already a sensible size for the selected quality preset. Keeping the full mesh.'
+        : `Keeping about ${keep}% of the triangles for the selected quality preset…`);
+      applied = await engine.runExact(ratio, { protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
     }
 
     const reduced = app()?.optimizedModel || engine.root;
@@ -168,7 +187,7 @@
     result.shrink = {
       before, after, pct: before ? (after / before) * 100 : 100,
       level: 'good',
-      text: after < before ? 'Reduced for the selected print quality' : 'Full detail kept',
+      text: after < before ? 'Reduced using the selected quality preset' : 'Full detail kept',
       nums: ''
     };
   }
@@ -334,7 +353,7 @@
     else setNative('splitMode', 'off', 'change');
     setNative('zUpToggle', true, 'change');
     const fuse = $('fuseSolidToggle');
-    if (fuse) { fuse.checked = S.result?.repair?.state === 'ok' && !splitting; fuse.dispatchEvent(new Event('change', { bubbles: true })); }   // a rebuilt solid is already clean, so it is exported as is
+    if (fuse) { fuse.checked = false; fuse.dispatchEvent(new Event('change', { bubbles: true })); }
     setStatusLine('Building your file…', false);
     $('saveStlBtn')?.click();
   }
@@ -449,7 +468,7 @@
         ofTriangles: live?.tris || null,
         tuned: !!S.tuned
       },
-      notes: 'Detail (mm) is the size of change SHRINK may not exceed, so it carries over to any model. print.heightMm is how tall the model was printed. keepPercent is the share of triangles kept on the model it was saved from.'
+      notes: 'Simple quality presets choose conservative triangle targets. detail.mm is retained for Compare/Tools and rebuild estimates; it is not a measured Simple-mode guarantee. print.heightMm is the intended printed height. keepPercent is the share of triangles kept on the model it was saved from.'
     };
   }
 
@@ -501,9 +520,9 @@
   }
 
   function detailLabel() {
-    if (S.detail === 'custom') return `Saved detail ${S.customMm} mm`;
+    if (S.detail === 'custom') return 'Custom quality (saved setting)';
     const d = DETAILS.find(x => x.id === S.detail) || DETAILS[0];
-    return `${d.name} (${d.mm} mm)`;
+    return d.name;
   }
 
   function renderLoaded() {
@@ -565,7 +584,7 @@
   /* ---- detail level chips ---- */
   function renderDetails() {
     const wrap = $('scDetails'); if (!wrap) return;
-    const list = S.customMm > 0 && S.detail === 'custom' ? [...DETAILS, { id: 'custom', name: `Saved: ${S.customMm} mm`, note: 'From your settings file' }] : DETAILS;
+    const list = S.customMm > 0 && S.detail === 'custom' ? [...DETAILS, { id: 'custom', name: 'Custom quality', note: 'Loaded from your saved settings' }] : DETAILS;
     wrap.dataset.count = String(list.length);
     wrap.innerHTML = list.map(d => `<button type="button" class="sc-chip sc-mini${d.id === S.detail ? ' on' : ''}" data-detail="${d.id}" aria-pressed="${d.id === S.detail}"><strong>${esc(d.name)}</strong><small>${esc(d.note)}</small></button>`).join('');
   }
@@ -631,7 +650,7 @@
         S.result.shrink = {
           before, after, pct: before ? (after / before) * 100 : 100,
           level: 'good',
-          text: after < before ? 'Reduced for the selected print quality' : 'Full detail kept',
+          text: after < before ? 'Reduced using the selected quality preset' : 'Full detail kept',
           nums: ''
         };
         await doSolidCheck(S.result);
@@ -823,7 +842,14 @@
     card.addEventListener('input', onProtectInput);
     $('scSettingsFile').addEventListener('change', () => { const f = $('scSettingsFile').files?.[0]; loadSettingsFile(f); $('scSettingsFile').value = ''; });
     $('scUsePercent').addEventListener('change', () => { S.usePercent = $('scUsePercent').checked; });
-    $('scDetailRange').addEventListener('input', () => { S.tuned = true; S.dragging = true; setNative('geometry', $('scDetailRange').value, 'input'); renderTune(); scheduleTuneRefresh(); });
+    $('scDetailRange').addEventListener('input', () => {
+      S.tuned = true; S.dragging = true;
+      const pct = Number($('scDetailRange').value) || 100;
+      window.__shrinkLiveUI?.setRatio?.(pct / 100, { notify: false });
+      if ($('geometryValue')) $('geometryValue').textContent = `${pct.toFixed(1)}%`;
+      renderTune();
+      scheduleTuneRefresh();
+    });
     ['liveLine', 'verdictText', 'verdict'].forEach(id => { const n = $(id); if (n) new MutationObserver(renderTune).observe(n, { childList: true, characterData: true, subtree: true, attributes: true }); });
     window.addEventListener('shrink:compare', renderTune);
     window.addEventListener('shrink:protect-changed', renderProtect);
