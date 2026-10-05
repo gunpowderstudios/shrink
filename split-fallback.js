@@ -39,9 +39,9 @@ async function directSplit(rawReason) {
     for(let i=0;i<parts.length;i++){
       const topo=analyzeTopology(THREE,parts[i]); topology.push(topo);
       const stl=buildBinaryStl({THREE,model:parts[i],mmPerUnit:scale,zUp}); total+=stl.triangles;
-      files[`${base}-part-${i+1}-of-${parts.length}.stl`]=new Uint8Array(stl.buffer);
+      files[`${base}-SHRINK-part-${i+1}-of-${parts.length}.stl`]=new Uint8Array(stl.buffer);
     }
-    const zip=zipSync(files,{level:0}); saveBlob(new Blob([zip],{type:'application/zip'}),`${base}-split-${parts.length}-parts-fallback.zip`);
+    const zip=zipSync(files,{level:0}); saveBlob(new Blob([zip],{type:'application/zip'}),`${base}-SHRINK-split-${parts.length}-parts.zip`);
     const pegCuts=out.joints?.filter(j=>j.pegsAdded).length||0;
     const unsafe=topology.map((t,i)=>({part:i+1,...t})).filter(t=>!t.watertight);
     console.info('[SHRINK 3D v1.90] Direct split result',{cuts:out.cuts,joints:out.joints,topology});
