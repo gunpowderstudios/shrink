@@ -1,6 +1,6 @@
-// SHRINK 3D v2.49 — cumulative multitool working model.
+// SHRINK 3D v2.50 — cumulative multitool with applied-change flags.
 (() => {
-  const VERSION = '2.49';
+  const VERSION = '2.50';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -12,6 +12,7 @@
   let fuseReady = false;
   let shrinkReady = false;
   let workingModel = null;
+  const appliedChanges = new Set();
 
   function setWorkingModel(model) {
     workingModel = model || app()?.originalModel || null;
@@ -21,6 +22,29 @@
   function healthModel() { return sourceModel(); }
   window.__shrinkWorkingModel = () => sourceModel();
   window.__shrinkSetWorkingModel = setWorkingModel;
+  function renderAppliedChanges() {
+    const wrap = $('v2HealthChanges');
+    if (!wrap) return;
+    const order = ['fixed','fused','shrunk'];
+    const labels = { fixed:'FIXED', fused:'FUSED', shrunk:'SHRUNK' };
+    const chips = order.filter(k => appliedChanges.has(k))
+      .map(k => `<span class="v2-change-chip ${k}"><i></i>${labels[k]}</span>`)
+      .join('');
+    wrap.innerHTML = chips
+      ? `<small>CHANGES</small><div>${chips}</div>`
+      : '<small>CHANGES</small><div class="v2-change-none">None yet</div>';
+  }
+
+  function markApplied(kind) {
+    appliedChanges.add(kind);
+    renderAppliedChanges();
+  }
+
+  function clearApplied() {
+    appliedChanges.clear();
+    renderAppliedChanges();
+  }
+
 
   function setNative(id, value, event = 'change') {
     const el = $(id);
@@ -67,6 +91,7 @@
         <div class="v2-health-score"><b id="v2HealthScore">—</b><span>/100</span></div>
       </div>
       <div id="v2HealthRows" class="v2-health-rows"><div class="v2-health-checking">Running mesh checks…</div></div>
+      <div id="v2HealthChanges" class="v2-health-changes"><small>CHANGES</small><div class="v2-change-none">None yet</div></div>
       <button id="v2HealthFixBtn" class="v2-health-fix" type="button">FIX IT</button>
     `;
     card.querySelector('#v2HealthFixBtn')?.addEventListener('click', fixHealthModel);
@@ -132,6 +157,7 @@
       app()?.show?.('optimized');
       if (view) app()?.restoreViewState?.(view);
       app()?.notifyReduced?.({ kind: 'repair' });
+      markApplied('fixed');
       window.__shrinkPrintSafety?.clearDiagnostic?.();
       btn.textContent = 'FIXED';
       await wait(80);
@@ -231,6 +257,7 @@
       setWorkingModel(built.root);
       app()?.show?.('optimized');
       app()?.notifyReduced?.({ kind: 'fuse', components });
+      markApplied('fused');
       window.__shrinkPrintSafety?.clearDiagnostic?.();
       card.dataset.state = 'good';
       markStep(2, 'done');
@@ -293,6 +320,7 @@
       const verdict = $('verdictText')?.textContent || '';
       const reducedRoot = window.__shrinkLive?.root || app()?.optimizedModel;
       if (reducedRoot) setWorkingModel(reducedRoot);
+      markApplied('shrunk');
       shrinkReady = true;
       progress(card, 100, 'Done.');
       $('v2ShrinkResult').innerHTML = `<strong>✓ ${verdict || 'Optimised'}</strong><span>${live}</span>`;
@@ -431,6 +459,7 @@
     chooser.insertAdjacentElement('afterend', dashboard);
     dashboard.querySelector('.v2-viewer-slot').appendChild(viewerPanel);
     ensureHealthCard();
+    renderAppliedChanges();
     if (!workingModel) setWorkingModel(app()?.originalModel);
     setTimeout(updateHealthCard, 80);
 
@@ -474,7 +503,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', () => { setWorkingModel(app()?.originalModel); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', () => { setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
