@@ -847,7 +847,7 @@ function downloadBytes(bytes, filename) {
 
 function downloadOptimized() {
   if (!optimizedBytes || !sourceFile) return;
-  downloadBytes(optimizedBytes, `${baseName()}-shrink.glb`);
+  downloadBytes(optimizedBytes, `${baseName()}-SHRINK.glb`);
 }
 
 applyPreset('game');
