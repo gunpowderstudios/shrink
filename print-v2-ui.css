@@ -112,3 +112,7 @@
   .v2-viewer-slot{position:relative;top:0;order:-1}
   .v2-viewer-slot .viewer-panel{height:62vh!important;min-height:500px!important}
 }
+
+
+/* v2.42 — remove duplicate setup strip */
+.v2-setup-strip{display:none!important}
