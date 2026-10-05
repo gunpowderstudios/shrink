@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { reduceIndices } from './reduce-core.js?v=2.18';
 
-/* Live reduction: keeps a lightweight "preview" copy of the model whose index buffers are re-simplified in a
+/* SHRINK 3D v2.49 — cumulative working-model reduction. Keeps a lightweight "preview" copy whose index buffers are re-simplified in a
  * background worker whenever the slider moves. Vertices/attributes are copied once; only triangle lists change,
  * so updates are fast and the page never freezes. */
 
@@ -12,7 +12,7 @@ export function createLiveReducer(app) {
     root: null, registered: false,
     wanted: null, busy: false, locked: false, timer: 0,
     last: { ratio: 1, triangles: 0, ms: 0, keepUsed: 1 },
-    originalTriangles: 0, mainSimplifier: null
+    originalTriangles: 0, mainSimplifier: null, baseOwned: null
   };
 
   /* ---------------- worker plumbing ---------------- */
@@ -52,15 +52,32 @@ export function createLiveReducer(app) {
   /* ---------------- building the preview ---------------- */
   function disposePreview() {
     for (const s of R.sources) if (s.preview && s.previewOwned) s.preview.geometry.dispose();
+    if (R.baseOwned) {
+      R.baseOwned.traverse(o => { if (o.isMesh) o.geometry?.dispose?.(); });
+      R.baseOwned = null;
+    }
     R.sources = []; R.root = null;
   }
 
-  async function prepare() {
+  function deepGeometryClone(model) {
+    if (!model) return null;
+    const clone = model.clone(true);
+    clone.traverse(o => { if (o.isMesh && o.geometry) o.geometry = o.geometry.clone(); });
+    clone.updateMatrixWorld(true);
+    return clone;
+  }
+
+  async function prepare(baseOverride = null) {
     clearTimeout(R.timer); R.wanted = null;
-    if (R.root) app.clearPreview?.();
+    const requested = baseOverride || app.originalModel;
+    if (!requested) return;
+    // Snapshot an explicit working model before setPreview/clearPreview is allowed
+    // to dispose the previous preview. This is the cumulative multitool baseline.
+    const ownedBase = baseOverride ? deepGeometryClone(requested) : null;
+    if (R.root && app.optimizedModel === R.root) app.clearPreview?.();
     disposePreview();
-    const original = app.originalModel;
-    if (!original) return;
+    const original = ownedBase || requested;
+    R.baseOwned = ownedBase;
     original.updateMatrixWorld(true);
     const clone = original.clone(true);
     const originals = [], clones = [];
@@ -201,6 +218,7 @@ export function createLiveReducer(app) {
     get root() { return R.root; },
     get last() { return R.last; },
     get originalTriangles() { return R.originalTriangles; },
+    get base() { return R.baseOwned || app.originalModel || null; },
     get ready() { return !!R.root && R.registered; },
     get usingWorker() { return !!R.worker && !R.workerFailed; }
   };
