@@ -1,6 +1,6 @@
-// SHRINK 3D v2.50 — cumulative multitool with applied-change flags.
+// SHRINK 3D v2.51 — keep action history separate from current repair state.
 (() => {
-  const VERSION = '2.50';
+  const VERSION = '2.51';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -130,13 +130,20 @@
         healthRow('Flipped faces', new Intl.NumberFormat().format(h.flippedEdges), oriented) +
         healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens);
       const fixBtn = $('v2HealthFixBtn');
-      if (fixBtn) fixBtn.hidden = rating.score === 100;
+      if (fixBtn) {
+        const healthyNow = rating.score === 100;
+        fixBtn.hidden = healthyNow;
+        if (!healthyNow) {
+          fixBtn.textContent = 'FIX IT';
+          fixBtn.disabled = false;
+        }
+      }
     } catch (err) {
       card.className = 'v2-health-card bad';
       $('v2HealthLabel').textContent = 'Check failed';
       $('v2HealthScore').textContent = '—';
       $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Could not analyse this mesh.</div>';
-      console.warn('[SHRINK 3D v2.47] Health card check failed', err);
+      console.warn('[SHRINK 3D v2.51] Health card check failed', err);
     }
   }
 
@@ -165,7 +172,7 @@
       const card = $('v2HealthCard');
       if (card && $('v2HealthScore')?.textContent === '100') btn.hidden = true;
     } catch (err) {
-      console.error('[SHRINK 3D v2.48] Health repair failed', err);
+      console.error('[SHRINK 3D v2.51] Health repair failed', err);
       btn.textContent = 'COULD NOT FIX';
       window.__shrinkPrintSafety?.showDiagnostic?.('Fuse', err?.message || String(err));
       setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; }, 1800);
