@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=2.18';
 import { gatherWorld, repairMesh } from './repair-core.js?v=2.27';
 
-// SHRINK 3D v2.43 — optional print export Boolean union / make-manifold pass,
+// SHRINK 3D v2.48 — gentle repair + optional Boolean union / make-manifold pass,
 // with a best-effort cleanup repair before Manifold gives up.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -159,6 +159,30 @@ function repairWholeModelSolid(model, wasm) {
   return solid;
 }
 
+function repairedRootFromModel(model) {
+  const raw = gatherWorld(THREE, model);
+  const repaired = repairMesh({
+    positions: raw.positions,
+    indices: raw.indices,
+    onProgress: () => {}
+  });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(repaired.positions, 3));
+  geometry.setIndex(new THREE.BufferAttribute(repaired.indices, 1));
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72, metalness: 0 })
+  );
+  const root = new THREE.Group();
+  root.name = 'SHRINK gentle repair';
+  root.userData.shrinkGentleRepair = true;
+  root.userData.repairStats = repaired.stats;
+  root.add(mesh);
+  root.updateMatrixWorld(true);
+  return { root, stats: repaired.stats };
+}
+
 async function modelToSolid(model) {
   const wasm = await loadManifold();
   const solids = [];
@@ -289,4 +313,4 @@ function wire() {
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true }); else wire();
-window.__shrinkFuse = { fuseModel, modelToSolid, loadManifold, solidToThree };
+window.__shrinkFuse = { fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };
