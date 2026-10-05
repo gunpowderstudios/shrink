@@ -375,7 +375,7 @@ window.addEventListener('shrink:compare', e => {
   if (on) {
     const a = app();
     labelL.textContent = `ORIGINAL · ${fmt(P.originalTriangles)} tris`;
-    labelR.textContent = `REDUCED · ${fmt(P.optimizedTriangles)} tris`;
+    labelR.textContent = `REDUCED · ${Number.isFinite(P.optimizedTriangles) ? fmt(P.optimizedTriangles) : '—'} tris`;
     window.__shrinkPrintRefreshLabels = () => { labelR.textContent = `REDUCED · ${fmt(P.optimizedTriangles)} tris`; };
     placeDivider();
   }
@@ -472,7 +472,19 @@ window.addEventListener('shrink:texture-applied', () => {
 
 let heatTimer = 0;
 window.addEventListener('shrink:reduced', e => {
-  P.optimizedTriangles = e.detail.triangles;
+  const reported = Number(e.detail?.triangles);
+  if (Number.isFinite(reported)) {
+    P.optimizedTriangles = reported;
+  } else {
+    const model = window.__shrinkWorkingModel?.() || app()?.optimizedModel;
+    let tris = 0;
+    model?.traverse?.(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const g = o.geometry;
+      tris += g.index ? Math.floor(g.index.count / 3) : Math.floor(g.attributes.position.count / 3);
+    });
+    if (tris > 0) P.optimizedTriangles = tris;
+  }
   els.compareBtn.disabled = false; els.heatBtn.disabled = false;
   window.__shrinkPrintRefreshLabels?.();
   // The measurement belongs to the previous slider position: refresh it once the slider settles.
