@@ -208,11 +208,11 @@ async function exportSplitSTL(evt) {
       const root = solidToThree(parts[i]);
       const out = buildBinaryStl({ THREE, model: root, mmPerUnit: scale, zUp });
       totalTris += out.triangles;
-      files[`${base}-part-${i+1}-of-${parts.length}.stl`] = new Uint8Array(out.buffer);
+      files[`${base}-SHRINK-part-${i+1}-of-${parts.length}.stl`] = new Uint8Array(out.buffer);
       disposeThree(root);
     }
     const zip = zipSync(files, { level: 0 });
-    saveBlob(new Blob([zip], {type:'application/zip'}), `${base}-split-${parts.length}-parts.zip`);
+    saveBlob(new Blob([zip], {type:'application/zip'}), `${base}-SHRINK-split-${parts.length}-parts.zip`);
     const cutText = n===2 ? ` · cut at ${(finishedHeightMM()*cutFractions(2)[0]).toFixed(1)} mm` : '';
     say(`Saved ${parts.length} watertight STL sections${withPegs ? ' with keyed alignment pegs (upper part pegs into lower sockets)' : ''}${cutText} · ${new Intl.NumberFormat().format(totalTris)} triangles total.`);
   } catch (err) {
