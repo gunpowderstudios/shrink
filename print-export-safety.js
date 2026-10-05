@@ -2,8 +2,8 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { healthOfModel } from './repair-core.js?v=2.27';
 
-// SHRINK 3D v2.31 — safety layer around optional Fuse / Split helpers.
-const VERSION = '2.31';
+// SHRINK 3D v2.43 — safety layer around optional Fuse / Split helpers.
+const VERSION = '2.43';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -31,7 +31,7 @@ function ensureDiagnosticPanel(){
     <div class="print-diagnostic-title">⚠ This model isn't one clean printable solid</div>
     <div id="printDiagnosticMessage"></div>
     <div class="repair-actions">
-      <label class="repair-quality"><span>Keep detail</span><select id="remeshQuality"><option value="high">High</option><option value="balanced" selected>Balanced</option><option value="fast">Fast</option></select></label>
+      <label class="repair-quality"><span>Keep detail</span><select id="remeshQuality"><option value="high" selected>High</option><option value="balanced">Balanced</option><option value="fast">Fast</option></select></label>
       <button id="makeWatertightBtn" type="button">Make watertight</button>
     </div>
     <div class="repair-help">Rebuilds the sculpt as a new voxel-style closed outer skin. Best for overlapping or troublesome parts. Tiny details may soften slightly. Your original file is not changed.</div>
