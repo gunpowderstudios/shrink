@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=2.18';
 
-// SHRINK 3D v1.88 — optional print export Boolean union / make-manifold pass,
+// SHRINK 3D v2.43 — optional print export Boolean union / make-manifold pass,
 // with a best-effort cleanup repair before Manifold gives up.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -141,6 +141,23 @@ function meshToSolid(mesh, wasm) {
   throw new Error(lastStatus ? `Manifold rejected a mesh part after repair: ${lastStatus}` : 'Manifold rejected a mesh part after repair as non-manifold.');
 }
 
+function repairWholeModelSolid(model, wasm) {
+  const raw = gatherWorld(THREE, model);
+  const repaired = repairMesh({
+    positions: raw.positions,
+    indices: raw.indices,
+    onProgress: () => {}
+  });
+  console.info('[SHRINK 3D v2.43] Detail-preserving whole-model repair before Fuse', repaired.stats);
+  const solid = solidFromData({ verts: repaired.positions, tris: repaired.indices }, wasm);
+  const status = statusText(solid);
+  if (!solid || solid.isEmpty?.()) {
+    try { solid?.delete?.(); } catch {}
+    throw new Error(status ? `Detail-preserving repair was still rejected: ${status}` : 'Detail-preserving repair was still non-manifold.');
+  }
+  return solid;
+}
+
 async function modelToSolid(model) {
   const wasm = await loadManifold();
   const solids = [];
@@ -156,10 +173,20 @@ async function modelToSolid(model) {
       console.warn('Could not convert one mesh part to a manifold solid after repair', err);
     }
   });
-  if (!solids.length) {
-    const reason = failures[0] ? ` ${failures[0]}` : '';
-    throw new Error(`No printable solid parts could be read from this model after repair.${reason}`);
+  // If even one part failed, do not silently omit it. Repair the complete model in
+  // world space first, preserving the existing axis/orientation, then retry Manifold.
+  if (failures.length) {
+    for (const s of solids) try { s.delete?.(); } catch {}
+    solids.length = 0;
+    try {
+      solids.push(repairWholeModelSolid(model, wasm));
+      failures.length = 0;
+    } catch (err) {
+      const first = failures[0] ? ` ${failures[0]}` : '';
+      throw new Error(`No printable solid parts could be read from this model after detail-preserving repair.${first} ${err?.message || ''}`.trim());
+    }
   }
+  if (!solids.length) throw new Error('No printable solid parts could be read from this model after repair.');
 
   let result = null;
   try {
