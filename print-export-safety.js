@@ -2,8 +2,8 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { healthOfModel } from './repair-core.js?v=2.27';
 
-// SHRINK 3D v2.43 — safety layer around optional Fuse / Split helpers.
-const VERSION = '2.43';
+// SHRINK 3D v2.44 — safety layer around optional Fuse / Split helpers.
+const VERSION = '2.44';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -38,7 +38,7 @@ function ensureDiagnosticPanel(){
     <details class="repair-advanced"><summary>Technical details</summary><div id="printDiagnosticStats" class="print-diagnostic-stats"></div></details>`;
   viewerPanel.appendChild(panel);
   const style=document.createElement('style'); style.id='printDiagnosticStyle';
-  style.textContent=`.print-diagnostic-panel{margin:10px 0 0;padding:13px 14px;border:1px solid #ff5b62;border-radius:12px;background:rgba(120,18,24,.22);color:#ffd3d5;font-size:12px;line-height:1.45}.print-diagnostic-title{font-weight:800;color:#ff747a;font-size:14px;margin-bottom:5px}.repair-actions{display:flex;gap:8px;align-items:end;margin-top:10px;flex-wrap:wrap}.repair-quality{display:grid;gap:4px;min-width:130px}.repair-quality span{font-size:11px;font-weight:700;color:#ffc2c5}.repair-quality select{background:#20242c;color:#fff;border:1px solid #4a515d;border-radius:8px;padding:8px}.repair-actions button{border:0;border-radius:9px;padding:9px 14px;background:#ff4f57;color:#fff;font-weight:800;cursor:pointer}.repair-actions button:disabled{opacity:.55;cursor:wait}.repair-help{margin-top:7px;color:#e9b9bc}.repair-advanced{margin-top:8px}.repair-advanced summary{cursor:pointer;color:#ffb5b9;font-weight:700}.print-diagnostic-stats{margin-top:6px;color:#ffb5b9}.print-diagnostic-panel[hidden]{display:none!important}`;
+  style.textContent=`.print-diagnostic-panel{box-sizing:border-box;width:calc(100% - 28px);margin:14px;padding:16px;border:1px solid #ff5b62;border-radius:16px;background:rgba(120,18,24,.22);color:#ffd3d5;font-size:12px;line-height:1.45;overflow:hidden}.print-diagnostic-title{margin:0 0 6px;font-weight:800;color:#ff747a;font-size:14px;line-height:1.3}#printDiagnosticMessage{margin:0}.repair-actions{display:flex;gap:10px;align-items:end;margin:12px 0 0;flex-wrap:wrap}.repair-quality{display:grid;gap:5px;min-width:134px}.repair-quality span{font-size:11px;font-weight:700;color:#ffc2c5}.repair-quality select{box-sizing:border-box;width:100%;min-height:38px;background:#20242c;color:#fff;border:1px solid #4a515d;border-radius:10px;padding:8px 10px}.repair-actions button{min-height:38px;border:0;border-radius:10px;padding:9px 14px;background:#ff4f57;color:#fff;font-weight:800;cursor:pointer}.repair-actions button:disabled{opacity:.55;cursor:wait}.repair-help{margin:10px 0 0;color:#e9b9bc}.repair-advanced{margin:12px 0 0;border:1px solid rgba(255,181,185,.24);border-radius:10px;background:rgba(255,255,255,.02);overflow:hidden}.repair-advanced summary{cursor:pointer;list-style:none;padding:9px 11px;color:#ffb5b9;font-weight:700}.repair-advanced summary::-webkit-details-marker{display:none}.repair-advanced summary::after{content:'⌄';float:right}.repair-advanced[open] summary::after{content:'⌃'}.print-diagnostic-stats{margin:0;padding:0 11px 11px;color:#ffb5b9;overflow-wrap:anywhere}.print-diagnostic-panel[hidden]{display:none!important}@media(max-width:900px){.print-diagnostic-panel{width:100%;margin:12px 0 0}}`;
   document.head.appendChild(style);
   $('makeWatertightBtn')?.addEventListener('click', makeWatertightCopy);
   return panel;
