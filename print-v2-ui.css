@@ -223,3 +223,49 @@
 .v2-health-fix:disabled{opacity:.55;cursor:wait}
 .v2-health-fix[hidden]{display:none!important}
 .v2-health-card.good .v2-health-fix{display:none!important}
+
+
+/* v2.50 — applied change flags in the model health card */
+.v2-health-changes{
+  margin-top:9px;
+  padding-top:8px;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.v2-health-changes>small{
+  display:block;
+  margin-bottom:6px;
+  color:#7f90a5;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.14em;
+}
+.v2-health-changes>div{
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap;
+}
+.v2-change-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 7px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:999px;
+  background:rgba(255,255,255,.04);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.04em;
+}
+.v2-change-chip i{
+  display:block;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+}
+.v2-change-chip.fixed{color:#ff9ba0;border-color:rgba(255,79,87,.35)}
+.v2-change-chip.fixed i{background:#ff4f57}
+.v2-change-chip.fused{color:#cda8ff;border-color:rgba(155,76,255,.38)}
+.v2-change-chip.fused i{background:#9b4cff}
+.v2-change-chip.shrunk{color:#89efbb;border-color:rgba(54,216,138,.38)}
+.v2-change-chip.shrunk i{background:#36d88a}
+.v2-change-none{color:#718196;font-size:9px}
