@@ -7,7 +7,7 @@ import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=2.18';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let busy = false;
-function sourceModel() { return app()?.optimizedModel || app()?.originalModel || null; }
+function sourceModel() { return window.__shrinkWorkingModel?.() || app()?.optimizedModel || app()?.originalModel || null; }
 function mmPerUnit() { return window.__shrinkPrint?.mmPerUnit?.() || 1; }
 function partCount() { return window.__shrinkSplit?.partCount?.() || 1; }
 function cutFractions() { return window.__shrinkSplit?.cutFractions?.(partCount()) || []; }
