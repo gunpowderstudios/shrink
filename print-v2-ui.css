@@ -116,3 +116,89 @@
 
 /* v2.42 — remove duplicate setup strip */
 .v2-setup-strip{display:none!important}
+
+
+/* v2.46 — compact bedside-style model health card */
+.v2-viewer-slot .viewer{position:relative!important}
+.v2-health-card{
+  position:absolute;
+  right:14px;
+  bottom:14px;
+  z-index:12;
+  width:220px;
+  box-sizing:border-box;
+  padding:12px;
+  border:1px solid #354458;
+  border-radius:14px;
+  background:rgba(10,16,24,.92);
+  box-shadow:0 14px 34px rgba(0,0,0,.34);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  color:#e8eef6;
+  pointer-events:none;
+}
+.v2-health-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom:9px;
+  margin-bottom:7px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.v2-health-top small{
+  display:block;
+  margin-bottom:2px;
+  color:#8ea0b7;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.14em;
+}
+.v2-health-top>div>strong{
+  display:block;
+  font-size:15px;
+  line-height:1.1;
+}
+.v2-health-score{
+  display:flex;
+  align-items:baseline;
+  white-space:nowrap;
+}
+.v2-health-score b{
+  font-size:26px;
+  line-height:1;
+}
+.v2-health-score span{
+  margin-left:2px;
+  color:#8292a6;
+  font-size:9px;
+  font-weight:800;
+}
+.v2-health-row{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:3px 0;
+  font-size:10px;
+}
+.v2-health-row span{color:#9cabbc}
+.v2-health-row strong{font-size:10px}
+.v2-health-row strong.ok{color:#67dfa1}
+.v2-health-row strong.issue{color:#ff7b82}
+.v2-health-checking{padding:5px 0;color:#91a1b5;font-size:10px}
+.v2-health-card.good{border-color:rgba(62,211,137,.58)}
+.v2-health-card.good .v2-health-top>div>strong,
+.v2-health-card.good .v2-health-score b{color:#67dfa1}
+.v2-health-card.fair{border-color:rgba(242,191,73,.65)}
+.v2-health-card.fair .v2-health-top>div>strong,
+.v2-health-card.fair .v2-health-score b{color:#f3c861}
+.v2-health-card.bad{border-color:rgba(255,91,98,.72)}
+.v2-health-card.bad .v2-health-top>div>strong,
+.v2-health-card.bad .v2-health-score b{color:#ff7b82}
+@media(max-width:900px){
+  .v2-health-card{right:10px;bottom:10px;width:205px}
+}
+@media(max-width:620px){
+  .v2-health-card{width:190px;padding:10px}
+  .v2-health-score b{font-size:22px}
+}
