@@ -1,6 +1,6 @@
-// SHRINK 3D v2.45 — distinguish healthy multi-part meshes from broken meshes.
+// SHRINK 3D v2.46 — model health bedside chart.
 (() => {
-  const VERSION = '2.45';
+  const VERSION = '2.46';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -26,6 +26,81 @@
   function nativeValue(id, fallback = '') {
     const el = $(id);
     return el ? el.value : fallback;
+  }
+
+  function healthScore(h) {
+    if (!h) return { score: 0, label: 'Checking…', level: 'checking' };
+    let score = 100;
+    if (h.openEdges > 0) score -= 35;
+    if (h.pinchedEdges > 0) score -= 35;
+    if (h.flippedEdges > 0) score -= 20;
+    if (h.degenerateTriangles > 0) score -= 10;
+    score = Math.max(0, score);
+    const label = score === 100 ? 'Excellent' : score >= 80 ? 'Good' : score >= 55 ? 'Needs attention' : 'Poor';
+    const level = score === 100 ? 'good' : score >= 80 ? 'fair' : 'bad';
+    return { score, label, level };
+  }
+
+  function healthRow(label, value, ok) {
+    return `<div class="v2-health-row"><span>${label}</span><strong class="${ok ? 'ok' : 'issue'}">${value}</strong></div>`;
+  }
+
+  function ensureHealthCard() {
+    const viewer = $('viewer');
+    if (!viewer) return null;
+    let card = $('v2HealthCard');
+    if (card) return card;
+    card = document.createElement('aside');
+    card.id = 'v2HealthCard';
+    card.className = 'v2-health-card checking';
+    card.innerHTML = `
+      <div class="v2-health-top">
+        <div><small>MODEL HEALTH</small><strong id="v2HealthLabel">Checking…</strong></div>
+        <div class="v2-health-score"><b id="v2HealthScore">—</b><span>/100</span></div>
+      </div>
+      <div id="v2HealthRows" class="v2-health-rows"><div class="v2-health-checking">Running mesh checks…</div></div>
+    `;
+    viewer.appendChild(card);
+    return card;
+  }
+
+  let healthRun = 0;
+  async function updateHealthCard() {
+    const card = ensureHealthCard();
+    const model = sourceModel();
+    if (!card || !model) return;
+    const run = ++healthRun;
+    card.className = 'v2-health-card checking';
+    $('v2HealthLabel').textContent = 'Checking…';
+    $('v2HealthScore').textContent = '—';
+    $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Running mesh checks…</div>';
+    await wait(60);
+    if (run !== healthRun) return;
+    try {
+      for (let i = 0; i < 40 && !window.__shrinkPrintSafety?.topologySummary; i++) await wait(50);
+      const h = window.__shrinkPrintSafety?.topologySummary?.(model);
+      if (!h || run !== healthRun) return;
+      const rating = healthScore(h);
+      card.className = `v2-health-card ${rating.level}`;
+      $('v2HealthLabel').textContent = rating.label;
+      $('v2HealthScore').textContent = String(rating.score);
+      const watertight = h.openEdges === 0;
+      const manifold = h.pinchedEdges === 0;
+      const oriented = h.flippedEdges === 0;
+      const cleanDegens = h.degenerateTriangles === 0;
+      $('v2HealthRows').innerHTML =
+        healthRow('Watertight', watertight ? 'YES' : 'NO', watertight) +
+        healthRow('Open edges', new Intl.NumberFormat().format(h.openEdges), h.openEdges === 0) +
+        healthRow('Non-manifold', new Intl.NumberFormat().format(h.pinchedEdges), manifold) +
+        healthRow('Flipped faces', new Intl.NumberFormat().format(h.flippedEdges), oriented) +
+        healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens);
+    } catch (err) {
+      card.className = 'v2-health-card bad';
+      $('v2HealthLabel').textContent = 'Check failed';
+      $('v2HealthScore').textContent = '—';
+      $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Could not analyse this mesh.</div>';
+      console.warn('[SHRINK 3D v2.46] Health card check failed', err);
+    }
   }
 
   function updateHeight() {
@@ -293,6 +368,8 @@
 
     chooser.insertAdjacentElement('afterend', dashboard);
     dashboard.querySelector('.v2-viewer-slot').appendChild(viewerPanel);
+    ensureHealthCard();
+    setTimeout(updateHealthCard, 80);
 
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
@@ -334,7 +411,8 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', () => { fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); });
+    window.addEventListener('shrink:model-opened', () => { fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
   function activate() {
