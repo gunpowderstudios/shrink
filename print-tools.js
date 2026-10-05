@@ -409,7 +409,7 @@ function exportModel(kind) {
   say(`Building ${kind.toUpperCase()}…`);
   setTimeout(() => {
     try {
-      const suffix = reduced ? '-reduced' : '';
+      const suffix = '-SHRINK';
       if (kind === 'stl') {
         const { buffer, triangles } = buildBinaryStl(opts);
         saveBlob(new Blob([buffer], { type: 'model/stl' }), `${a.baseName()}${suffix}.stl`);
