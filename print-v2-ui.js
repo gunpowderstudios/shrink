@@ -1,6 +1,6 @@
-// SHRINK 3D v2.46 — model health bedside chart.
+// SHRINK 3D v2.47 — actionable model health bedside chart.
 (() => {
-  const VERSION = '2.46';
+  const VERSION = '2.47';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -12,7 +12,8 @@
   let fuseReady = false;
   let shrinkReady = false;
 
-  function sourceModel() { return app()?.originalModel || app()?.optimizedModel || null; }
+  function sourceModel() { return app()?.optimizedModel || app()?.originalModel || null; }
+  function healthModel() { return app()?.currentModel || app()?.optimizedModel || app()?.originalModel || null; }
 
   function setNative(id, value, event = 'change') {
     const el = $(id);
@@ -59,7 +60,9 @@
         <div class="v2-health-score"><b id="v2HealthScore">—</b><span>/100</span></div>
       </div>
       <div id="v2HealthRows" class="v2-health-rows"><div class="v2-health-checking">Running mesh checks…</div></div>
+      <button id="v2HealthFixBtn" class="v2-health-fix" type="button">FIX IT</button>
     `;
+    card.querySelector('#v2HealthFixBtn')?.addEventListener('click', fixHealthModel);
     viewer.appendChild(card);
     return card;
   }
@@ -67,7 +70,7 @@
   let healthRun = 0;
   async function updateHealthCard() {
     const card = ensureHealthCard();
-    const model = sourceModel();
+    const model = healthModel();
     if (!card || !model) return;
     const run = ++healthRun;
     card.className = 'v2-health-card checking';
@@ -94,12 +97,47 @@
         healthRow('Non-manifold', new Intl.NumberFormat().format(h.pinchedEdges), manifold) +
         healthRow('Flipped faces', new Intl.NumberFormat().format(h.flippedEdges), oriented) +
         healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens);
+      const fixBtn = $('v2HealthFixBtn');
+      if (fixBtn) fixBtn.hidden = rating.score === 100;
     } catch (err) {
       card.className = 'v2-health-card bad';
       $('v2HealthLabel').textContent = 'Check failed';
       $('v2HealthScore').textContent = '—';
       $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Could not analyse this mesh.</div>';
-      console.warn('[SHRINK 3D v2.46] Health card check failed', err);
+      console.warn('[SHRINK 3D v2.47] Health card check failed', err);
+    }
+  }
+
+  async function fixHealthModel() {
+    const btn = $('v2HealthFixBtn');
+    const model = healthModel();
+    if (!btn || !model || btn.disabled) return;
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'FIXING…';
+    try {
+      for (let i = 0; i < 50 && !window.__shrinkFuse?.fuseModel; i++) await wait(100);
+      if (!window.__shrinkFuse?.fuseModel) throw new Error('The repair engine is still loading.');
+      const view = app()?.getViewState?.();
+      const { root, components } = await window.__shrinkFuse.fuseModel(model);
+      app()?.setPreview?.(root);
+      app()?.show?.('optimized');
+      if (view) app()?.restoreViewState?.(view);
+      app()?.notifyReduced?.({ kind: 'repair', components });
+      window.__shrinkPrintSafety?.clearDiagnostic?.();
+      btn.textContent = 'FIXED';
+      await wait(80);
+      await updateHealthCard();
+      const card = $('v2HealthCard');
+      if (card && $('v2HealthScore')?.textContent === '100') btn.hidden = true;
+    } catch (err) {
+      console.error('[SHRINK 3D v2.47] Health repair failed', err);
+      btn.textContent = 'COULD NOT FIX';
+      window.__shrinkPrintSafety?.showDiagnostic?.('Fuse', err?.message || String(err));
+      setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; }, 1800);
+    } finally {
+      btn.disabled = false;
+      if (!btn.hidden && btn.textContent === 'FIXING…') btn.textContent = old;
     }
   }
 
