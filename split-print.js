@@ -15,7 +15,7 @@ function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-function sourceModel() { return app()?.optimizedModel || app()?.originalModel || null; }
+function sourceModel() { return window.__shrinkWorkingModel?.() || app()?.optimizedModel || app()?.originalModel || null; }
 function finishedHeightMM() { return Math.max(1, Number($('figureHeightMm')?.value) || 75); }
 function mmPerUnit() { return window.__shrinkPrint?.mmPerUnit?.() || 1; }
 
