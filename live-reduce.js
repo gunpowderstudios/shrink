@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { reduceIndices } from './reduce-core.js?v=2.18';
 
-/* SHRINK 3D v2.49 — cumulative working-model reduction. Keeps a lightweight "preview" copy whose index buffers are re-simplified in a
+/* SHRINK 3D v2.53 — cumulative reduction with refreshed shading normals. Keeps a lightweight preview whose index buffers are re-simplified in a
  * background worker whenever the slider moves. Vertices/attributes are copied once; only triangle lists change,
  * so updates are fast and the page never freezes. */
 
@@ -163,6 +163,13 @@ export function createLiveReducer(app) {
       const g = new THREE.BufferGeometry();
       for (const name of Object.keys(old.attributes)) g.setAttribute(name, old.attributes[name]);
       g.setIndex(new THREE.BufferAttribute(r ? idx : idx.slice(), 1));
+      // The triangle connectivity changed, so normals inherited from the source mesh
+      // are no longer valid. Rebuild them or the reduced side shows dark/fuzzy patches.
+      if (r && g.attributes.position) {
+        g.deleteAttribute('normal');
+        g.computeVertexNormals();
+        g.normalizeNormals?.();
+      }
       if (old.boundingBox) g.boundingBox = old.boundingBox; if (old.boundingSphere) g.boundingSphere = old.boundingSphere;
       s.preview.geometry = g;
       old.dispose();
