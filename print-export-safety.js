@@ -9,7 +9,7 @@ const app = () => window.__shrinkApp;
 let fallbackBusy = false;
 let lastAttempt = null;
 
-function sourceModel(){ return app()?.optimizedModel || app()?.originalModel || null; }
+function sourceModel(){ return window.__shrinkWorkingModel?.() || app()?.optimizedModel || app()?.originalModel || null; }
 function topologySummary(model){
   if(!model)return null;
   const h=healthOfModel(THREE,model);
