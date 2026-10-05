@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.48';
+  const PRINT_RELEASE = '2.49';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -19,7 +19,7 @@
     const theme = document.createElement('link'); theme.rel = 'stylesheet'; theme.href = `./matrix-theme.css?v=${VERSION}`; theme.dataset.shrinkMatrixTheme = 'true'; document.head.appendChild(theme);
   }
   if (!document.querySelector('link[data-shrink-print-v2]')) {
-    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = `./print-v2-ui.css?v=${VERSION}`; css.dataset.shrinkPrintV2 = 'true'; document.head.appendChild(css);
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = `./print-v2-ui.css?v=${PRINT_RELEASE}`; css.dataset.shrinkPrintV2 = 'true'; document.head.appendChild(css);
   }
 
   const h1 = document.querySelector('.title-row h1'); if (h1) h1.textContent = APP_NAME;
