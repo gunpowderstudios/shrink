@@ -1,6 +1,6 @@
-// SHRINK 3D v2.42 — stacked multitool + large viewer.
+// SHRINK 3D v2.45 — distinguish healthy multi-part meshes from broken meshes.
 (() => {
-  const VERSION = '2.42';
+  const VERSION = '2.45';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -105,19 +105,25 @@
       await wait(20);
       const built = await window.__shrinkFuse.modelToSolid(model);
       progress(card, 78, 'Checking the solid…');
-      if (built.components !== 1) {
-        try { built.solid?.delete?.(); } catch {}
-        throw new Error(`The model still has ${built.components} separate solid parts after repair.`);
-      }
+      const components = Math.max(1, Number(built.components) || 1);
       try { built.solid?.delete?.(); } catch {}
-      setNative('fuseSolidToggle', true, 'change');
-      fuseReady = true;
-      progress(card, 100, 'Ready — SHRINK can fuse this model when you download it.');
-      $('v2FuseResult').innerHTML = '<strong>✓ Ready to fuse</strong><span>This model can be made into one clean printable solid.</span>';
+      window.__shrinkPrintSafety?.clearDiagnostic?.();
       card.dataset.state = 'good';
       markStep(2, 'done');
       markStep(3, 'active');
-      window.__shrinkPrintSafety?.clearDiagnostic?.();
+
+      if (components === 1) {
+        setNative('fuseSolidToggle', true, 'change');
+        fuseReady = true;
+        progress(card, 100, 'Ready — this can be one fused printable solid.');
+        $('v2FuseResult').innerHTML = '<strong>✓ Ready to fuse</strong><span>The repaired geometry forms one connected watertight solid.</span>';
+      } else {
+        setNative('fuseSolidToggle', false, 'change');
+        fuseReady = false;
+        const noun = components === 1 ? 'component' : 'components';
+        progress(card, 100, `Healthy — ${components} watertight ${noun}. No repair needed.`);
+        $('v2FuseResult').innerHTML = `<strong>✓ Model is healthy</strong><span>Watertight and manifold · ${components} separate ${noun}. They do not all touch, so SHRINK will keep them separate rather than remesh them and lose detail.</span>`;
+      }
     } catch (err) {
       fuseReady = false;
       progress(card, 100, 'This model needs more repair.');
@@ -247,11 +253,11 @@
 
           <div class="v2-action-grid">
             <section id="v2FuseCard" class="v2-card v2-action-card v2-fuse-card">
-              <div class="v2-card-head"><div><h2>Fuse it</h2><p>Fix common mesh problems and check it can become one printable solid.</p></div></div>
+              <div class="v2-card-head"><div><h2>Fuse it</h2><p>Repair mesh problems and join parts that genuinely touch or overlap.</p></div></div>
               <button id="v2FuseBtn" class="v2-mega v2-purple" type="button">FUSE IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
-              <div id="v2FuseResult" class="v2-result">SHRINK will try the quick repair first. If the model is stubborn, you'll get a simple Make watertight option.</div>
-              <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles, then asks Manifold to build one closed solid. Detailed errors appear under the viewer if this fails.</p></div></details>
+              <div id="v2FuseResult" class="v2-result">SHRINK repairs the mesh and joins touching parts. Separate watertight parts are fine and will be left intact.</div>
+              <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles and joins touching/overlapping parts. Multiple closed components are valid; SHRINK only reports a repair problem when the mesh itself is open or non-manifold.</p></div></details>
             </section>
 
             <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
