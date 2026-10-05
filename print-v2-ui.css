@@ -202,3 +202,24 @@
   .v2-health-card{width:190px;padding:10px}
   .v2-health-score b{font-size:22px}
 }
+
+
+/* v2.47 — health FIX IT action */
+.v2-health-card{pointer-events:auto}
+.v2-health-fix{
+  width:100%;
+  margin-top:9px;
+  min-height:34px;
+  border:1px solid #ff5b62;
+  border-radius:9px;
+  background:rgba(255,79,87,.14);
+  color:#ff9ba0;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.04em;
+  cursor:pointer;
+}
+.v2-health-fix:hover:not(:disabled){background:rgba(255,79,87,.23)}
+.v2-health-fix:disabled{opacity:.55;cursor:wait}
+.v2-health-fix[hidden]{display:none!important}
+.v2-health-card.good .v2-health-fix{display:none!important}
