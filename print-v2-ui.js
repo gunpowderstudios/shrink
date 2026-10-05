@@ -1,6 +1,6 @@
-// SHRINK 3D v2.40 — 3D print multitool workflow.
+// SHRINK 3D v2.41 — stacked multitool + large viewer.
 (() => {
-  const VERSION = '2.40';
+  const VERSION = '2.41';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -222,69 +222,72 @@
       </div>
 
       <div class="v2-top-grid">
-        <section class="v2-card v2-setup-card">
-          <div class="v2-card-head"><span class="v2-num">1</span><div><h2>Choose your printer & size</h2><p>No model numbers needed — just choose the kind of printer.</p></div></div>
-          <div class="v2-printer-grid">
-            <button type="button" class="v2-choice active" data-printer="resin"><span>💧</span><strong>Resin printer</strong><small>Best for miniatures & fine detail</small></button>
-            <button type="button" class="v2-choice" data-printer="fdm"><span>🧱</span><strong>FDM printer</strong><small>Best for larger, tougher parts</small></button>
-            <button type="button" class="v2-choice" data-printer="custom"><span>⚙️</span><strong>Custom</strong><small>Set your own detail limit</small></button>
+        <div class="v2-left-stack">
+          <section class="v2-card v2-setup-card">
+            <div class="v2-card-head"><span class="v2-num">1</span><div><h2>Choose your printer & size</h2><p>No model numbers needed — just choose the kind of printer.</p></div></div>
+            <div class="v2-printer-grid">
+              <button type="button" class="v2-choice active" data-printer="resin"><span>💧</span><strong>Resin printer</strong><small>Best for miniatures & fine detail</small></button>
+              <button type="button" class="v2-choice" data-printer="fdm"><span>🧱</span><strong>FDM printer</strong><small>Best for larger, tougher parts</small></button>
+              <button type="button" class="v2-choice" data-printer="custom"><span>⚙️</span><strong>Custom</strong><small>Set your own detail limit</small></button>
+            </div>
+            <div class="v2-size-row">
+              <label><span>Finished height</span><div><input id="v2Height" type="number" min="1" max="500" step="1" value="75"><em>mm</em></div></label>
+              <input id="v2HeightRange" type="range" min="10" max="300" step="1" value="75">
+            </div>
+            <div class="v2-quality-row">
+              <span>Quality</span>
+              <button type="button" class="active" data-quality="standard">Standard</button>
+              <button type="button" data-quality="fine">Fine detail</button>
+              <button type="button" data-quality="large">Large / fast</button>
+            </div>
+            <div id="v2Step1Summary" class="v2-summary">Resin · 75 mm high</div>
+            <details class="v2-advanced"><summary>Advanced printer settings</summary><div class="v2-advanced-body"><label id="v2CustomPrinter" hidden>Smallest detail to keep (mm)<input id="v2PrinterDetail" type="number" min="0.005" step="0.005" value="0.05"></label><p>Technical users can set the printer's smallest visible detail here. SHRINK uses this when judging whether a change will be visible.</p></div></details>
+          </section>
+
+          <div class="v2-tool-intro">
+            <span>3D PRINT MULTITOOL</span>
+            <strong>USE ANY TOOL YOU NEED</strong>
+            <small>Fuse it, shrink it, download it — use one, two or all three.</small>
           </div>
-          <div class="v2-size-row">
-            <label><span>Finished height</span><div><input id="v2Height" type="number" min="1" max="500" step="1" value="75"><em>mm</em></div></label>
-            <input id="v2HeightRange" type="range" min="10" max="300" step="1" value="75">
+
+          <div class="v2-action-grid">
+            <section id="v2FuseCard" class="v2-card v2-action-card v2-fuse-card">
+              <div class="v2-card-head"><div><h2>Fuse it baby!</h2><p>Fix common mesh problems and check it can become one printable solid.</p></div></div>
+              <button id="v2FuseBtn" class="v2-mega v2-purple" type="button">FUSE IT</button>
+              <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
+              <div id="v2FuseResult" class="v2-result">SHRINK will try the quick repair first. If the model is stubborn, you'll get a simple Make watertight option.</div>
+              <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles, then asks Manifold to build one closed solid. Detailed errors appear under the viewer if this fails.</p></div></details>
+            </section>
+
+            <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
+              <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
+              <div class="v2-protect">
+                <div class="v2-protect-head">
+                  <div><strong>Protect detail <em>(optional)</em></strong><small>Paint over faces, hands or fine ornament you don't want reduced.</small></div>
+                  <button id="v2ProtectBtn" class="v2-protect-btn" type="button" aria-pressed="false">PROTECT DETAIL</button>
+                </div>
+                <div id="v2ProtectTools" class="v2-protect-tools" hidden>
+                  <label>Brush size <input id="v2ProtectRadius" type="range" min="0.5" max="20" step="0.5" value="3"><output id="v2ProtectRadiusValue">3.0 mm</output></label>
+                  <button id="v2ProtectClear" class="v2-protect-clear" type="button">CLEAR PAINT</button>
+                </div>
+              </div>
+              <button id="v2ShrinkBtn" class="v2-mega v2-green" type="button">SHRINK IT</button>
+              <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
+              <div id="v2ShrinkResult" class="v2-result">SHRINK compares the reduced model with the original and stops before the difference should be visible.</div>
+              <details class="v2-advanced"><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"></label><p>Use this only if you want to override the automatic result manually.</p></div></details>
+            </section>
+
+            <section class="v2-card v2-action-card v2-download-card">
+              <div class="v2-card-head"><div><h2>Download</h2><p>Save one STL, or split it into printable sections with pegs.</p></div></div>
+              <div class="v2-download-options"><label>Split into<select id="v2SplitMode"><option value="off">One STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">Auto by maximum height</option></select></label><label>Joint<select id="v2Joint"><option value="pegs">Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label></div>
+              <div id="v2CutWrap" class="v2-cut-row" hidden><div><span>Cut height</span><strong id="v2CutLabel">50%</strong></div><input id="v2Cut" type="range" min="10" max="90" step="0.5" value="50"></div>
+              <button id="v2DownloadBtn" class="v2-mega v2-red" type="button">DOWNLOAD IT</button>
+              <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label></div></details>
+            </section>
           </div>
-          <div class="v2-quality-row">
-            <span>Quality</span>
-            <button type="button" class="active" data-quality="standard">Standard</button>
-            <button type="button" data-quality="fine">Fine detail</button>
-            <button type="button" data-quality="large">Large / fast</button>
-          </div>
-          <div id="v2Step1Summary" class="v2-summary">Resin · 75 mm high</div>
-          <details class="v2-advanced"><summary>Advanced printer settings</summary><div class="v2-advanced-body"><label id="v2CustomPrinter" hidden>Smallest detail to keep (mm)<input id="v2PrinterDetail" type="number" min="0.005" step="0.005" value="0.05"></label><p>Technical users can set the printer's smallest visible detail here. SHRINK uses this when judging whether a change will be visible.</p></div></details>
-        </section>
+        </div>
+
         <div class="v2-viewer-slot"></div>
-      </div>
-
-      <div class="v2-tool-intro">
-        <span>3D PRINT MULTITOOL</span>
-        <strong>USE ANY TOOL YOU NEED</strong>
-        <small>Fuse it, shrink it, download it — use one, two or all three.</small>
-      </div>
-
-      <div class="v2-action-grid">
-        <section id="v2FuseCard" class="v2-card v2-action-card v2-fuse-card">
-          <div class="v2-card-head"><div><h2>Fuse it baby!</h2><p>Fix common mesh problems and check it can become one printable solid.</p></div></div>
-          <button id="v2FuseBtn" class="v2-mega v2-purple" type="button">FUSE IT</button>
-          <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
-          <div id="v2FuseResult" class="v2-result">SHRINK will try the quick repair first. If the model is stubborn, you'll get a simple Make watertight option.</div>
-          <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles, then asks Manifold to build one closed solid. Detailed errors appear under the viewer if this fails.</p></div></details>
-        </section>
-
-        <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
-          <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
-          <div class="v2-protect">
-            <div class="v2-protect-head">
-              <div><strong>Protect detail <em>(optional)</em></strong><small>Paint over faces, hands or fine ornament you don't want reduced.</small></div>
-              <button id="v2ProtectBtn" class="v2-protect-btn" type="button" aria-pressed="false">PROTECT DETAIL</button>
-            </div>
-            <div id="v2ProtectTools" class="v2-protect-tools" hidden>
-              <label>Brush size <input id="v2ProtectRadius" type="range" min="0.5" max="20" step="0.5" value="3"><output id="v2ProtectRadiusValue">3.0 mm</output></label>
-              <button id="v2ProtectClear" class="v2-protect-clear" type="button">CLEAR PAINT</button>
-            </div>
-          </div>
-          <button id="v2ShrinkBtn" class="v2-mega v2-green" type="button">SHRINK IT</button>
-          <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
-          <div id="v2ShrinkResult" class="v2-result">SHRINK compares the reduced model with the original and stops before the difference should be visible.</div>
-          <details class="v2-advanced"><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"></label><p>Use this only if you want to override the automatic result manually.</p></div></details>
-        </section>
-
-        <section class="v2-card v2-action-card v2-download-card">
-          <div class="v2-card-head"><div><h2>Download</h2><p>Save one STL, or split it into printable sections with pegs.</p></div></div>
-          <div class="v2-download-options"><label>Split into<select id="v2SplitMode"><option value="off">One STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">Auto by maximum height</option></select></label><label>Joint<select id="v2Joint"><option value="pegs">Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label></div>
-          <div id="v2CutWrap" class="v2-cut-row" hidden><div><span>Cut height</span><strong id="v2CutLabel">50%</strong></div><input id="v2Cut" type="range" min="10" max="90" step="0.5" value="50"></div>
-          <button id="v2DownloadBtn" class="v2-mega v2-red" type="button">DOWNLOAD IT</button>
-          <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label></div></details>
-        </section>
       </div>`;
 
     chooser.insertAdjacentElement('afterend', dashboard);
