@@ -1,6 +1,6 @@
-// SHRINK 3D v2.41 — stacked multitool + large viewer.
+// SHRINK 3D v2.42 — stacked multitool + large viewer.
 (() => {
-  const VERSION = '2.41';
+  const VERSION = '2.42';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -216,11 +216,6 @@
     dashboard.dataset.printerType = 'resin';
     dashboard.dataset.quality = 'standard';
     dashboard.innerHTML = `
-      <div class="v2-setup-strip">
-        <span class="v2-setup-badge">1</span>
-        <div><strong>Set up your print</strong><small>Choose the printer, size and quality first.</small></div>
-      </div>
-
       <div class="v2-top-grid">
         <div class="v2-left-stack">
           <section class="v2-card v2-setup-card">
@@ -252,7 +247,7 @@
 
           <div class="v2-action-grid">
             <section id="v2FuseCard" class="v2-card v2-action-card v2-fuse-card">
-              <div class="v2-card-head"><div><h2>Fuse it baby!</h2><p>Fix common mesh problems and check it can become one printable solid.</p></div></div>
+              <div class="v2-card-head"><div><h2>Fuse it</h2><p>Fix common mesh problems and check it can become one printable solid.</p></div></div>
               <button id="v2FuseBtn" class="v2-mega v2-purple" type="button">FUSE IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
               <div id="v2FuseResult" class="v2-result">SHRINK will try the quick repair first. If the model is stubborn, you'll get a simple Make watertight option.</div>
