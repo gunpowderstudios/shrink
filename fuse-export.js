@@ -33,7 +33,7 @@ function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(link.href), 4000);
 }
 
-function sourceModel() { return app()?.optimizedModel || app()?.originalModel || null; }
+function sourceModel() { return window.__shrinkWorkingModel?.() || app()?.optimizedModel || app()?.originalModel || null; }
 
 function statusText(solid) {
   try {
