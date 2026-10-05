@@ -3,7 +3,7 @@ import { createLiveReducer } from './live-reduce.js?v=2.18';
 import { getMeshBVH } from './bvh-support.js?v=2.18';
 import { computeDetailLoss, analyzeTopology, stlBytes, glbBytesEstimate } from './mesh-tools.js?v=2.18';
 
-/* Live UI: drag the slider -> the model updates -> a plain-language verdict says whether it still looks the same. */
+/* SHRINK 3D v2.49 — live reduction rebases on the current working model when requested. */
 
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -106,12 +106,13 @@ function setVerdict(level, text, nums = '') {
 
 async function measureLoss() {
   const a = app();
-  if (!engine.root || !a?.originalModel) return null;
+  const baseline = engine.base || a?.originalModel;
+  if (!engine.root || !baseline) return null;
   const MeshBVH = await getMeshBVH();
   if (!MeshBVH) return null;
-  let total = 0; a.originalModel.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) total += o.geometry.attributes.position.count; });
+  let total = 0; baseline.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) total += o.geometry.attributes.position.count; });
   const stride = Math.max(1, Math.floor(total / 40000));   // more samples so the 99% / 99.5% tails are meaningful
-  const { stats } = await computeDetailLoss({ THREE, MeshBVH, original: a.originalModel, reduced: engine.root, stride, yieldToUi: false });
+  const { stats } = await computeDetailLoss({ THREE, MeshBVH, original: baseline, reduced: engine.root, stride, yieldToUi: false });
   return stats;
 }
 
@@ -164,7 +165,8 @@ function updateTopo() {
   if (!engine.root || !el.topo) return;
   try {
     const a = app();
-    if (!S.topoOrig && a.originalModel) S.topoOrig = analyzeTopology(THREE, a.originalModel);
+    const baseline = engine.base || a.originalModel;
+    if (!S.topoOrig && baseline) S.topoOrig = analyzeTopology(THREE, baseline);
     const r = ratio() >= 0.999 ? S.topoOrig : analyzeTopology(THREE, engine.root);
     const issues = r.openEdges + r.nonManifold;
     el.topo.hidden = false;
@@ -287,4 +289,16 @@ window.addEventListener('shrink:optimized', e => {
     : `<b>Kept:</b> textures (resized to ${el.textureSize?.value}px${el.webp?.checked ? ', WebP' : ''}), UV maps and smooth shading. <b>Removed:</b> unused materials and data${el.meshopt?.checked ? ' · mesh compressed (Meshopt)' : ''}.`;
 });
 
-window.__shrinkLiveUI = { strictKey, autoFind, chooseTarget, setRatio, state: S, measureLoss, scheduleMeasure };
+async function rebaseWorking(model = window.__shrinkWorkingModel?.() || app()?.originalModel) {
+  if (!model) return false;
+  S.topoOrig = null; S.lastLive = null; S.firstShow = false;
+  setVerdict('busy', 'Preparing current working model…');
+  await engine.prepare(model);
+  S.tris = engine.originalTriangles;
+  setRatio(1, { notify: false });
+  updateLiveLine(S.tris);
+  window.__shrinkSetWorkingModel?.(engine.root);
+  return true;
+}
+
+window.__shrinkLiveUI = { strictKey, autoFind, chooseTarget, setRatio, state: S, measureLoss, scheduleMeasure, rebaseWorking };
