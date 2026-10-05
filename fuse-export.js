@@ -291,11 +291,11 @@ async function fusedExport(kind, evt) {
     const name = app()?.baseName?.() || 'model';
     if (kind === 'stl') {
       const { buffer, triangles } = buildBinaryStl({ THREE, model: root, mmPerUnit: scale, zUp });
-      saveBlob(new Blob([buffer], { type: 'model/stl' }), `${name}-fused.stl`);
+      saveBlob(new Blob([buffer], { type: 'model/stl' }), `${name}-SHRINK.stl`);
       say(`Saved fused STL: ${new Intl.NumberFormat().format(triangles)} triangles · one connected manifold solid.`);
     } else {
       const { blob, triangles } = buildObjBlob({ THREE, model: root, mmPerUnit: scale, zUp });
-      saveBlob(blob, `${name}-fused.obj`);
+      saveBlob(blob, `${name}-SHRINK.obj`);
       say(`Saved fused OBJ: ${new Intl.NumberFormat().format(triangles)} triangles · one connected manifold solid.`);
     }
     root.traverse(o => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
