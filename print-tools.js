@@ -51,7 +51,7 @@ function printMmPerUnit() { const mm = Number(els.height.value); return P.modelH
 function detailMM() { return uiMode() === 'game' ? GAME_DETAIL_PCT : Math.max(0.001, Number(els.detail.value) || 0.05); }
 const unitLabel = () => uiMode() === 'game' ? '%' : ' mm';
 
-function currentModelForExport() { return app()?.optimizedModel || app()?.originalModel; }
+function currentModelForExport() { return window.__shrinkWorkingModel?.() || app()?.optimizedModel || app()?.originalModel; }
 
 function updateEstimates() { /* live size readouts are handled by live-ui.js */ }
 
