@@ -1,6 +1,6 @@
-// SHRINK 3D v2.48 — gentle health repair separated from Fuse.
+// SHRINK 3D v2.49 — cumulative multitool working model.
 (() => {
-  const VERSION = '2.48';
+  const VERSION = '2.49';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -11,9 +11,16 @@
   let viewerNext = null;
   let fuseReady = false;
   let shrinkReady = false;
+  let workingModel = null;
 
-  function sourceModel() { return app()?.optimizedModel || app()?.originalModel || null; }
-  function healthModel() { return app()?.currentModel || app()?.optimizedModel || app()?.originalModel || null; }
+  function setWorkingModel(model) {
+    workingModel = model || app()?.originalModel || null;
+    return workingModel;
+  }
+  function sourceModel() { return workingModel || app()?.originalModel || null; }
+  function healthModel() { return sourceModel(); }
+  window.__shrinkWorkingModel = () => sourceModel();
+  window.__shrinkSetWorkingModel = setWorkingModel;
 
   function setNative(id, value, event = 'change') {
     const el = $(id);
@@ -121,6 +128,7 @@
       const view = app()?.getViewState?.();
       const { root } = window.__shrinkFuse.repairModel(model);
       app()?.setPreview?.(root);
+      setWorkingModel(root);
       app()?.show?.('optimized');
       if (view) app()?.restoreViewState?.(view);
       app()?.notifyReduced?.({ kind: 'repair' });
@@ -214,29 +222,33 @@
       if (!window.__shrinkFuse?.modelToSolid) throw new Error('The repair tool is still loading. Try again in a moment.');
       const model = sourceModel();
       if (!model) throw new Error('Load a model first.');
-      progress(card, 36, 'Repairing seams…');
+      progress(card, 36, 'Repairing seams and joining touching parts…');
       await wait(20);
-      const built = await window.__shrinkFuse.modelToSolid(model);
-      progress(card, 78, 'Checking the solid…');
+      const built = await window.__shrinkFuse.fuseModel(model);
+      progress(card, 78, 'Checking the result…');
       const components = Math.max(1, Number(built.components) || 1);
-      try { built.solid?.delete?.(); } catch {}
+      app()?.setPreview?.(built.root);
+      setWorkingModel(built.root);
+      app()?.show?.('optimized');
+      app()?.notifyReduced?.({ kind: 'fuse', components });
       window.__shrinkPrintSafety?.clearDiagnostic?.();
       card.dataset.state = 'good';
       markStep(2, 'done');
       markStep(3, 'active');
 
       if (components === 1) {
-        setNative('fuseSolidToggle', true, 'change');
-        fuseReady = true;
-        progress(card, 100, 'Ready — this can be one fused printable solid.');
-        $('v2FuseResult').innerHTML = '<strong>✓ Ready to fuse</strong><span>The repaired geometry forms one connected watertight solid.</span>';
+        setNative('fuseSolidToggle', false, 'change');
+        fuseReady = false;
+        progress(card, 100, 'Done — current model is one fused printable solid.');
+        $('v2FuseResult').innerHTML = '<strong>✓ Fused</strong><span>The fused result is now your current working model.</span>';
       } else {
         setNative('fuseSolidToggle', false, 'change');
         fuseReady = false;
         const noun = components === 1 ? 'component' : 'components';
-        progress(card, 100, `Healthy — ${components} watertight ${noun}. No repair needed.`);
-        $('v2FuseResult').innerHTML = `<strong>✓ Model is healthy</strong><span>Watertight and manifold · ${components} separate ${noun}. They do not all touch, so SHRINK will keep them separate rather than remesh them and lose detail.</span>`;
+        progress(card, 100, `Done — ${components} watertight ${noun} remain separate.`);
+        $('v2FuseResult').innerHTML = `<strong>✓ Repaired and fused where possible</strong><span>${components} watertight ${noun} remain because they do not all touch. This result is now your current working model.</span>`;
       }
+      setTimeout(updateHealthCard, 80);
     } catch (err) {
       fuseReady = false;
       progress(card, 100, 'This model needs more repair.');
@@ -255,6 +267,15 @@
     if (!source || source.disabled || !btn) return;
     btn.disabled = true;
     markStep(3, 'active');
+    progress(card, 5, 'Preparing the current working model…');
+    try {
+      if (window.__shrinkLiveUI?.rebaseWorking) await window.__shrinkLiveUI.rebaseWorking(sourceModel());
+    } catch (err) {
+      btn.disabled = false;
+      progress(card, 100, 'Could not prepare the current model.');
+      $('v2ShrinkResult').innerHTML = `<strong>Could not SHRINK</strong><span>${err.message}</span>`;
+      return;
+    }
     progress(card, 8, 'Finding the smallest version that still looks the same…');
     $('v2ShrinkResult').textContent = 'SHRINK is testing different detail levels automatically.';
     source.click();
@@ -270,12 +291,15 @@
       }
       const live = $('liveLine')?.innerText?.replace(/\s+/g, ' ').trim() || '';
       const verdict = $('verdictText')?.textContent || '';
+      const reducedRoot = window.__shrinkLive?.root || app()?.optimizedModel;
+      if (reducedRoot) setWorkingModel(reducedRoot);
       shrinkReady = true;
       progress(card, 100, 'Done.');
       $('v2ShrinkResult').innerHTML = `<strong>✓ ${verdict || 'Optimised'}</strong><span>${live}</span>`;
       card.dataset.state = 'good';
       markStep(3, 'done');
       markStep(4, 'active');
+      setTimeout(updateHealthCard, 80);
     } finally {
       clearInterval(timer);
       btn.disabled = false;
@@ -407,6 +431,7 @@
     chooser.insertAdjacentElement('afterend', dashboard);
     dashboard.querySelector('.v2-viewer-slot').appendChild(viewerPanel);
     ensureHealthCard();
+    if (!workingModel) setWorkingModel(app()?.originalModel);
     setTimeout(updateHealthCard, 80);
 
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
@@ -449,7 +474,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', () => { fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', () => { setWorkingModel(app()?.originalModel); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
