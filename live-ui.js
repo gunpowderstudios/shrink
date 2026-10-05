@@ -1,5 +1,5 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { createLiveReducer } from './live-reduce.js?v=2.18';
+import { createLiveReducer } from './live-reduce.js?v=2.49';
 import { getMeshBVH } from './bvh-support.js?v=2.18';
 import { computeDetailLoss, analyzeTopology, stlBytes, glbBytesEstimate } from './mesh-tools.js?v=2.18';
 
