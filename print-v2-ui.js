@@ -1,6 +1,6 @@
-// SHRINK 3D v2.47 — actionable model health bedside chart.
+// SHRINK 3D v2.48 — gentle health repair separated from Fuse.
 (() => {
-  const VERSION = '2.47';
+  const VERSION = '2.48';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -116,14 +116,14 @@
     btn.disabled = true;
     btn.textContent = 'FIXING…';
     try {
-      for (let i = 0; i < 50 && !window.__shrinkFuse?.fuseModel; i++) await wait(100);
-      if (!window.__shrinkFuse?.fuseModel) throw new Error('The repair engine is still loading.');
+      for (let i = 0; i < 50 && !window.__shrinkFuse?.repairModel; i++) await wait(100);
+      if (!window.__shrinkFuse?.repairModel) throw new Error('The repair engine is still loading.');
       const view = app()?.getViewState?.();
-      const { root, components } = await window.__shrinkFuse.fuseModel(model);
+      const { root } = window.__shrinkFuse.repairModel(model);
       app()?.setPreview?.(root);
       app()?.show?.('optimized');
       if (view) app()?.restoreViewState?.(view);
-      app()?.notifyReduced?.({ kind: 'repair', components });
+      app()?.notifyReduced?.({ kind: 'repair' });
       window.__shrinkPrintSafety?.clearDiagnostic?.();
       btn.textContent = 'FIXED';
       await wait(80);
@@ -131,7 +131,7 @@
       const card = $('v2HealthCard');
       if (card && $('v2HealthScore')?.textContent === '100') btn.hidden = true;
     } catch (err) {
-      console.error('[SHRINK 3D v2.47] Health repair failed', err);
+      console.error('[SHRINK 3D v2.48] Health repair failed', err);
       btn.textContent = 'COULD NOT FIX';
       window.__shrinkPrintSafety?.showDiagnostic?.('Fuse', err?.message || String(err));
       setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; }, 1800);
