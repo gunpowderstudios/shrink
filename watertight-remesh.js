@@ -1,9 +1,9 @@
 import { rebuildSolid } from './solid-rebuild.js?v=2.27';
 
-// SHRINK 3D v2.18 — "Make watertight": rebuild the model as one closed solid.
+// SHRINK 3D v2.43 — "Make watertight": higher-detail fallback rebuild.
 // The surface is traced into a voxel grid, small gaps are sealed, everything the outside cannot reach becomes solid,
 // and the result is turned back into a smooth, guaranteed-watertight mesh. See solid-core.js.
-const VERSION = '2.18';
+const VERSION = '2.43';
 
 function disposeRoot(root) {
   root?.traverse?.(o => {
@@ -52,7 +52,15 @@ export async function makeWatertight(model, quality = 'balanced', onStatus = () 
   const P = window.__shrinkPrint;
   const mmPerUnit = P?.mmPerUnit?.() || 1;
   const detailUnits = (P?.detailMM?.() || 0) / mmPerUnit;
-  const { root, stats } = await rebuildSolid(source, { detailUnits, maxCells: cellBudget(quality), maxTris: 300000, onStatus: (text, pct) => onStatus(`${text}${pct ? ` ${Math.round(pct)}%` : ''}`) });
+  const maxTris = quality === 'high' ? 650000 : quality === 'fast' ? 250000 : 450000;
+  const simplifyError = quality === 'high' ? 0.12 : quality === 'fast' ? 0.35 : 0.20;
+  const { root, stats } = await rebuildSolid(source, {
+    detailUnits,
+    maxCells: cellBudget(quality),
+    maxTris,
+    simplifyError,
+    onStatus: (text, pct) => onStatus(`${text}${pct ? ` ${Math.round(pct)}%` : ''}`)
+  });
   root.name = 'SHRINK watertight rebuild';
   root.userData.shrinkWatertight = true;
   root.userData.remeshMethod = 'voxel-flood-closing';
