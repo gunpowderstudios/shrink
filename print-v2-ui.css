@@ -271,3 +271,44 @@
 .v2-change-chip.shrunk{color:#89efbb;border-color:rgba(54,216,138,.38)}
 .v2-change-chip.shrunk i{background:#36d88a}
 .v2-change-none{color:#718196;font-size:9px}
+
+
+/* v2.59 — direct detail percentage entry */
+.v2-detail-control{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 76px;
+  gap:10px;
+  align-items:center;
+  margin-top:6px;
+}
+.v2-detail-control>input[type=range]{
+  width:100%;
+  margin:0;
+}
+.v2-detail-number{
+  display:flex;
+  align-items:center;
+  border:1px solid #37465a;
+  border-radius:9px;
+  background:#182230;
+  overflow:hidden;
+}
+.v2-detail-number input{
+  width:100%;
+  min-width:0;
+  border:0!important;
+  margin:0!important;
+  padding:8px 6px 8px 9px!important;
+  background:transparent!important;
+  color:#fff;
+  font-size:12px;
+  font-weight:800;
+  text-align:right;
+  outline:none;
+}
+.v2-detail-number span{
+  padding-right:9px;
+  color:#93a3b7;
+  font-size:10px;
+  font-weight:800;
+}
