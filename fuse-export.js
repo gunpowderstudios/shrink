@@ -316,13 +316,14 @@ async function fusedExport(kind, evt) {
     const scale = window.__shrinkPrint?.mmPerUnit?.() || 1;
     const zUp = $('zUpToggle')?.checked !== false;
     const name = app()?.baseName?.() || 'model';
+    const stem = window.__shrinkDownloadStem?.(name) || `${name}-SHRINK`;
     if (kind === 'stl') {
       const { buffer, triangles } = buildBinaryStl({ THREE, model: root, mmPerUnit: scale, zUp });
-      saveBlob(new Blob([buffer], { type: 'model/stl' }), `${name}-SHRINK.stl`);
+      saveBlob(new Blob([buffer], { type: 'model/stl' }), `${stem}.stl`);
       say(`Saved fused STL: ${new Intl.NumberFormat().format(triangles)} triangles · ${shape}.`);
     } else {
       const { blob, triangles } = buildObjBlob({ THREE, model: root, mmPerUnit: scale, zUp });
-      saveBlob(blob, `${name}-SHRINK.obj`);
+      saveBlob(blob, `${stem}.obj`);
       say(`Saved fused OBJ: ${new Intl.NumberFormat().format(triangles)} triangles · ${shape}.`);
     }
     root.traverse(o => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
