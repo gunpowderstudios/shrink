@@ -8,6 +8,7 @@ import { JSDOM } from 'jsdom';
 import * as THREE from 'three';
 import { unzipSync } from 'fflate';
 import { root as repoRoot, ok, failures, wait } from './helpers.mjs';
+import { MeshoptSimplifier } from 'meshoptimizer';
 
 export { THREE, ok, failures, wait };
 export const mtBuild = path.join(repoRoot, 'tests', '.build', 'mt');
@@ -41,7 +42,7 @@ export function prepareMultitool() {
   // the helper `collectTriangles` is not exported, so take it as a plain function too
   const helper = (() => { const i = mt.indexOf('function collectTriangles'); const open = mt.indexOf('{', mt.indexOf(')', i)); let d = 0; for (let k = open; k < mt.length; k++) { if (mt[k] === '{') d++; else if (mt[k] === '}' && --d === 0) return mt.slice(i, k + 1); } })();
   fs.writeFileSync(path.join(mtBuild, 'mesh-tools.js'), helper + '\n\n' + ['buildBinaryStl', 'buildObjBlob', 'analyzeTopology', 'modelHeight'].map(n => extractFn(mt, n)).join('\n\n') + '\n');
-  for (const f of ['repair-core.js', 'solid-core.js', 'solid-rebuild.js', 'raw-split.js', 'split-print.js', 'split-fallback.js', 'fuse-export.js', 'watertight-remesh.js', 'print-export-safety.js', 'preview-material-fix.js']) {
+  for (const f of ['live-reduce.js', 'crease-normals.js', 'reduce-core.js', 'repair-core.js', 'solid-core.js', 'solid-rebuild.js', 'raw-split.js', 'split-print.js', 'split-fallback.js', 'fuse-export.js', 'watertight-remesh.js', 'print-export-safety.js', 'preview-material-fix.js']) {
     if (fs.existsSync(path.join(repoRoot, f))) fs.writeFileSync(path.join(mtBuild, f), rewrite(sh(f)));
   }
   fs.writeFileSync(path.join(mtBuild, 'package.json'), '{"type":"module"}\n');
@@ -163,3 +164,32 @@ export async function stlHealth(stl) {
   const core = await import(path.join(repoRoot, 'repair-core.js'));
   return core.meshHealth(stl.positions, Uint32Array.from({ length: stl.triangles * 3 }, (_, i) => i));
 }
+
+
+/* ----------------------------- a clean "miniature" made of many small closed pieces, and a real reduction of it ----------------------------- */
+// ~90 small separate spheres, a body, a head and a noisy base disc. After FIX IT it is clean, like the repaired dwarf; reducing it with the
+// app's own reducer settings leaves a few edges shared by three triangles (the "Needs attention" after SHRINK).
+export async function makeFigure({ holes = false } = {}) {
+  const core = await import(path.join(repoRoot, 'repair-core.js'));
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pos = [], idx = [];
+  const sphere = (cx, cy, cz, r, seg = 18, rings = 12, noise = 0) => { const o = pos.length / 3; for (let y = 0; y <= rings; y++) for (let x = 0; x <= seg; x++) { const v = y / rings * Math.PI, u = x / seg * 2 * Math.PI, rr = r * (1 + noise * Math.sin(u * 7) * Math.sin(v * 9)); pos.push(cx + rr * Math.sin(v) * Math.cos(u), cy + rr * Math.cos(v), cz + rr * Math.sin(v) * Math.sin(u)); } for (let y = 0; y < rings; y++) for (let x = 0; x < seg; x++) { const a = o + y * (seg + 1) + x, b = a + seg + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); } };
+  const disc = (r, h, seg = 160, rings = 40) => { const P = (x, y, z) => { pos.push(x, y, z); return pos.length / 3 - 1; }; const rowsIdx = []; for (let k = 0; k <= rings; k++) { const rr = r * k / rings, row = []; for (let s2 = 0; s2 < seg; s2++) { const a = s2 / seg * 2 * Math.PI; row.push(P(rr * Math.cos(a), h + (k > 2 ? 0.25 * Math.sin(a * 11) * Math.sin(rr * 1.7) : 0), rr * Math.sin(a))); } rowsIdx.push(row); } for (let k = 0; k < rings; k++) for (let s2 = 0; s2 < seg; s2++) { const a = rowsIdx[k][s2], b = rowsIdx[k][(s2 + 1) % seg], c = rowsIdx[k + 1][s2], d = rowsIdx[k + 1][(s2 + 1) % seg]; if (k === 0) idx.push(a, d, c); else idx.push(a, b, c, b, d, c); } const rim = rowsIdx[rings], bot = []; for (let s2 = 0; s2 < seg; s2++) { const a = s2 / seg * 2 * Math.PI; bot.push(P(r * Math.cos(a), 0, r * Math.sin(a))); } for (let s2 = 0; s2 < seg; s2++) { const a = rim[s2], b = rim[(s2 + 1) % seg], c = bot[s2], d = bot[(s2 + 1) % seg]; idx.push(a, c, b, b, c, d); } const ctr = P(0, 0, 0); for (let s2 = 0; s2 < seg; s2++) idx.push(ctr, bot[(s2 + 1) % seg], bot[s2]); };
+  disc(20, 3); sphere(0, 14, 0, 8, 40, 28, 0.08); sphere(0, 26, 0, 5, 36, 24, 0.06);
+  for (let i = 0; i < 90; i++) { const a = rnd() * 6.28, r = 2 + rnd() * 9, y = 6 + rnd() * 22; sphere(r * Math.cos(a) * 1.1, y, r * Math.sin(a) * 1.1, 0.5 + rnd() * 1.2, 12, 8, 0.1); }
+  const fixed = core.repairMesh({ positions: new Float32Array(pos), indices: new Uint32Array(idx) });      // = FIX IT: now clean
+  let indices = fixed.indices;
+  if (holes) { const keep = []; for (let t = 0; t < indices.length; t += 3) { if ((t / 3) % 997 < 2) continue; keep.push(indices[t], indices[t + 1], indices[t + 2]); } indices = Uint32Array.from(keep); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(fixed.positions, 3)); geo.setIndex(new THREE.BufferAttribute(indices, 1)); geo.computeVertexNormals();
+  const grp = new THREE.Group(); grp.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial())); grp.updateMatrixWorld(true); return grp;
+}
+// Reduce a model with the app's own reducer (reduce-core.js + the same meshoptimizer) and wrap the result like the live preview does.
+export async function reduceModel(model, ratio) {
+  await MeshoptSimplifier.ready;
+  const { reduceIndices } = await import(path.join(repoRoot, 'reduce-core.js'));
+  const src = model.children[0].geometry, positions = src.attributes.position.array, indices = src.index.array;
+  const out = reduceIndices({ simplifier: MeshoptSimplifier, positions, indices, lock: null, ratio, error: 0.05 }).indices;
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(positions, 3)); geo.setIndex(new THREE.BufferAttribute(out, 1)); geo.computeVertexNormals();
+  const grp = new THREE.Group(); grp.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial())); grp.updateMatrixWorld(true); return grp;
+}
+export async function healthOf(model) { const core = await import(path.join(repoRoot, 'repair-core.js')); return core.healthOfModel(THREE, model); }

@@ -1,6 +1,6 @@
-// SHRINK 3D v2.55 — shared install-result helper, split controls fixed, DOWNLOAD IT never forces Fuse.
+// SHRINK 3D v2.56 — SHRINK tidies edges the reduction disturbed; shared install-result helper, split controls fixed, DOWNLOAD IT never forces Fuse.
 (() => {
-  const VERSION = '2.55';
+  const VERSION = '2.56';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -116,6 +116,7 @@
   }
 
   let healthRun = 0;
+  let lastHealth = null;                         // { model, h }: the newest health result and the model it belongs to
   async function updateHealthCard() {
     const card = ensureHealthCard();
     const model = healthModel();
@@ -131,6 +132,7 @@
       for (let i = 0; i < 40 && !window.__shrinkPrintSafety?.topologySummary; i++) await wait(50);
       const h = window.__shrinkPrintSafety?.topologySummary?.(model);
       if (!h || run !== healthRun) return;
+      lastHealth = { model, h };
       const rating = healthScore(h);
       card.className = `v2-health-card ${rating.level}`;
       $('v2HealthLabel').textContent = rating.label;
@@ -303,6 +305,21 @@
     }
   }
 
+  // After SHRINK: if the reduced working model is no longer clean, repair it gently (FIX IT's repair) and install the result.
+  async function tidyAfterShrink(card) {
+    const model = sourceModel();
+    const h = model && window.__shrinkPrintSafety?.topologySummary?.(model);
+    if (!h || h.clean) return null;
+    if (!window.__shrinkFuse?.repairModel) return null;
+    const edges = (h.openEdges || 0) + (h.pinchedEdges || 0) + (h.flippedEdges || 0);
+    progress(card, 94, 'Tidying a few edges the reduction disturbed…');
+    await wait(20);
+    const { root } = window.__shrinkFuse.repairModel(model);
+    installWorkingResult(root, 'repair');
+    const after = window.__shrinkPrintSafety?.topologySummary?.(root);
+    return { edges, clean: !!after?.clean };
+  }
+
   async function shrinkModel() {
     const source = $('autoBtn');
     const btn = $('v2ShrinkBtn');
@@ -311,6 +328,13 @@
     btn.disabled = true;
     markStep(3, 'active');
     progress(card, 5, 'Preparing the current working model…');
+    // Was the model clean going in? If so, a reduction that leaves it unclean is a side effect we should put right.
+    let wasClean = null;
+    try {
+      const before = sourceModel();
+      const known = lastHealth && lastHealth.model === before ? lastHealth.h : window.__shrinkPrintSafety?.topologySummary?.(before);
+      wasClean = known ? known.clean === true : null;
+    } catch { wasClean = null; }
     try {
       if (window.__shrinkLiveUI?.rebaseWorking) await window.__shrinkLiveUI.rebaseWorking(sourceModel());
     } catch (err) {
@@ -338,8 +362,20 @@
       if (reducedRoot) setWorkingModel(reducedRoot);
       markApplied('shrunk');
       shrinkReady = true;
+      // The simplifier does not promise to keep a mesh manifold: on a model made of many small pieces it can leave a few
+      // edges shared by three triangles. If the model was clean before SHRINK, put that right with the same gentle repair as FIX IT.
+      let tidyNote = '';
+      if (wasClean === true) {
+        try {
+          const t = tidyAfterShrink(card);
+          if (t instanceof Promise) { const r = await t; if (r) tidyNote = r.clean ? ` · Tidied ${r.edges} edge${r.edges === 1 ? '' : 's'} the reduction disturbed.` : ` · ${r.edges} edge${r.edges === 1 ? '' : 's'} could not be tidied automatically — press FIX IT.`; }
+        } catch (err) {
+          console.warn('[SHRINK 3D v2.56] Automatic tidy after SHRINK did not finish', err);
+          tidyNote = ' · A few edges need FIX IT.';
+        }
+      }
       progress(card, 100, 'Done.');
-      $('v2ShrinkResult').innerHTML = `<strong>✓ ${verdict || 'Optimised'}</strong><span>${live}</span>`;
+      $('v2ShrinkResult').innerHTML = `<strong>✓ ${verdict || 'Optimised'}</strong><span>${live}${tidyNote}</span>`;
       card.dataset.state = 'good';
       markStep(3, 'done');
       markStep(4, 'active');

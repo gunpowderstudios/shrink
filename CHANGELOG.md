@@ -2,6 +2,29 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.56 — SHRINK no longer breaks a clean model; no more dark patches on the base
+
+### Fixed: MODEL HEALTH fell from 100 to "Needs attention" after SHRINK IT
+- **Cause.** The simplifier (meshoptimizer, via `reduce-core.js`) does not promise to keep a mesh manifold. On a model made of many small closed pieces (the repaired dwarf has ~94) a reduction can leave a few edges shared by three triangles. Reproduced with the app's own reducer settings on a clean test model: 1 / 13 / 2 non-manifold edges at 50% / 20% / 4%. `LockBorder`, `Prune` and `Sparse` change nothing.
+- **Fix.** SHRINK IT notes whether the model was clean going in (it reuses the health result already measured for the card). If it was clean and the reduction left it unclean, SHRINK runs the same gentle repair as FIX IT on the reduced model and installs the result through `__shrinkInstallWorkingModel`. The result card says what it did ("Tidied 13 edges the reduction disturbed."). On the test model 6,410 → 6,384 triangles (13 tangled edges removed); it takes ~50–120 ms.
+- A model that was **not** clean before SHRINK is left alone: FIX IT stays the person's decision. A reduction that happens to stay clean is used as it is.
+
+### Fixed: dark patches on flat areas (the base) of the reduced model
+- **Cause.** Display only. A heavily reduced mesh has big triangles, and `computeVertexNormals()` averages the faces around a vertex even across a hard edge (the rim of a base), so a big flat triangle is shaded as if it were curved. The geometry was fine: on the test base 0% of the top faces pointed the wrong way or were tilted, while 9–10% of the top surface was shaded more than 12° wrong. An STL stores only triangles, so **the downloaded file never contained these patches**; a slicer shades from the triangles.
+- **Fix.** New `crease-normals.js` (`creaseSplit`): vertices on a crease (faces more than 55° apart) get one copy per smoothing group, each with its own normal. Positions and triangles are unchanged (health, points and triangle counts are identical once welded), original vertex numbers stay valid (extra copies are appended). Used by the live reduced preview (`live-reduce.js`) and by FIX IT / FUSE IT results (`fuse-export.js`). A preview at 100%, or a mesh with extra vertex data (colours), uses the previous path; going back to 100% restores the original normals exactly.
+- Measured: top of a decimated base shaded >12° wrong: 9.3% → 0.04% (20% reduction), 10.4% → 0.06% (5%). 1,000,000 triangles take 0.4 s.
+
+### Tests
+- `tests/crease.test.mjs`, `tests/livereduce.test.mjs` (the real reducer and the real simplifier), and groups K, K2, K3 and L in `tests/multitool.test.mjs` (SHRINK on a clean model, a clean reduction, an unhealthy model, and a model with crease-split vertices through health, STL export, FUSE IT and split).
+- Against v2.55 the new K group fails exactly as reported (13 non-manifold edges remain; health never returns to 100).
+
+### Version boundaries
+- Visible release **v2.56**. Multitool graph key **2.56** (`print-v2-ui.*`, `print-export-safety.js`, `fuse-export.js`, `split-print.js`, `split-fallback.js`, `raw-split.js`, `watertight-remesh.js`).
+- `live-reduce.js` and `live-ui.js` are engine-graph files and now carry **2.56** (`live-ui.js` in `index.html`, `live-reduce.js` from `live-ui.js`). `crease-normals.js` is **2.56** everywhere it is imported (`live-reduce.js`, `fuse-export.js`).
+- Reducer core `reduce-core.js`, `mesh-tools.js`, `app.js` stay **2.18**; repair graph stays **2.27**.
+
+---
+
 ## v2.55 — Split and Make watertight fixed in the multitool
 
 ### Fixed: splitting into sections (DOWNLOAD IT → 2 parts / 3 parts / Auto by maximum height)

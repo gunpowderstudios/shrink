@@ -1,7 +1,9 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { reduceIndices } from './reduce-core.js?v=2.18';
+import { creaseSplit } from './crease-normals.js?v=2.56';
 
-/* SHRINK 3D v2.53 — cumulative reduction with refreshed shading normals. Keeps a lightweight preview whose index buffers are re-simplified in a
+/* SHRINK 3D v2.56 — cumulative reduction; the reduced preview gets crease-aware shading (hard edges stay crisp, no dark smudges on big flat triangles).
+ * Previously v2.53 — cumulative reduction with refreshed shading normals. Keeps a lightweight preview whose index buffers are re-simplified in a
  * background worker whenever the slider moves. Vertices/attributes are copied once; only triangle lists change,
  * so updates are fast and the page never freezes. */
 
@@ -103,6 +105,7 @@ export function createLiveReducer(app) {
       if (g.boundingBox) pg.boundingBox = g.boundingBox.clone();
       if (g.boundingSphere) pg.boundingSphere = g.boundingSphere.clone();
       clones[i].geometry = pg;
+      src.baseAttrs = {}; for (const name of Object.keys(pg.attributes)) src.baseAttrs[name] = pg.attributes[name];   // pristine copies: the display geometry may add split vertices
       src.skip = false; src.previewOwned = true; src.positions = positions; src.indices = indices; src.count = count;
       tris += count / 3;
       loadMeshes.push({ key: src.key, positions: positions.slice(), indices: indices.slice(), lock: null });
@@ -161,14 +164,25 @@ export function createLiveReducer(app) {
       if (r) keepUsed = Math.min(keepUsed, r.keepUsed ?? 1);
       const old = s.preview.geometry;
       const g = new THREE.BufferGeometry();
-      for (const name of Object.keys(old.attributes)) g.setAttribute(name, old.attributes[name]);
-      g.setIndex(new THREE.BufferAttribute(r ? idx : idx.slice(), 1));
-      // The triangle connectivity changed, so normals inherited from the source mesh
-      // are no longer valid. Rebuild them or the reduced side shows dark/fuzzy patches.
-      if (r && g.attributes.position) {
-        g.deleteAttribute('normal');
-        g.computeVertexNormals();
-        g.normalizeNormals?.();
+      const base = s.baseAttrs || null;
+      const plain = !!base && Object.keys(base).every(n => n === 'position' || n === 'normal') && !!s.positions;
+      if (r && plain) {
+        // Crease-aware shading. The triangle connectivity changed, so the normals inherited from the source are wrong, and plain
+        // smooth vertex normals smear shading across hard edges (a base rim, a belt) over the big triangles a reduction leaves,
+        // which shows up as dark patches. Vertices on a crease get one copy per smoothing group; the geometry is unchanged.
+        const cs = creaseSplit(s.positions, idx, { creaseDeg: 55 });
+        g.setAttribute('position', new THREE.BufferAttribute(cs.positions, 3));
+        g.setAttribute('normal', new THREE.BufferAttribute(cs.normals, 3));
+        g.setIndex(new THREE.BufferAttribute(cs.indices, 1));
+      } else {
+        // 100% (no reduction), or a mesh with extra attributes: use the pristine attributes of the source preview
+        for (const name of Object.keys(base || old.attributes)) g.setAttribute(name, (base || old.attributes)[name]);
+        g.setIndex(new THREE.BufferAttribute(r ? idx : idx.slice(), 1));
+        if (r && g.attributes.position) {
+          g.deleteAttribute('normal');
+          g.computeVertexNormals();
+          g.normalizeNormals?.();
+        }
       }
       if (old.boundingBox) g.boundingBox = old.boundingBox; if (old.boundingSphere) g.boundingSphere = old.boundingSphere;
       s.preview.geometry = g;

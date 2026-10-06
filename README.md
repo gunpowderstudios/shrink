@@ -1,14 +1,18 @@
-# SHRINK 3D v2.55
+# SHRINK 3D v2.56
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
 
+## v2.56 — SHRINK keeps a clean model clean; no dark patches on flat areas
+- After **SHRINK IT**, a model that was clean going in is tidied automatically if the reduction disturbed a few edges (MODEL HEALTH no longer drops from 100 to "Needs attention").
+- The reduced preview and FIX IT / FUSE IT results use crease-aware shading, so flat areas next to hard edges (like a base rim) are no longer smudged with dark patches. This is display only: the STL you download never contained them.
+
 ## v2.55 — Split and Make watertight fixed
 - **DOWNLOAD IT** splits the current working model into 2 / 3 / auto-by-height sections (flat or with keyed pegs) and downloads a ZIP of STLs. It no longer forces Fuse on, and models made of several separate closed pieces split fine.
 - **Make watertight** now replaces the current working model in the viewer, refreshes **MODEL HEALTH** and clears the red warning, instead of only downloading a file. It adds a **REBUILT** chip.
-- Tests: `cd tests && npm install && npm test` (128 checks, includes clicking the real buttons with the real Manifold library).
+- Tests: `cd tests && npm install && npm test` (178 checks, includes clicking the real buttons with the real Manifold library).
 
 ## v2.39 — 3D Print multitool
 

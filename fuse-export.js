@@ -1,6 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=2.18';
 import { gatherWorld, repairMesh } from './repair-core.js?v=2.27';
+import { creaseSplit } from './crease-normals.js?v=2.56';
 
 // SHRINK 3D v2.55 — gentle repair + optional Boolean union / make-manifold pass (inside-out parts turned outward; multi-piece results allowed),
 // with a best-effort cleanup repair before Manifold gives up.
@@ -172,6 +173,24 @@ function repairWholeModelSolid(model, wasm) {
   return solid;
 }
 
+// Display geometry with crease-aware shading (see crease-normals.js). The triangles and positions are unchanged, so exports
+// and health checks are unaffected; only the picture is.
+function displayGeometry(positions, indices) {
+  const geometry = new THREE.BufferGeometry();
+  try {
+    const cs = creaseSplit(positions, indices, { creaseDeg: 55 });
+    geometry.setAttribute('position', new THREE.BufferAttribute(cs.positions, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(cs.normals, 3));
+    geometry.setIndex(new THREE.BufferAttribute(cs.indices, 1));
+  } catch (err) {
+    console.warn('Crease-aware shading failed; using smooth normals.', err);
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+    geometry.computeVertexNormals();
+  }
+  return geometry;
+}
+
 function repairedRootFromModel(model) {
   const raw = gatherWorld(THREE, model);
   const repaired = repairMesh({
@@ -179,10 +198,7 @@ function repairedRootFromModel(model) {
     indices: raw.indices,
     onProgress: () => {}
   });
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(repaired.positions, 3));
-  geometry.setIndex(new THREE.BufferAttribute(repaired.indices, 1));
-  geometry.computeVertexNormals();
+  const geometry = displayGeometry(repaired.positions, repaired.indices);
   const mesh = new THREE.Mesh(
     geometry,
     new THREE.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72, metalness: 0 })
@@ -252,10 +268,7 @@ function solidToThree(solid) {
     positions[i * 3 + 1] = m.vertProperties[i * m.numProp + 1];
     positions[i * 3 + 2] = m.vertProperties[i * m.numProp + 2];
   }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(m.triVerts), 1));
-  geometry.computeVertexNormals();
+  const geometry = displayGeometry(positions, new Uint32Array(m.triVerts));
   try { m.delete?.(); } catch {}
   const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72, metalness: 0 }));
   const root = new THREE.Group(); root.add(mesh); root.updateMatrixWorld(true);

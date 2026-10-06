@@ -1,9 +1,12 @@
 // Regression tests for the 3D-print multitool: split into sections and Make watertight.
 // They click the VISIBLE buttons (DOWNLOAD IT, FUSE IT, Make watertight) on a jsdom page that loads the real
 // print-v2-ui / fuse-export / split-print / split-fallback / raw-split / print-export-safety modules and the real Manifold library.
-import { makePage, models, THREE, ok, failures, wait, unzipDownload, readStl, stlHealth } from './mt-harness.mjs';
+import path from 'path';
+import { mtBuild, prepareMultitool } from './mt-harness.mjs';
+import { makePage, models, THREE, ok, failures, wait, unzipDownload, readStl, stlHealth, makeFigure, reduceModel, healthOf } from './mt-harness.mjs';
 
-const block = async (n, fn) => { try { await fn(); } catch (e) { ok(false, `group ${n} stopped with an error: ${String(e?.message || e).slice(0, 120)}`); } };
+const FROM = Number(process.env.SHRINK_ONLY_FROM || 0);
+const block = async (n, fn) => { if (n < FROM) return; try { await fn(); } catch (e) { ok(false, `group ${n} stopped with an error: ${String(e?.message || e).slice(0, 120)}`); } };
 const waitFor = async (fn, ms = 25000, step = 100) => { for (let t = 0; t < ms; t += step) { if (await fn()) return true; await wait(step); } return !!(await fn()); };
 const zipOf = page => page.downloads.find(d => /\.zip$/.test(d.name));
 const volume = stl => { let v = 0; const p = stl.positions; for (let t = 0; t < stl.triangles; t++) { const o = t * 9; v += p[o] * (p[o+4] * p[o+8] - p[o+5] * p[o+7]) - p[o+1] * (p[o+3] * p[o+8] - p[o+5] * p[o+6]) + p[o+2] * (p[o+3] * p[o+7] - p[o+4] * p[o+6]); } return Math.abs(v / 6); };
@@ -249,6 +252,84 @@ await block(20, async () => {
   ok(window.__shrinkWorkingModel() === bowl && page.calls.setPreview === 0, 'J the working model was left exactly as it was');
   ok(page.$('printDiagnosticPanel').hidden === false && page.downloads.length === 0, 'J the warning stays and nothing was downloaded');
   ok(page.$('makeWatertightBtn').disabled === false, 'J the button is usable again');
+});
+
+/* ============ K. SHRINK IT: a clean model must not come back "Needs attention" ============ */
+// The simplifier does not promise to keep a mesh manifold. Reducing this clean model of ~90 small pieces to 20% leaves 13 edges shared by three triangles.
+const shrinkWith = async (page, reduced) => {              // stand in for the live reducer: the click on the hidden Auto button installs the reduced preview
+  page.w.__shrinkLiveUI = { rebaseWorking: async () => {} };
+  page.$('autoBtn').addEventListener('click', () => { page.w.__shrinkLive = { root: reduced }; page.app.optimizedModel = reduced; });
+  page.$('v2ShrinkBtn').click();
+};
+await block(21, async () => {
+  const figure = await makeFigure(), reduced = await reduceModel(figure, 0.2);
+  const hBefore = await healthOf(figure), hReduced = await healthOf(reduced);
+  ok(hBefore.clean && !hReduced.clean && hReduced.pinchedEdges > 0, `K setup: the figure is clean (${hBefore.triangles} tris) and its 20% reduction is not (${hReduced.pinchedEdges} non-manifold edges)`);
+  const page = await makePage({ model: figure, heightMm: 40 });
+  page.w.__shrinkSetWorkingModel(figure);
+  await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
+  ok(page.$('v2HealthScore').textContent === '100', 'K the figure shows 100 before SHRINK');
+  const previews = page.calls.setPreview;
+  await shrinkWith(page, reduced);
+  ok(await waitFor(() => window.__shrinkWorkingModel() !== reduced && window.__shrinkWorkingModel() !== figure, 30000), 'K SHRINK replaced the reduced model with a tidied one');
+  const now = window.__shrinkWorkingModel(), h = await healthOf(now);
+  ok(h.clean && h.pinchedEdges === 0 && h.openEdges === 0, `K the working model is clean again (open ${h.openEdges}, non-manifold ${h.pinchedEdges}, flipped ${h.flippedEdges})`);
+  ok(Math.abs(h.triangles - hReduced.triangles) / hReduced.triangles < 0.01, `K almost nothing was changed (${hReduced.triangles} -> ${h.triangles} triangles)`);
+  ok(await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000), 'K MODEL HEALTH is 100 after SHRINK, not "Needs attention"');
+  ok(/Tidied \d+ edges? the reduction disturbed/.test(page.$('v2ShrinkResult').textContent), 'K the SHRINK result says what it tidied: ' + page.$('v2ShrinkResult').textContent.replace(/\s+/g, ' ').slice(0, 110));
+  ok(/SHRUNK/.test(page.$('v2HealthChanges').textContent) && /FIXED/.test(page.$('v2HealthChanges').textContent), 'K chips show SHRUNK and FIXED');
+  ok(page.calls.setPreview === previews + 1 && page.app.optimizedModel === now, 'K the tidied model is the one in the viewer');
+  // and it can be split straight away
+  await joint(page, 'flat'); await pick(page, '2'); page.$('v2DownloadBtn').click();
+  ok(await waitFor(() => zipOf(page), 30000), 'K the tidied model can be split');
+  const r = await readParts(page); ok((await Promise.all(r.parts.map(p => stlHealth(p.stl)))).every(x => x.clean), 'K and the sections are watertight');
+});
+await block(22, async () => {
+  // a reduction that happens to stay clean is left alone: no extra repair, same model
+  const figure = await makeFigure(), reduced = await reduceModel(figure, 0.1);
+  ok((await healthOf(reduced)).clean, 'K2 setup: the 10% reduction is clean');
+  const page = await makePage({ model: figure, heightMm: 40 });
+  page.w.__shrinkSetWorkingModel(figure); await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
+  await shrinkWith(page, reduced);
+  ok(await waitFor(() => window.__shrinkWorkingModel() === reduced, 30000), 'K2 a clean reduction is used as it is');
+  await wait(300);
+  ok(window.__shrinkWorkingModel() === reduced && !/Tidied/.test(page.$('v2ShrinkResult').textContent), 'K2 nothing was tidied');
+});
+await block(23, async () => {
+  // a model the person left unhealthy is NOT silently repaired by SHRINK: FIX IT stays their decision
+  const figure = await makeFigure({ holes: true }), reduced = await reduceModel(figure, 0.2);
+  const page = await makePage({ model: figure, heightMm: 40 });
+  page.w.__shrinkSetWorkingModel(figure); await waitFor(() => page.$('v2HealthScore')?.textContent && page.$('v2HealthScore').textContent !== '—', 6000);
+  ok(page.$('v2HealthScore').textContent !== '100', 'K3 setup: this figure is not healthy before SHRINK');
+  await shrinkWith(page, reduced);
+  ok(await waitFor(() => window.__shrinkWorkingModel() === reduced, 30000), 'K3 SHRINK used the reduction as it is');
+  await wait(300);
+  ok(window.__shrinkWorkingModel() === reduced && !/Tidied/.test(page.$('v2ShrinkResult').textContent) && page.$('v2HealthFixBtn').hidden === false, 'K3 nothing was repaired behind the person\'s back; FIX IT is still offered');
+});
+
+/* ============ L. a model whose display geometry has crease-split vertices behaves exactly like any other ============ */
+await block(24, async () => {
+  prepareMultitool();
+  const { creaseSplit } = await import('../crease-normals.js');
+  const { buildBinaryStl } = await import(path.join(mtBuild, 'mesh-tools.js'));
+  const figure = await makeFigure(), reduced = await reduceModel(figure, 0.1);                    // a clean 10% reduction
+  const g = reduced.children[0].geometry, cs = creaseSplit(g.attributes.position.array, g.index.array, { creaseDeg: 55 });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(cs.positions, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(cs.normals, 3)); geo.setIndex(new THREE.BufferAttribute(cs.indices, 1));
+  const creased = new THREE.Group(); creased.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial())); creased.updateMatrixWorld(true);
+  ok(cs.splitVertices > 0, `L setup: ${cs.splitVertices} vertices were split at hard edges`);
+  const h = await healthOf(creased), h0 = await healthOf(reduced);
+  ok(h.clean === h0.clean && h.triangles === h0.triangles && h.points === h0.points, `L health is identical to the plain reduction (clean ${h.clean}, ${h.triangles} triangles, ${h.points} points)`);
+  const stl = buildBinaryStl({ THREE, model: creased, mmPerUnit: 1, zUp: true }), stl0 = buildBinaryStl({ THREE, model: reduced, mmPerUnit: 1, zUp: true });
+  ok(stl.triangles === stl0.triangles && stl.buffer.byteLength === stl0.buffer.byteLength, `L the STL export is the same size as without the shading split (${stl.triangles} triangles)`);
+  const parsed = await readStl(new Uint8Array(stl.buffer)); ok((await stlHealth(parsed)).clean, 'L the exported STL is watertight');
+  const page = await makePage({ model: figure, heightMm: 40 });
+  page.w.__shrinkSetWorkingModel(creased);
+  page.$('v2FuseBtn').click();
+  ok(await waitFor(() => window.__shrinkWorkingModel() !== creased, 30000), 'L FUSE IT works on a creased model');
+  ok((await healthOf(window.__shrinkWorkingModel())).clean, 'L and the fused result is clean');
+  await joint(page, 'flat'); await pick(page, '2'); page.$('v2DownloadBtn').click();
+  ok(await waitFor(() => zipOf(page), 30000), 'L it can then be split');
+  const r = await readParts(page); ok(r.parts.length === 2 && (await Promise.all(r.parts.map(p => stlHealth(p.stl)))).every(x => x.clean), 'L both sections are watertight');
 });
 
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
