@@ -1,6 +1,6 @@
-// SHRINK 3D v2.58 — current v2.57 workflow plus descriptive download naming.
+// SHRINK 3D v2.59 — detail-kept slider plus direct percentage entry.
 (() => {
-  const VERSION = '2.58';
+  const VERSION = '2.59';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -526,7 +526,7 @@
               <button id="v2ShrinkBtn" class="v2-mega v2-green" type="button">SHRINK IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
               <div id="v2ShrinkResult" class="v2-result">SHRINK compares the reduced model with the original and stops before the difference should be visible.</div>
-              <details class="v2-advanced"><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"></label><p>Use this only if you want to override the automatic result manually.</p></div></details>
+              <details class="v2-advanced"><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<div class="v2-detail-control"><input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"><div class="v2-detail-number"><input id="v2DetailNumber" type="number" min="1" max="100" step="0.1" value="70" inputmode="decimal" aria-label="Detail kept percentage"><span>%</span></div></div></label><p>Drag the slider or type the percentage you want to keep.</p></div></details>
             </section>
 
             <section class="v2-card v2-action-card v2-download-card">
@@ -581,8 +581,15 @@
     ['v2PegDiameter','v2PegDepth','v2PegClearance'].forEach(id => $(id).addEventListener('input', syncAdvancedToNative));
     $('v2Zup').addEventListener('change', syncAdvancedToNative);
     $('v2DownloadBtn').addEventListener('click', download);
-    $('v2Detail').addEventListener('input', async () => {
-      // The slider drives the live reducer's own preview. If another tool (FIX IT, FUSE IT, Make watertight) has since replaced the
+    async function applyDetailValue(raw, source = 'slider') {
+      let value = Number(raw);
+      if (!Number.isFinite(value)) value = Number($('v2Detail')?.value || 70);
+      value = Math.max(1, Math.min(100, value));
+      const text = String(Math.round(value * 10) / 10);
+      $('v2Detail').value = text;
+      $('v2DetailNumber').value = text;
+
+      // The control drives the live reducer's own preview. If another tool (FIX IT, FUSE IT, Make watertight) has since replaced the
       // working model, that preview is no longer on screen, so re-base the reducer on the current model before moving it.
       const live = window.__shrinkLive;
       if (live?.root && sourceModel() && sourceModel() !== live.root && window.__shrinkLiveUI?.rebaseWorking) {
@@ -596,12 +603,20 @@
         })();
         await rebasing;
       }
-      setNative('geometry', $('v2Detail').value, 'input');
+      setNative('geometry', text, 'input');
+    }
+
+    $('v2Detail').addEventListener('input', () => applyDetailValue($('v2Detail').value, 'slider'));
+    $('v2DetailNumber').addEventListener('input', () => {
+      const v = $('v2DetailNumber').value;
+      if (v === '' || v === '-' || v === '.') return;
+      applyDetailValue(v, 'number');
     });
+    $('v2DetailNumber').addEventListener('change', () => applyDetailValue($('v2DetailNumber').value, 'number'));
 
     const h = Number(nativeValue('figureHeightMm', 75)) || 75;
     $('v2Height').value = h; $('v2HeightRange').value = Math.max(10, Math.min(300, h));
-    const geom = Number(nativeValue('geometry', 70)) || 70; $('v2Detail').value = geom;
+    const geom = Number(nativeValue('geometry', 70)) || 70; $('v2Detail').value = geom; $('v2DetailNumber').value = geom;
     choosePrinter('resin');
     setQuality('standard');
     syncSplitControls();
