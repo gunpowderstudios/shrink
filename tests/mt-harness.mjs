@@ -90,7 +90,7 @@ export const models = {
 let pageCounter = 0, currentRun = 0;
 const realSetTimeout = globalThis.setTimeout;
 globalThis.setTimeout = (fn, ms, ...args) => { const run = currentRun; return realSetTimeout(() => { if (run === currentRun) fn(...args); }, ms); };
-export async function makePage({ model, heightMm = 52, splitMax = 80 } = {}) {
+export async function makePage({ model, heightMm = 52, splitMax = 80, live = null } = {}) {
   const run = ++pageCounter; currentRun = run;
   prepareMultitool();
   const html = `<!doctype html><html><body class="app-mode-print">
@@ -145,9 +145,20 @@ export async function makePage({ model, heightMm = 52, splitMax = 80 } = {}) {
   document.body.classList.add('app-mode-print');
   await loadPrintModules();
   loadMultitoolUi();
+  let engine = null;
+  if (live) {
+    // the REAL live reducer (real simplifier, main-thread fallback) wired the way live-ui.js wires it
+    const { createLiveReducer } = await imp('live-reduce.js');
+    engine = createLiveReducer(app);
+    w.__shrinkLive = engine;
+    w.__shrinkLiveUI = { rebaseWorking: async model => { await engine.prepare(model); w.__shrinkSetWorkingModel?.(engine.root); w.document.getElementById('geometry').value = '100'; return true; } };
+    const auto = w.document.getElementById('autoBtn');
+    auto.addEventListener('click', async () => { auto.disabled = true; try { await engine.runExact(live.ratio ?? 0.2); } finally { auto.disabled = false; } });
+    w.document.getElementById('geometry').addEventListener('input', () => engine.request(Number(w.document.getElementById('geometry').value) / 100, {}, 10));
+  }
   w.dispatchEvent(new w.CustomEvent('shrink:ui-mode'));
   await wait(150);
-  return { w, document: w.document, app, statuses, calls, downloads: g.__downloads, mods, $: id => w.document.getElementById(id), blobs };
+  return { w, document: w.document, app, statuses, calls, downloads: g.__downloads, mods, engine, $: id => w.document.getElementById(id), blobs };
 }
 
 /* ----------------------------- inspecting downloads ----------------------------- */

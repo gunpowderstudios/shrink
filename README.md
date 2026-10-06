@@ -1,9 +1,13 @@
-# SHRINK 3D v2.56
+# SHRINK 3D v2.57
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.57 — the Detail kept slider drives the picture again
+- Fixes a v2.56 regression: after SHRINK IT the slider changed the numbers but not the model on screen. The tidy of edges the reduction disturbed now happens inside the live preview itself, so the slider, Compare and the working model are one and the same.
+- If you press FIX IT / FUSE IT / Make watertight and then move **Detail kept**, it re-bases on the current model first.
 
 ## v2.56 — SHRINK keeps a clean model clean; no dark patches on flat areas
 - After **SHRINK IT**, a model that was clean going in is tidied automatically if the reduction disturbed a few edges (MODEL HEALTH no longer drops from 100 to "Needs attention").
@@ -12,7 +16,7 @@ After deploying, hard-refresh (Cmd+Shift+R).
 ## v2.55 — Split and Make watertight fixed
 - **DOWNLOAD IT** splits the current working model into 2 / 3 / auto-by-height sections (flat or with keyed pegs) and downloads a ZIP of STLs. It no longer forces Fuse on, and models made of several separate closed pieces split fine.
 - **Make watertight** now replaces the current working model in the viewer, refreshes **MODEL HEALTH** and clears the red warning, instead of only downloading a file. It adds a **REBUILT** chip.
-- Tests: `cd tests && npm install && npm test` (178 checks, includes clicking the real buttons with the real Manifold library).
+- Tests: `cd tests && npm install && npm test` (188 checks, includes clicking the real buttons with the real Manifold library).
 
 ## v2.39 — 3D Print multitool
 

@@ -57,5 +57,21 @@ const g0 = figure.children[0].geometry, origVerts = g0.attributes.position.count
   const g = geoOf(app);
   ok(g.attributes.position.count === cg.attributes.position.count && !!g.attributes.normal && !!g.attributes.color, 'a mesh with vertex colours keeps its vertices and attributes (legacy path)');
 }
+
+{
+  // the reducer can tidy in place: a CLEAN model whose reduction leaves non-manifold edges comes out clean, with the preview itself repaired
+  const clean = await makeFigure();
+  const run = async tidy => { const app = mkApp(clean), engine = createLiveReducer(app); await engine.prepare(); engine.setTidy(tidy); await engine.runExact(0.2); const g = geoOf(app); return { g, last: engine.last, h: core.meshHealth(g.attributes.position.array, g.index.array) }; };
+  const plain = await run(false), tidy = await run(true);
+  ok(!plain.h.clean && plain.h.tangled > 0 && plain.last.tidied === 0, `tidy off: the 20% reduction keeps its ${plain.h.tangled} non-manifold edges`);
+  ok(tidy.h.clean && tidy.last.tidied === plain.h.tangled && Math.abs(tidy.g.index.count - plain.g.index.count) / plain.g.index.count < 0.01, `tidy on: the preview itself is clean (${tidy.last.tidied} edges tidied, ${plain.g.index.count / 3} -> ${tidy.g.index.count / 3} triangles)`);
+  ok(tidy.g.attributes.normal.count === tidy.g.attributes.position.count && tidy.g.index.array.every(x => x < tidy.g.attributes.position.count), 'tidy on: normals and indices stay valid');
+  // and the next reduction after a tidied one is built from the source again, not from the tidied copy
+  const app = mkApp(clean), engine = createLiveReducer(app); await engine.prepare(); engine.setTidy(true);
+  await engine.runExact(0.2); await engine.runExact(0.5); await engine.runExact(1);
+  const g1 = geoOf(app), g0c = clean.children[0].geometry;
+  ok(g1.index.count === g0c.index.count && g1.attributes.position.count === g0c.attributes.position.count && engine.last.tidied === 0, 'tidy on: back at 100% the preview is exactly the original (nothing tidied)');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.56** (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.57** (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -27,10 +27,10 @@ Read this file before changing the repository.
 - If the solid split fails, `split-fallback.js` (`raw-split.js`) makes a direct capped split. It must keep working on inside-out input and on cuts that pass exactly through a ring of vertices.
 - `syncSplitControls()` runs from a page-wide `MutationObserver`. Anything it does must be idempotent (write only when a value changes) or the page will loop.
 
-### SHRINK keeps a clean model clean (v2.56)
-`shrinkModel()` records whether the working model was clean before it ran (it reuses `lastHealth` from the health card). The simplifier can leave a few non-manifold edges on a model of many small pieces, so if the model **was** clean and the reduced result is **not**, `tidyAfterShrink()` runs the gentle repair (`__shrinkFuse.repairModel`) and installs it with `__shrinkInstallWorkingModel`. A model that was already unhealthy is never repaired behind the person's back. Do not "fix" this by changing simplifier flags: `LockBorder`, `Prune` and `Sparse` make no difference.
+### SHRINK keeps a clean model clean (v2.57)
+The simplifier can leave a few non-manifold edges on a model of many small pieces. `shrinkModel()` notes whether the working model was clean before it ran (reusing `lastHealth`) and tells the reducer with `window.__shrinkLive.setTidy(wasClean)`. **The repair happens inside `live-reduce.js` `apply()`**, on the reduced indices, before the display geometry is built; it is not a separate model installed afterwards. **Never replace `app().optimizedModel`/the working model with a different object while the Detail kept slider is meant to drive it**: the slider modifies `engine.root` in place, so the model on screen must stay `engine.root` (v2.56 broke exactly this). If another tool (FIX IT, FUSE IT, Make watertight) installs a new working model, the next slider move re-bases the reducer on it (`__shrinkLiveUI.rebaseWorking`) first. A model that was already unhealthy is never repaired behind the person's back. Do not "fix" non-manifold output by changing simplifier flags: `LockBorder`, `Prune` and `Sparse` make no difference. The in-place repair is skipped above 300,000 triangles (`TIDY_MAX_TRIANGLES`).
 
-### Display shading (v2.56)
+### Display shading (v2.56, unchanged in v2.57)
 Reduced previews and FIX/FUSE results get their shading normals from `crease-normals.js` (`creaseSplit`), not `computeVertexNormals()`. Plain smooth normals smear shading over big flat triangles across hard edges and look like dark patches; the geometry is fine and the STL never contains them. `creaseSplit` only appends duplicate vertices and never changes positions or triangles; the original vertex numbers stay valid, which `live-reduce.js` relies on (worker indices refer to the original numbering). Keep `src.baseAttrs` (pristine attributes) in `live-reduce.js` and rebuild the display geometry from `s.positions` on every reduction.
 
 ### Make watertight

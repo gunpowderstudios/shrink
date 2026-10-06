@@ -2,6 +2,26 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.57 — the Detail kept slider drives the picture again (regression from v2.56)
+
+### Fixed
+- **After SHRINK IT the Advanced "Detail kept" slider changed the numbers but not the picture** (Compare showed the same faceted model at 1% and at 100%).
+  - **Cause (mine, v2.56).** The slider drives the live reducer's own preview (`engine.root`). v2.56 tidied the reduced model by building a *different* repaired model and installing it as the preview, so the model on screen was no longer the one the slider modifies. Pressing FIX IT after SHRINK always did this; v2.56 made it happen on almost every SHRINK of a many-piece model.
+  - **Fix.** The tidy now happens **inside** the live reducer: `live-reduce.js` `apply()` health-checks each reduction and, if the model was clean going in (`engine.setTidy(true)`, set by SHRINK IT) and the reduction left it unclean, repairs it there and builds the display geometry from the repaired mesh. The model on screen is always the engine's own preview, so the slider, Compare and the working model all agree. `print-v2-ui.js` no longer installs a second model after SHRINK; the result card reads `engine.last.tidied` ("Tidied N edges the reduction disturbed").
+  - A reduction that stays clean, or a model that was unhealthy before SHRINK, is not touched.
+- **The slider re-bases after another tool replaced the model.** If FIX IT, FUSE IT or Make watertight has installed a new working model, the next move of "Detail kept" first re-bases the live reducer on that model (`__shrinkLiveUI.rebaseWorking`, tidy flag set from its health), then applies the slider. Percentages are then of the current model, and the picture follows.
+- Cost of the in-place tidy (1M-triangle source): health check 125–250 ms per update; repair 0.4 s at 50k triangles, 0.9 s at 216k, only when needed. It is skipped above 300,000 triangles while sliding (the health card flags it; FIX IT repairs).
+
+### Tests
+- `multitool.test.mjs` groups K, K2, K3, K4 now use the **real live reducer and real simplifier** wired like `live-ui.js`: SHRINK keeps a clean model clean; the slider at 50% / 100% / 10% changes the geometry on screen (triangle count, original vertices at 100%) and the model stays clean; after FIX IT the slider re-bases and the picture follows; a clean reduction and an unhealthy model are left alone.
+- `livereduce.test.mjs`: tidy off vs on (13 non-manifold edges kept vs tidied), valid normals/indices, 100% restores the original exactly. All 188 checks pass (`cd tests && npm test`).
+
+### Version boundaries
+- Visible release **v2.57**. Multitool graph **2.57** (`print-v2-ui.*`, `print-export-safety.js`, `fuse-export.js`, `split-print.js`, `split-fallback.js`, `raw-split.js`, `watertight-remesh.js`).
+- `live-ui.js`, `live-reduce.js` and `crease-normals.js` carry **2.57** (`live-reduce.js` now also imports `repair-core.js?v=2.27`). `reduce-core.js`, `mesh-tools.js`, `app.js` stay **2.18**; repair graph stays **2.27**.
+
+---
+
 ## v2.56 — SHRINK no longer breaks a clean model; no more dark patches on the base
 
 ### Fixed: MODEL HEALTH fell from 100 to "Needs attention" after SHRINK IT

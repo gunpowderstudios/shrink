@@ -1,8 +1,10 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { reduceIndices } from './reduce-core.js?v=2.18';
-import { creaseSplit } from './crease-normals.js?v=2.56';
+import { creaseSplit } from './crease-normals.js?v=2.57';
+import { meshHealth, repairMesh } from './repair-core.js?v=2.27';
 
-/* SHRINK 3D v2.56 — cumulative reduction; the reduced preview gets crease-aware shading (hard edges stay crisp, no dark smudges on big flat triangles).
+/* SHRINK 3D v2.57 — a reduction of a CLEAN model is tidied inside apply() (see setTidy), so the preview the slider drives is always the tidied one.
+ * Previously v2.56 — cumulative reduction; the reduced preview gets crease-aware shading (hard edges stay crisp, no dark smudges on big flat triangles).
  * Previously v2.53 — cumulative reduction with refreshed shading normals. Keeps a lightweight preview whose index buffers are re-simplified in a
  * background worker whenever the slider moves. Vertices/attributes are copied once; only triangle lists change,
  * so updates are fast and the page never freezes. */
@@ -14,8 +16,10 @@ export function createLiveReducer(app) {
     root: null, registered: false,
     wanted: null, busy: false, locked: false, timer: 0,
     last: { ratio: 1, triangles: 0, ms: 0, keepUsed: 1 },
-    originalTriangles: 0, mainSimplifier: null, baseOwned: null
+    originalTriangles: 0, mainSimplifier: null, baseOwned: null,
+    tidy: false                 // set by the UI when the model was clean going in: then a reduction that leaves it unclean is repaired in place
   };
+  const TIDY_MAX_TRIANGLES = 300000;   // above this the repair is skipped while sliding (the health card still flags it; FIX IT repairs)
 
   /* ---------------- worker plumbing ---------------- */
   function ensureWorker() {
@@ -155,7 +159,7 @@ export function createLiveReducer(app) {
   }
 
   function apply(ratio, output) {
-    let tris = 0, keepUsed = 1;
+    let tris = 0, keepUsed = 1, tidied = 0;
     const byKey = new Map((output?.results || []).map(r => [r.key, r]));
     for (const s of R.sources) {
       if (s.skip) { tris += (s.mesh.geometry.index ? s.mesh.geometry.index.count : s.mesh.geometry.attributes.position.count) / 3; continue; }
@@ -164,13 +168,22 @@ export function createLiveReducer(app) {
       if (r) keepUsed = Math.min(keepUsed, r.keepUsed ?? 1);
       const old = s.preview.geometry;
       const g = new THREE.BufferGeometry();
+      let used = idx.length;
       const base = s.baseAttrs || null;
       const plain = !!base && Object.keys(base).every(n => n === 'position' || n === 'normal') && !!s.positions;
       if (r && plain) {
         // Crease-aware shading. The triangle connectivity changed, so the normals inherited from the source are wrong, and plain
         // smooth vertex normals smear shading across hard edges (a base rim, a belt) over the big triangles a reduction leaves,
         // which shows up as dark patches. Vertices on a crease get one copy per smoothing group; the geometry is unchanged.
-        const cs = creaseSplit(s.positions, idx, { creaseDeg: 55 });
+        // The simplifier does not promise manifold output. If this model was clean before the reduction, repair what it disturbed
+        // here, in the preview itself, instead of swapping in a different model: the slider must keep driving what is on screen.
+        let P = s.positions, I = idx;
+        if (R.tidy && idx.length / 3 <= TIDY_MAX_TRIANGLES) {
+          const h = meshHealth(s.positions, idx);
+          if (!h.clean) { const rep = repairMesh({ positions: s.positions, indices: idx }); P = rep.positions; I = rep.indices; tidied += h.open + h.tangled + h.flipped; }
+        }
+        used = I.length;
+        const cs = creaseSplit(P, I, { creaseDeg: 55 });
         g.setAttribute('position', new THREE.BufferAttribute(cs.positions, 3));
         g.setAttribute('normal', new THREE.BufferAttribute(cs.normals, 3));
         g.setIndex(new THREE.BufferAttribute(cs.indices, 1));
@@ -187,9 +200,9 @@ export function createLiveReducer(app) {
       if (old.boundingBox) g.boundingBox = old.boundingBox; if (old.boundingSphere) g.boundingSphere = old.boundingSphere;
       s.preview.geometry = g;
       old.dispose();
-      tris += idx.length / 3;
+      tris += used / 3;
     }
-    R.last = { ratio, triangles: tris, ms: output?.ms || 0, keepUsed };
+    R.last = { ratio, triangles: tris, ms: output?.ms || 0, keepUsed, tidied };
     app.notifyReduced?.({ triangles: tris, ratio, keepUsed, preview: true });
     window.dispatchEvent(new CustomEvent('shrink:live-updated', { detail: { ...R.last } }));
     return R.last;
@@ -236,6 +249,8 @@ export function createLiveReducer(app) {
   return {
     prepare, request, runExact, syncLocks,
     lock(v) { R.locked = !!v; },
+    setTidy(on) { R.tidy = !!on; },
+    get tidy() { return R.tidy; },
     get root() { return R.root; },
     get last() { return R.last; },
     get originalTriangles() { return R.originalTriangles; },

@@ -254,57 +254,80 @@ await block(20, async () => {
   ok(page.$('makeWatertightBtn').disabled === false, 'J the button is usable again');
 });
 
-/* ============ K. SHRINK IT: a clean model must not come back "Needs attention" ============ */
-// The simplifier does not promise to keep a mesh manifold. Reducing this clean model of ~90 small pieces to 20% leaves 13 edges shared by three triangles.
-const shrinkWith = async (page, reduced) => {              // stand in for the live reducer: the click on the hidden Auto button installs the reduced preview
-  page.w.__shrinkLiveUI = { rebaseWorking: async () => {} };
-  page.$('autoBtn').addEventListener('click', () => { page.w.__shrinkLive = { root: reduced }; page.app.optimizedModel = reduced; });
-  page.$('v2ShrinkBtn').click();
-};
+/* ============ K. SHRINK IT with the REAL live reducer: a clean model must not come back "Needs attention", and the slider must keep working ============ */
+// The simplifier does not promise manifold output: reducing this clean ~90-piece model to 20% leaves 13 edges shared by three triangles.
+const triOf = model => { let n = 0; model.traverse(o => { if (o.isMesh) n += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; }); return n; };
+const settle = async (page, ratio, ms = 30000) => waitFor(() => { const l = page.engine.last; return l && Math.abs(l.ratio - ratio) < 0.011 && !page.$('autoBtn').disabled; }, ms);
 await block(21, async () => {
   const figure = await makeFigure(), reduced = await reduceModel(figure, 0.2);
   const hBefore = await healthOf(figure), hReduced = await healthOf(reduced);
-  ok(hBefore.clean && !hReduced.clean && hReduced.pinchedEdges > 0, `K setup: the figure is clean (${hBefore.triangles} tris) and its 20% reduction is not (${hReduced.pinchedEdges} non-manifold edges)`);
-  const page = await makePage({ model: figure, heightMm: 40 });
+  ok(hBefore.clean && !hReduced.clean && hReduced.pinchedEdges > 0, `K setup: the figure is clean (${hBefore.triangles} tris) and its plain 20% reduction is not (${hReduced.pinchedEdges} non-manifold edges)`);
+  const page = await makePage({ model: figure, heightMm: 40, live: { ratio: 0.2 } });
   page.w.__shrinkSetWorkingModel(figure);
   await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
   ok(page.$('v2HealthScore').textContent === '100', 'K the figure shows 100 before SHRINK');
-  const previews = page.calls.setPreview;
-  await shrinkWith(page, reduced);
-  ok(await waitFor(() => window.__shrinkWorkingModel() !== reduced && window.__shrinkWorkingModel() !== figure, 30000), 'K SHRINK replaced the reduced model with a tidied one');
-  const now = window.__shrinkWorkingModel(), h = await healthOf(now);
-  ok(h.clean && h.pinchedEdges === 0 && h.openEdges === 0, `K the working model is clean again (open ${h.openEdges}, non-manifold ${h.pinchedEdges}, flipped ${h.flippedEdges})`);
+  page.$('v2ShrinkBtn').click();
+  ok(await waitFor(() => /Optimised|Looks the same|✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000), 'K SHRINK IT finished');
+  const root = window.__shrinkLive.root, h = await healthOf(root);
+  ok(window.__shrinkWorkingModel() === root && page.app.optimizedModel === root, 'K the working model IS the live preview (the thing the slider drives)');
+  ok(h.clean && h.pinchedEdges === 0 && h.openEdges === 0, `K the reduced model is clean (open ${h.openEdges}, non-manifold ${h.pinchedEdges}, flipped ${h.flippedEdges})`);
   ok(Math.abs(h.triangles - hReduced.triangles) / hReduced.triangles < 0.01, `K almost nothing was changed (${hReduced.triangles} -> ${h.triangles} triangles)`);
   ok(await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000), 'K MODEL HEALTH is 100 after SHRINK, not "Needs attention"');
-  ok(/Tidied \d+ edges? the reduction disturbed/.test(page.$('v2ShrinkResult').textContent), 'K the SHRINK result says what it tidied: ' + page.$('v2ShrinkResult').textContent.replace(/\s+/g, ' ').slice(0, 110));
-  ok(/SHRUNK/.test(page.$('v2HealthChanges').textContent) && /FIXED/.test(page.$('v2HealthChanges').textContent), 'K chips show SHRUNK and FIXED');
-  ok(page.calls.setPreview === previews + 1 && page.app.optimizedModel === now, 'K the tidied model is the one in the viewer');
-  // and it can be split straight away
-  await joint(page, 'flat'); await pick(page, '2'); page.$('v2DownloadBtn').click();
-  ok(await waitFor(() => zipOf(page), 30000), 'K the tidied model can be split');
-  const r = await readParts(page); ok((await Promise.all(r.parts.map(p => stlHealth(p.stl)))).every(x => x.clean), 'K and the sections are watertight');
+  ok(/Tidied \d+ edges? the reduction disturbed/.test(page.$('v2ShrinkResult').textContent), 'K the result says what it tidied: ' + page.$('v2ShrinkResult').textContent.replace(/\s+/g, ' ').slice(0, 110));
+  ok(/SHRUNK/.test(page.$('v2HealthChanges').textContent), 'K the SHRUNK chip is shown');
+
+  // ---- the Detail kept slider: numbers AND picture change, and the model stays clean ----
+  page.$('v2Detail').value = '50'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
+  ok(await settle(page, 0.5), 'K moving the slider to 50% updates the live preview');
+  ok(window.__shrinkLive.root === root && page.app.optimizedModel === root && window.__shrinkWorkingModel() === root, 'K the visible model is still the one the slider drives');
+  const t50 = triOf(root), tFull = triOf(figure);
+  ok(Math.abs(t50 / tFull - 0.5) < 0.04, `K the picture really changed: ${t50} triangles on screen = ${(100 * t50 / tFull).toFixed(1)}% of ${tFull}`);
+  ok((await healthOf(root)).clean, 'K and the model on screen is still clean at 50%');
+  page.$('v2Detail').value = '100'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
+  ok(await settle(page, 1), 'K moving the slider to 100% updates the preview');
+  const g100 = root.children[0].geometry;
+  ok(g100.index.count / 3 === tFull && g100.attributes.position.count === figure.children[0].geometry.attributes.position.count, `K at 100% the preview is the original again (${g100.index.count / 3} triangles, original vertices)`);
+  page.$('v2Detail').value = '10'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
+  ok(await settle(page, 0.1) && (await healthOf(root)).clean, 'K dragging back down to 10% works and is clean');
 });
 await block(22, async () => {
-  // a reduction that happens to stay clean is left alone: no extra repair, same model
-  const figure = await makeFigure(), reduced = await reduceModel(figure, 0.1);
-  ok((await healthOf(reduced)).clean, 'K2 setup: the 10% reduction is clean');
-  const page = await makePage({ model: figure, heightMm: 40 });
+  // another tool replaced the working model after SHRINK: the slider re-bases on the current model instead of changing a picture nobody can see
+  const figure = await makeFigure();
+  const page = await makePage({ model: figure, heightMm: 40, live: { ratio: 0.2 } });
   page.w.__shrinkSetWorkingModel(figure); await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
-  await shrinkWith(page, reduced);
-  ok(await waitFor(() => window.__shrinkWorkingModel() === reduced, 30000), 'K2 a clean reduction is used as it is');
-  await wait(300);
-  ok(window.__shrinkWorkingModel() === reduced && !/Tidied/.test(page.$('v2ShrinkResult').textContent), 'K2 nothing was tidied');
+  page.$('v2ShrinkBtn').click();
+  await waitFor(() => /✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000);
+  const oldRoot = window.__shrinkLive.root;
+  const { root: fixed } = page.w.__shrinkFuse.repairModel(window.__shrinkWorkingModel());      // like pressing FIX IT after SHRINK
+  page.w.__shrinkInstallWorkingModel(fixed, 'repair');
+  ok(window.__shrinkWorkingModel() === fixed && window.__shrinkLive.root === oldRoot, 'K2 setup: FIX IT replaced the working model; the reducer\'s own preview is no longer on screen');
+  const base = triOf(fixed);
+  page.$('v2Detail').value = '30'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
+  ok(await waitFor(() => window.__shrinkLive.root === window.__shrinkWorkingModel() && Math.abs((window.__shrinkLive.last?.ratio ?? 0) - 0.3) < 0.011 && page.app.optimizedModel === window.__shrinkLive.root, 30000), 'K2 the slider re-based on the current model and the preview on screen follows it');
+  const now = triOf(window.__shrinkLive.root);
+  // asked for 30%; the simplifier stops earlier when its error limit binds on an already-reduced mesh, which is correct
+  ok(now < base * 0.5 && now > base * 0.2, `K2 the picture changed: ${now} triangles on screen (${(100 * now / base).toFixed(1)}% of the current model's ${base})`);
 });
 await block(23, async () => {
+  // a reduction that happens to stay clean is left alone
+  const figure = await makeFigure(), reduced = await reduceModel(figure, 0.1);
+  ok((await healthOf(reduced)).clean, 'K3 setup: the plain 10% reduction is clean');
+  const page = await makePage({ model: figure, heightMm: 40, live: { ratio: 0.1 } });
+  page.w.__shrinkSetWorkingModel(figure); await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
+  page.$('v2ShrinkBtn').click();
+  await waitFor(() => /✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000);
+  ok(!/Tidied/.test(page.$('v2ShrinkResult').textContent) && (await healthOf(window.__shrinkLive.root)).clean, 'K3 nothing needed tidying, and the result is clean');
+});
+await block(25, async () => {
   // a model the person left unhealthy is NOT silently repaired by SHRINK: FIX IT stays their decision
-  const figure = await makeFigure({ holes: true }), reduced = await reduceModel(figure, 0.2);
-  const page = await makePage({ model: figure, heightMm: 40 });
+  const figure = await makeFigure({ holes: true });
+  const page = await makePage({ model: figure, heightMm: 40, live: { ratio: 0.2 } });
   page.w.__shrinkSetWorkingModel(figure); await waitFor(() => page.$('v2HealthScore')?.textContent && page.$('v2HealthScore').textContent !== '—', 6000);
-  ok(page.$('v2HealthScore').textContent !== '100', 'K3 setup: this figure is not healthy before SHRINK');
-  await shrinkWith(page, reduced);
-  ok(await waitFor(() => window.__shrinkWorkingModel() === reduced, 30000), 'K3 SHRINK used the reduction as it is');
+  ok(page.$('v2HealthScore').textContent !== '100', 'K4 setup: this figure is not healthy before SHRINK');
+  page.$('v2ShrinkBtn').click();
+  await waitFor(() => /✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000);
   await wait(300);
-  ok(window.__shrinkWorkingModel() === reduced && !/Tidied/.test(page.$('v2ShrinkResult').textContent) && page.$('v2HealthFixBtn').hidden === false, 'K3 nothing was repaired behind the person\'s back; FIX IT is still offered');
+  ok(!/Tidied/.test(page.$('v2ShrinkResult').textContent) && !(await healthOf(window.__shrinkLive.root)).clean && page.$('v2HealthFixBtn').hidden === false, 'K4 nothing was repaired behind the person\'s back; FIX IT is still offered');
 });
 
 /* ============ L. a model whose display geometry has crease-split vertices behaves exactly like any other ============ */

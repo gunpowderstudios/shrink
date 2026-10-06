@@ -1,6 +1,6 @@
-// SHRINK 3D v2.56 — SHRINK tidies edges the reduction disturbed; shared install-result helper, split controls fixed, DOWNLOAD IT never forces Fuse.
+// SHRINK 3D v2.57 — the live reducer tidies edges the reduction disturbed (in place), and the Detail kept slider re-bases on the current model; shared install-result helper, split controls fixed, DOWNLOAD IT never forces Fuse.
 (() => {
-  const VERSION = '2.56';
+  const VERSION = '2.57';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -116,6 +116,7 @@
   }
 
   let healthRun = 0;
+  let rebasing = null;                          // a re-base of the live reducer that is in flight (the slider waits for it)
   let lastHealth = null;                         // { model, h }: the newest health result and the model it belongs to
   async function updateHealthCard() {
     const card = ensureHealthCard();
@@ -305,21 +306,6 @@
     }
   }
 
-  // After SHRINK: if the reduced working model is no longer clean, repair it gently (FIX IT's repair) and install the result.
-  async function tidyAfterShrink(card) {
-    const model = sourceModel();
-    const h = model && window.__shrinkPrintSafety?.topologySummary?.(model);
-    if (!h || h.clean) return null;
-    if (!window.__shrinkFuse?.repairModel) return null;
-    const edges = (h.openEdges || 0) + (h.pinchedEdges || 0) + (h.flippedEdges || 0);
-    progress(card, 94, 'Tidying a few edges the reduction disturbed…');
-    await wait(20);
-    const { root } = window.__shrinkFuse.repairModel(model);
-    installWorkingResult(root, 'repair');
-    const after = window.__shrinkPrintSafety?.topologySummary?.(root);
-    return { edges, clean: !!after?.clean };
-  }
-
   async function shrinkModel() {
     const source = $('autoBtn');
     const btn = $('v2ShrinkBtn');
@@ -337,6 +323,7 @@
     } catch { wasClean = null; }
     try {
       if (window.__shrinkLiveUI?.rebaseWorking) await window.__shrinkLiveUI.rebaseWorking(sourceModel());
+      window.__shrinkLive?.setTidy?.(wasClean === true);
     } catch (err) {
       btn.disabled = false;
       progress(card, 100, 'Could not prepare the current model.');
@@ -364,16 +351,8 @@
       shrinkReady = true;
       // The simplifier does not promise to keep a mesh manifold: on a model made of many small pieces it can leave a few
       // edges shared by three triangles. If the model was clean before SHRINK, put that right with the same gentle repair as FIX IT.
-      let tidyNote = '';
-      if (wasClean === true) {
-        try {
-          const t = tidyAfterShrink(card);
-          if (t instanceof Promise) { const r = await t; if (r) tidyNote = r.clean ? ` · Tidied ${r.edges} edge${r.edges === 1 ? '' : 's'} the reduction disturbed.` : ` · ${r.edges} edge${r.edges === 1 ? '' : 's'} could not be tidied automatically — press FIX IT.`; }
-        } catch (err) {
-          console.warn('[SHRINK 3D v2.56] Automatic tidy after SHRINK did not finish', err);
-          tidyNote = ' · A few edges need FIX IT.';
-        }
-      }
+      const tidied = window.__shrinkLive?.last?.tidied || 0;
+      const tidyNote = tidied ? ` · Tidied ${tidied} edge${tidied === 1 ? '' : 's'} the reduction disturbed.` : '';
       progress(card, 100, 'Done.');
       $('v2ShrinkResult').innerHTML = `<strong>✓ ${verdict || 'Optimised'}</strong><span>${live}${tidyNote}</span>`;
       card.dataset.state = 'good';
@@ -558,7 +537,23 @@
     ['v2PegDiameter','v2PegDepth','v2PegClearance'].forEach(id => $(id).addEventListener('input', syncAdvancedToNative));
     $('v2Zup').addEventListener('change', syncAdvancedToNative);
     $('v2DownloadBtn').addEventListener('click', download);
-    $('v2Detail').addEventListener('input', () => setNative('geometry', $('v2Detail').value, 'input'));
+    $('v2Detail').addEventListener('input', async () => {
+      // The slider drives the live reducer's own preview. If another tool (FIX IT, FUSE IT, Make watertight) has since replaced the
+      // working model, that preview is no longer on screen, so re-base the reducer on the current model before moving it.
+      const live = window.__shrinkLive;
+      if (live?.root && sourceModel() && sourceModel() !== live.root && window.__shrinkLiveUI?.rebaseWorking) {
+        rebasing = rebasing || (async () => {
+          try {
+            const model = sourceModel();
+            const known = lastHealth && lastHealth.model === model ? lastHealth.h : window.__shrinkPrintSafety?.topologySummary?.(model);
+            await window.__shrinkLiveUI.rebaseWorking(model);
+            window.__shrinkLive?.setTidy?.(known ? known.clean === true : false);
+          } finally { rebasing = null; }
+        })();
+        await rebasing;
+      }
+      setNative('geometry', $('v2Detail').value, 'input');
+    });
 
     const h = Number(nativeValue('figureHeightMm', 75)) || 75;
     $('v2Height').value = h; $('v2HeightRange').value = Math.max(10, Math.min(300, h));
