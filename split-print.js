@@ -211,17 +211,19 @@ async function exportSplitSTL(evt) {
     const withPegs = $('splitJoint')?.value !== 'flat';
     parts = await splitSolid(solid, wasm, n, withPegs, cutFractions(n));
     const files = {}, scale = mmPerUnit(), zUp = $('zUpToggle')?.checked !== false;
-    const base = app()?.baseName?.() || 'model'; let totalTris = 0;
+    const base = app()?.baseName?.() || 'model';
+    const stem = window.__shrinkDownloadStem?.(base) || `${base}-SHRINK`;
+    let totalTris = 0;
     for (let i=0;i<parts.length;i++) {
       if (parts[i]?.isEmpty?.()) throw new Error(`Part ${i+1} is empty. Move the cut position or use fewer sections.`);
       const root = solidToThree(parts[i]);
       const out = buildBinaryStl({ THREE, model: root, mmPerUnit: scale, zUp });
       totalTris += out.triangles;
-      files[`${base}-SHRINK-part-${i+1}-of-${parts.length}.stl`] = new Uint8Array(out.buffer);
+      files[`${stem}-PART${i+1}of${parts.length}.stl`] = new Uint8Array(out.buffer);
       disposeThree(root);
     }
     const zip = zipSync(files, { level: 0 });
-    saveBlob(new Blob([zip], {type:'application/zip'}), `${base}-SHRINK-split-${parts.length}-parts.zip`);
+    saveBlob(new Blob([zip], {type:'application/zip'}), `${stem}-SPLIT${parts.length}.zip`);
     const cutText = n===2 ? ` · cut at ${(finishedHeightMM()*cutFractions(2)[0]).toFixed(1)} mm` : '';
     const joints = !withPegs ? '' : parts.pegCuts ? ` with keyed alignment pegs on ${parts.pegCuts} cut${parts.pegCuts === 1 ? '' : 's'} (upper part pegs into lower sockets)` : ' with flat cuts (no safe peg position was found)';
     say(`Saved ${parts.length} watertight STL sections${joints}${cutText} · ${new Intl.NumberFormat().format(totalTris)} triangles total.`);
