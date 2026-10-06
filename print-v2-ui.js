@@ -1,6 +1,6 @@
-// SHRINK 3D v2.57 — the live reducer tidies edges the reduction disturbed (in place), and the Detail kept slider re-bases on the current model; shared install-result helper, split controls fixed, DOWNLOAD IT never forces Fuse.
+// SHRINK 3D v2.58 — current v2.57 workflow plus descriptive download naming.
 (() => {
-  const VERSION = '2.57';
+  const VERSION = '2.58';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -22,6 +22,50 @@
   function healthModel() { return sourceModel(); }
   window.__shrinkWorkingModel = () => sourceModel();
   window.__shrinkSetWorkingModel = setWorkingModel;
+  function modelTriangles(model) {
+    let tris = 0;
+    model?.traverse?.(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const g = o.geometry;
+      tris += g.index ? Math.floor(g.index.count / 3) : Math.floor(g.attributes.position.count / 3);
+    });
+    return tris;
+  }
+
+  function cleanBaseName(base = 'model') {
+    // If the source already ends in a height such as H37mm, replace it with the
+    // current print height rather than creating H37mm-H100.
+    return String(base || 'model')
+      .replace(/[-_ ]H\d+(?:\.\d+)?(?:mm)?$/i, '')
+      .replace(/[-_ ]+$/g, '') || 'model';
+  }
+
+  function downloadStem(base) {
+    const parts = [cleanBaseName(base)];
+    const height = Math.max(1, Number($('v2Height')?.value || $('figureHeightMm')?.value || 75));
+    const hText = Number.isInteger(height) ? String(height) : String(Number(height.toFixed(1))).replace('.', 'p');
+    parts.push(`H${hText}`, 'SHRINK');
+
+    if (appliedChanges.has('fixed')) parts.push('FIX');
+    if (appliedChanges.has('rebuilt')) parts.push('REBUILD');
+    if (appliedChanges.has('fused')) parts.push('FUSE');
+
+    if (appliedChanges.has('shrunk')) {
+      const original = modelTriangles(app()?.originalModel);
+      const current = modelTriangles(sourceModel());
+      if (original > 0 && current > 0) {
+        const pct = current / original * 100;
+        const r = pct < 10 ? Math.max(0.1, Math.round(pct * 10) / 10) : Math.round(pct);
+        parts.push(`R${String(r).replace('.', 'p')}`);
+      } else {
+        parts.push('REDUCED');
+      }
+    }
+    return parts.join('-');
+  }
+
+  window.__shrinkDownloadStem = downloadStem;
+
 
   // Make a tool's result the new current working model: show it, keep the camera, tell the rest of the app,
   // record the change chip and clear the red warning. Fix It, Make watertight and any future tool go through here.
