@@ -2,6 +2,47 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.55 — Split and Make watertight fixed in the multitool
+
+### Fixed: splitting into sections (DOWNLOAD IT → 2 parts / 3 parts / Auto by maximum height)
+- **DOWNLOAD IT no longer switches Fuse on.** It used to tick the legacy `fuseSolidToggle` whenever a split was chosen. The Fuse export listens in the capture phase and calls `stopImmediatePropagation()`, so it swallowed the click and the split never ran (on a model made of several closed pieces it failed with "disconnected solids" and saved a plain STL instead). Fuse is only ever used through **FUSE IT**; the Fuse export also steps aside whenever a split is requested.
+- **Several separate closed pieces are valid.** `split-print.js` and the Fuse export no longer require `components === 1`. The cut planes slice every piece, and the Fuse export reports "N separate watertight pieces" instead of failing.
+- **Pegs only where material exists on both sides of the cut.** The probe used to look only below the cut, so on multi-piece models a peg could be attached to nothing. A peg that cannot be built now leaves a flat cut for that joint instead of failing the whole split, and the status message only claims pegs that were really added.
+- **Inside-out meshes.** A closed mesh whose triangles face inwards gave Manifold a negative volume, which silently disabled pegs and could invert cut parts. `fuse-export.js` now turns such parts outward; `raw-split.js` does the same for the direct fallback.
+- **Direct (capped) fallback** left open edges when a cut plane passed exactly through a ring of vertices. Such cuts are nudged by 0.02% of the height so the cap outline is complete.
+- **Cut slider:** `print-v2-ui.js` read/wrote `splitCutPct`, which does not exist. It now uses the real `splitCutHeight`, so the cut position reaches the split engine.
+- **Auto by maximum height** now has a visible **Maximum part height** box (`v2MaxHeight` → `splitMaxHeight`). The engine never makes a part shorter than 20 mm.
+- `syncSplitControls()` is called from a page-wide `MutationObserver`; it now writes only when a value actually changed, so it cannot re-trigger itself.
+
+### Fixed: Make watertight
+- It rebuilt `app().originalModel`, downloaded a `-watertight.stl` and then disposed the result. It never replaced the working model, never refreshed health and never cleared the warning.
+- It now rebuilds the **current working model** and installs the result like every other tool, through the new shared helper `window.__shrinkInstallWorkingModel(root, kind)` in `print-v2-ui.js` (the same steps FIX IT uses): `setPreview` → `setWorkingModel` → `show('optimized')` → restore the camera → `notifyReduced` → change chip → clear the red panel. Health is refreshed straight away and a **REBUILT** chip appears.
+- The rebuilt skin must pass the shared `meshHealth` check before it replaces anything. If the rebuild is refused (gaps too big, too heavy) or unhealthy, the working model, the warning panel and the camera are left exactly as they were and nothing is downloaded.
+- Position, orientation and scale are those of the model being rebuilt (tested inside a scaled, rotated, moved parent).
+
+### Tests (new)
+- `tests/mt-harness.mjs` loads the **real** `print-v2-ui.js`, `fuse-export.js`, `split-print.js`, `split-fallback.js`, `raw-split.js`, `print-export-safety.js` and `watertight-remesh.js` into jsdom with the real Manifold library, and the tests click the visible buttons.
+- `tests/multitool.test.mjs` (76 checks): flat 2/3 parts, keyed pegs, auto by maximum height, the cut slider, no self-triggering page watcher, multi-piece models, inside-out models, the direct fallback (flat and pegs), a failing peg, splitting the working model rather than the original, a stale Fuse toggle, FUSE IT then split, Make watertight (replace, viewer, camera, health, chips, transform, refusal).
+- Run against the previous v2.54 code the split groups fail; against this release all 128 checks in the six test files pass.
+
+### Version boundaries
+- Visible release: **v2.55** (`index.html`). Print-multitool graph key: **2.55** (`print-v2-ui.js`, `print-v2-ui.css`, `print-export-safety.js` and what it imports).
+- Repair graph (`repair-core.js`, `repair-worker.js`, `solid-rebuild.js`) stays **2.27**; reducer/core engine stays **2.18**.
+
+---
+
+## v2.37–v2.54 — reconstructed from commit titles (these releases were not documented here)
+This summary comes from `git log`, not from release notes. Check the commits before relying on any detail.
+- **v2.37–v2.38** consolidated the Simple Print layout and made the full print dashboard the only print interface.
+- **v2.39–v2.42** made 3D Print a multitool (Fuse / SHRINK / Download, any order), added Protect Detail to the SHRINK tool and stacked the tools beside a larger viewer.
+- **v2.43–v2.45** detail-preserving repair before the voxel Fuse fallback; watertight fallback defaults to high detail; watertight multi-part meshes count as healthy.
+- **v2.46–v2.48** automatic MODEL HEALTH chart on the viewer with a **FIX IT** action; FIX IT uses a gentle, non-Boolean repair that keeps the original surface.
+- **v2.49** cumulative tools: `window.__shrinkWorkingModel()` / `__shrinkSetWorkingModel()`; Fix, Fuse, SHRINK, export and split all act on the latest working model; the live reducer can rebase onto it.
+- **v2.50** download file names standardised to `<name>-SHRINK…`; applied-change chips.
+- **v2.51–v2.54** FIX IT re-arms when later tools create issues; FIXED/FUSED/SHRUNK chips; corrected compare rendering and normals; NaN triangle labels fixed.
+
+---
+
 ## v2.36 — Restore actual Oct 3 layout
 
 ### Restored from history

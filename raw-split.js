@@ -1,6 +1,6 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v1.90 — direct triangle-mesh splitter used when solid/Boolean splitting cannot read the source.
+// SHRINK 3D v2.55 — direct triangle-mesh splitter used when solid/Boolean splitting cannot read the source (handles inside-out input and cuts through vertices).
 // Supports exact cut fractions from the Split UI and optional peg/socket joints.
 const EPS = 1e-7;
 
@@ -20,6 +20,10 @@ function worldTriangles(model) {
       out.push([{x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z},{x:c.x,y:c.y,z:c.z}]);
     }
   });
+  // An inside-out model would get its caps on the wrong way round. Turn it the right way first.
+  let signed = 0;
+  for (const [a, b, c] of out) signed += a.x * (b.y * c.z - b.z * c.y) - a.y * (b.x * c.z - b.z * c.x) + a.z * (b.x * c.y - b.y * c.x);
+  if (signed < 0) for (const t of out) { const tmp = t[1]; t[1] = t[2]; t[2] = tmp; }
   return out;
 }
 
@@ -101,7 +105,11 @@ export function splitModelFlat(model,sections=2,options={}){
   let minY=Infinity,maxY=-Infinity,minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;for(const t of tris)for(const p of t){minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z);}
   const span=Math.max(maxY-minY,EPS),diag=Math.hypot(maxX-minX,maxY-minY,maxZ-minZ),tol=Math.max(diag*1e-6,1e-7);
   const fractions=Array.isArray(options.cutFractions)&&options.cutFractions.length===sections-1?options.cutFractions:Array.from({length:sections-1},(_,i)=>(i+1)/sections);
-  const cuts=fractions.map(f=>minY+span*Math.max(.02,Math.min(.98,Number(f))));
+  let cuts=fractions.map(f=>minY+span*Math.max(.02,Math.min(.98,Number(f))));
+  // A plane that passes exactly through a ring of vertices leaves the cap outline incomplete (edges lying in the plane are skipped).
+  // Nudge such a cut by a hair (0.02% of the height) so it falls between vertices.
+  const onVertex=y=>{const lim=Math.max(EPS*10,span*1e-6);for(const t of tris)for(const p of t)if(Math.abs(p.y-y)<=lim)return true;return false;};
+  cuts=cuts.map(y=>{let c=y,n=0;while(onVertex(c)&&n++<5)c+=span*2e-4;return c;});
   const withPegs=!!options.withPegs,radius=Math.max(EPS,Number(options.pegRadius)||0),depth=Math.max(EPS,Number(options.pegDepth)||0),clearance=Math.max(0,Number(options.clearance)||0);
   const cutData=cuts.map(y=>{const segs=[];for(const tri of tris){const s=planeSegment(tri,y);if(s)segs.push(s);}const loops=stitchLoops(segs,tol),closed=loops.filter(l=>l.closed).sort((a,b)=>Math.abs(areaXZ(b.points))-Math.abs(areaXZ(a.points))),outer=closed[0]?.points||null,points=withPegs&&outer?choosePegPoints(outer,radius,clearance):[];return{y,loops,outer,points,pegsSafe:!!outer&&points.length>0};});
   const result=[];

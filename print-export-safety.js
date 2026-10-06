@@ -2,8 +2,8 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { healthOfModel } from './repair-core.js?v=2.27';
 
-// SHRINK 3D v2.49 — safety layer using the cumulative working model.
-const VERSION = '2.49';
+// SHRINK 3D v2.55 — safety layer using the cumulative working model; Make watertight now replaces the working model.
+const VERSION = '2.55';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -34,7 +34,7 @@ function ensureDiagnosticPanel(){
       <label class="repair-quality"><span>Keep detail</span><select id="remeshQuality"><option value="high" selected>High</option><option value="balanced">Balanced</option><option value="fast">Fast</option></select></label>
       <button id="makeWatertightBtn" type="button">Make watertight</button>
     </div>
-    <div class="repair-help">Rebuilds the sculpt as a new voxel-style closed outer skin. Best for overlapping or troublesome parts. Tiny details may soften slightly. Your original file is not changed.</div>
+    <div class="repair-help">Rebuilds the current model as a new voxel-style closed outer skin and makes it your current model. Best for overlapping or troublesome parts. Tiny details may soften slightly. Your original upload is not changed.</div>
     <details class="repair-advanced"><summary>Technical details</summary><div id="printDiagnosticStats" class="print-diagnostic-stats"></div></details>`;
   viewerPanel.appendChild(panel);
   const style=document.createElement('style'); style.id='printDiagnosticStyle';
@@ -62,6 +62,8 @@ function saveBlob(blob,filename){const a=document.createElement('a');a.href=URL.
 async function makeWatertightCopy(){
   const btn=$('makeWatertightBtn'),model=sourceModel(); if(!btn||!model)return;
   const quality=$('remeshQuality')?.value||'balanced'; const old=btn.textContent; btn.disabled=true; btn.textContent='Checking…';
+  let root=null,installed=false;
+  const disposeRoot=r=>r?.traverse?.(o=>{if(o.isMesh){o.geometry?.dispose?.();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m?.dispose?.());}});
   try{
     const mod=await import(`./watertight-remesh.js?v=${VERSION}`);
     const pre=mod.remeshPreflight?.(model,quality);
@@ -75,16 +77,27 @@ async function makeWatertightCopy(){
       return;
     }
     btn.textContent='Voxelising…';
-    app()?.setStatus?.('Rebuilding the sculpt as one watertight voxel skin. This can take a little while…',false);
+    app()?.setStatus?.('Rebuilding the current model as one watertight voxel skin. This can take a little while…',false);
     const result=await mod.makeWatertight(model,quality,msg=>app()?.setStatus?.(msg,false));
-    const scale=window.__shrinkPrint?.mmPerUnit?.()||1; const zUp=$('zUpToggle')?.checked!==false;
-    const out=buildBinaryStl({THREE,model:result.root,mmPerUnit:scale,zUp});
-    const base=app()?.baseName?.()||'model';
-    saveBlob(new Blob([out.buffer],{type:'model/stl'}),`${base}-watertight.stl`);
-    result.root.traverse(o=>{if(o.isMesh){o.geometry?.dispose?.();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m?.dispose?.());}});
-    const panel=ensureDiagnosticPanel();
-    if(panel){panel.querySelector('.print-diagnostic-title').textContent='✓ Watertight voxel copy created';const msg=$('printDiagnosticMessage');if(msg)msg.textContent='The rebuilt STL has been downloaded. Drop that new file back into SHRINK, then use Fuse / Split as normal.';const help=panel.querySelector('.repair-help');if(help)help.textContent='Your original file was left untouched. Advanced: voxel parity union was used instead of triangle-normal signing.';}
-    app()?.setStatus?.(`Saved ${base}-watertight.stl. Re-open that repaired file to fuse or split it.`,false);
+    root=result.root;
+    // The rebuilt skin has to pass the same health check as everything else before it replaces the current model.
+    const health=healthOfModel(THREE,root);
+    if(!health.clean){
+      const err=new Error(`The rebuilt surface still has ${health.openEdges} open, ${health.pinchedEdges} pinched and ${health.flippedEdges} flipped edges, so nothing was changed.`);
+      err.code='REMESH_UNHEALTHY'; throw err;
+    }
+    // Same road every tool takes: the rebuilt model becomes the current working model, is shown in the viewer
+    // (camera kept, orientation and scale are those of the model it replaces) and the health card is refreshed.
+    if(window.__shrinkInstallWorkingModel) window.__shrinkInstallWorkingModel(root,'rebuild');
+    else{
+      const view=app()?.getViewState?.();
+      app()?.setPreview?.(root); window.__shrinkSetWorkingModel?.(root); app()?.show?.('optimized');
+      if(view)app()?.restoreViewState?.(view);
+      app()?.notifyReduced?.({kind:'rebuild'}); clearDiagnostic();
+    }
+    installed=true; root=null;
+    window.__shrinkRefreshHealth?.();
+    app()?.setStatus?.('Rebuilt as one watertight solid. It is now your current model — SHRINK it, FUSE it or DOWNLOAD it as normal.',false);
   }catch(err){
     console.error(`[SHRINK 3D ${VERSION}] Watertight voxel rebuild failed`,err);
     const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats'),help=ensureDiagnosticPanel()?.querySelector('.repair-help');
@@ -94,15 +107,18 @@ async function makeWatertightCopy(){
       if(stats&&err.preflight){const nf=new Intl.NumberFormat();stats.textContent=`Voxel safety check: ${nf.format(err.preflight.triangles)} triangles · safe limit: about ${nf.format(err.preflight.triangleLimit)} triangles.`;}
       app()?.setStatus?.('Watertight rebuild stopped safely — reduce the model first.',true);
     } else if(err?.code==='REMESH_MESSY'||err?.code==='REMESH_LEAKY'){
-      app()?.setStatus?.('Watertight rebuild stopped: this model has gaps that are too big to close, so nothing was downloaded.',true);
+      app()?.setStatus?.('Watertight rebuild stopped: this model has gaps that are too big to close, so nothing was changed.',true);
       if(msg)msg.textContent=err.message;
       if(help)help.textContent='Big gaps cannot be closed this way. Use your slicer\'s repair, or close the holes in your modelling software.';
+    } else if(err?.code==='REMESH_UNHEALTHY'){
+      app()?.setStatus?.('Watertight rebuild did not pass the mesh check, so your current model was left as it is.',true);
+      if(msg)msg.textContent=err.message;
     } else {
       app()?.setStatus?.(`Watertight repair failed: ${err.message}`,true);
       if(msg)msg.textContent='SHRINK could not rebuild this model automatically. Try Fast detail, or repair/remesh it in your modelling software.';
     }
   }
-  finally{btn.disabled=false;btn.textContent=old;}
+  finally{ if(!installed)disposeRoot(root); btn.disabled=false; btn.textContent=old; }
 }
 
 function normalExport(kind,message){if(fallbackBusy)return;fallbackBusy=true;const fuse=$('fuseSolidToggle'),split=$('splitMode'),prevFuse=fuse?.checked,prevSplit=split?.value;if(fuse)fuse.checked=false;if(split)split.value='off';setTimeout(()=>{const btn=kind==='obj'?$('saveObjBtn'):$('saveStlBtn');btn?.click();setTimeout(()=>{app()?.setStatus?.(message,false);if(fuse&&prevFuse!=null)fuse.checked=prevFuse;if(split&&prevSplit!=null){split.value=prevSplit;split.dispatchEvent(new Event('change',{bubbles:true}));}fallbackBusy=false;},60);},0);}

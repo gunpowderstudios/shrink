@@ -39,9 +39,9 @@ export function remeshPreflight(model, quality = 'balanced') {
 
 export async function makeWatertight(model, quality = 'balanced', onStatus = () => {}) {
   if (!model) throw new Error('No model is loaded.');
-  // Rebuild from the original file when we can: it still has all the fine detail the shrink step trimmed away.
-  const original = window.__shrinkApp?.originalModel;
-  const source = original && countTriangles(original) <= TRIANGLE_LIMIT ? original : model;
+  // Always rebuild the model we were given: the tools are cumulative, so this is the current working model
+  // (never the original upload, which may be an earlier stage with different geometry).
+  const source = model;
   const preflight = remeshPreflight(source, quality);
   if (!preflight.safe) {
     const err = new Error(`This model is too heavy to rebuild safely in your browser (${new Intl.NumberFormat().format(preflight.triangles)} triangles). SHRINK it first, then try again.`);

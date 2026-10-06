@@ -1,6 +1,6 @@
-// SHRINK 3D v2.51 — keep action history separate from current repair state.
+// SHRINK 3D v2.55 — shared install-result helper, split controls fixed, DOWNLOAD IT never forces Fuse.
 (() => {
-  const VERSION = '2.51';
+  const VERSION = '2.55';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -22,11 +22,27 @@
   function healthModel() { return sourceModel(); }
   window.__shrinkWorkingModel = () => sourceModel();
   window.__shrinkSetWorkingModel = setWorkingModel;
+
+  // Make a tool's result the new current working model: show it, keep the camera, tell the rest of the app,
+  // record the change chip and clear the red warning. Fix It, Make watertight and any future tool go through here.
+  function installWorkingResult(root, kind) {
+    const view = app()?.getViewState?.();
+    app()?.setPreview?.(root);
+    setWorkingModel(root);
+    app()?.show?.('optimized');
+    if (view) app()?.restoreViewState?.(view);
+    app()?.notifyReduced?.({ kind });
+    markApplied(kind === 'rebuild' ? 'rebuilt' : 'fixed');
+    window.__shrinkPrintSafety?.clearDiagnostic?.();
+    return root;
+  }
+  window.__shrinkInstallWorkingModel = installWorkingResult;
+  window.__shrinkRefreshHealth = () => updateHealthCard();
   function renderAppliedChanges() {
     const wrap = $('v2HealthChanges');
     if (!wrap) return;
-    const order = ['fixed','fused','shrunk'];
-    const labels = { fixed:'FIXED', fused:'FUSED', shrunk:'SHRUNK' };
+    const order = ['fixed','rebuilt','fused','shrunk'];
+    const labels = { fixed:'FIXED', rebuilt:'REBUILT', fused:'FUSED', shrunk:'SHRUNK' };
     const chips = order.filter(k => appliedChanges.has(k))
       .map(k => `<span class="v2-change-chip ${k}"><i></i>${labels[k]}</span>`)
       .join('');
@@ -143,7 +159,7 @@
       $('v2HealthLabel').textContent = 'Check failed';
       $('v2HealthScore').textContent = '—';
       $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Could not analyse this mesh.</div>';
-      console.warn('[SHRINK 3D v2.51] Health card check failed', err);
+      console.warn('[SHRINK 3D v2.55] Health card check failed', err);
     }
   }
 
@@ -157,22 +173,15 @@
     try {
       for (let i = 0; i < 50 && !window.__shrinkFuse?.repairModel; i++) await wait(100);
       if (!window.__shrinkFuse?.repairModel) throw new Error('The repair engine is still loading.');
-      const view = app()?.getViewState?.();
       const { root } = window.__shrinkFuse.repairModel(model);
-      app()?.setPreview?.(root);
-      setWorkingModel(root);
-      app()?.show?.('optimized');
-      if (view) app()?.restoreViewState?.(view);
-      app()?.notifyReduced?.({ kind: 'repair' });
-      markApplied('fixed');
-      window.__shrinkPrintSafety?.clearDiagnostic?.();
+      installWorkingResult(root, 'repair');
       btn.textContent = 'FIXED';
       await wait(80);
       await updateHealthCard();
       const card = $('v2HealthCard');
       if (card && $('v2HealthScore')?.textContent === '100') btn.hidden = true;
     } catch (err) {
-      console.error('[SHRINK 3D v2.51] Health repair failed', err);
+      console.error('[SHRINK 3D v2.55] Health repair failed', err);
       btn.textContent = 'COULD NOT FIX';
       window.__shrinkPrintSafety?.showDiagnostic?.('Fuse', err?.message || String(err));
       setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; }, 1800);
@@ -345,14 +354,22 @@
     const select = $('v2SplitMode');
     if (!select) return;
     const src = $('splitMode');
-    if (src) select.value = src.value || 'off';
+    if (src && select.value !== (src.value || 'off')) select.value = src.value || 'off';
     const joint = $('v2Joint');
-    if (joint && $('splitJoint')) joint.value = $('splitJoint').value;
+    if (joint && $('splitJoint') && joint.value !== $('splitJoint').value) joint.value = $('splitJoint').value;
+    // This runs from a MutationObserver on the whole page, so it must only write when something actually changed:
+    // rewriting the same text re-triggers the observer and would loop forever.
+    const set = (el, prop, value) => { if (el && el[prop] !== value) el[prop] = value; };
     const showCut = select.value === '2';
-    $('v2CutWrap').hidden = !showCut;
-    if (showCut && $('splitCutPct')) {
-      $('v2Cut').value = $('splitCutPct').value;
-      $('v2CutLabel').textContent = `${$('splitCutPct').value}%`;
+    set($('v2CutWrap'), 'hidden', !showCut);
+    if (showCut && $('splitCutHeight')) {
+      set($('v2Cut'), 'value', $('splitCutHeight').value);
+      set($('v2CutLabel'), 'textContent', `${$('splitCutHeight').value}%`);
+    }
+    const maxWrap = $('v2MaxWrap');
+    if (maxWrap) {
+      set(maxWrap, 'hidden', select.value !== 'max');
+      if (!maxWrap.hidden && $('splitMaxHeight') && document.activeElement !== $('v2MaxHeight')) set($('v2MaxHeight'), 'value', $('splitMaxHeight').value);
     }
   }
 
@@ -360,6 +377,7 @@
     const mode = $('v2SplitMode')?.value || 'off';
     setNative('splitMode', mode, 'change');
     $('v2CutWrap').hidden = mode !== '2';
+    if ($('v2MaxWrap')) $('v2MaxWrap').hidden = mode !== 'max';
     if (mode !== 'off') markStep(4, 'active');
   }
 
@@ -374,7 +392,9 @@
   function download() {
     syncAdvancedToNative();
     chooseSplit();
-    if ($('fuseSolidToggle')) $('fuseSolidToggle').checked = fuseReady || $('v2SplitMode')?.value !== 'off';
+    // Fuse is an explicit tool (FUSE IT) that already advanced the working model. Download exports the current
+    // working model as it is, or splits it. It must never switch Fuse on, or the Fuse export would swallow the split.
+    if ($('fuseSolidToggle')) setNative('fuseSolidToggle', false, 'change');
     markStep(4, 'done');
     $('saveStlBtn')?.click();
   }
@@ -453,6 +473,7 @@
             <section class="v2-card v2-action-card v2-download-card">
               <div class="v2-card-head"><div><h2>Download</h2><p>Save one STL, or split it into printable sections with pegs.</p></div></div>
               <div class="v2-download-options"><label>Split into<select id="v2SplitMode"><option value="off">One STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">Auto by maximum height</option></select></label><label>Joint<select id="v2Joint"><option value="pegs">Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label></div>
+              <div id="v2MaxWrap" class="v2-cut-row" hidden><div><span>Maximum part height</span><strong>mm</strong></div><input id="v2MaxHeight" type="number" min="20" max="500" step="5" value="80"></div>
               <div id="v2CutWrap" class="v2-cut-row" hidden><div><span>Cut height</span><strong id="v2CutLabel">50%</strong></div><input id="v2Cut" type="range" min="10" max="90" step="0.5" value="50"></div>
               <button id="v2DownloadBtn" class="v2-mega v2-red" type="button">DOWNLOAD IT</button>
               <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label></div></details>
@@ -496,7 +517,8 @@
     $('v2ShrinkBtn').addEventListener('click', shrinkModel);
     $('v2SplitMode').addEventListener('change', chooseSplit);
     $('v2Joint').addEventListener('change', syncAdvancedToNative);
-    $('v2Cut').addEventListener('input', () => { $('v2CutLabel').textContent = `${$('v2Cut').value}%`; setNative('splitCutPct', $('v2Cut').value, 'input'); });
+    $('v2Cut').addEventListener('input', () => { $('v2CutLabel').textContent = `${$('v2Cut').value}%`; setNative('splitCutHeight', $('v2Cut').value, 'input'); });
+    $('v2MaxHeight').addEventListener('input', () => setNative('splitMaxHeight', Math.max(20, Number($('v2MaxHeight').value) || 80), 'input'));
     ['v2PegDiameter','v2PegDepth','v2PegClearance'].forEach(id => $(id).addEventListener('input', syncAdvancedToNative));
     $('v2Zup').addEventListener('change', syncAdvancedToNative);
     $('v2DownloadBtn').addEventListener('click', download);

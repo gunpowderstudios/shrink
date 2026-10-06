@@ -1,9 +1,14 @@
-# SHRINK 3D v2.39
+# SHRINK 3D v2.55
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.55 — Split and Make watertight fixed
+- **DOWNLOAD IT** splits the current working model into 2 / 3 / auto-by-height sections (flat or with keyed pegs) and downloads a ZIP of STLs. It no longer forces Fuse on, and models made of several separate closed pieces split fine.
+- **Make watertight** now replaces the current working model in the viewer, refreshes **MODEL HEALTH** and clears the red warning, instead of only downloading a file. It adds a **REBUILT** chip.
+- Tests: `cd tests && npm install && npm test` (128 checks, includes clicking the real buttons with the real Manifold library).
 
 ## v2.39 — 3D Print multitool
 

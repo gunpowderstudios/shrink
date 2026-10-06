@@ -4,11 +4,34 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.36**
+- Current user-facing release: **v2.55** (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## 3D Print multitool (v2.38 onward) — read this before touching print code
+
+`print-v2-ui.js` owns the visible 3D Print interface: printer & size, **FUSE IT**, **SHRINK IT**, **DOWNLOAD IT**, the MODEL HEALTH card with **FIX IT**, and the change chips. The tools are **cumulative and order-free**: each one acts on the *current working model* and its result becomes the new working model. The untouched upload stays in `app().originalModel` for Compare/reset.
+
+### The working model
+- `window.__shrinkWorkingModel()` returns it; `window.__shrinkSetWorkingModel(model)` sets it. `sourceModel()` in `fuse-export.js`, `split-print.js`, `split-fallback.js`, `print-export-safety.js` and `print-tools.js` all start from it. **Never read `app().originalModel` or `app().optimizedModel` directly in a print tool.**
+- **To make a tool's result the new working model, call `window.__shrinkInstallWorkingModel(root, kind)`** (defined in `print-v2-ui.js`). It does everything in the right order: `setPreview`, `setWorkingModel`, `show('optimized')`, restore the camera, `notifyReduced`, change chip, clear the red warning. FIX IT and Make watertight use it. Do not copy those steps into a new tool. Call `window.__shrinkRefreshHealth()` afterwards if the health card must update at once.
+- `setPreview()` disposes the previous preview's geometry. Never keep using a model after it has been passed to `setPreview` as its replacement.
+
+### Split / Fuse rules
+- DOWNLOAD IT must **never** switch `fuseSolidToggle` on. Fuse is a deliberate tool (FUSE IT). The legacy Fuse export (`fuse-export.js`) and the split export (`split-print.js`) both intercept `saveStlBtn` in the capture phase and call `stopImmediatePropagation()`, and their order depends on module load order, so the Fuse export steps aside whenever `splitMode !== 'off'`.
+- **A model made of several separate closed pieces is valid.** Do not require `components === 1` unless the operation truly needs one connected solid (it does not for splitting or exporting).
+- A closed mesh can be inside-out (negative Manifold volume). `fuse-export.js` turns it outward; any new code that builds Manifold solids from meshes must go through `meshToSolid`/`modelToSolid`.
+- Pegs are best-effort. If a peg cannot be built the joint stays flat and the status message must say so. Pegs need material on both sides of the cut.
+- If the solid split fails, `split-fallback.js` (`raw-split.js`) makes a direct capped split. It must keep working on inside-out input and on cuts that pass exactly through a ring of vertices.
+- `syncSplitControls()` runs from a page-wide `MutationObserver`. Anything it does must be idempotent (write only when a value changes) or the page will loop.
+
+### Make watertight
+Rebuilds the **working model** (not the original), checks the result with the shared `meshHealth`, and only then installs it. On refusal or an unhealthy result nothing changes and nothing is downloaded.
+
+### Tests
+`cd tests && npm install && npm test`. `multitool.test.mjs` clicks the real DOWNLOAD IT / FUSE IT / Make watertight buttons on a jsdom page that loads the real modules and the real Manifold library (`mt-harness.mjs`). If you change split, fuse, working-model or watertight code, run it and add a case for what you changed.
 
 ## v2.36 historical layout baseline
 The current Simple desktop layout is intentionally restored from the final Oct 3 v2.25 commit `67ce3c`.
@@ -263,6 +286,11 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - `simple-postreduce.js`
 - `simple-mode.js`
 - `simple-mode.css`
+
+### Print multitool (loaded by `ui-mode.js`)
+- `print-v2-ui.js` + `print-v2-ui.css` (the visible tools, working model, health card)
+- `print-export-safety.js` (red diagnostic panel, Make watertight, safe export fallbacks; loads fuse/split helpers)
+- `fuse-export.js`, `split-print.js`, `split-fallback.js`, `raw-split.js`, `watertight-remesh.js`
 
 ### Print geometry / repair
 - `repair-core.js`

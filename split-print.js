@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v1.90 — split tall print models into sections with adjustable two-part cut height.
+// SHRINK 3D v2.55 — split tall print models into sections; separate closed pieces allowed, pegs best-effort.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -119,14 +119,17 @@ function choosePegPoints(solid, wasm, y, box, r, depth) {
   const candidates = [[cx,cz],[cx-dx,cz],[cx+dx,cz],[cx,cz-dz],[cx,cz+dz],[cx-dx,cz-dz],[cx+dx,cz+dz],[cx-dx,cz+dz],[cx+dx,cz-dz]];
   const scored = [];
   for (const [x,z] of candidates) {
-    let probe = null, hit = null;
-    try {
-      const h = Math.max(depth * .35, r * 1.5);
-      probe = makeYCylinder(wasm, h, r * 1.2, x, y - h / 2, z, 18);
-      hit = solid.intersect(probe);
-      const vol = hit.volume?.() || 0;
-      if (vol > 0) scored.push({ x, z, vol });
-    } catch {} finally { try { hit?.delete?.(); } catch {} try { probe?.delete?.(); } catch {} }
+    // A peg needs material on BOTH sides of the cut at this spot: below it the socket is carved, above it the peg is
+    // attached. Without that the peg would float free (or the socket would cut into nothing) on multi-piece models.
+    const h = Math.max(depth * .35, r * 1.5);
+    const volumeIn = baseY => {            // a probe cylinder standing on baseY and reaching h upwards
+      let probe = null, hit = null;
+      try { probe = makeYCylinder(wasm, h, r * 1.2, x, baseY, z, 18); hit = solid.intersect(probe); return hit.volume?.() || 0; }
+      catch { return 0; } finally { try { hit?.delete?.(); } catch {} try { probe?.delete?.(); } catch {} }
+    };
+    const below = volumeIn(y - h), above = volumeIn(y);
+    const vol = Math.min(below, above);
+    if (vol > 0) scored.push({ x, z, vol });
   }
   scored.sort((a,b) => b.vol - a.vol);
   if (!scored.length) return [];
@@ -164,8 +167,10 @@ async function splitSolid(solid, wasm, n, withPegs, fractions = cutFractions(n))
     const depth = Math.max(2, Number($('pegDepth')?.value || 6)) / scale;
     const clearance = Math.max(.05, Number($('pegClearance')?.value || .2)) / scale;
     const eps = Math.max(clearance * .25, span*1e-5);
+    parts.pegCuts = 0;
     for (let i=0;i<cuts.length;i++) {
       const y = cuts[i], points = choosePegPoints(solid, wasm, y, box, radiusMain, depth);
+      let added = 0;
       for (let p=0;p<Math.min(2,points.length);p++) {
         const {x,z} = points[p], r = p===0 ? radiusMain : radiusMain*.76;
         let peg=null,socket=null,newLower=null,newUpper=null;
@@ -175,11 +180,15 @@ async function splitSolid(solid, wasm, n, withPegs, fractions = cutFractions(n))
           newLower = parts[i].subtract(socket);
           newUpper = parts[i+1].add(peg);
           try { parts[i].delete?.(); } catch {} try { parts[i+1].delete?.(); } catch {}
-          parts[i]=newLower; parts[i+1]=newUpper; newLower=null; newUpper=null;
+          parts[i]=newLower; parts[i+1]=newUpper; newLower=null; newUpper=null; added++;
+        } catch (err) {
+          // Pegs are a bonus. If one cannot be built, keep the flat cut for it rather than failing the whole split.
+          console.warn('[SHRINK 3D] A peg/socket could not be built; leaving that joint flat.', err);
         } finally {
           try { peg?.delete?.(); } catch {} try { socket?.delete?.(); } catch {} try { newLower?.delete?.(); } catch {} try { newUpper?.delete?.(); } catch {}
         }
       }
+      if (added) parts.pegCuts++;
     }
   }
   return parts;
@@ -194,11 +203,11 @@ async function exportSplitSTL(evt) {
   try {
     const model = sourceModel(); if (!model) return;
     if (!window.__shrinkFuse?.modelToSolid) throw new Error('Fuse engine is not ready yet. Reload SHRINK 3D and try again.');
-    say('Fusing the model, cutting sections and adding alignment pegs…');
+    say('Cutting the current model into sections' + ($('splitJoint')?.value !== 'flat' ? ' and adding alignment pegs…' : '…'));
     await new Promise(r => requestAnimationFrame(() => setTimeout(r,0)));
     const built = await window.__shrinkFuse.modelToSolid(model);
     solid = built.solid; const wasm = built.wasm;
-    if (built.components !== 1) throw new Error(`The model still contains ${built.components} disconnected solids after fusion. Overlap the parts before splitting.`);
+    // Separate closed pieces are fine: the cut planes slice every piece, so a single connected solid is not needed here.
     const withPegs = $('splitJoint')?.value !== 'flat';
     parts = await splitSolid(solid, wasm, n, withPegs, cutFractions(n));
     const files = {}, scale = mmPerUnit(), zUp = $('zUpToggle')?.checked !== false;
@@ -214,7 +223,8 @@ async function exportSplitSTL(evt) {
     const zip = zipSync(files, { level: 0 });
     saveBlob(new Blob([zip], {type:'application/zip'}), `${base}-SHRINK-split-${parts.length}-parts.zip`);
     const cutText = n===2 ? ` · cut at ${(finishedHeightMM()*cutFractions(2)[0]).toFixed(1)} mm` : '';
-    say(`Saved ${parts.length} watertight STL sections${withPegs ? ' with keyed alignment pegs (upper part pegs into lower sockets)' : ''}${cutText} · ${new Intl.NumberFormat().format(totalTris)} triangles total.`);
+    const joints = !withPegs ? '' : parts.pegCuts ? ` with keyed alignment pegs on ${parts.pegCuts} cut${parts.pegCuts === 1 ? '' : 's'} (upper part pegs into lower sockets)` : ' with flat cuts (no safe peg position was found)';
+    say(`Saved ${parts.length} watertight STL sections${joints}${cutText} · ${new Intl.NumberFormat().format(totalTris)} triangles total.`);
   } catch (err) {
     console.error(err); say(`Split failed: ${err.message}`, true);
   } finally {

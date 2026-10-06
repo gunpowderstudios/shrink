@@ -3,5 +3,5 @@
   "private": true,
   "type": "module",
   "scripts": { "test": "node run-all.mjs" },
-  "devDependencies": { "jsdom": "^26.0.0", "three": "0.180.0", "manifold-3d": "3.5.4" }
+  "devDependencies": { "jsdom": "^26.0.0", "three": "0.180.0", "manifold-3d": "3.5.4", "fflate": "0.8.2", "meshoptimizer": "0.24.0" }
 }

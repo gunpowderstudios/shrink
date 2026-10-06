@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl, analyzeTopology } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
-import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=2.18';
+import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=2.55';
 
 // SHRINK 3D v1.90 — intercept a failed solid split and try a direct capped triangle-mesh split.
 const $ = id => document.getElementById(id);

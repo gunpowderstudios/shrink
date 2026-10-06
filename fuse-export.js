@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=2.18';
 import { gatherWorld, repairMesh } from './repair-core.js?v=2.27';
 
-// SHRINK 3D v2.48 — gentle repair + optional Boolean union / make-manifold pass,
+// SHRINK 3D v2.55 — gentle repair + optional Boolean union / make-manifold pass (inside-out parts turned outward; multi-piece results allowed),
 // with a best-effort cleanup repair before Manifold gives up.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -120,6 +120,19 @@ function solidFromData(data, wasm) {
   return solid;
 }
 
+// A closed mesh whose triangles face inwards (inside-out) gives Manifold a negative volume. Boolean operations, cut planes and the
+// peg probes in the split code all assume a positive volume, so turn such a mesh the right way round before using it.
+function orientOutward(solid, data, wasm) {
+  let volume = 0;
+  try { volume = solid.volume(); } catch {}
+  if (!(volume < 0)) return solid;
+  const flipped = new Uint32Array(data.tris.length);
+  for (let i = 0; i + 2 < flipped.length; i += 3) { flipped[i] = data.tris[i]; flipped[i + 1] = data.tris[i + 2]; flipped[i + 2] = data.tris[i + 1]; }
+  console.info('[SHRINK 3D v2.55] A mesh part was inside-out; turned it outward.');
+  try { solid.delete?.(); } catch {}
+  return solidFromData({ verts: data.verts, tris: flipped }, wasm);
+}
+
 function meshToSolid(mesh, wasm) {
   const raw=rawWorldMesh(mesh);
   if(!raw) return null;
@@ -132,7 +145,7 @@ function meshToSolid(mesh, wasm) {
     try {
       solid=solidFromData(repaired,wasm);
       const status=statusText(solid);
-      if(!solid?.isEmpty?.()) return solid;
+      if(!solid?.isEmpty?.()) return orientOutward(solid, repaired, wasm);
       lastStatus=status||lastStatus;
     } catch(err){
       lastStatus=err?.message||String(err);
@@ -272,6 +285,9 @@ function injectUI() {
 async function fusedExport(kind, evt) {
   const toggle = $('fuseSolidToggle');
   if (!toggle?.checked || document.body.classList.contains('app-mode-game')) return;
+  // Splitting owns this click. Both handlers listen in the capture phase and which one runs first depends on
+  // module load order, so the Fuse export must step aside whenever a split is requested.
+  if (($('splitMode')?.value || 'off') !== 'off') return;
   evt.preventDefault(); evt.stopImmediatePropagation();
   const model = sourceModel(); if (!model) return;
   const stlBtn = $('saveStlBtn'), objBtn = $('saveObjBtn');
@@ -282,21 +298,19 @@ async function fusedExport(kind, evt) {
     say('Repairing seams, removing bad triangles and fusing overlapping parts…');
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
     const { root, components } = await fuseModel(model);
-    if (components !== 1) {
-      root.traverse(o => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
-      throw new Error(`The Boolean union still contains ${components} disconnected solids. Move/overlap those parts, or use a voxel-remesh tool to bridge real gaps.`);
-    }
+    // Several separate closed pieces are a valid, printable result. Only say so; do not fail the export.
+    const shape = components === 1 ? 'one connected manifold solid' : `${components} separate watertight pieces`;
     const scale = window.__shrinkPrint?.mmPerUnit?.() || 1;
     const zUp = $('zUpToggle')?.checked !== false;
     const name = app()?.baseName?.() || 'model';
     if (kind === 'stl') {
       const { buffer, triangles } = buildBinaryStl({ THREE, model: root, mmPerUnit: scale, zUp });
       saveBlob(new Blob([buffer], { type: 'model/stl' }), `${name}-SHRINK.stl`);
-      say(`Saved fused STL: ${new Intl.NumberFormat().format(triangles)} triangles · one connected manifold solid.`);
+      say(`Saved fused STL: ${new Intl.NumberFormat().format(triangles)} triangles · ${shape}.`);
     } else {
       const { blob, triangles } = buildObjBlob({ THREE, model: root, mmPerUnit: scale, zUp });
       saveBlob(blob, `${name}-SHRINK.obj`);
-      say(`Saved fused OBJ: ${new Intl.NumberFormat().format(triangles)} triangles · one connected manifold solid.`);
+      say(`Saved fused OBJ: ${new Intl.NumberFormat().format(triangles)} triangles · ${shape}.`);
     }
     root.traverse(o => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
   } catch (err) {
