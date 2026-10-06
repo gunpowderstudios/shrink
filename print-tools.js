@@ -409,14 +409,14 @@ function exportModel(kind) {
   say(`Building ${kind.toUpperCase()}…`);
   setTimeout(() => {
     try {
-      const suffix = '-SHRINK';
+      const stem = window.__shrinkDownloadStem?.(a.baseName()) || `${a.baseName()}-SHRINK`;
       if (kind === 'stl') {
         const { buffer, triangles } = buildBinaryStl(opts);
-        saveBlob(new Blob([buffer], { type: 'model/stl' }), `${a.baseName()}${suffix}.stl`);
+        saveBlob(new Blob([buffer], { type: 'model/stl' }), `${stem}.stl`);
         say(`Saved STL: ${fmt(triangles)} triangles, ${fmtBytes(buffer.byteLength)}, scaled so the figure is ${heightMM} mm tall${els.zUp.checked ? ' (Z-up)' : ''}.`);
       } else {
         const { blob, triangles } = buildObjBlob(opts);
-        saveBlob(blob, `${a.baseName()}${suffix}.obj`);
+        saveBlob(blob, `${stem}.obj`);
         say(`Saved OBJ: ${fmt(triangles)} triangles, ${fmtBytes(blob.size)}, scaled so the figure is ${heightMM} mm tall.`);
       }
     } catch (err) { console.error(err); say(`Export failed: ${err.message}`, true); }
