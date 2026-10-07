@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.55 — split tall print models into sections; separate closed pieces allowed, pegs best-effort.
+// SHRINK 3D v2.60 — split tall print models; peg/socket centres are chosen from the actual cut cross-section and kept safely inside it.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -112,30 +112,162 @@ function makeYCylinder(wasm, height, radius, x, y, z, segments = 28) {
   return wasm.Manifold.cylinder(height, radius, radius, segments, false).rotate([-90, 0, 0]).translate([x, y, z]);
 }
 
-function choosePegPoints(solid, wasm, y, box, r, depth) {
-  const min = box.min, max = box.max;
-  const cx = (min.x + max.x) / 2, cz = (min.z + max.z) / 2;
-  const dx = (max.x - min.x) * .22, dz = (max.z - min.z) * .22;
-  const candidates = [[cx,cz],[cx-dx,cz],[cx+dx,cz],[cx,cz-dz],[cx,cz+dz],[cx-dx,cz-dz],[cx+dx,cz+dz],[cx-dx,cz+dz],[cx+dx,cz-dz]];
-  const scored = [];
-  for (const [x,z] of candidates) {
-    // A peg needs material on BOTH sides of the cut at this spot: below it the socket is carved, above it the peg is
-    // attached. Without that the peg would float free (or the socket would cut into nothing) on multi-piece models.
-    const h = Math.max(depth * .35, r * 1.5);
-    const volumeIn = baseY => {            // a probe cylinder standing on baseY and reaching h upwards
-      let probe = null, hit = null;
-      try { probe = makeYCylinder(wasm, h, r * 1.2, x, baseY, z, 18); hit = solid.intersect(probe); return hit.volume?.() || 0; }
-      catch { return 0; } finally { try { hit?.delete?.(); } catch {} try { probe?.delete?.(); } catch {} }
-    };
-    const below = volumeIn(y - h), above = volumeIn(y);
-    const vol = Math.min(below, above);
-    if (vol > 0) scored.push({ x, z, vol });
+function pointInPolyXZ(x, z, loop) {
+  let inside = false;
+  for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+    const a = loop[i], b = loop[j];
+    const hit = ((a.z > z) !== (b.z > z)) &&
+      (x < (b.x - a.x) * (z - a.z) / ((b.z - a.z) || 1e-20) + a.x);
+    if (hit) inside = !inside;
   }
-  scored.sort((a,b) => b.vol - a.vol);
+  return inside;
+}
+
+function distToSegXZ(x, z, a, b) {
+  const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz || 1;
+  const t = Math.max(0, Math.min(1, ((x-a.x)*dx + (z-a.z)*dz) / l2));
+  return Math.hypot(x - (a.x + t*dx), z - (a.z + t*dz));
+}
+
+function boundaryDistanceXZ(x, z, loops) {
+  let d = Infinity;
+  for (const loop of loops) {
+    for (let i=0;i<loop.length;i++) d = Math.min(d, distToSegXZ(x, z, loop[i], loop[(i+1)%loop.length]));
+  }
+  return d;
+}
+
+function materialAtCut(x, z, loops) {
+  // Even/odd rule handles separate islands and holes: inside an outer outline = material,
+  // inside an outer + inner outline = a void.
+  let crossings = 0;
+  for (const loop of loops) if (pointInPolyXZ(x, z, loop)) crossings++;
+  return (crossings & 1) === 1;
+}
+
+function cutLoopsFromSolid(solid, y, span) {
+  const mesh = solid.getMesh(), np = mesh.numProp, verts = mesh.vertProperties, tris = mesh.triVerts;
+  const tol = Math.max(Math.abs(span) * 1e-6, 1e-7);
+  const segments = [];
+  const p = i => ({ x:verts[i*np], y:verts[i*np+1], z:verts[i*np+2] });
+  const intersect = (a,b) => {
+    const dy=b.y-a.y, t=Math.abs(dy)<1e-20 ? 0 : (y-a.y)/dy;
+    return {x:a.x+(b.x-a.x)*t, y, z:a.z+(b.z-a.z)*t};
+  };
+  try {
+    for (let t=0;t+2<tris.length;t+=3) {
+      const tri=[p(tris[t]),p(tris[t+1]),p(tris[t+2])], hits=[];
+      for (let i=0;i<3;i++) {
+        const a=tri[i], b=tri[(i+1)%3], da=a.y-y, db=b.y-y;
+        if (Math.abs(da)<=tol && Math.abs(db)<=tol) continue;
+        if ((da < -tol && db > tol) || (da > tol && db < -tol)) hits.push(intersect(a,b));
+        else if (Math.abs(da)<=tol) hits.push({x:a.x,y,z:a.z});
+      }
+      const unique=[];
+      for (const q of hits) if (!unique.some(v => Math.hypot(v.x-q.x,v.z-q.z)<=tol)) unique.push(q);
+      if (unique.length>=2) segments.push([unique[0],unique[1]]);
+    }
+  } finally { try { mesh.delete?.(); } catch {} }
+
+  const key = q => `${Math.round(q.x/tol)},${Math.round(q.z/tol)}`;
+  const entries=segments.map((seg,i)=>({i,a:seg[0],b:seg[1],used:false})), byKey=new Map();
+  const add=(k,i)=>{let list=byKey.get(k);if(!list)byKey.set(k,list=[]);list.push(i);};
+  entries.forEach((e,i)=>{add(key(e.a),i);add(key(e.b),i);});
+  const loops=[];
+  for (let seed=0;seed<entries.length;seed++) {
+    if (entries[seed].used) continue;
+    const e=entries[seed]; e.used=true;
+    const loop=[e.a,e.b]; let current=e.b, closed=false, guard=0;
+    while (guard++ < entries.length+4) {
+      const k=key(current), ids=byKey.get(k)||[];
+      let next=null;
+      for (const id of ids) if (!entries[id].used) { next=entries[id]; break; }
+      if (!next) break;
+      next.used=true;
+      current = key(next.a)===k ? next.b : next.a;
+      if (Math.hypot(current.x-loop[0].x,current.z-loop[0].z)<=tol*1.5) { closed=true; break; }
+      loop.push(current);
+    }
+    if (closed && loop.length>=3) loops.push(loop);
+  }
+  return loops;
+}
+
+function choosePegPoints(solid, wasm, y, box, r, depth, clearance, span) {
+  const loops = cutLoopsFromSolid(solid, y, span);
+  if (!loops.length) return [];
+
+  // Keep the COMPLETE socket circle inside the cut face, plus a small resin wall.
+  // 0.6 mm is deliberately conservative; convert from finished-mm into model units.
+  const safetyWall = 0.6 / Math.max(mmPerUnit(), 1e-9);
+  const safeRadius = r + clearance + safetyWall;
+
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  for (const loop of loops) for (const q of loop) {
+    minX=Math.min(minX,q.x); maxX=Math.max(maxX,q.x);
+    minZ=Math.min(minZ,q.z); maxZ=Math.max(maxZ,q.z);
+  }
+  const width=maxX-minX, depthZ=maxZ-minZ;
+  if (!(width>safeRadius*2 && depthZ>safeRadius*2)) return [];
+
+  // Search the actual section rather than the model's overall bounding-box centre.
+  // A fairly fine grid is cheap here (only at split time) and copes with torsos, capes,
+  // limbs and multiple disconnected islands far better than nine hard-coded guesses.
+  const candidates=[];
+  const steps=17;
+  for (let iz=1;iz<steps;iz++) for (let ix=1;ix<steps;ix++) {
+    const x=minX + width*ix/steps, z=minZ + depthZ*iz/steps;
+    if (!materialAtCut(x,z,loops)) continue;
+    const edge=boundaryDistanceXZ(x,z,loops);
+    if (edge < safeRadius) continue;
+    candidates.push({x,z,edge});
+  }
+
+  // Also try polygon vertex averages; useful for narrow but valid islands that fall between grid samples.
+  for (const loop of loops) {
+    const x=loop.reduce((n,q)=>n+q.x,0)/loop.length, z=loop.reduce((n,q)=>n+q.z,0)/loop.length;
+    if (materialAtCut(x,z,loops)) {
+      const edge=boundaryDistanceXZ(x,z,loops);
+      if (edge>=safeRadius) candidates.push({x,z,edge});
+    }
+  }
+  if (!candidates.length) return [];
+
+  // Confirm there is real material both just below and just above the cut. For the lower
+  // half we require enough depth to carve a socket without immediately breaking through.
+  const probeH=Math.max(depth*.8, r*1.5);
+  const probeR=r+clearance;
+  const fullProbeVolume=Math.PI*probeR*probeR*probeH;
+  const volumeIn = (x,z,baseY) => {
+    let probe=null, hit=null;
+    try {
+      probe=makeYCylinder(wasm,probeH,probeR,x,baseY,z,20);
+      hit=solid.intersect(probe);
+      return hit.volume?.() || 0;
+    } catch { return 0; }
+    finally { try { hit?.delete?.(); } catch {} try { probe?.delete?.(); } catch {} }
+  };
+
+  const scored=[];
+  for (const c of candidates) {
+    const below=volumeIn(c.x,c.z,y-probeH), above=volumeIn(c.x,c.z,y);
+    // Above only needs a strong attachment at the cut; below needs room for most of the socket.
+    const belowFrac=fullProbeVolume ? below/fullProbeVolume : 0;
+    const aboveFrac=fullProbeVolume ? above/fullProbeVolume : 0;
+    if (belowFrac >= .72 && aboveFrac >= .30) scored.push({...c, score:c.edge + Math.min(belowFrac,1)*safeRadius});
+  }
   if (!scored.length) return [];
-  const first = scored[0];
-  const second = scored.slice(1).sort((a,b) => ((b.x-first.x)**2 + (b.z-first.z)**2) - ((a.x-first.x)**2 + (a.z-first.z)**2))[0];
-  return second ? [first, second] : [first];
+
+  scored.sort((a,b)=>b.score-a.score);
+  const first=scored[0];
+
+  // Prefer a second safe point far from the first; don't cram two pegs into a small section.
+  const minSeparation=(r+clearance+safetyWall)*2.6;
+  const second=scored
+    .filter(c=>c!==first && Math.hypot(c.x-first.x,c.z-first.z)>=minSeparation)
+    .sort((a,b)=>(Math.hypot(b.x-first.x,b.z-first.z)+b.edge)-(Math.hypot(a.x-first.x,a.z-first.z)+a.edge))[0];
+
+  return second ? [first,second] : [first];
 }
 
 function sectionSolid(solid, minY, maxY) {
@@ -169,7 +301,7 @@ async function splitSolid(solid, wasm, n, withPegs, fractions = cutFractions(n))
     const eps = Math.max(clearance * .25, span*1e-5);
     parts.pegCuts = 0;
     for (let i=0;i<cuts.length;i++) {
-      const y = cuts[i], points = choosePegPoints(solid, wasm, y, box, radiusMain, depth);
+      const y = cuts[i], points = choosePegPoints(solid, wasm, y, box, radiusMain, depth, clearance, span);
       let added = 0;
       for (let p=0;p<Math.min(2,points.length);p++) {
         const {x,z} = points[p], r = p===0 ? radiusMain : radiusMain*.76;
