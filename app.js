@@ -12,7 +12,7 @@ const $ = (id) => document.getElementById(id);
 const els = {
   dropZone: $('dropZone'), fileInput: $('fileInput'), workspace: $('workspace'), fileName: $('fileName'),
   originalSize: $('originalSize'), triangleCount: $('triangleCount'), vertexCount: $('vertexCount'), textureCount: $('textureCount'),
-  preset: $('preset'), geometry: $('geometry'), geometryValue: $('geometryValue'), textureSize: $('textureSize'),
+  preset: $('preset'), geometry: $('geometry'), geometryNumber: $('geometryNumber'), geometryValue: $('geometryValue'), textureSize: $('textureSize'),
   textureQuality: $('textureQuality'), textureQualityValue: $('textureQualityValue'), webpToggle: $('webpToggle'),
   quantizeToggle: $('quantizeToggle'), meshoptToggle: $('meshoptToggle'), optimizeBtn: $('optimizeBtn'), status: $('status'), resultCard: $('resultCard'),
   optimizedSize: $('optimizedSize'), optimizedTriangleCount: $('optimizedTriangleCount'), optimizedVertexCount: $('optimizedVertexCount'),
@@ -335,7 +335,9 @@ function applyPreset(name) {
   updateLabels();
 }
 function updateLabels(){
-  els.geometryValue.textContent = `${els.geometry.value}%`;
+  const geometryText = String(Math.round(Number(els.geometry.value) * 10) / 10);
+  els.geometryValue.textContent = `${geometryText}%`;
+  if (els.geometryNumber && document.activeElement !== els.geometryNumber) els.geometryNumber.value = geometryText;
   els.textureQualityValue.textContent = `${els.textureQuality.value}%`;
   els.brushSizeValue.textContent = `${els.brushSize.value} px`;
   els.brushOpacityValue.textContent = `${els.brushOpacity.value}%`;
@@ -343,6 +345,22 @@ function updateLabels(){
 
 els.preset.addEventListener('change', () => applyPreset(els.preset.value));
 els.geometry.addEventListener('input', () => { updateLabels(); markCustom(); });
+els.geometryNumber?.addEventListener('input', () => {
+  const raw = els.geometryNumber.value;
+  if (raw === '' || raw === '-' || raw === '.') return;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return;
+  els.geometry.value = String(Math.max(1, Math.min(100, value)));
+  els.geometry.dispatchEvent(new Event('input', { bubbles: true }));
+});
+els.geometryNumber?.addEventListener('change', () => {
+  let value = Number(els.geometryNumber.value);
+  if (!Number.isFinite(value)) value = Number(els.geometry.value) || 70;
+  value = Math.max(1, Math.min(100, value));
+  els.geometryNumber.value = String(Math.round(value * 10) / 10);
+  els.geometry.value = els.geometryNumber.value;
+  els.geometry.dispatchEvent(new Event('input', { bubbles: true }));
+});
 els.textureQuality.addEventListener('input', () => { updateLabels(); markCustom(); });
 els.textureSize.addEventListener('change', markCustom);
 els.webpToggle.addEventListener('change', markCustom);
