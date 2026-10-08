@@ -1,6 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'https://esm.sh/three@0.180.0/examples/jsm/environments/RoomEnvironment.js';
 import { WebIO, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt } from '@gltf-transform/functions';
@@ -84,6 +85,23 @@ window.__shrinkViewer = { renderer, scene, camera, controls };
 scene.add(new THREE.HemisphereLight(0xffffff, 0x303540, 2.2));
 const key = new THREE.DirectionalLight(0xffffff, 3.0); key.position.set(4, 8, 6); scene.add(key);
 const fill = new THREE.DirectionalLight(0xbfd2ff, 1.2); fill.position.set(-6, 3, -4); scene.add(fill);
+
+// Game GLBs often use PBR metallic materials. Without an environment map, chrome/silver
+// can look almost black even though the GLB is correct. Use a neutral studio reflection
+// in Game mode only; the visible SHRINK background remains unchanged.
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+const roomEnvironment = new RoomEnvironment();
+const studioEnvironment = pmrem.fromScene(roomEnvironment, 0.04).texture;
+roomEnvironment.dispose?.();
+pmrem.dispose();
+
+function syncViewerEnvironment(mode = null) {
+  const game = mode ? mode === 'game' : !document.body.classList.contains('app-mode-print');
+  scene.environment = game ? studioEnvironment : null;
+}
+syncViewerEnvironment('game');
+window.addEventListener('shrink:ui-mode', e => syncViewerEnvironment(e.detail?.mode));
 
 const grid = new THREE.GridHelper(20, 20, 0x525964, 0x2b3038);
 grid.material.opacity = 0.32; grid.material.transparent = true; scene.add(grid);
