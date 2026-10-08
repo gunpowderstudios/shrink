@@ -51,6 +51,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
 .control-block > label, .range-heading label { display: block; font-size: 13px; font-weight: 750; margin-bottom: 8px; }
 .range-heading label { margin-bottom: 0; }
 .range-heading output { color: var(--accent-2); font-weight: 800; font-size: 13px; }
+.geometry-number { display:flex; align-items:center; gap:5px; color:var(--accent-2); font-weight:800; font-size:13px; }
+.geometry-number input { width:62px; color:var(--accent-2); background:#20242b; border:1px solid #454d5a; padding:5px 7px; border-radius:8px; outline:none; font:inherit; text-align:right; }
+.geometry-number input:focus { border-color:var(--accent-2); box-shadow:0 0 0 2px rgba(255,79,87,.15); }
+.geometry-number output { display:none; }
 select { width: 100%; color: var(--text); background: #20242b; border: 1px solid #353b46; padding: 10px 11px; border-radius: 10px; outline: none; }
 input[type="range"] { width: 100%; accent-color: var(--accent); margin: 9px 0 4px; }
 .hint { color: var(--muted); font-size: 11px; line-height: 1.4; }
