@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl, analyzeTopology } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
-import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=2.57';
+import { splitModelFlat, disposeSplitParts } from './raw-split.js?v=2.63';
 
 // SHRINK 3D v1.90 — intercept a failed solid split and try a direct capped triangle-mesh split.
 const $ = id => document.getElementById(id);
@@ -32,7 +32,8 @@ async function directSplit(rawReason) {
     const clearance=Math.max(.05,Number($('pegClearance')?.value||.2))/scale;
     app()?.setStatus?.(wantsPegs ? 'The solid split could not be made. Trying a direct split with safe peg/socket joints…' : 'The solid split could not be made. Trying a direct flat-cut split instead…', false);
     await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
-    const out=splitModelFlat(model,n,{withPegs:wantsPegs,pegRadius,pegDepth,clearance,cutFractions:cutFractions()});
+    const manualPegPoints=$('splitPegPosition')?.value==='manual' ? window.__shrinkSplit?.manualPegPoints?.() : null;
+    const out=splitModelFlat(model,n,{withPegs:wantsPegs,pegRadius,pegDepth,clearance,cutFractions:cutFractions(),manualPegPoints});
     parts=out.parts;
     const files={}, zUp=$('zUpToggle')?.checked!==false, base=app()?.baseName?.()||'model';
     const stem=window.__shrinkDownloadStem?.(base)||`${base}-SHRINK`;
