@@ -30,7 +30,7 @@ await block(1, async () => {
   ok(await waitFor(() => zipOf(page)), 'A1 flat 2 parts: DOWNLOAD IT produced a ZIP');
   ok(page.$('fuseSolidToggle').checked === false, 'A1 DOWNLOAD IT did not switch Fuse on');
   const r = await readParts(page);
-  ok(r.zip.name === 'dwarf-SHRINK-split-2-parts.zip' && r.names.join() === 'dwarf-SHRINK-part-1-of-2.stl,dwarf-SHRINK-part-2-of-2.stl', 'A1 file names: ' + r.zip.name + ' / ' + r.names.join(' '));
+  ok(r.zip.name === 'dwarf-H40-SHRINK-SPLIT2.zip' && r.names.join() === 'dwarf-H40-SHRINK-PART1of2.stl,dwarf-H40-SHRINK-PART2of2.stl', 'A1 file names: ' + r.zip.name + ' / ' + r.names.join(' '));
   const [p1, p2] = r.parts;
   ok(Math.abs(p1.stl.maxZ - 20) < 0.05 && Math.abs(p2.stl.minZ - 20) < 0.05, `A1 cut at 50% of the height (lower part tops out at ${p1.stl.maxZ.toFixed(2)}, upper starts at ${p2.stl.minZ.toFixed(2)})`);
   ok((await stlHealth(p1.stl)).clean && (await stlHealth(p2.stl)).clean, 'A1 both sections are watertight (no open, tangled or flipped edges)');
@@ -353,6 +353,74 @@ await block(24, async () => {
   await joint(page, 'flat'); await pick(page, '2'); page.$('v2DownloadBtn').click();
   ok(await waitFor(() => zipOf(page), 30000), 'L it can then be split');
   const r = await readParts(page); ok(r.parts.length === 2 && (await Promise.all(r.parts.map(p => stlHealth(p.stl)))).every(x => x.clean), 'L both sections are watertight');
+});
+
+
+/* ============ N. peg report: every peg is checked against the model and shown green / amber / red ============ */
+const setCut = async (page, pct) => { const el = page.$('splitCutHeight'); el.value = String(pct); el.dispatchEvent(new page.w.Event('input', { bubbles: true })); await wait(400); };
+const report = page => page.w.__shrinkSplit.pegReport();
+await block(20, async () => {
+  const page = await makePage({ model: models.single(), heightMm: 40 });
+  await pick(page, '2'); await wait(400);
+  const rep = report(page);
+  ok(rep.length === 2 && rep.every(r => r.status === 'ok'), 'N1 a cut through the middle of a sphere: both pegs are reported as fitting (' + rep.map(r => r.status).join(',') + ')');
+  ok(/All pegs fit inside the model/.test(page.$('v2PegStatus').textContent) && !page.$('v2PegStatus').hidden, 'N1 the Download card says "All pegs fit inside the model"');
+  ok(page.$('v2PegStatus').querySelectorAll('.v2-peg-row.ok').length === 2, 'N1 one green row per peg');
+  const best = page.w.__shrinkSplit.pegReport()[0];
+  ok(best.wallMM > 5, `N1 auto placement puts the peg where the wall is thick (${best.wallMM.toFixed(1)} mm)`);
+});
+await block(21, async () => {
+  // cut so low that the 6 mm peg would hang below the bottom of the sphere: it cannot fit and must be flagged, not exported
+  const page = await makePage({ model: models.single(), heightMm: 40 });
+  await pick(page, '2'); await setCut(page, 10);
+  const rep = report(page);
+  ok(rep.length === 0 || rep.some(r => r.status !== 'ok'), 'N2 a cut near the bottom is not reported as all fine (' + (rep.map(r => r.status).join(',') || 'no peg place') + ')');
+  ok(/stick|No safe place|tight/.test(page.$('v2PegStatus').textContent), 'N2 the card explains the problem: ' + page.$('v2PegStatus').textContent.slice(0, 90));
+  page.$('v2DownloadBtn').click();
+  ok(await waitFor(() => zipOf(page)), 'N2 the download still works');
+  const r = await readParts(page); ok(r.parts.length === 2 && (await Promise.all(r.parts.map(p => stlHealth(p.stl)))).every(h => h.clean), 'N2 both sections are watertight, nothing sticks out of the lower part');
+  const lower = r.parts[0].stl, upper = r.parts[1].stl;
+  ok(upper.minZ >= lower.maxZ - 0.05, `N2 flagged pegs were left out: the upper part starts at the cut (${upper.minZ.toFixed(2)} vs ${lower.maxZ.toFixed(2)})`);
+});
+await block(22, async () => {
+  // manual: slide a peg towards the edge. It is allowed to go there, turns red, is left out of the file; snapping back fixes it.
+  const page = await makePage({ model: models.single(), heightMm: 40 });
+  await pick(page, '2');
+  page.$('v2PegPosition').value = 'manual'; page.$('v2PegPosition').dispatchEvent(new page.w.Event('change', { bubbles: true })); await wait(500);
+  ok(report(page).length === 2 && report(page).every(r => r.status === 'ok'), 'N3 manual starts from the safe automatic spots');
+  const split = page.w.__shrinkSplit; let guard = 0;
+  while (guard++ < 30 && report(page)[0].status === 'ok') split.moveManualPegAxis(0, 0, 'x', Math.min(100, (split.getManualPegControls(0).pegs[0].leftRight || 50) + 6));
+  ok(report(page)[0].status !== 'ok', 'N3 sliding Peg 1 towards the rim turns it amber or red (' + report(page)[0].status + ')');
+  while (guard++ < 80 && report(page)[0].status !== 'bad') split.moveManualPegAxis(0, 0, 'x', Math.min(100, (split.getManualPegControls(0).pegs[0].leftRight || 50) + 3));
+  ok(report(page)[0].status === 'bad' && /sticks out/.test(report(page)[0].text), 'N3 further out it is red: ' + report(page)[0].text);
+  ok(/stick/.test(page.$('v2PegStatus').textContent) && page.$('v2PegStatus').querySelector('.v2-peg-row.bad'), 'N3 the card shows a red row and says it will be left out');
+  ok(page.w.__shrinkSplit.shownPegPoints()[0].length === 1, 'N3 only the good peg is passed on to the file');
+  page.$('v2DownloadBtn').click();
+  ok(await waitFor(() => zipOf(page)), 'N3 download works with one red peg');
+  ok(page.statuses.some(s => /1 peg was left out because it stuck out/.test(s.msg)), 'N3 the message says the red peg was left out');
+  const r = await readParts(page); ok((await Promise.all(r.parts.map(p => stlHealth(p.stl)))).every(h => h.clean), 'N3 sections are watertight');
+  split.resetManualPegPositions(); await wait(400);
+  ok(report(page).every(r => r.status === 'ok'), 'N3 snapping back to the safest spots makes both pegs green again');
+});
+await block(23, async () => {
+  // an axe: a thin plank crossing the cut at mid height. Find best cut should move off it.
+  const page = await makePage({ model: models.axe(), heightMm: 40 });
+  await pick(page, '2'); await wait(300);
+  const best = page.w.__shrinkSplit.findBestCut();
+  ok(best && (best.pct < 44 || best.pct > 56) && best.islands === 1, `N4 best cut avoids the plank (${best?.pct}% , ${best?.islands} outline(s))`);
+  page.$('v2BestCut').click(); await wait(600);
+  const f = Number(page.$('splitCutHeight').value);
+  ok(f < 44 || f > 56, 'N4 the cut slider moved to the best cut: ' + f + '%');
+  ok(report(page).length >= 1 && report(page).every(r => r.status !== 'bad'), 'N4 pegs at the new cut stay inside the model');
+});
+await block(24, async () => {
+  // a cut landing exactly on a ring of vertices (the sphere's equator) used to find no outline and lose the pegs
+  const page = await makePage({ model: models.single(), heightMm: 40 });
+  await pick(page, '2'); await wait(300);
+  ok(page.w.__shrinkSplit.cutCount() === 1 && report(page).length === 2, 'N5 a cut exactly through a vertex ring still gets an outline and pegs');
+  const page2 = await makePage({ model: models.inside(), heightMm: 40 });
+  await pick(page2, '2'); await wait(300);
+  ok(report(page2).length === 2, 'N5 and so does an inside-out model');
 });
 
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');

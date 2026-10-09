@@ -390,3 +390,22 @@
 .v2-peg-axis-group input[type=range]{width:100%;margin:0;accent-color:#ffb13b}
 .v2-peg2 input[type=range]{accent-color:#55d9ff}
 .v2-peg-axis-group input:disabled{opacity:.35}
+
+/* v2.71 — peg report: green / amber / red per peg, plus Find best cut */
+.v2-bestcut-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 0}
+.v2-bestcut-row[hidden]{display:none!important}
+.v2-bestcut-row span{font-size:11px;color:var(--muted,#8fa3b8);flex:1 1 180px}
+.v2-peg-status{margin:10px 0 0;padding:9px 10px;border:1px solid rgba(86,255,154,.28);border-radius:10px;background:rgba(0,0,0,.28);display:grid;gap:5px;font-size:12px}
+.v2-peg-status[hidden]{display:none!important}
+.v2-peg-status>strong{font-size:12px;line-height:1.35}
+.v2-peg-status>strong.ok{color:#56ff9a}
+.v2-peg-status>strong.warn{color:#ffd24a}
+.v2-peg-status>strong.bad{color:#ff5f7a}
+.v2-peg-status p{margin:2px 0 0;font-size:11px;color:var(--muted,#8fa3b8);line-height:1.4}
+.v2-peg-row{display:grid;grid-template-columns:12px auto 1fr;gap:7px;align-items:baseline}
+.v2-peg-row i{width:9px;height:9px;border-radius:50%;background:#56ff9a;box-shadow:0 0 7px rgba(86,255,154,.6);align-self:center}
+.v2-peg-row.warn i{background:#ffd24a;box-shadow:0 0 7px rgba(255,210,74,.6)}
+.v2-peg-row.bad i{background:#ff3f5f;box-shadow:0 0 8px rgba(255,63,95,.75)}
+.v2-peg-row b{font-weight:700;white-space:nowrap}
+.v2-peg-row span{color:#b9c6d4;line-height:1.35}
+.v2-peg-row.bad span{color:#ff9aab}

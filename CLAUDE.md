@@ -379,3 +379,9 @@ A good Simple-mode run should:
 5. keep the reduced mesh clean or fall back safely
 6. fit within the viewport with the right panel independently scrollable
 7. download without forcing the user through repeated technical decisions
+
+## Split pegs (v2.71)
+- `split-print.js` owns the preview AND the export's peg choice: the file uses the pegs the preview shows (`previewPegsFor`), minus any marked `bad`. Do not add a second placement algorithm.
+- A peg is judged by the worst cross-section down its whole depth (`worstClearance`), not by the cut face alone. Statuses: ok / warn / bad (`assessPeg`).
+- Cut outlines must go through `cutLoopsFromModel` / `cutLoopsFromSolid` (they step off vertex rings with `CUT_NUDGES`). Never slice at an exact height without that.
+- Manual pegs may sit anywhere on material so problems are visible; export skips red pegs and says so.

@@ -71,9 +71,21 @@ function toModel(parts) {
 }
 function merged(parts) { const pos = [], idx = []; for (const g of parts) { const o = pos.length / 3; pos.push(...g.pos); for (const i of g.idx) idx.push(i + o); } return { pos, idx }; }
 // a tall "figure": body, head and hat as ONE connected solid (overlapping spheres are one mesh but welded per sphere => 3 closed shells)
+// a closed box (outward-facing), used for thin "arms", axes and capes that a cut should avoid
+function boxGeo(x0, x1, y0, y1, z0, z1) {
+  const pos = [], idx = [];
+  for (let iz = 0; iz < 2; iz++) for (let iy = 0; iy < 2; iy++) for (let ix = 0; ix < 2; ix++) pos.push(ix ? x1 : x0, iy ? y1 : y0, iz ? z1 : z0);
+  const q = (a, b, c, d) => idx.push(a, b, c, a, c, d);
+  q(0, 2, 3, 1); q(4, 5, 7, 6); q(0, 1, 5, 4); q(2, 6, 7, 3); q(0, 4, 6, 2); q(1, 3, 7, 5);
+  let v = 0; for (let t = 0; t < idx.length; t += 3) { const [a, b, c] = [idx[t], idx[t+1], idx[t+2]].map(i => pos.slice(i*3, i*3+3)); v += a[0]*(b[1]*c[2]-b[2]*c[1]) - a[1]*(b[0]*c[2]-b[2]*c[0]) + a[2]*(b[0]*c[1]-b[1]*c[0]); }
+  if (v < 0) for (let t = 0; t < idx.length; t += 3) [idx[t+1], idx[t+2]] = [idx[t+2], idx[t+1]];
+  return { pos, idx };
+}
 export const models = {
   // one closed sphere, 40 units tall
   single: () => toModel([welded(sphereGeo(20, 0, 20, 0))]),
+  // the sphere plus a thin plank (an "axe") standing out sideways at mid height: a cut at 50% crosses both
+  axe: () => toModel([welded(sphereGeo(20, 0, 20, 0)), boxGeo(24, 44, 18, 22, -2, 2)]),
   // the same sphere with every triangle turned round (inside-out), as some exported STLs are
   inside: () => { const g = welded(sphereGeo(20, 0, 20, 0)); const idx = []; for (let t = 0; t < g.idx.length; t += 3) idx.push(g.idx[t], g.idx[t + 2], g.idx[t + 1]); return toModel([{ pos: g.pos, idx }]); },
   // three separate closed spheres stacked (a valid, watertight multi-part model, like the repaired dwarf's ~95 closed components)

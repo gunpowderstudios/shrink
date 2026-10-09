@@ -411,6 +411,32 @@
 
   let activePegCut = 0;
 
+  // ---- peg report: plain words + colour for every peg, so a peg sticking out of the model is obvious ----
+  function renderPegStatus() {
+    const box = $('v2PegStatus'); if (!box) return;
+    const split = window.__shrinkSplit;
+    const mode = $('splitMode')?.value || 'off', pegsOn = ($('splitJoint')?.value || 'pegs') !== 'flat';
+    const report = (mode !== 'off' && pegsOn) ? (split?.pegReport?.() || []) : [];
+    const showBest = mode === '2';
+    if ($('v2BestCutRow') && $('v2BestCutRow').hidden === showBest) $('v2BestCutRow').hidden = !showBest;
+    let html = '';
+    if (report.length) {
+      const bad = report.filter(r => r.status === 'bad').length, warn = report.filter(r => r.status === 'warn').length;
+      const multi = new Set(report.map(r => r.cut)).size > 1;
+      const head = bad ? `<strong class="bad">${bad} peg${bad === 1 ? '' : 's'} stick${bad === 1 ? 's' : ''} out of the model — move ${bad === 1 ? 'it' : 'them'} or change the cut height. Pegs marked red are left out of the download.</strong>`
+        : warn ? `<strong class="warn">${warn} peg${warn === 1 ? ' is' : 's are'} tight — check ${warn === 1 ? 'it' : 'them'} before printing.</strong>`
+        : '<strong class="ok">All pegs fit inside the model.</strong>';
+      const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+      const rows = report.map(r => `<div class="v2-peg-row ${r.status}"><i></i><b>${multi ? `Cut ${r.cut + 1} · ` : ''}Peg ${r.peg + 1}</b><span>${esc(r.text)}</span></div>`).join('');
+      html = head + rows;
+      if (bad || warn) html += '<p>Tip: turn on <em>Manual</em> in Advanced split settings and slide the peg, press <em>Snap pegs to safest spot</em>, or try <em>Find best cut</em>.</p>';
+    } else if (mode !== 'off' && pegsOn) {
+      html = '<strong class="warn">No safe place for pegs at this cut — the download will be a flat cut. Try a different cut height.</strong>';
+    }
+    if (box.innerHTML !== html) box.innerHTML = html;
+    if (box.hidden !== !html) box.hidden = !html;
+  }
+
   function refreshPegAxisControls() {
     const manual=$('v2PegPosition')?.value==='manual';
     if($('v2PegAxisPanel')) $('v2PegAxisPanel').hidden=!manual;
@@ -462,6 +488,7 @@
     if ($('v2PegReset')) $('v2PegReset').hidden = !pegPos || pegPos.value !== 'manual';
     if ($('v2PegHelp')) $('v2PegHelp').hidden = !pegPos || pegPos.value !== 'manual';
     refreshPegAxisControls();
+    renderPegStatus();
     // This runs from a MutationObserver on the whole page, so it must only write when something actually changed:
     // rewriting the same text re-triggers the observer and would loop forever.
     const set = (el, prop, value) => { if (el && el[prop] !== value) el[prop] = value; };
@@ -581,8 +608,8 @@
               <div class="v2-download-options"><label>Split into<select id="v2SplitMode"><option value="off">One STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">Auto by maximum height</option></select></label><label>Joint<select id="v2Joint"><option value="pegs">Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label></div>
               <div id="v2MaxWrap" class="v2-cut-row" hidden><div><span>Maximum part height</span><strong>mm</strong></div><input id="v2MaxHeight" type="number" min="20" max="500" step="5" value="80"></div>
               <div id="v2CutWrap" class="v2-cut-row" hidden><div><span>Cut height</span><strong id="v2CutLabel">50%</strong></div><input id="v2Cut" type="range" min="10" max="90" step="0.5" value="50"></div>
-              <button id="v2DownloadBtn" class="v2-mega v2-red" type="button">DOWNLOAD IT</button>
-              <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg position<select id="v2PegPosition"><option value="auto">Auto — safest position</option><option value="manual">Manual — position with sliders</option></select></label><button id="v2PegReset" class="v2-peg-reset" type="button" hidden>RESET PEG POSITIONS</button><div id="v2PegAxisPanel" class="v2-peg-axis-panel" hidden><label id="v2PegCutWrap" class="v2-peg-cut" hidden>Cut<select id="v2PegCut"></select></label><div class="v2-peg-axis-group v2-peg1"><strong><i></i> Peg 1</strong><label><span>Left</span><input id="v2Peg1X" type="range" min="0" max="100" step="0.25" value="50"><span>Right</span></label><label><span>Back</span><input id="v2Peg1Z" type="range" min="0" max="100" step="0.25" value="50"><span>Forward</span></label></div><div class="v2-peg-axis-group v2-peg2"><strong><i></i> Peg 2</strong><label><span>Left</span><input id="v2Peg2X" type="range" min="0" max="100" step="0.25" value="50"><span>Right</span></label><label><span>Back</span><input id="v2Peg2Z" type="range" min="0" max="100" step="0.25" value="50"><span>Forward</span></label></div></div><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label><p id="v2PegHelp" class="v2-peg-help" hidden>Use the sliders for smooth left/right and forward/back movement. The viewer shows the actual peg shape; pegs stop automatically at unsafe edges.</p></div></details>
+              <div id="v2BestCutRow" class="v2-bestcut-row" hidden><button id="v2BestCut" class="v2-peg-reset" type="button">FIND BEST CUT</button><span>Looks for a cut through one solid outline, away from thin arms and axes, with room for pegs.</span></div><div id="v2PegStatus" class="v2-peg-status" role="status" aria-live="polite" hidden></div><button id="v2DownloadBtn" class="v2-mega v2-red" type="button">DOWNLOAD IT</button>
+              <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg position<select id="v2PegPosition"><option value="auto">Auto — safest position</option><option value="manual">Manual — position with sliders</option></select></label><button id="v2PegReset" class="v2-peg-reset" type="button" hidden>SNAP PEGS TO SAFEST SPOT</button><div id="v2PegAxisPanel" class="v2-peg-axis-panel" hidden><label id="v2PegCutWrap" class="v2-peg-cut" hidden>Cut<select id="v2PegCut"></select></label><div class="v2-peg-axis-group v2-peg1"><strong><i></i> Peg 1</strong><label><span>Left</span><input id="v2Peg1X" type="range" min="0" max="100" step="0.25" value="50"><span>Right</span></label><label><span>Back</span><input id="v2Peg1Z" type="range" min="0" max="100" step="0.25" value="50"><span>Forward</span></label></div><div class="v2-peg-axis-group v2-peg2"><strong><i></i> Peg 2</strong><label><span>Left</span><input id="v2Peg2X" type="range" min="0" max="100" step="0.25" value="50"><span>Right</span></label><label><span>Back</span><input id="v2Peg2Z" type="range" min="0" max="100" step="0.25" value="50"><span>Forward</span></label></div></div><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label><p id="v2PegHelp" class="v2-peg-help" hidden>Use the sliders for smooth left/right and forward/back movement. The viewer shows the actual peg shape; pegs stop automatically at unsafe edges.</p></div></details>
             </section>
           </div>
         </div>
@@ -636,8 +663,12 @@
     $('v2Peg1Z').addEventListener('input', () => movePegFromSlider(0,'z','v2Peg1Z'));
     $('v2Peg2X').addEventListener('input', () => movePegFromSlider(1,'x','v2Peg2X'));
     $('v2Peg2Z').addEventListener('input', () => movePegFromSlider(1,'z','v2Peg2Z'));
-    window.addEventListener('shrink:peg-position-changed', refreshPegAxisControls);
-    window.addEventListener('shrink:peg-preview-updated', refreshPegAxisControls);
+    window.addEventListener('shrink:peg-position-changed', () => { refreshPegAxisControls(); renderPegStatus(); });
+    window.addEventListener('shrink:peg-preview-updated', () => { refreshPegAxisControls(); renderPegStatus(); });
+    $('v2BestCut')?.addEventListener('click', () => {
+      const best = window.__shrinkSplit?.applyBestCut?.();
+      if (best && $('splitInfo')) setTimeout(() => { const n = best.islands > 1 ? ' (some thin parts are still crossed at every height)' : ''; window.__shrinkApp?.setStatus?.(`Best cut found at ${best.pct}% of the height${n}.`); }, 0);
+    });
     $('v2Cut').addEventListener('input', () => { $('v2CutLabel').textContent = `${$('v2Cut').value}%`; setNative('splitCutHeight', $('v2Cut').value, 'input'); });
     $('v2MaxHeight').addEventListener('input', () => setNative('splitMaxHeight', Math.max(20, Number($('v2MaxHeight').value) || 80), 'input'));
     ['v2PegDiameter','v2PegDepth','v2PegClearance'].forEach(id => $(id).addEventListener('input', syncAdvancedToNative));

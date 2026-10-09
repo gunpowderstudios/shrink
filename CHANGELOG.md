@@ -2,6 +2,32 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.71 — split pegs: see at a glance whether they fit, and the file matches the preview
+
+(v2.58–v2.70 were GPT's peg work — draggable pegs, true-size X-ray pegs, axis sliders, pink exposed areas — and are not itemised here. This release builds on it.)
+
+### Added
+- **Peg report.** Every peg is checked against the model along its whole depth (the lower part's cross-sections at 9 heights down the peg, plus one just above the cut for the peg's root). The Download card lists each peg in plain words with a green / amber / red dot — "fits inside the model, 16.8 mm of wall", "tight: only 0.3 mm of wall", "sticks out of the model by 2.2 mm (the lowest 6 mm of the peg)", "its socket would break through the surface". A status ring on the cut plane in the viewer uses the same colours; the pink X-ray colouring of exposed areas is kept.
+- **Better automatic placement.** The old preview picked the roomiest point of the cut *face* only. Auto now maximises the worst cross-section anywhere down the peg (grid of candidates, shortlist, then a small pattern search), so the peg sits in the thickest part of the model rather than near the middle of the bounding box.
+- **Find best cut** (2 parts). Scans 20–80% of the height and prefers a cut through ONE solid outline (not a plank, axe or cape as well), with room for two pegs; cuts within ~1% of the height of a ledge/arm are treated as fragile. Moves the Cut height slider.
+- **Manual sliders can go into the red.** A manual peg may be slid anywhere on the material so the problem is visible; red pegs are left out of the files and the message says so. "Snap pegs to safest spot" (the old Reset) returns to the automatic spots.
+
+### Fixed
+- **Pegs disappeared when the cut landed exactly on a ring of vertices** (a flat plateau, a sphere's equator): the cut outline came out doubled and unusable, so the split silently became a flat cut. Outlines are now taken a hair (0.02% of the height) above or below such a ring. This was also why 4 checks in the v2.70 suite failed.
+- **The file now uses the pegs the preview shows** (auto as well as manual), so what you see is what is exported. The Manifold volume check still guards each peg. The direct-split fallback uses the same pegs (`__shrinkSplit.shownPegPoints()`).
+- Stale peg data is cleared when split is switched off.
+
+### Performance
+- Cut outlines skip triangles that do not reach the cut height before allocating anything: preview 340 ms on a 240k-triangle model, Find best cut ~3 s.
+
+### Tests
+- `multitool.test.mjs` group N (N1–N5): green report for a central cut, no pegs/flagged near the bottom, manual peg slid to red then snapped back, Find best cut avoids a plank (new `models.axe`), cut exactly on a vertex ring (and inside-out). A1 updated to GPT's `…-H40-SHRINK-SPLIT2.zip` / `…-PART1of2.stl` names. 211 checks pass.
+
+### Version boundaries
+- Visible release **v2.71**; cache key unchanged scheme (`PRINT_RELEASE` in `ui-mode.js`).
+
+---
+
 ## v2.57 — the Detail kept slider drives the picture again (regression from v2.56)
 
 ### Fixed

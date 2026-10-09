@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.70 — pink peg exposure uses cached cross-sections for smooth slider performance.
+// SHRINK 3D v2.71 — peg report (green/amber/red per peg), worst-depth auto placement, Find best cut, export uses the pegs shown.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -53,108 +53,154 @@ function pegSizing() {
   return { radius, depth, clearance, safeRadius: radius + clearance + safetyWall };
 }
 
+function linkLoops(segments, tol) {
+  const key = q => `${Math.round(q.x/tol)},${Math.round(q.z/tol)}`;
+  const entries = segments.map((seg,i) => ({i,a:seg[0],b:seg[1],used:false})), byKey = new Map();
+  const add = (k,i) => { let list = byKey.get(k); if (!list) byKey.set(k, list = []); list.push(i); };
+  entries.forEach((e,i) => { add(key(e.a),i); add(key(e.b),i); });
+  const loops = [];
+  for (let seed=0; seed<entries.length; seed++) {
+    if (entries[seed].used) continue;
+    const e = entries[seed]; e.used = true;
+    const loop = [e.a,e.b]; let current = e.b, closed = false, guard = 0;
+    while (guard++ < entries.length+4) {
+      const k = key(current), ids = byKey.get(k) || []; let next = null;
+      for (const id of ids) if (!entries[id].used) { next = entries[id]; break; }
+      if (!next) break;
+      next.used = true; current = key(next.a) === k ? next.b : next.a;
+      if (Math.hypot(current.x-loop[0].x, current.z-loop[0].z) <= tol*1.5) { closed = true; break; }
+      loop.push(current);
+    }
+    if (closed && loop.length >= 3) loops.push(loop);
+  }
+  return loops;
+}
+
+// A cut that lands exactly on a ring of vertices (a flat plateau, a sphere's equator) gives doubled, unusable outlines.
+// Slice a hair higher or lower instead (0.02% of the height) so the outline is always clean.
+const CUT_NUDGES = [0, 1, -1, 2.5, -2.5];
+
 function cutLoopsFromModel(model, y) {
   if (!model) return [];
   model.updateMatrixWorld(true);
-  const box = boundsFor(model), diag = Math.max(box.getSize(new THREE.Vector3()).length(), 1e-6);
-  const tol = Math.max(diag * 1e-6, 1e-7);
-  const segments = [];
-  const a=new THREE.Vector3(), b=new THREE.Vector3(), c=new THREE.Vector3();
-  const intersect=(p,q)=>{
-    const dy=q.y-p.y, t=Math.abs(dy)<1e-20?0:(y-p.y)/dy;
-    return {x:p.x+(q.x-p.x)*t,y,z:p.z+(q.z-p.z)*t};
-  };
-  model.traverse(o=>{
-    if(!o.isMesh || !o.geometry?.attributes?.position) return;
-    const g=o.geometry,pos=g.attributes.position,idx=g.index,count=idx?idx.count:pos.count;
-    for(let i=0;i+2<count;i+=3){
-      const ids=[idx?idx.getX(i):i,idx?idx.getX(i+1):i+1,idx?idx.getX(i+2):i+2];
-      a.fromBufferAttribute(pos,ids[0]).applyMatrix4(o.matrixWorld);
-      b.fromBufferAttribute(pos,ids[1]).applyMatrix4(o.matrixWorld);
-      c.fromBufferAttribute(pos,ids[2]).applyMatrix4(o.matrixWorld);
-      const tri=[a.clone(),b.clone(),c.clone()], hits=[];
-      for(let e=0;e<3;e++){
-        const p=tri[e],q=tri[(e+1)%3],dp=p.y-y,dq=q.y-y;
-        if(Math.abs(dp)<=tol && Math.abs(dq)<=tol) continue;
-        if((dp < -tol && dq > tol)||(dp > tol && dq < -tol)) hits.push(intersect(p,q));
-        else if(Math.abs(dp)<=tol) hits.push({x:p.x,y,z:p.z});
+  const box = boundsFor(model), size = box.getSize(new THREE.Vector3());
+  const diag = Math.max(size.length(), 1e-6), tol = Math.max(diag * 1e-6, 1e-7), nudge = Math.max(size.y * 2e-4, tol * 50);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const slice = yy => {
+    const segments = []; let touched = false;
+    const intersect = (p,q) => { const dy = q.y-p.y, t = Math.abs(dy) < 1e-20 ? 0 : (yy-p.y)/dy; return {x:p.x+(q.x-p.x)*t, y:yy, z:p.z+(q.z-p.z)*t}; };
+    model.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const g = o.geometry, pos = g.attributes.position, idx = g.index, count = idx ? idx.count : pos.count;
+      for (let i=0; i+2<count; i+=3) {
+        a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(o.matrixWorld);
+        b.fromBufferAttribute(pos, idx ? idx.getX(i+1) : i+1).applyMatrix4(o.matrixWorld);
+        c.fromBufferAttribute(pos, idx ? idx.getX(i+2) : i+2).applyMatrix4(o.matrixWorld);
+        if (Math.min(a.y,b.y,c.y) > yy + tol || Math.max(a.y,b.y,c.y) < yy - tol) continue;   // most triangles never reach the cut
+        if (Math.abs(a.y-yy) <= tol || Math.abs(b.y-yy) <= tol || Math.abs(c.y-yy) <= tol) touched = true;
+        const tri = [a.clone(), b.clone(), c.clone()], hits = [];
+        for (let e=0; e<3; e++) {
+          const p = tri[e], q = tri[(e+1)%3], dp = p.y-yy, dq = q.y-yy;
+          if (Math.abs(dp) <= tol && Math.abs(dq) <= tol) continue;
+          if ((dp < -tol && dq > tol) || (dp > tol && dq < -tol)) hits.push(intersect(p,q));
+          else if (Math.abs(dp) <= tol) hits.push({x:p.x, y:yy, z:p.z});
+        }
+        const unique = [];
+        for (const h of hits) if (!unique.some(v => Math.hypot(v.x-h.x, v.z-h.z) <= tol)) unique.push(h);
+        if (unique.length >= 2) segments.push([unique[0], unique[1]]);
       }
-      const unique=[];
-      for(const h of hits) if(!unique.some(v=>Math.hypot(v.x-h.x,v.z-h.z)<=tol)) unique.push(h);
-      if(unique.length>=2) segments.push([unique[0],unique[1]]);
-    }
-  });
-  const key=q=>`${Math.round(q.x/tol)},${Math.round(q.z/tol)}`;
-  const entries=segments.map((seg,i)=>({i,a:seg[0],b:seg[1],used:false})), byKey=new Map();
-  const add=(k,i)=>{let list=byKey.get(k);if(!list)byKey.set(k,list=[]);list.push(i);};
-  entries.forEach((e,i)=>{add(key(e.a),i);add(key(e.b),i);});
-  const loops=[];
-  for(let seed=0;seed<entries.length;seed++){
-    if(entries[seed].used) continue;
-    const e=entries[seed]; e.used=true;
-    const loop=[e.a,e.b]; let current=e.b,closed=false,guard=0;
-    while(guard++<entries.length+4){
-      const k=key(current),ids=byKey.get(k)||[]; let next=null;
-      for(const id of ids) if(!entries[id].used){next=entries[id];break;}
-      if(!next) break;
-      next.used=true; current=key(next.a)===k?next.b:next.a;
-      if(Math.hypot(current.x-loop[0].x,current.z-loop[0].z)<=tol*1.5){closed=true;break;}
-      loop.push(current);
-    }
-    if(closed&&loop.length>=3) loops.push(loop);
-  }
-  return loops;
+    });
+    return { segments, touched };
+  };
+  for (const k of CUT_NUDGES) { const r = slice(y + k*nudge); if (!r.touched) return linkLoops(r.segments, tol); }
+  return linkLoops(slice(y + nudge).segments, tol);
+}
+
+// Signed distance from a point to the edge of the cross-section: positive inside material, negative outside.
+function signedDistXZ(x, z, loops) {
+  const d = boundaryDistanceXZ(x, z, loops);
+  return materialAtCut(x, z, loops) ? d : -d;
+}
+
+// The smallest signed distance over several cross-sections: how close the peg's centre ever gets to the outside.
+function worstClearance(x, z, slices) {
+  let worst = Infinity;
+  for (const s of slices) { const v = signedDistXZ(x, z, s.loops || []); if (v < worst) worst = v; }
+  return worst;
 }
 
 function previewCandidateSafe(point, loops, safeRadius) {
   return !!point && materialAtCut(point.x, point.z, loops) && boundaryDistanceXZ(point.x, point.z, loops) >= safeRadius;
 }
 
-function previewAutoPegPoints(loops, safeRadius) {
-  if(!loops.length) return [];
-  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
-  for(const loop of loops) for(const q of loop){
-    minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minZ=Math.min(minZ,q.z);maxZ=Math.max(maxZ,q.z);
-  }
-  const width=maxX-minX, depth=maxZ-minZ;
-  if(!(width>safeRadius*2 && depth>safeRadius*2)) return [];
-  const candidates=[], steps=19;
-  for(let iz=1;iz<steps;iz++) for(let ix=1;ix<steps;ix++){
-    const x=minX+width*ix/steps,z=minZ+depth*iz/steps;
-    if(!materialAtCut(x,z,loops)) continue;
-    const edge=boundaryDistanceXZ(x,z,loops);
-    if(edge>=safeRadius) candidates.push({x,z,edge});
-  }
-  for(const loop of loops){
-    const x=loop.reduce((n,q)=>n+q.x,0)/loop.length,z=loop.reduce((n,q)=>n+q.z,0)/loop.length;
-    const edge=boundaryDistanceXZ(x,z,loops);
-    if(materialAtCut(x,z,loops)&&edge>=safeRadius) candidates.push({x,z,edge});
-  }
-  if(!candidates.length) return [];
-  candidates.sort((a,b)=>b.edge-a.edge);
-  const first=candidates[0];
-  const minSep=safeRadius*2.2;
-  const second=candidates.filter(c=>c!==first&&Math.hypot(c.x-first.x,c.z-first.z)>=minSep)
-    .sort((a,b)=>(Math.hypot(b.x-first.x,b.z-first.z)+b.edge)-(Math.hypot(a.x-first.x,a.z-first.z)+a.edge))[0];
-  return second?[{x:first.x,z:first.z},{x:second.x,z:second.z}]:[{x:first.x,z:first.z}];
+function previewCandidateInside(point, loops, radius) {
+  return !!point && materialAtCut(point.x, point.z, loops) && boundaryDistanceXZ(point.x, point.z, loops) >= radius;
 }
 
-function manualPointsForCut(cutIndex, loops, safeRadius) {
-  const auto=previewAutoPegPoints(loops,safeRadius);
-  let points=(manualPegPositions.get(cutIndex)||[]).filter(p=>previewCandidateSafe(p,loops,safeRadius));
-  const minSep=safeRadius*2.0;
-  for(const p of auto){
-    if(points.length>=2) break;
-    if(points.every(q=>Math.hypot(p.x-q.x,p.z-q.z)>=minSep)) points.push({x:p.x,z:p.z});
+const DIRS8 = [[1,0],[-1,0],[0,1],[0,-1],[.7071,.7071],[.7071,-.7071],[-.7071,.7071],[-.7071,-.7071]];
+
+// Auto placement: the spot whose WORST cross-section (anywhere along the peg's depth) is the roomiest, polished by a
+// small pattern search, so the peg sits in the thickest part of the model instead of at a fixed point near the middle.
+function previewAutoPegPoints(loops, safeRadius, slices = null, minClear = 0) {
+  if (!loops.length) return [];
+  const bounds = loopBoundsXZ(loops), width = bounds.maxX-bounds.minX, depth = bounds.maxZ-bounds.minZ;
+  if (!(width > safeRadius*2 && depth > safeRadius*2)) return [];
+  const all = slices?.length ? slices : [{ loops }];
+  const steps = 19, cands = [];
+  const consider = (x, z) => {
+    if (!materialAtCut(x, z, loops)) return;
+    const edge = boundaryDistanceXZ(x, z, loops);
+    if (edge >= Math.max(minClear, safeRadius * .6)) cands.push({ x, z, edge });
+  };
+  for (let iz=1; iz<steps; iz++) for (let ix=1; ix<steps; ix++) consider(bounds.minX + width*ix/steps, bounds.minZ + depth*iz/steps);
+  for (const loop of loops) consider(loop.reduce((n,q) => n+q.x, 0)/loop.length, loop.reduce((n,q) => n+q.z, 0)/loop.length);
+  if (!cands.length) return [];
+  cands.sort((p,q) => q.edge-p.edge);
+  const shortlist = cands.slice(0, 48);
+  for (const c of shortlist) c.clear = worstClearance(c.x, c.z, all);
+  shortlist.sort((p,q) => q.clear-p.clear);
+  const refine = c => {
+    let step = Math.min(width, depth) / steps, best = { x:c.x, z:c.z, clear:c.clear };
+    for (let it=0; it<8; it++) {
+      let moved = false;
+      for (const [dx,dz] of DIRS8) {
+        const x = best.x + dx*step, z = best.z + dz*step, cl = worstClearance(x, z, all);
+        if (cl > best.clear + 1e-9) { best = { x, z, clear:cl }; moved = true; }
+      }
+      if (!moved) step /= 2;
+    }
+    return best;
+  };
+  if (!(shortlist[0].clear >= minClear)) return [];
+  const first = refine(shortlist[0]);
+  const minSep = safeRadius * 2.2;
+  const second = shortlist.filter(c => c.clear >= minClear && Math.hypot(c.x-first.x, c.z-first.z) >= minSep)
+    .sort((p,q) => (Math.hypot(q.x-first.x, q.z-first.z) + q.clear) - (Math.hypot(p.x-first.x, p.z-first.z) + p.clear))[0];
+  if (!second) return [{ x:first.x, z:first.z }];
+  const polished = refine(second);
+  const useP = polished.clear >= second.clear && Math.hypot(polished.x-first.x, polished.z-first.z) >= minSep;
+  const s = useP ? polished : second;
+  return [{ x:first.x, z:first.z }, { x:s.x, z:s.z }];
+}
+
+function manualPointsForCut(cutIndex, auto, loops, safeRadius) {
+  // A hand-placed peg is kept wherever it still sits on material (even if it now sticks out: the report says so);
+  // only pegs that fell off the model altogether are replaced by the automatic spot.
+  let points = (manualPegPositions.get(cutIndex) || []).filter(p => materialAtCut(p.x, p.z, loops));
+  const minSep = safeRadius * 2.0;
+  points = points.filter((p, i) => points.every((q, j) => j >= i || Math.hypot(p.x-q.x, p.z-q.z) >= minSep));
+  for (const p of auto) {
+    if (points.length >= 2) break;
+    if (points.every(q => Math.hypot(p.x-q.x, p.z-q.z) >= minSep)) points.push({ x:p.x, z:p.z });
   }
-  points=points.slice(0,2);
-  manualPegPositions.set(cutIndex,points);
+  points = points.slice(0, 2);
+  manualPegPositions.set(cutIndex, points);
   return points;
 }
 
 function loopBoundsXZ(loops) {
   let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
-  for(const loop of loops||[]) for(const q of loop){
+  for (const loop of loops||[]) for (const q of loop) {
     minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);
     minZ=Math.min(minZ,q.z);maxZ=Math.max(maxZ,q.z);
   }
@@ -168,7 +214,7 @@ function axisPercent(value,min,max) {
 
 function currentPegControls(cutIndex=0) {
   const data=previewCutData[cutIndex];
-  const points=manualPegPositions.get(cutIndex)||[];
+  const points=manualPegPositions.get(cutIndex)||data?.points||[];
   if(!data) return null;
   const b=loopBoundsXZ(data.loops);
   return {
@@ -177,9 +223,53 @@ function currentPegControls(cutIndex=0) {
     pegs:points.map((p,i)=>({
       index:i,
       leftRight:axisPercent(p.x,b.minX,b.maxX),
-      backForward:axisPercent(p.z,b.minZ,b.maxZ)
+      backForward:axisPercent(p.z,b.minZ,b.maxZ),
+      status:data.verdicts?.[i]?.status || 'ok'
     }))
   };
+}
+
+// ---- Is the peg inside the model? ---------------------------------------------------------------
+// The male peg hangs below the cut (it belongs to the upper part) so the LOWER part's cross-sections at the peg's
+// depths decide whether it sticks out. The cross-section a little above the cut decides whether the peg has a root.
+const STATUS_COLOUR = { ok: 0x56ff9a, warn: 0xffd24a, bad: 0xff3f5f };
+
+function assessPeg(point, radius, data, sizing) {
+  const scale = mmPerUnit(), mm = v => Math.abs(v * scale);
+  const slices = data.exposureSlices || [];
+  const below = slices.length ? worstClearance(point.x, point.z, slices) : Infinity;
+  const above = data.aboveSlice ? signedDistXZ(point.x, point.z, data.aboveSlice.loops || []) : Infinity;
+  const margin = below - radius, wall = margin - sizing.clearance, root = above - radius;
+  let exposedSlices = 0;
+  for (const s of slices) if (signedDistXZ(point.x, point.z, s.loops || []) < radius) exposedSlices++;
+  const exposedMM = slices.length > 1 ? (exposedSlices / (slices.length - 1)) * sizing.depth * scale : 0;
+  const base = { marginMM: Number.isFinite(margin) ? margin * scale : null, wallMM: Number.isFinite(wall) ? wall * scale : null, exposedMM };
+  if (!Number.isFinite(below)) return { ...base, status:'bad', text:'there is no model under the peg here' };
+  if (margin < 0) return { ...base, status:'bad', text:`sticks out of the model by ${mm(margin).toFixed(1)} mm (the lowest ${Math.min(sizing.depth*scale, exposedMM).toFixed(0)} mm of the peg)` };
+  if (wall < 0) return { ...base, status:'bad', text:`its socket would break through the surface (${mm(wall).toFixed(1)} mm short)` };
+  if (root < 0) return { ...base, status:'warn', text:`the top of the peg overhangs the upper part by ${mm(root).toFixed(1)} mm` };
+  if (wall < sizing.safetyWall) return { ...base, status:'warn', text:`only ${mm(wall).toFixed(1)} mm of wall around the socket (aim for ${(sizing.safetyWall*scale).toFixed(1)}+)` };
+  return { ...base, status:'ok', text:`fits inside the model, ${mm(wall).toFixed(1)} mm of wall around the socket` };
+}
+
+function lookFor(group, verdict) {
+  if (!group) return;
+  const ring = group.children.find(o => o.userData?.pegRing);
+  if (ring) ring.material.color.setHex(STATUS_COLOUR[verdict?.status] ?? STATUS_COLOUR.ok);
+  group.userData.status = verdict?.status || 'ok';
+}
+
+function refreshVerdicts(cutIndex) {
+  const data = previewCutData[cutIndex]; if (!data) return;
+  const sizing = pegSizing();
+  data.verdicts = data.points.slice(0,2).map((p,i) => assessPeg(p, i===0 ? sizing.radius : sizing.radius*.76, data, sizing));
+  if (previewGroup) for (const g of previewGroup.children) if (g.userData?.shrinkPegPreview && g.userData.cutIndex === cutIndex) lookFor(g, data.verdicts[g.userData.pegIndex]);
+}
+
+function pegReport() {
+  const out = [];
+  previewCutData.forEach((data, cut) => (data?.verdicts || []).forEach((v, peg) => out.push({ cut, peg, ...v })));
+  return out;
 }
 
 function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
@@ -195,25 +285,22 @@ function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
   const desired=min+(max-min)*Math.max(0,Math.min(100,Number(percent)||0))/100;
   const start=axis==='x'?current.x:current.z;
   const other=points[pegIndex===0?1:0];
-  const safe=c=>{
-    if(!previewCandidateSafe(c,data.loops,data.safeRadius)) return false;
-    return !other || Math.hypot(c.x-other.x,c.z-other.z)>=data.safeRadius*2.0;
-  };
+  // The slider may take a peg anywhere on the model so the person can SEE it turn red; it only refuses to leave the
+  // material altogether or to land on the other peg.
+  const allowed=c=>materialAtCut(c.x,c.z,data.loops) && (!other || Math.hypot(c.x-other.x,c.z-other.z)>=data.safeRadius*2.0);
 
-  // Travel continuously from the current safe point towards the requested position.
-  // Once an unsafe boundary is hit, stop there rather than jumping to another island.
   let best={x:current.x,z:current.z};
   const steps=120;
   for(let i=1;i<=steps;i++){
     const v=start+(desired-start)*i/steps;
     const candidate=axis==='x'?{x:v,z:current.z}:{x:current.x,z:v};
-    if(!safe(candidate)) break;
+    if(!allowed(candidate)) break;
     best=candidate;
   }
   points[pegIndex]=best;
   manualPegPositions.set(cutIndex,points);
+  data.points=points.slice(0,2);
 
-  // Move the existing gizmo immediately, then rebuild once so all slider/bounds data stays current.
   if(previewGroup){
     const pegs=previewGroup.children.filter(o=>o.userData?.shrinkPegPreview);
     const target=pegs.find(o=>o.userData.cutIndex===cutIndex&&o.userData.pegIndex===pegIndex);
@@ -222,7 +309,8 @@ function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
       colourPegExposure(target,data.exposureSlices);
     }
   }
-  window.dispatchEvent(new CustomEvent('shrink:peg-position-changed',{detail:{cutIndex,pegIndex,controls:currentPegControls(cutIndex)}}));
+  refreshVerdicts(cutIndex);
+  window.dispatchEvent(new CustomEvent('shrink:peg-position-changed',{detail:{cutIndex,pegIndex,controls:currentPegControls(cutIndex),report:pegReport()}}));
   return currentPegControls(cutIndex);
 }
 
@@ -323,7 +411,12 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth, expos
   outline.userData.basePegColor=baseColor;
   outline.position.y=-pegDepth*.5;
 
-  group.add(peg,outline);
+  // Status ring on the cut plane: green = fits, amber = thin or overhanging, red = sticks out of the model.
+  const ringGeom = new THREE.RingGeometry(pegRadius * 1.15, pegRadius * 1.5, 40); ringGeom.rotateX(-Math.PI / 2);
+  const ring = new THREE.Mesh(ringGeom, new THREE.MeshBasicMaterial({ color: STATUS_COLOUR.ok, transparent: true, opacity: .95, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+  ring.renderOrder = 1004; ring.userData.pegRing = true; ring.position.y = pegDepth * 0.0;
+
+  group.add(peg,outline,ring);
   previewGroup.add(group);
   colourPegExposure(group,exposureSlices);
   return group;
@@ -331,15 +424,19 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth, expos
 
 function addPegPreviews(model, cutIndex, y) {
   const loops=cutLoopsFromModel(model,y);
-  const {radius,depth,safeRadius}=pegSizing();
+  const sizing=pegSizing(), {radius,depth,safeRadius}=sizing;
   const manual=manualPegMode();
-  const points=manual ? manualPointsForCut(cutIndex,loops,safeRadius) : previewAutoPegPoints(loops,safeRadius);
   const exposureSlices=makeExposureSlices(model,y,depth,9);
-  previewCutData[cutIndex]={y,loops,safeRadius,points,exposureSlices};
+  const aboveSlice={y:y+depth*.35,loops:cutLoopsFromModel(model,y+depth*.35)};
+  const auto=previewAutoPegPoints(loops,safeRadius,[...exposureSlices,aboveSlice],radius);
+  const points=manual ? manualPointsForCut(cutIndex,auto,loops,safeRadius) : auto;
+  previewCutData[cutIndex]={y,loops,safeRadius,points,exposureSlices,aboveSlice,verdicts:[]};
+  refreshVerdicts(cutIndex);
 
   points.slice(0,2).forEach((p,i)=>{
     const pegRadius=i===0?radius:radius*.76;
-    makePegPreview(cutIndex,i,p,y,pegRadius,depth,exposureSlices);
+    const g=makePegPreview(cutIndex,i,p,y,pegRadius,depth,exposureSlices);
+    lookFor(g,previewCutData[cutIndex].verdicts[i]);
   });
 }
 
@@ -363,7 +460,9 @@ function updatePreview() {
   const n = partCount(), model = sourceModel(), scene = window.__shrinkViewer?.scene;
   const info = $('splitInfo');
   if (!model || !scene || n <= 1 || !document.body.classList.contains('app-mode-print')) {
+    previewCutData = [];
     if (info) info.textContent = 'Off — export one STL.';
+    window.dispatchEvent(new CustomEvent('shrink:peg-preview-updated',{detail:{cuts:0,report:[]}}));
     return;
   }
   const box = boundsFor(model), size = box.getSize(new THREE.Vector3());
@@ -382,12 +481,12 @@ function updatePreview() {
     if ($('splitJoint')?.value !== 'flat') addPegPreviews(model, cutIndex, y);
   }
   scene.add(previewGroup);
-  window.dispatchEvent(new CustomEvent('shrink:peg-preview-updated',{detail:{cuts:previewCutData.length}}));
+  window.dispatchEvent(new CustomEvent('shrink:peg-preview-updated',{detail:{cuts:previewCutData.length,report:pegReport()}}));
   updateCutLabel();
   if (info) {
     if (n === 2) {
       const f = fractions[0];
-      info.textContent = `2 sections · cut at ${(finishedHeightMM() * f).toFixed(1)} mm (${Math.round(f * 100)}%) · green plane and true-size peg previews shown.`;
+      info.textContent = `2 sections · cut at ${(finishedHeightMM() * f).toFixed(1)} mm (${Math.round(f * 100)}%) · green plane and true-size peg previews shown (ring: green fits · amber thin · red sticks out).`;
     } else {
       const each = finishedHeightMM() / n;
       info.textContent = `${n} sections · about ${each.toFixed(0)} mm high each · green planes show the cuts.`;
@@ -456,50 +555,32 @@ function materialAtCut(x, z, loops) {
 
 function cutLoopsFromSolid(solid, y, span) {
   const mesh = solid.getMesh(), np = mesh.numProp, verts = mesh.vertProperties, tris = mesh.triVerts;
-  const tol = Math.max(Math.abs(span) * 1e-6, 1e-7);
-  const segments = [];
+  const tol = Math.max(Math.abs(span) * 1e-6, 1e-7), nudge = Math.max(Math.abs(span) * 2e-4, tol * 50);
   const p = i => ({ x:verts[i*np], y:verts[i*np+1], z:verts[i*np+2] });
-  const intersect = (a,b) => {
-    const dy=b.y-a.y, t=Math.abs(dy)<1e-20 ? 0 : (y-a.y)/dy;
-    return {x:a.x+(b.x-a.x)*t, y, z:a.z+(b.z-a.z)*t};
-  };
-  try {
+  const slice = yy => {
+    const segments = []; let touched = false;
+    const intersect = (a,b) => { const dy=b.y-a.y, t=Math.abs(dy)<1e-20 ? 0 : (yy-a.y)/dy; return {x:a.x+(b.x-a.x)*t, y:yy, z:a.z+(b.z-a.z)*t}; };
     for (let t=0;t+2<tris.length;t+=3) {
+      const y0=verts[tris[t]*np+1], y1=verts[tris[t+1]*np+1], y2=verts[tris[t+2]*np+1];
+      if (Math.min(y0,y1,y2) > yy+tol || Math.max(y0,y1,y2) < yy-tol) continue;
+      if (Math.abs(y0-yy)<=tol || Math.abs(y1-yy)<=tol || Math.abs(y2-yy)<=tol) touched = true;
       const tri=[p(tris[t]),p(tris[t+1]),p(tris[t+2])], hits=[];
       for (let i=0;i<3;i++) {
-        const a=tri[i], b=tri[(i+1)%3], da=a.y-y, db=b.y-y;
+        const a=tri[i], b=tri[(i+1)%3], da=a.y-yy, db=b.y-yy;
         if (Math.abs(da)<=tol && Math.abs(db)<=tol) continue;
         if ((da < -tol && db > tol) || (da > tol && db < -tol)) hits.push(intersect(a,b));
-        else if (Math.abs(da)<=tol) hits.push({x:a.x,y,z:a.z});
+        else if (Math.abs(da)<=tol) hits.push({x:a.x,y:yy,z:a.z});
       }
       const unique=[];
       for (const q of hits) if (!unique.some(v => Math.hypot(v.x-q.x,v.z-q.z)<=tol)) unique.push(q);
       if (unique.length>=2) segments.push([unique[0],unique[1]]);
     }
+    return { segments, touched };
+  };
+  try {
+    for (const k of CUT_NUDGES) { const r = slice(y + k*nudge); if (!r.touched) return linkLoops(r.segments, tol); }
+    return linkLoops(slice(y + nudge).segments, tol);
   } finally { try { mesh.delete?.(); } catch {} }
-
-  const key = q => `${Math.round(q.x/tol)},${Math.round(q.z/tol)}`;
-  const entries=segments.map((seg,i)=>({i,a:seg[0],b:seg[1],used:false})), byKey=new Map();
-  const add=(k,i)=>{let list=byKey.get(k);if(!list)byKey.set(k,list=[]);list.push(i);};
-  entries.forEach((e,i)=>{add(key(e.a),i);add(key(e.b),i);});
-  const loops=[];
-  for (let seed=0;seed<entries.length;seed++) {
-    if (entries[seed].used) continue;
-    const e=entries[seed]; e.used=true;
-    const loop=[e.a,e.b]; let current=e.b, closed=false, guard=0;
-    while (guard++ < entries.length+4) {
-      const k=key(current), ids=byKey.get(k)||[];
-      let next=null;
-      for (const id of ids) if (!entries[id].used) { next=entries[id]; break; }
-      if (!next) break;
-      next.used=true;
-      current = key(next.a)===k ? next.b : next.a;
-      if (Math.hypot(current.x-loop[0].x,current.z-loop[0].z)<=tol*1.5) { closed=true; break; }
-      loop.push(current);
-    }
-    if (closed && loop.length>=3) loops.push(loop);
-  }
-  return loops;
 }
 
 function choosePegPoints(solid, wasm, y, box, r, depth, clearance, span, preferred = null) {
@@ -519,7 +600,7 @@ function choosePegPoints(solid, wasm, y, box, r, depth, clearance, span, preferr
   let candidates=[];
   if(Array.isArray(preferred)&&preferred.length){
     candidates=preferred
-      .filter(p=>previewCandidateSafe(p,loops,safeRadius))
+      .filter(p=>previewCandidateInside(p,loops,r))
       .map((p,i)=>({x:p.x,z:p.z,edge:boundaryDistanceXZ(p.x,p.z,loops),manualIndex:i}));
   } else {
     const steps=17;
@@ -577,6 +658,14 @@ function sectionSolid(solid, minY, maxY) {
   return part;
 }
 
+function previewPegsFor(cutIndex, y, span) {
+  const data = previewCutData[cutIndex];
+  if (!data || !data.verdicts || Math.abs(data.y - y) > Math.max(span * 1e-3, 1e-6)) return null;
+  const use = [], total = data.points.slice(0, 2).length;
+  data.points.slice(0, 2).forEach((p, i) => { if (data.verdicts[i]?.status !== 'bad') use.push({ x:p.x, z:p.z }); });
+  return { use, skipped: total - use.length };
+}
+
 async function splitSolid(solid, wasm, n, withPegs, fractions = cutFractions(n)) {
   const m = solid.getMesh(), np = m.numProp;
   let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
@@ -599,8 +688,10 @@ async function splitSolid(solid, wasm, n, withPegs, fractions = cutFractions(n))
     parts.pegCuts = 0;
     for (let i=0;i<cuts.length;i++) {
       const y = cuts[i];
-      const preferred = manualPegMode() ? (manualPegPositions.get(i) || null) : null;
-      const points = choosePegPoints(solid, wasm, y, box, radiusMain, depth, clearance, span, preferred);
+      // What you see is what you get: use the pegs the preview showed (red ones are left out).
+      const shown = previewPegsFor(i, y, span);
+      const points = shown ? (shown.use.length ? choosePegPoints(solid, wasm, y, box, radiusMain, depth, clearance, span, shown.use) : []) : choosePegPoints(solid, wasm, y, box, radiusMain, depth, clearance, span, null);
+      if (shown?.skipped) parts.pegSkipped = (parts.pegSkipped || 0) + shown.skipped;
       let added = 0;
       for (let p=0;p<Math.min(2,points.length);p++) {
         const {x,z} = points[p], r = p===0 ? radiusMain : radiusMain*.76;
@@ -656,7 +747,8 @@ async function exportSplitSTL(evt) {
     const zip = zipSync(files, { level: 0 });
     saveBlob(new Blob([zip], {type:'application/zip'}), `${stem}-SPLIT${parts.length}.zip`);
     const cutText = n===2 ? ` · cut at ${(finishedHeightMM()*cutFractions(2)[0]).toFixed(1)} mm` : '';
-    const joints = !withPegs ? '' : parts.pegCuts ? ` with keyed alignment pegs on ${parts.pegCuts} cut${parts.pegCuts === 1 ? '' : 's'} (upper part pegs into lower sockets)` : ' with flat cuts (no safe peg position was found)';
+    const skippedNote = parts.pegSkipped ? ` · ${parts.pegSkipped} peg${parts.pegSkipped === 1 ? ' was' : 's were'} left out because ${parts.pegSkipped === 1 ? 'it' : 'they'} stuck out of the model` : '';
+    const joints = !withPegs ? '' : (parts.pegCuts ? ` with keyed alignment pegs on ${parts.pegCuts} cut${parts.pegCuts === 1 ? '' : 's'} (upper part pegs into lower sockets)` : ' with flat cuts (no safe peg position was found)') + skippedNote;
     say(`Saved ${parts.length} watertight STL sections${joints}${cutText} · ${new Intl.NumberFormat().format(totalTris)} triangles total.`);
   } catch (err) {
     console.error(err); say(`Split failed: ${err.message}`, true);
@@ -705,12 +797,63 @@ function injectUI() {
 
 function wire() { injectUI(); $('saveStlBtn')?.addEventListener('click', exportSplitSTL, true); }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, {once:true}); else wire();
+// "Find best cut": try cut heights near the current one and prefer a cut that goes through ONE solid outline
+// (not a thin arm, axe or cape as well) and leaves room for pegs that stay inside the model.
+function findBestCut() {
+  const model = sourceModel(); if (!model || partCount() !== 2) return null;
+  const box = boundsFor(model), size = box.getSize(new THREE.Vector3()), sizing = pegSizing(), scale = mmPerUnit();
+  const area = loop => { let a = 0; for (let i=0;i<loop.length;i++) { const p=loop[i], q=loop[(i+1)%loop.length]; a += p.x*q.z - q.x*p.z; } return Math.abs(a/2); };
+  const countIslands = ls => { const ar = ls.map(area), mx = Math.max(0, ...ar); return ar.filter(a => a > mx * 0.02).length; };
+  const current = Number($('splitCutHeight')?.value || 50);
+  const scoreOf = r => Math.min(r.clearMM, 8) - 3 * (r.islands - 1) + 4 * r.solidShare - Math.abs(r.pct - current) * 0.03 - (r.pegs < 2 ? 1 : 0);
+  // Pass 1: every height, cheaply.
+  const results = [];
+  for (let pct = 20; pct <= 80.001; pct += 2.5) {
+    const y = box.min.y + size.y * pct / 100, loops = cutLoopsFromModel(model, y);
+    if (!loops.length) continue;
+    const areas = loops.map(area), big = Math.max(...areas), total = areas.reduce((n,a) => n + a, 0);
+    const slices = [{ loops }, ...makeExposureSlices(model, y, sizing.depth, 3).slice(1), { loops: cutLoopsFromModel(model, y + sizing.depth * .35) }];
+    const pts = previewAutoPegPoints(loops, sizing.safeRadius, slices, sizing.radius);
+    const clear = pts.length ? Math.min(...pts.map(p => worstClearance(p.x, p.z, slices))) : -Infinity;
+    const r = { pct, y, islands: countIslands(loops), solidShare: big / Math.max(total, 1e-9), clearMM: Number.isFinite(clear) ? Math.max(-5, clear * scale) : -5, pegs: pts.length };
+    r.score = scoreOf(r); results.push(r);
+  }
+  if (!results.length) return null;
+  // Pass 2: the best few again, also looking just above and below, because a cut within ~1% of the height of a ledge,
+  // arm or plank is fragile and counts as crossing it.
+  results.sort((a,b) => b.score - a.score);
+  const near = size.y * 0.01;
+  for (const r of results.slice(0, 6)) {
+    r.islands = Math.max(r.islands, countIslands(cutLoopsFromModel(model, r.y + near)), countIslands(cutLoopsFromModel(model, r.y - near)));
+    r.score = scoreOf(r);
+  }
+  results.sort((a,b) => b.score - a.score);
+  const { pct, score, islands, clearMM, pegs } = results[0];
+  return { pct, score, islands, clearMM, pegs };
+}
+
+function applyBestCut() {
+  const best = findBestCut(); if (!best) return null;
+  const slider = $('splitCutHeight');
+  if (slider) { slider.value = String(best.pct); slider.dispatchEvent(new Event('input', { bubbles: true })); }
+  return best;
+}
+
 window.__shrinkSplit = {
-  updatePreview, partCount, cutFractions,
+  updatePreview, partCount, cutFractions, pegReport, findBestCut, applyBestCut,
   resetManualPegPositions: clearManualPegPositions,
   getManualPegControls: currentPegControls,
   moveManualPegAxis: manualPegAxisMove,
   cutCount() { return previewCutData.length; },
+  // The pegs the preview shows (red ones left out), per cut: the direct-split fallback uses these so it matches the preview.
+  shownPegPoints() {
+    const n=partCount(), out=[];
+    for(let i=0;i<Math.max(0,n-1);i++){
+      const d=previewCutData[i];
+      out.push(d ? d.points.slice(0,2).filter((p,k)=>d.verdicts?.[k]?.status!=='bad').map(p=>({x:p.x,z:p.z})) : []);
+    }
+    return out;
+  },
   manualPegPoints() {
     const n=partCount(), out=[];
     for(let i=0;i<Math.max(0,n-1);i++) out.push((manualPegPositions.get(i)||[]).map(p=>({x:p.x,z:p.z})));

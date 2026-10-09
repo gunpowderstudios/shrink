@@ -32,7 +32,7 @@ async function directSplit(rawReason) {
     const clearance=Math.max(.05,Number($('pegClearance')?.value||.2))/scale;
     app()?.setStatus?.(wantsPegs ? 'The solid split could not be made. Trying a direct split with safe peg/socket joints…' : 'The solid split could not be made. Trying a direct flat-cut split instead…', false);
     await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
-    const manualPegPoints=$('splitPegPosition')?.value==='manual' ? window.__shrinkSplit?.manualPegPoints?.() : null;
+    const manualPegPoints=window.__shrinkSplit?.shownPegPoints?.() || ($('splitPegPosition')?.value==='manual' ? window.__shrinkSplit?.manualPegPoints?.() : null);
     const out=splitModelFlat(model,n,{withPegs:wantsPegs,pegRadius,pegDepth,clearance,cutFractions:cutFractions(),manualPegPoints});
     parts=out.parts;
     const files={}, zUp=$('zUpToggle')?.checked!==false, base=app()?.baseName?.()||'model';
