@@ -334,3 +334,59 @@
   font-size:10px!important;
   line-height:1.45!important;
 }
+
+
+/* v2.67 — smooth manual peg axis sliders */
+.v2-peg-axis-panel{
+  grid-column:1/-1;
+  display:grid;
+  gap:9px;
+  padding:10px;
+  border:1px solid #344255;
+  border-radius:10px;
+  background:rgba(255,255,255,.018);
+}
+.v2-peg-axis-panel[hidden]{display:none!important}
+.v2-peg-cut{max-width:150px}
+.v2-peg-cut select,.v2-advanced-body select{
+  width:100%;
+  margin-top:5px;
+  padding:9px 10px;
+  border:1px solid #37465a;
+  border-radius:9px;
+  background:#182230;
+  color:#fff;
+  outline:none;
+}
+.v2-peg-axis-group{
+  padding:8px 9px;
+  border:1px solid #2d3948;
+  border-radius:9px;
+  background:rgba(0,0,0,.10);
+}
+.v2-peg-axis-group>strong{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:7px;
+  color:#e6edf6;
+  font-size:10.5px;
+}
+.v2-peg-axis-group>strong i{
+  width:9px;height:9px;border-radius:50%;background:#ffb13b;box-shadow:0 0 8px rgba(255,177,59,.55)
+}
+.v2-peg2>strong i{background:#55d9ff;box-shadow:0 0 8px rgba(85,217,255,.55)}
+.v2-peg-axis-group label{
+  display:grid!important;
+  grid-template-columns:42px minmax(0,1fr) 48px;
+  align-items:center;
+  gap:6px;
+  margin:5px 0;
+  color:#91a1b5!important;
+  font-size:9px!important;
+  font-weight:750!important;
+}
+.v2-peg-axis-group label span:last-child{text-align:right}
+.v2-peg-axis-group input[type=range]{width:100%;margin:0;accent-color:#ffb13b}
+.v2-peg2 input[type=range]{accent-color:#55d9ff}
+.v2-peg-axis-group input:disabled{opacity:.35}
