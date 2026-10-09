@@ -312,3 +312,25 @@
   font-size:10px;
   font-weight:800;
 }
+
+
+/* v2.63 — manual peg controls */
+.v2-peg-reset{
+  min-height:34px;
+  border:1px solid rgba(86,255,154,.38);
+  border-radius:9px;
+  background:rgba(86,255,154,.08);
+  color:#89efbb;
+  font-size:10px;
+  font-weight:850;
+  letter-spacing:.04em;
+  cursor:pointer;
+}
+.v2-peg-reset:hover{background:rgba(86,255,154,.14)}
+.v2-peg-help{
+  grid-column:1/-1;
+  margin:0!important;
+  color:#9fb0c2!important;
+  font-size:10px!important;
+  line-height:1.45!important;
+}
