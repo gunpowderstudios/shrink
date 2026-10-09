@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.67 — manual split pegs can be positioned smoothly with constrained left/right and forward/back axis sliders.
+// SHRINK 3D v2.68 — show true-size peg previews in Auto and Manual; manual positioning is slider-only.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -39,8 +39,6 @@ function cutFractions(n = partCount()) {
 function boundsFor(model) { return new THREE.Box3().setFromObject(model); }
 const manualPegPositions = new Map(); // cut index -> [{x,z}, ...]
 let previewCutData = [];
-let pegDrag = null;
-let pegDragInstalled = false;
 
 function pegPositionMode() { return $('splitPegPosition')?.value || 'auto'; }
 function manualPegMode() { return pegPositionMode() === 'manual' && $('splitJoint')?.value !== 'flat'; }
@@ -217,8 +215,8 @@ function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
 
   // Move the existing gizmo immediately, then rebuild once so all slider/bounds data stays current.
   if(previewGroup){
-    const gizmos=previewGroup.children.filter(o=>o.userData?.shrinkPegGizmo);
-    const target=gizmos.find(o=>o.userData.cutIndex===cutIndex&&o.userData.pegIndex===pegIndex);
+    const pegs=previewGroup.children.filter(o=>o.userData?.shrinkPegPreview);
+    const target=pegs.find(o=>o.userData.cutIndex===cutIndex&&o.userData.pegIndex===pegIndex);
     if(target){target.position.x=best.x;target.position.z=best.z;}
   }
   window.dispatchEvent(new CustomEvent('shrink:peg-position-changed',{detail:{cutIndex,pegIndex,controls:currentPegControls(cutIndex)}}));
@@ -226,204 +224,63 @@ function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
 }
 
 
-function setPegHandleState(group, state='idle') {
-  if(!group) return;
-  const scale = state === 'drag' ? 1.14 : state === 'hover' ? 1.08 : 1;
-  const glow = state !== 'idle';
-  group.children.forEach(o=>{
-    if(!o.isMesh) return;
-    // True-size peg preview and outline must never scale on hover/drag.
-    if(o.userData?.truePegPreview || o.position.y < 0) o.scale.setScalar(1);
-    else o.scale.setScalar(scale);
-  });
-  group.traverse(o=>{
-    if(!o.isMesh || !o.material || o.userData?.shrinkPegHit) return;
-    if('opacity' in o.material) o.material.opacity = glow ? Math.min(1,(o.userData?.baseOpacity ?? .98)+.12) : (o.userData?.baseOpacity ?? .98);
-  });
-}
-
-function makePegHandle(cutIndex, pegIndex, point, y, pegRadius, pegDepth, markerRadius) {
+function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
+  const color=pegIndex===0?0xffb13b:0x55d9ff;
   const group=new THREE.Group();
   group.position.set(point.x,y,point.z);
   group.renderOrder=1000;
-  group.userData.shrinkPegGizmo=true;
+  group.userData.shrinkPegPreview=true;
   group.userData.cutIndex=cutIndex;
   group.userData.pegIndex=pegIndex;
 
-  const color=pegIndex===0?0xffb13b:0x55d9ff;
-
-  // The cylinder below the green cut plane is the ACTUAL male peg that will be
-  // exported on the upper section: same radius and same depth. Render it X-ray
-  // style so the full peg remains visible through the model while positioning.
-  const pegMat=new THREE.MeshBasicMaterial({
-    color,
-    transparent:true,
-    opacity:.42,
-    depthTest:false,
-    depthWrite:false,
-    side:THREE.DoubleSide
-  });
-  const actualPeg=new THREE.Mesh(
+  // This is the actual male peg shape: same radius and depth as the exported STL.
+  // X-ray rendering keeps the whole cylinder visible through the model.
+  const peg=new THREE.Mesh(
     new THREE.CylinderGeometry(pegRadius,pegRadius,pegDepth,28,false),
-    pegMat
-  );
-  actualPeg.renderOrder=1002;
-  actualPeg.userData.baseOpacity=.42;
-  actualPeg.userData.truePegPreview=true;
-  actualPeg.position.y=-pegDepth*.5;
-
-  // Thin bright outline makes the complete cylinder easy to read against pale models.
-  const pegOutline=new THREE.Mesh(
-    new THREE.CylinderGeometry(pegRadius*1.015,pegRadius*1.015,pegDepth*1.005,28,true),
     new THREE.MeshBasicMaterial({
       color,
       transparent:true,
-      opacity:.92,
+      opacity:.44,
+      depthTest:false,
+      depthWrite:false,
+      side:THREE.DoubleSide
+    })
+  );
+  peg.renderOrder=1002;
+  peg.position.y=-pegDepth*.5;
+
+  // A fine edge overlay is part of the peg preview itself, not a control handle.
+  const outline=new THREE.Mesh(
+    new THREE.CylinderGeometry(pegRadius*1.012,pegRadius*1.012,pegDepth*1.004,28,true),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent:true,
+      opacity:.9,
       depthTest:false,
       depthWrite:false,
       wireframe:true
     })
   );
-  pegOutline.renderOrder=1003;
-  pegOutline.userData.baseOpacity=.92;
-  pegOutline.userData.truePegPreview=true;
-  pegOutline.position.y=-pegDepth*.5;
+  outline.renderOrder=1003;
+  outline.position.y=-pegDepth*.5;
 
-  // Exact footprint at the cut plane.
-  const ringMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.98});
-  const ring=new THREE.Mesh(
-    new THREE.TorusGeometry(pegRadius,Math.max(pegRadius*.12,markerRadius*.08),10,32),
-    ringMat
-  );
-  ring.userData.baseOpacity=.98;
-  ring.rotation.x=Math.PI/2;
-
-  // Separate grab stalk above the cut. This is UI only and is never exported.
-  const stemHeight=Math.max(markerRadius*2.7,pegRadius*2.0);
-  const stemMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.92});
-  const stem=new THREE.Mesh(
-    new THREE.CylinderGeometry(markerRadius*.20,markerRadius*.20,stemHeight,14),
-    stemMat
-  );
-  stem.userData.baseOpacity=.92;
-  stem.position.y=stemHeight*.5;
-
-  const capMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.98});
-  const cap=new THREE.Mesh(
-    new THREE.SphereGeometry(markerRadius*.62,18,12),
-    capMat
-  );
-  cap.userData.baseOpacity=.98;
-  cap.position.y=stemHeight;
-
-  const hit=new THREE.Mesh(
-    new THREE.CylinderGeometry(markerRadius*1.75,markerRadius*1.75,stemHeight+markerRadius*1.8,20),
-    new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,depthTest:false})
-  );
-  hit.position.y=(stemHeight+markerRadius*.9)*.5;
-  hit.userData.shrinkPegHit=true;
-  hit.userData.shrinkPegHandle=true;
-  hit.userData.cutIndex=cutIndex;
-  hit.userData.pegIndex=pegIndex;
-  hit.userData.handleGroup=group;
-
-  group.add(actualPeg,pegOutline,ring,stem,cap,hit);
+  group.add(peg,outline);
   previewGroup.add(group);
   return group;
 }
 
-function addManualPegHandles(model, cutIndex, y, modelSize) {
+function addPegPreviews(model, cutIndex, y) {
   const loops=cutLoopsFromModel(model,y);
   const {radius,depth,safeRadius}=pegSizing();
-  const points=manualPointsForCut(cutIndex,loops,safeRadius);
+  const manual=manualPegMode();
+  const points=manual ? manualPointsForCut(cutIndex,loops,safeRadius) : previewAutoPegPoints(loops,safeRadius);
   previewCutData[cutIndex]={y,loops,safeRadius,points};
-  const markerRadius=Math.max(radius*.85,modelSize.length()*.008);
-  points.forEach((p,i)=>{
+
+  points.slice(0,2).forEach((p,i)=>{
     const pegRadius=i===0?radius:radius*.76;
-    makePegHandle(cutIndex,i,p,y,pegRadius,depth,markerRadius);
+    makePegPreview(cutIndex,i,p,y,pegRadius,depth);
   });
 }
-
-function pointerRay(evt) {
-  const v=window.__shrinkViewer, canvas=v?.renderer?.domElement;
-  if(!v||!canvas) return null;
-  const rect=canvas.getBoundingClientRect();
-  const ndc=new THREE.Vector2(((evt.clientX-rect.left)/rect.width)*2-1,-((evt.clientY-rect.top)/rect.height)*2+1);
-  const raycaster=new THREE.Raycaster();
-  raycaster.setFromCamera(ndc,v.camera);
-  return {raycaster,canvas,v};
-}
-
-function endPegDrag(evt) {
-  if(!pegDrag) return;
-  const {canvas,v,handle}=pegDrag;
-  try{canvas.releasePointerCapture?.(evt.pointerId);}catch{}
-  if(v?.controls) v.controls.enabled=true;
-  setPegHandleState(handle,'hover');
-  canvas.style.cursor='grab';
-  pegDrag=null;
-}
-
-function installPegDrag() {
-  if(pegDragInstalled) return;
-  const v=window.__shrinkViewer,canvas=v?.renderer?.domElement;
-  if(!v||!canvas) return;
-  pegDragInstalled=true;
-  let hovered=null;
-
-  const updateHover=evt=>{
-    if(pegDrag || !manualPegMode() || !previewGroup) {
-      if(hovered){ setPegHandleState(hovered,'idle'); hovered=null; }
-      if(!pegDrag) canvas.style.cursor='';
-      return;
-    }
-    const pr=pointerRay(evt); if(!pr) return;
-    const hit=pr.raycaster.intersectObjects(previewGroup.children,true).find(h=>h.object?.userData?.shrinkPegHandle);
-    const next=hit?.object?.userData?.handleGroup||null;
-    if(next!==hovered){
-      if(hovered) setPegHandleState(hovered,'idle');
-      hovered=next;
-      if(hovered) setPegHandleState(hovered,'hover');
-    }
-    canvas.style.cursor=hovered?'grab':'';
-  };
-  canvas.addEventListener('pointermove',updateHover);
-  canvas.addEventListener('pointerdown',evt=>{
-    if(!manualPegMode()||!previewGroup) return;
-    const pr=pointerRay(evt); if(!pr) return;
-    const hit=pr.raycaster.intersectObjects(previewGroup.children,true).find(h=>h.object?.userData?.shrinkPegHandle);
-    if(!hit) return;
-    const d=hit.object.userData;
-    pegDrag={...pr,cutIndex:d.cutIndex,pegIndex:d.pegIndex,handle:d.handleGroup};
-    if(hovered && hovered!==pegDrag.handle) setPegHandleState(hovered,'idle');
-    hovered=pegDrag.handle;
-    setPegHandleState(pegDrag.handle,'drag');
-    canvas.style.cursor='grabbing';
-    if(v.controls) v.controls.enabled=false;
-    canvas.setPointerCapture?.(evt.pointerId);
-    evt.preventDefault(); evt.stopImmediatePropagation();
-  },true);
-  canvas.addEventListener('pointermove',evt=>{
-    if(!pegDrag) return;
-    const pr=pointerRay(evt); if(!pr) return;
-    const data=previewCutData[pegDrag.cutIndex]; if(!data) return;
-    const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-data.y), p=new THREE.Vector3();
-    if(!pr.raycaster.ray.intersectPlane(plane,p)) return;
-    const candidate={x:p.x,z:p.z};
-    if(!previewCandidateSafe(candidate,data.loops,data.safeRadius)) return;
-    const points=manualPegPositions.get(pegDrag.cutIndex)||[];
-    const other=points[pegDrag.pegIndex===0?1:0];
-    if(other&&Math.hypot(candidate.x-other.x,candidate.z-other.z)<data.safeRadius*2.0) return;
-    points[pegDrag.pegIndex]=candidate;
-    manualPegPositions.set(pegDrag.cutIndex,points);
-    pegDrag.handle.position.x=candidate.x; pegDrag.handle.position.z=candidate.z;
-    window.dispatchEvent(new CustomEvent('shrink:peg-position-changed',{detail:{cutIndex:pegDrag.cutIndex,pegIndex:pegDrag.pegIndex,controls:currentPegControls(pegDrag.cutIndex)}}));
-    evt.preventDefault(); evt.stopImmediatePropagation();
-  },true);
-  canvas.addEventListener('pointerup',endPegDrag,true);
-  canvas.addEventListener('pointercancel',endPegDrag,true);
-}
-
 
 let previewGroup = null;
 function clearPreview() {
@@ -461,16 +318,15 @@ function updatePreview() {
     const plane = new THREE.Mesh(geom, mat); plane.position.y = y; previewGroup.add(plane);
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color: 0x56ff9a, transparent: true, opacity: .9 }));
     edges.position.y = y + size.y * 0.0005; previewGroup.add(edges);
-    if (manualPegMode()) addManualPegHandles(model, cutIndex, y, size);
+    if ($('splitJoint')?.value !== 'flat') addPegPreviews(model, cutIndex, y);
   }
   scene.add(previewGroup);
-  installPegDrag();
   window.dispatchEvent(new CustomEvent('shrink:peg-preview-updated',{detail:{cuts:previewCutData.length}}));
   updateCutLabel();
   if (info) {
     if (n === 2) {
       const f = fractions[0];
-      info.textContent = `2 sections · cut at ${(finishedHeightMM() * f).toFixed(1)} mm (${Math.round(f * 100)}%) · green plane shows the cut.`;
+      info.textContent = `2 sections · cut at ${(finishedHeightMM() * f).toFixed(1)} mm (${Math.round(f * 100)}%) · green plane and true-size peg previews shown.`;
     } else {
       const each = finishedHeightMM() / n;
       info.textContent = `${n} sections · about ${each.toFixed(0)} mm high each · green planes show the cuts.`;
@@ -761,7 +617,7 @@ function injectUI() {
     <label id="splitMaxWrap" class="field" hidden><span>Maximum part height (mm)</span><input id="splitMaxHeight" type="number" min="20" max="500" step="5" value="80"></label>
     <div id="splitCutWrap" class="field split-cut-wrap" hidden><div class="range-heading"><label for="splitCutHeight">Cut height</label><output id="splitCutHeightValue">50%</output></div><input id="splitCutHeight" type="range" min="10" max="90" step="0.5" value="50"><div class="slider-ends"><span>Lower</span><span>Higher</span></div></div>
     <label class="field"><span>Joint</span><select id="splitJoint"><option value="pegs" selected>Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label>
-    <label id="splitPegPositionWrap" class="field"><span>Peg position</span><select id="splitPegPosition"><option value="auto" selected>Auto — safest position</option><option value="manual">Manual — drag pegs in viewer</option></select></label>
+    <label id="splitPegPositionWrap" class="field"><span>Peg position</span><select id="splitPegPosition"><option value="auto" selected>Auto — safest position</option><option value="manual">Manual — position with sliders</option></select></label>
     <button id="splitPegReset" class="button ghost small" type="button" hidden>Reset peg positions</button>
     <div id="splitPegSettings" class="field-grid split-peg-grid"><label class="field"><span>Peg Ø (mm)</span><input id="pegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label class="field"><span>Depth (mm)</span><input id="pegDepth" type="number" min="2" max="30" step="0.5" value="6"></label></div>
     <label id="splitClearanceWrap" class="field"><span>Socket clearance (mm)</span><input id="pegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><div id="splitInfo" class="hint">Off — export one STL.</div>`;
