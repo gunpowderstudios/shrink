@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.66 — true-size split pegs use X-ray preview so the whole cylinder stays visible through the model.
+// SHRINK 3D v2.67 — manual split pegs can be positioned smoothly with constrained left/right and forward/back axis sliders.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -154,6 +154,78 @@ function manualPointsForCut(cutIndex, loops, safeRadius) {
   return points;
 }
 
+function loopBoundsXZ(loops) {
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  for(const loop of loops||[]) for(const q of loop){
+    minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);
+    minZ=Math.min(minZ,q.z);maxZ=Math.max(maxZ,q.z);
+  }
+  return {minX,maxX,minZ,maxZ};
+}
+
+function axisPercent(value,min,max) {
+  if(!Number.isFinite(value)||!Number.isFinite(min)||!Number.isFinite(max)||max<=min) return 50;
+  return Math.max(0,Math.min(100,100*(value-min)/(max-min)));
+}
+
+function currentPegControls(cutIndex=0) {
+  const data=previewCutData[cutIndex];
+  const points=manualPegPositions.get(cutIndex)||[];
+  if(!data) return null;
+  const b=loopBoundsXZ(data.loops);
+  return {
+    cutIndex,
+    count:points.length,
+    pegs:points.map((p,i)=>({
+      index:i,
+      leftRight:axisPercent(p.x,b.minX,b.maxX),
+      backForward:axisPercent(p.z,b.minZ,b.maxZ)
+    }))
+  };
+}
+
+function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
+  const data=previewCutData[cutIndex];
+  const points=manualPegPositions.get(cutIndex)||[];
+  const current=points[pegIndex];
+  if(!data||!current) return currentPegControls(cutIndex);
+
+  const b=loopBoundsXZ(data.loops);
+  const min=axis==='x'?b.minX:b.minZ, max=axis==='x'?b.maxX:b.maxZ;
+  if(!Number.isFinite(min)||!Number.isFinite(max)||max<=min) return currentPegControls(cutIndex);
+
+  const desired=min+(max-min)*Math.max(0,Math.min(100,Number(percent)||0))/100;
+  const start=axis==='x'?current.x:current.z;
+  const other=points[pegIndex===0?1:0];
+  const safe=c=>{
+    if(!previewCandidateSafe(c,data.loops,data.safeRadius)) return false;
+    return !other || Math.hypot(c.x-other.x,c.z-other.z)>=data.safeRadius*2.0;
+  };
+
+  // Travel continuously from the current safe point towards the requested position.
+  // Once an unsafe boundary is hit, stop there rather than jumping to another island.
+  let best={x:current.x,z:current.z};
+  const steps=120;
+  for(let i=1;i<=steps;i++){
+    const v=start+(desired-start)*i/steps;
+    const candidate=axis==='x'?{x:v,z:current.z}:{x:current.x,z:v};
+    if(!safe(candidate)) break;
+    best=candidate;
+  }
+  points[pegIndex]=best;
+  manualPegPositions.set(cutIndex,points);
+
+  // Move the existing gizmo immediately, then rebuild once so all slider/bounds data stays current.
+  if(previewGroup){
+    const gizmos=previewGroup.children.filter(o=>o.userData?.shrinkPegGizmo);
+    const target=gizmos.find(o=>o.userData.cutIndex===cutIndex&&o.userData.pegIndex===pegIndex);
+    if(target){target.position.x=best.x;target.position.z=best.z;}
+  }
+  window.dispatchEvent(new CustomEvent('shrink:peg-position-changed',{detail:{cutIndex,pegIndex,controls:currentPegControls(cutIndex)}}));
+  return currentPegControls(cutIndex);
+}
+
+
 function setPegHandleState(group, state='idle') {
   if(!group) return;
   const scale = state === 'drag' ? 1.14 : state === 'hover' ? 1.08 : 1;
@@ -175,6 +247,8 @@ function makePegHandle(cutIndex, pegIndex, point, y, pegRadius, pegDepth, marker
   group.position.set(point.x,y,point.z);
   group.renderOrder=1000;
   group.userData.shrinkPegGizmo=true;
+  group.userData.cutIndex=cutIndex;
+  group.userData.pegIndex=pegIndex;
 
   const color=pegIndex===0?0xffb13b:0x55d9ff;
 
@@ -343,6 +417,7 @@ function installPegDrag() {
     points[pegDrag.pegIndex]=candidate;
     manualPegPositions.set(pegDrag.cutIndex,points);
     pegDrag.handle.position.x=candidate.x; pegDrag.handle.position.z=candidate.z;
+    window.dispatchEvent(new CustomEvent('shrink:peg-position-changed',{detail:{cutIndex:pegDrag.cutIndex,pegIndex:pegDrag.pegIndex,controls:currentPegControls(pegDrag.cutIndex)}}));
     evt.preventDefault(); evt.stopImmediatePropagation();
   },true);
   canvas.addEventListener('pointerup',endPegDrag,true);
@@ -390,6 +465,7 @@ function updatePreview() {
   }
   scene.add(previewGroup);
   installPegDrag();
+  window.dispatchEvent(new CustomEvent('shrink:peg-preview-updated',{detail:{cuts:previewCutData.length}}));
   updateCutLabel();
   if (info) {
     if (n === 2) {
@@ -715,6 +791,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 window.__shrinkSplit = {
   updatePreview, partCount, cutFractions,
   resetManualPegPositions: clearManualPegPositions,
+  getManualPegControls: currentPegControls,
+  moveManualPegAxis: manualPegAxisMove,
+  cutCount() { return previewCutData.length; },
   manualPegPoints() {
     const n=partCount(), out=[];
     for(let i=0;i<Math.max(0,n-1);i++) out.push((manualPegPositions.get(i)||[]).map(p=>({x:p.x,z:p.z})));
