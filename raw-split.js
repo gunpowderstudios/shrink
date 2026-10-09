@@ -1,6 +1,6 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
-// SHRINK 3D v2.55 — direct triangle-mesh splitter used when solid/Boolean splitting cannot read the source (handles inside-out input and cuts through vertices).
+// SHRINK 3D v2.63 — direct fallback splitter with support for manual peg positions.
 // Supports exact cut fractions from the Split UI and optional peg/socket joints.
 const EPS = 1e-7;
 
@@ -93,10 +93,22 @@ function addSocketDown(arr,x,z,y,r,depth,segments=28){
   for(let i=0;i<segments;i++){const j=(i+1)%segments;pushTri(arr,mouth[i],mouth[j],floor[j]);pushTri(arr,mouth[i],floor[j],floor[i]);}
   const center={x,y:y-depth,z};for(let i=0;i<segments;i++){const j=(i+1)%segments;pushTri(arr,center,floor[i],floor[j]);}
 }
-function choosePegPoints(loop,radius,clearance){
-  if(!loop?.length)return[];let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;for(const p of loop){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z);}
-  const cx=(minX+maxX)/2,cz=(minZ+maxZ)/2,dx=(maxX-minX)*.22,dz=(maxZ-minZ)*.22,candidates=[[cx,cz],[cx-dx,cz],[cx+dx,cz],[cx,cz-dz],[cx,cz+dz],[cx-dx,cz-dz],[cx+dx,cz+dz],[cx-dx,cz+dz],[cx+dx,cz-dz]],margin=(radius+clearance)*1.35;
-  const good=candidates.filter(([x,z])=>pointInPolyXZ(x,z,loop)&&boundaryDistance(x,z,loop)>=margin).map(([x,z])=>({x,z}));if(!good.length)return[];const first=good[0],second=good.slice(1).sort((a,b)=>((b.x-first.x)**2+(b.z-first.z)**2)-((a.x-first.x)**2+(a.z-first.z)**2))[0];return second?[first,second]:[first];
+function choosePegPoints(loop,radius,clearance,preferred=null){
+  if(!loop?.length)return[];
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  for(const p of loop){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z);}
+  const margin=(radius+clearance)*1.35;
+  let candidates;
+  if(Array.isArray(preferred)&&preferred.length) candidates=preferred.map(p=>[p.x,p.z]);
+  else {
+    const cx=(minX+maxX)/2,cz=(minZ+maxZ)/2,dx=(maxX-minX)*.22,dz=(maxZ-minZ)*.22;
+    candidates=[[cx,cz],[cx-dx,cz],[cx+dx,cz],[cx,cz-dz],[cx,cz+dz],[cx-dx,cz-dz],[cx+dx,cz+dz],[cx-dx,cz+dz],[cx+dx,cz-dz]];
+  }
+  const good=candidates.filter(([x,z])=>pointInPolyXZ(x,z,loop)&&boundaryDistance(x,z,loop)>=margin).map(([x,z])=>({x,z}));
+  if(!good.length)return[];
+  if(Array.isArray(preferred)&&preferred.length)return good.slice(0,2);
+  const first=good[0],second=good.slice(1).sort((a,b)=>((b.x-first.x)**2+(b.z-first.z)**2)-((a.x-first.x)**2+(a.z-first.z)**2))[0];
+  return second?[first,second]:[first];
 }
 function geometryFromPositions(values){if(!values.length)return null;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(values,3));g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g;}
 
@@ -111,7 +123,7 @@ export function splitModelFlat(model,sections=2,options={}){
   const onVertex=y=>{const lim=Math.max(EPS*10,span*1e-6);for(const t of tris)for(const p of t)if(Math.abs(p.y-y)<=lim)return true;return false;};
   cuts=cuts.map(y=>{let c=y,n=0;while(onVertex(c)&&n++<5)c+=span*2e-4;return c;});
   const withPegs=!!options.withPegs,radius=Math.max(EPS,Number(options.pegRadius)||0),depth=Math.max(EPS,Number(options.pegDepth)||0),clearance=Math.max(0,Number(options.clearance)||0);
-  const cutData=cuts.map(y=>{const segs=[];for(const tri of tris){const s=planeSegment(tri,y);if(s)segs.push(s);}const loops=stitchLoops(segs,tol),closed=loops.filter(l=>l.closed).sort((a,b)=>Math.abs(areaXZ(b.points))-Math.abs(areaXZ(a.points))),outer=closed[0]?.points||null,points=withPegs&&outer?choosePegPoints(outer,radius,clearance):[];return{y,loops,outer,points,pegsSafe:!!outer&&points.length>0};});
+  const cutData=cuts.map((y,ci)=>{const segs=[];for(const tri of tris){const s=planeSegment(tri,y);if(s)segs.push(s);}const loops=stitchLoops(segs,tol),closed=loops.filter(l=>l.closed).sort((a,b)=>Math.abs(areaXZ(b.points))-Math.abs(areaXZ(a.points))),outer=closed[0]?.points||null,preferred=options.manualPegPoints?.[ci]||null,points=withPegs&&outer?choosePegPoints(outer,radius,clearance,preferred):[];return{y,loops,outer,points,pegsSafe:!!outer&&points.length>0};});
   const result=[];
   for(let part=0;part<sections;part++){
     const low=part===0?-Infinity:cuts[part-1],high=part===sections-1?Infinity:cuts[part],positions=[];
