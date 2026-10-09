@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.60 — split tall print models; peg/socket centres are chosen from the actual cut cross-section and kept safely inside it.
+// SHRINK 3D v2.63 — safe auto peg placement plus draggable manual peg positioning on the cut plane.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -37,6 +37,207 @@ function cutFractions(n = partCount()) {
 }
 
 function boundsFor(model) { return new THREE.Box3().setFromObject(model); }
+const manualPegPositions = new Map(); // cut index -> [{x,z}, ...]
+let previewCutData = [];
+let pegDrag = null;
+let pegDragInstalled = false;
+
+function pegPositionMode() { return $('splitPegPosition')?.value || 'auto'; }
+function manualPegMode() { return pegPositionMode() === 'manual' && $('splitJoint')?.value !== 'flat'; }
+function clearManualPegPositions() { manualPegPositions.clear(); updatePreview(); }
+
+function pegSizing() {
+  const scale = mmPerUnit();
+  const radius = Math.max(.5, Number($('pegDiameter')?.value || 4) / 2) / scale;
+  const clearance = Math.max(.05, Number($('pegClearance')?.value || .2)) / scale;
+  const safetyWall = 0.6 / Math.max(scale, 1e-9);
+  return { radius, clearance, safeRadius: radius + clearance + safetyWall };
+}
+
+function cutLoopsFromModel(model, y) {
+  if (!model) return [];
+  model.updateMatrixWorld(true);
+  const box = boundsFor(model), diag = Math.max(box.getSize(new THREE.Vector3()).length(), 1e-6);
+  const tol = Math.max(diag * 1e-6, 1e-7);
+  const segments = [];
+  const a=new THREE.Vector3(), b=new THREE.Vector3(), c=new THREE.Vector3();
+  const intersect=(p,q)=>{
+    const dy=q.y-p.y, t=Math.abs(dy)<1e-20?0:(y-p.y)/dy;
+    return {x:p.x+(q.x-p.x)*t,y,z:p.z+(q.z-p.z)*t};
+  };
+  model.traverse(o=>{
+    if(!o.isMesh || !o.geometry?.attributes?.position) return;
+    const g=o.geometry,pos=g.attributes.position,idx=g.index,count=idx?idx.count:pos.count;
+    for(let i=0;i+2<count;i+=3){
+      const ids=[idx?idx.getX(i):i,idx?idx.getX(i+1):i+1,idx?idx.getX(i+2):i+2];
+      a.fromBufferAttribute(pos,ids[0]).applyMatrix4(o.matrixWorld);
+      b.fromBufferAttribute(pos,ids[1]).applyMatrix4(o.matrixWorld);
+      c.fromBufferAttribute(pos,ids[2]).applyMatrix4(o.matrixWorld);
+      const tri=[a.clone(),b.clone(),c.clone()], hits=[];
+      for(let e=0;e<3;e++){
+        const p=tri[e],q=tri[(e+1)%3],dp=p.y-y,dq=q.y-y;
+        if(Math.abs(dp)<=tol && Math.abs(dq)<=tol) continue;
+        if((dp < -tol && dq > tol)||(dp > tol && dq < -tol)) hits.push(intersect(p,q));
+        else if(Math.abs(dp)<=tol) hits.push({x:p.x,y,z:p.z});
+      }
+      const unique=[];
+      for(const h of hits) if(!unique.some(v=>Math.hypot(v.x-h.x,v.z-h.z)<=tol)) unique.push(h);
+      if(unique.length>=2) segments.push([unique[0],unique[1]]);
+    }
+  });
+  const key=q=>`${Math.round(q.x/tol)},${Math.round(q.z/tol)}`;
+  const entries=segments.map((seg,i)=>({i,a:seg[0],b:seg[1],used:false})), byKey=new Map();
+  const add=(k,i)=>{let list=byKey.get(k);if(!list)byKey.set(k,list=[]);list.push(i);};
+  entries.forEach((e,i)=>{add(key(e.a),i);add(key(e.b),i);});
+  const loops=[];
+  for(let seed=0;seed<entries.length;seed++){
+    if(entries[seed].used) continue;
+    const e=entries[seed]; e.used=true;
+    const loop=[e.a,e.b]; let current=e.b,closed=false,guard=0;
+    while(guard++<entries.length+4){
+      const k=key(current),ids=byKey.get(k)||[]; let next=null;
+      for(const id of ids) if(!entries[id].used){next=entries[id];break;}
+      if(!next) break;
+      next.used=true; current=key(next.a)===k?next.b:next.a;
+      if(Math.hypot(current.x-loop[0].x,current.z-loop[0].z)<=tol*1.5){closed=true;break;}
+      loop.push(current);
+    }
+    if(closed&&loop.length>=3) loops.push(loop);
+  }
+  return loops;
+}
+
+function previewCandidateSafe(point, loops, safeRadius) {
+  return !!point && materialAtCut(point.x, point.z, loops) && boundaryDistanceXZ(point.x, point.z, loops) >= safeRadius;
+}
+
+function previewAutoPegPoints(loops, safeRadius) {
+  if(!loops.length) return [];
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  for(const loop of loops) for(const q of loop){
+    minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minZ=Math.min(minZ,q.z);maxZ=Math.max(maxZ,q.z);
+  }
+  const width=maxX-minX, depth=maxZ-minZ;
+  if(!(width>safeRadius*2 && depth>safeRadius*2)) return [];
+  const candidates=[], steps=19;
+  for(let iz=1;iz<steps;iz++) for(let ix=1;ix<steps;ix++){
+    const x=minX+width*ix/steps,z=minZ+depth*iz/steps;
+    if(!materialAtCut(x,z,loops)) continue;
+    const edge=boundaryDistanceXZ(x,z,loops);
+    if(edge>=safeRadius) candidates.push({x,z,edge});
+  }
+  for(const loop of loops){
+    const x=loop.reduce((n,q)=>n+q.x,0)/loop.length,z=loop.reduce((n,q)=>n+q.z,0)/loop.length;
+    const edge=boundaryDistanceXZ(x,z,loops);
+    if(materialAtCut(x,z,loops)&&edge>=safeRadius) candidates.push({x,z,edge});
+  }
+  if(!candidates.length) return [];
+  candidates.sort((a,b)=>b.edge-a.edge);
+  const first=candidates[0];
+  const minSep=safeRadius*2.2;
+  const second=candidates.filter(c=>c!==first&&Math.hypot(c.x-first.x,c.z-first.z)>=minSep)
+    .sort((a,b)=>(Math.hypot(b.x-first.x,b.z-first.z)+b.edge)-(Math.hypot(a.x-first.x,a.z-first.z)+a.edge))[0];
+  return second?[{x:first.x,z:first.z},{x:second.x,z:second.z}]:[{x:first.x,z:first.z}];
+}
+
+function manualPointsForCut(cutIndex, loops, safeRadius) {
+  const auto=previewAutoPegPoints(loops,safeRadius);
+  let points=(manualPegPositions.get(cutIndex)||[]).filter(p=>previewCandidateSafe(p,loops,safeRadius));
+  const minSep=safeRadius*2.0;
+  for(const p of auto){
+    if(points.length>=2) break;
+    if(points.every(q=>Math.hypot(p.x-q.x,p.z-q.z)>=minSep)) points.push({x:p.x,z:p.z});
+  }
+  points=points.slice(0,2);
+  manualPegPositions.set(cutIndex,points);
+  return points;
+}
+
+function makePegHandle(cutIndex, pegIndex, point, y, markerRadius) {
+  const group=new THREE.Group();
+  group.position.set(point.x,y,point.z);
+  group.renderOrder=1000;
+  const ring=new THREE.Mesh(
+    new THREE.TorusGeometry(markerRadius,markerRadius*.22,10,32),
+    new THREE.MeshBasicMaterial({color:pegIndex===0?0xffb13b:0x55d9ff,depthTest:false,transparent:true,opacity:.98})
+  );
+  ring.rotation.x=Math.PI/2;
+  const hit=new THREE.Mesh(
+    new THREE.CylinderGeometry(markerRadius*1.45,markerRadius*1.45,markerRadius*.5,20),
+    new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})
+  );
+  hit.userData.shrinkPegHandle=true;
+  hit.userData.cutIndex=cutIndex;
+  hit.userData.pegIndex=pegIndex;
+  hit.userData.handleGroup=group;
+  group.add(ring,hit);
+  previewGroup.add(group);
+  return group;
+}
+
+function addManualPegHandles(model, cutIndex, y, modelSize) {
+  const loops=cutLoopsFromModel(model,y);
+  const {safeRadius}=pegSizing();
+  const points=manualPointsForCut(cutIndex,loops,safeRadius);
+  previewCutData[cutIndex]={y,loops,safeRadius,points};
+  const markerRadius=Math.max(safeRadius*.75,modelSize.length()*.008);
+  points.forEach((p,i)=>makePegHandle(cutIndex,i,p,y+Math.max(modelSize.y*0.002,markerRadius*.08),markerRadius));
+}
+
+function pointerRay(evt) {
+  const v=window.__shrinkViewer, canvas=v?.renderer?.domElement;
+  if(!v||!canvas) return null;
+  const rect=canvas.getBoundingClientRect();
+  const ndc=new THREE.Vector2(((evt.clientX-rect.left)/rect.width)*2-1,-((evt.clientY-rect.top)/rect.height)*2+1);
+  const raycaster=new THREE.Raycaster();
+  raycaster.setFromCamera(ndc,v.camera);
+  return {raycaster,canvas,v};
+}
+
+function endPegDrag(evt) {
+  if(!pegDrag) return;
+  const {canvas,v}=pegDrag;
+  try{canvas.releasePointerCapture?.(evt.pointerId);}catch{}
+  if(v?.controls) v.controls.enabled=true;
+  pegDrag=null;
+}
+
+function installPegDrag() {
+  if(pegDragInstalled) return;
+  const v=window.__shrinkViewer,canvas=v?.renderer?.domElement;
+  if(!v||!canvas) return;
+  pegDragInstalled=true;
+  canvas.addEventListener('pointerdown',evt=>{
+    if(!manualPegMode()||!previewGroup) return;
+    const pr=pointerRay(evt); if(!pr) return;
+    const hit=pr.raycaster.intersectObjects(previewGroup.children,true).find(h=>h.object?.userData?.shrinkPegHandle);
+    if(!hit) return;
+    const d=hit.object.userData;
+    pegDrag={...pr,cutIndex:d.cutIndex,pegIndex:d.pegIndex,handle:d.handleGroup};
+    if(v.controls) v.controls.enabled=false;
+    canvas.setPointerCapture?.(evt.pointerId);
+    evt.preventDefault(); evt.stopImmediatePropagation();
+  },true);
+  canvas.addEventListener('pointermove',evt=>{
+    if(!pegDrag) return;
+    const pr=pointerRay(evt); if(!pr) return;
+    const data=previewCutData[pegDrag.cutIndex]; if(!data) return;
+    const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-data.y), p=new THREE.Vector3();
+    if(!pr.raycaster.ray.intersectPlane(plane,p)) return;
+    const candidate={x:p.x,z:p.z};
+    if(!previewCandidateSafe(candidate,data.loops,data.safeRadius)) return;
+    const points=manualPegPositions.get(pegDrag.cutIndex)||[];
+    const other=points[pegDrag.pegIndex===0?1:0];
+    if(other&&Math.hypot(candidate.x-other.x,candidate.z-other.z)<data.safeRadius*2.0) return;
+    points[pegDrag.pegIndex]=candidate;
+    manualPegPositions.set(pegDrag.cutIndex,points);
+    pegDrag.handle.position.x=candidate.x; pegDrag.handle.position.z=candidate.z;
+    evt.preventDefault(); evt.stopImmediatePropagation();
+  },true);
+  canvas.addEventListener('pointerup',endPegDrag,true);
+  canvas.addEventListener('pointercancel',endPegDrag,true);
+}
+
 
 let previewGroup = null;
 function clearPreview() {
@@ -64,7 +265,9 @@ function updatePreview() {
   const box = boundsFor(model), size = box.getSize(new THREE.Vector3());
   const fractions = cutFractions(n);
   previewGroup = new THREE.Group(); previewGroup.name = 'shrink-split-preview';
-  for (const f of fractions) {
+  previewCutData = [];
+  for (let cutIndex=0; cutIndex<fractions.length; cutIndex++) {
+    const f = fractions[cutIndex];
     const y = box.min.y + size.y * f;
     const geom = new THREE.PlaneGeometry(Math.max(size.x * 1.15, .01), Math.max(size.z * 1.15, .01));
     geom.rotateX(-Math.PI / 2);
@@ -72,8 +275,10 @@ function updatePreview() {
     const plane = new THREE.Mesh(geom, mat); plane.position.y = y; previewGroup.add(plane);
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color: 0x56ff9a, transparent: true, opacity: .9 }));
     edges.position.y = y + size.y * 0.0005; previewGroup.add(edges);
+    if (manualPegMode()) addManualPegHandles(model, cutIndex, y, size);
   }
   scene.add(previewGroup);
+  installPegDrag();
   updateCutLabel();
   if (info) {
     if (n === 2) {
@@ -193,12 +398,9 @@ function cutLoopsFromSolid(solid, y, span) {
   return loops;
 }
 
-function choosePegPoints(solid, wasm, y, box, r, depth, clearance, span) {
+function choosePegPoints(solid, wasm, y, box, r, depth, clearance, span, preferred = null) {
   const loops = cutLoopsFromSolid(solid, y, span);
   if (!loops.length) return [];
-
-  // Keep the COMPLETE socket circle inside the cut face, plus a small resin wall.
-  // 0.6 mm is deliberately conservative; convert from finished-mm into model units.
   const safetyWall = 0.6 / Math.max(mmPerUnit(), 1e-9);
   const safeRadius = r + clearance + safetyWall;
 
@@ -210,63 +412,54 @@ function choosePegPoints(solid, wasm, y, box, r, depth, clearance, span) {
   const width=maxX-minX, depthZ=maxZ-minZ;
   if (!(width>safeRadius*2 && depthZ>safeRadius*2)) return [];
 
-  // Search the actual section rather than the model's overall bounding-box centre.
-  // A fairly fine grid is cheap here (only at split time) and copes with torsos, capes,
-  // limbs and multiple disconnected islands far better than nine hard-coded guesses.
-  const candidates=[];
-  const steps=17;
-  for (let iz=1;iz<steps;iz++) for (let ix=1;ix<steps;ix++) {
-    const x=minX + width*ix/steps, z=minZ + depthZ*iz/steps;
-    if (!materialAtCut(x,z,loops)) continue;
-    const edge=boundaryDistanceXZ(x,z,loops);
-    if (edge < safeRadius) continue;
-    candidates.push({x,z,edge});
-  }
-
-  // Also try polygon vertex averages; useful for narrow but valid islands that fall between grid samples.
-  for (const loop of loops) {
-    const x=loop.reduce((n,q)=>n+q.x,0)/loop.length, z=loop.reduce((n,q)=>n+q.z,0)/loop.length;
-    if (materialAtCut(x,z,loops)) {
+  let candidates=[];
+  if(Array.isArray(preferred)&&preferred.length){
+    candidates=preferred
+      .filter(p=>previewCandidateSafe(p,loops,safeRadius))
+      .map((p,i)=>({x:p.x,z:p.z,edge:boundaryDistanceXZ(p.x,p.z,loops),manualIndex:i}));
+  } else {
+    const steps=17;
+    for (let iz=1;iz<steps;iz++) for (let ix=1;ix<steps;ix++) {
+      const x=minX + width*ix/steps, z=minZ + depthZ*iz/steps;
+      if (!materialAtCut(x,z,loops)) continue;
       const edge=boundaryDistanceXZ(x,z,loops);
-      if (edge>=safeRadius) candidates.push({x,z,edge});
+      if (edge >= safeRadius) candidates.push({x,z,edge});
+    }
+    for (const loop of loops) {
+      const x=loop.reduce((n,q)=>n+q.x,0)/loop.length, z=loop.reduce((n,q)=>n+q.z,0)/loop.length;
+      if (materialAtCut(x,z,loops)) {
+        const edge=boundaryDistanceXZ(x,z,loops);
+        if (edge>=safeRadius) candidates.push({x,z,edge});
+      }
     }
   }
   if (!candidates.length) return [];
 
-  // Confirm there is real material both just below and just above the cut. For the lower
-  // half we require enough depth to carve a socket without immediately breaking through.
-  const probeH=Math.max(depth*.8, r*1.5);
-  const probeR=r+clearance;
+  const probeH=Math.max(depth*.8, r*1.5), probeR=r+clearance;
   const fullProbeVolume=Math.PI*probeR*probeR*probeH;
   const volumeIn = (x,z,baseY) => {
     let probe=null, hit=null;
-    try {
-      probe=makeYCylinder(wasm,probeH,probeR,x,baseY,z,20);
-      hit=solid.intersect(probe);
-      return hit.volume?.() || 0;
-    } catch { return 0; }
+    try { probe=makeYCylinder(wasm,probeH,probeR,x,baseY,z,20); hit=solid.intersect(probe); return hit.volume?.() || 0; }
+    catch { return 0; }
     finally { try { hit?.delete?.(); } catch {} try { probe?.delete?.(); } catch {} }
   };
-
   const scored=[];
   for (const c of candidates) {
     const below=volumeIn(c.x,c.z,y-probeH), above=volumeIn(c.x,c.z,y);
-    // Above only needs a strong attachment at the cut; below needs room for most of the socket.
-    const belowFrac=fullProbeVolume ? below/fullProbeVolume : 0;
-    const aboveFrac=fullProbeVolume ? above/fullProbeVolume : 0;
-    if (belowFrac >= .72 && aboveFrac >= .30) scored.push({...c, score:c.edge + Math.min(belowFrac,1)*safeRadius});
+    const belowFrac=fullProbeVolume ? below/fullProbeVolume : 0, aboveFrac=fullProbeVolume ? above/fullProbeVolume : 0;
+    if (belowFrac >= .72 && aboveFrac >= .30) scored.push({...c,score:c.edge + Math.min(belowFrac,1)*safeRadius});
   }
   if (!scored.length) return [];
 
+  if(Array.isArray(preferred)&&preferred.length) {
+    scored.sort((a,b)=>(a.manualIndex??0)-(b.manualIndex??0));
+    return scored.slice(0,2).map(({x,z})=>({x,z}));
+  }
+
   scored.sort((a,b)=>b.score-a.score);
-  const first=scored[0];
-
-  // Prefer a second safe point far from the first; don't cram two pegs into a small section.
-  const minSeparation=(r+clearance+safetyWall)*2.6;
-  const second=scored
-    .filter(c=>c!==first && Math.hypot(c.x-first.x,c.z-first.z)>=minSeparation)
+  const first=scored[0], minSeparation=(r+clearance+safetyWall)*2.6;
+  const second=scored.filter(c=>c!==first&&Math.hypot(c.x-first.x,c.z-first.z)>=minSeparation)
     .sort((a,b)=>(Math.hypot(b.x-first.x,b.z-first.z)+b.edge)-(Math.hypot(a.x-first.x,a.z-first.z)+a.edge))[0];
-
   return second ? [first,second] : [first];
 }
 
@@ -301,7 +494,9 @@ async function splitSolid(solid, wasm, n, withPegs, fractions = cutFractions(n))
     const eps = Math.max(clearance * .25, span*1e-5);
     parts.pegCuts = 0;
     for (let i=0;i<cuts.length;i++) {
-      const y = cuts[i], points = choosePegPoints(solid, wasm, y, box, radiusMain, depth, clearance, span);
+      const y = cuts[i];
+      const preferred = manualPegMode() ? (manualPegPositions.get(i) || null) : null;
+      const points = choosePegPoints(solid, wasm, y, box, radiusMain, depth, clearance, span, preferred);
       let added = 0;
       for (let p=0;p<Math.min(2,points.length);p++) {
         const {x,z} = points[p], r = p===0 ? radiusMain : radiusMain*.76;
@@ -379,6 +574,8 @@ function injectUI() {
     <label id="splitMaxWrap" class="field" hidden><span>Maximum part height (mm)</span><input id="splitMaxHeight" type="number" min="20" max="500" step="5" value="80"></label>
     <div id="splitCutWrap" class="field split-cut-wrap" hidden><div class="range-heading"><label for="splitCutHeight">Cut height</label><output id="splitCutHeightValue">50%</output></div><input id="splitCutHeight" type="range" min="10" max="90" step="0.5" value="50"><div class="slider-ends"><span>Lower</span><span>Higher</span></div></div>
     <label class="field"><span>Joint</span><select id="splitJoint"><option value="pegs" selected>Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label>
+    <label id="splitPegPositionWrap" class="field"><span>Peg position</span><select id="splitPegPosition"><option value="auto" selected>Auto — safest position</option><option value="manual">Manual — drag pegs in viewer</option></select></label>
+    <button id="splitPegReset" class="button ghost small" type="button" hidden>Reset peg positions</button>
     <div id="splitPegSettings" class="field-grid split-peg-grid"><label class="field"><span>Peg Ø (mm)</span><input id="pegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label class="field"><span>Depth (mm)</span><input id="pegDepth" type="number" min="2" max="30" step="0.5" value="6"></label></div>
     <label id="splitClearanceWrap" class="field"><span>Socket clearance (mm)</span><input id="pegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><div id="splitInfo" class="hint">Off — export one STL.</div>`;
   save.insertBefore(box, exportRow);
@@ -389,11 +586,14 @@ function injectUI() {
     const mode = $('splitMode').value, on = mode !== 'off', max = mode === 'max', two = mode === '2', pegs = $('splitJoint').value === 'pegs';
     $('splitMaxWrap').hidden = !max; $('splitCutWrap').hidden = !two;
     $('splitPegSettings').hidden = !on || !pegs; $('splitClearanceWrap').hidden = !on || !pegs;
+    if ($('splitPegPositionWrap')) $('splitPegPositionWrap').hidden = !on || !pegs;
+    if ($('splitPegReset')) $('splitPegReset').hidden = !on || !pegs || !manualPegMode();
     updateCutLabel(); updatePreview();
   };
-  ['splitMode','splitMaxHeight','splitCutHeight','splitJoint','pegDiameter','pegDepth','pegClearance','figureHeightMm'].forEach(id => $(id)?.addEventListener('input', sync));
-  $('splitMode')?.addEventListener('change', sync); $('splitJoint')?.addEventListener('change', sync);
-  window.addEventListener('shrink:model-opened', () => setTimeout(updatePreview, 0));
+  ['splitMode','splitMaxHeight','splitCutHeight','splitJoint','splitPegPosition','pegDiameter','pegDepth','pegClearance','figureHeightMm'].forEach(id => $(id)?.addEventListener('input', sync));
+  $('splitMode')?.addEventListener('change', sync); $('splitJoint')?.addEventListener('change', sync); $('splitPegPosition')?.addEventListener('change', sync);
+  $('splitPegReset')?.addEventListener('click', clearManualPegPositions);
+  window.addEventListener('shrink:model-opened', () => { manualPegPositions.clear(); setTimeout(updatePreview, 0); });
   window.addEventListener('shrink:live-updated', () => { if (partCount()>1) updatePreview(); });
   window.addEventListener('shrink:ui-mode', updatePreview);
   sync();
@@ -401,4 +601,12 @@ function injectUI() {
 
 function wire() { injectUI(); $('saveStlBtn')?.addEventListener('click', exportSplitSTL, true); }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, {once:true}); else wire();
-window.__shrinkSplit = { updatePreview, partCount, cutFractions };
+window.__shrinkSplit = {
+  updatePreview, partCount, cutFractions,
+  resetManualPegPositions: clearManualPegPositions,
+  manualPegPoints() {
+    const n=partCount(), out=[];
+    for(let i=0;i<Math.max(0,n-1);i++) out.push((manualPegPositions.get(i)||[]).map(p=>({x:p.x,z:p.z})));
+    return out;
+  }
+};
