@@ -1,6 +1,6 @@
-// SHRINK 3D v2.59 — detail-kept slider plus direct percentage entry.
+// SHRINK 3D v2.63 — manual draggable split-peg positioning.
 (() => {
-  const VERSION = '2.59';
+  const VERSION = '2.63';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -416,6 +416,10 @@
     if (src && select.value !== (src.value || 'off')) select.value = src.value || 'off';
     const joint = $('v2Joint');
     if (joint && $('splitJoint') && joint.value !== $('splitJoint').value) joint.value = $('splitJoint').value;
+    const pegPos = $('v2PegPosition');
+    if (pegPos && $('splitPegPosition') && pegPos.value !== $('splitPegPosition').value) pegPos.value = $('splitPegPosition').value;
+    if ($('v2PegReset')) $('v2PegReset').hidden = !pegPos || pegPos.value !== 'manual';
+    if ($('v2PegHelp')) $('v2PegHelp').hidden = !pegPos || pegPos.value !== 'manual';
     // This runs from a MutationObserver on the whole page, so it must only write when something actually changed:
     // rewriting the same text re-triggers the observer and would loop forever.
     const set = (el, prop, value) => { if (el && el[prop] !== value) el[prop] = value; };
@@ -442,6 +446,7 @@
 
   function syncAdvancedToNative() {
     setNative('splitJoint', $('v2Joint')?.value || 'pegs', 'change');
+    if ($('v2PegPosition')) setNative('splitPegPosition', $('v2PegPosition').value || 'auto', 'change');
     if ($('v2PegDiameter')) setNative('pegDiameter', $('v2PegDiameter').value, 'input');
     if ($('v2PegDepth')) setNative('pegDepth', $('v2PegDepth').value, 'input');
     if ($('v2PegClearance')) setNative('pegClearance', $('v2PegClearance').value, 'input');
@@ -535,7 +540,7 @@
               <div id="v2MaxWrap" class="v2-cut-row" hidden><div><span>Maximum part height</span><strong>mm</strong></div><input id="v2MaxHeight" type="number" min="20" max="500" step="5" value="80"></div>
               <div id="v2CutWrap" class="v2-cut-row" hidden><div><span>Cut height</span><strong id="v2CutLabel">50%</strong></div><input id="v2Cut" type="range" min="10" max="90" step="0.5" value="50"></div>
               <button id="v2DownloadBtn" class="v2-mega v2-red" type="button">DOWNLOAD IT</button>
-              <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label></div></details>
+              <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg position<select id="v2PegPosition"><option value="auto">Auto — safest position</option><option value="manual">Manual — drag pegs in viewer</option></select></label><button id="v2PegReset" class="v2-peg-reset" type="button" hidden>RESET PEG POSITIONS</button><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label><p id="v2PegHelp" class="v2-peg-help" hidden>Drag the coloured peg markers left/right or forward/back across the green cut plane. Unsafe positions are blocked.</p></div></details>
             </section>
           </div>
         </div>
@@ -576,6 +581,13 @@
     $('v2ShrinkBtn').addEventListener('click', shrinkModel);
     $('v2SplitMode').addEventListener('change', chooseSplit);
     $('v2Joint').addEventListener('change', syncAdvancedToNative);
+    $('v2PegPosition').addEventListener('change', () => {
+      syncAdvancedToNative();
+      const manual=$('v2PegPosition').value==='manual';
+      $('v2PegReset').hidden=!manual; $('v2PegHelp').hidden=!manual;
+      window.__shrinkSplit?.updatePreview?.();
+    });
+    $('v2PegReset').addEventListener('click', () => window.__shrinkSplit?.resetManualPegPositions?.());
     $('v2Cut').addEventListener('input', () => { $('v2CutLabel').textContent = `${$('v2Cut').value}%`; setNative('splitCutHeight', $('v2Cut').value, 'input'); });
     $('v2MaxHeight').addEventListener('input', () => setNative('splitMaxHeight', Math.max(20, Number($('v2MaxHeight').value) || 80), 'input'));
     ['v2PegDiameter','v2PegDepth','v2PegClearance'].forEach(id => $(id).addEventListener('input', syncAdvancedToNative));
