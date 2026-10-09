@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.63 — safe auto peg placement plus draggable manual peg positioning on the cut plane.
+// SHRINK 3D v2.64 — draggable split pegs with larger vertical grab handles and hover/drag feedback.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -153,24 +153,61 @@ function manualPointsForCut(cutIndex, loops, safeRadius) {
   return points;
 }
 
+function setPegHandleState(group, state='idle') {
+  if(!group) return;
+  const scale = state === 'drag' ? 1.14 : state === 'hover' ? 1.08 : 1;
+  group.scale.setScalar(scale);
+  const glow = state !== 'idle';
+  group.traverse(o=>{
+    if(!o.isMesh || !o.material || o.userData?.shrinkPegHit) return;
+    if('opacity' in o.material) o.material.opacity = glow ? 1 : (o.userData?.baseOpacity ?? .98);
+  });
+}
+
 function makePegHandle(cutIndex, pegIndex, point, y, markerRadius) {
   const group=new THREE.Group();
   group.position.set(point.x,y,point.z);
   group.renderOrder=1000;
+  group.userData.shrinkPegGizmo=true;
+
+  const color=pegIndex===0?0xffb13b:0x55d9ff;
+  const ringMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.95});
   const ring=new THREE.Mesh(
     new THREE.TorusGeometry(markerRadius,markerRadius*.22,10,32),
-    new THREE.MeshBasicMaterial({color:pegIndex===0?0xffb13b:0x55d9ff,depthTest:false,transparent:true,opacity:.98})
+    ringMat
   );
+  ring.userData.baseOpacity=.95;
   ring.rotation.x=Math.PI/2;
-  const hit=new THREE.Mesh(
-    new THREE.CylinderGeometry(markerRadius*1.45,markerRadius*1.45,markerRadius*.5,20),
-    new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})
+
+  const stemHeight=markerRadius*2.7;
+  const stemMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.92});
+  const stem=new THREE.Mesh(
+    new THREE.CylinderGeometry(markerRadius*.20,markerRadius*.20,stemHeight,14),
+    stemMat
   );
+  stem.userData.baseOpacity=.92;
+  stem.position.y=stemHeight*.5;
+
+  const capMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.98});
+  const cap=new THREE.Mesh(
+    new THREE.SphereGeometry(markerRadius*.62,18,12),
+    capMat
+  );
+  cap.userData.baseOpacity=.98;
+  cap.position.y=stemHeight;
+
+  const hit=new THREE.Mesh(
+    new THREE.CylinderGeometry(markerRadius*1.75,markerRadius*1.75,stemHeight+markerRadius*1.8,20),
+    new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,depthTest:false})
+  );
+  hit.position.y=(stemHeight+markerRadius*.9)*.5;
+  hit.userData.shrinkPegHit=true;
   hit.userData.shrinkPegHandle=true;
   hit.userData.cutIndex=cutIndex;
   hit.userData.pegIndex=pegIndex;
   hit.userData.handleGroup=group;
-  group.add(ring,hit);
+
+  group.add(ring,stem,cap,hit);
   previewGroup.add(group);
   return group;
 }
@@ -196,9 +233,11 @@ function pointerRay(evt) {
 
 function endPegDrag(evt) {
   if(!pegDrag) return;
-  const {canvas,v}=pegDrag;
+  const {canvas,v,handle}=pegDrag;
   try{canvas.releasePointerCapture?.(evt.pointerId);}catch{}
   if(v?.controls) v.controls.enabled=true;
+  setPegHandleState(handle,'hover');
+  canvas.style.cursor='grab';
   pegDrag=null;
 }
 
@@ -207,6 +246,25 @@ function installPegDrag() {
   const v=window.__shrinkViewer,canvas=v?.renderer?.domElement;
   if(!v||!canvas) return;
   pegDragInstalled=true;
+  let hovered=null;
+
+  const updateHover=evt=>{
+    if(pegDrag || !manualPegMode() || !previewGroup) {
+      if(hovered){ setPegHandleState(hovered,'idle'); hovered=null; }
+      if(!pegDrag) canvas.style.cursor='';
+      return;
+    }
+    const pr=pointerRay(evt); if(!pr) return;
+    const hit=pr.raycaster.intersectObjects(previewGroup.children,true).find(h=>h.object?.userData?.shrinkPegHandle);
+    const next=hit?.object?.userData?.handleGroup||null;
+    if(next!==hovered){
+      if(hovered) setPegHandleState(hovered,'idle');
+      hovered=next;
+      if(hovered) setPegHandleState(hovered,'hover');
+    }
+    canvas.style.cursor=hovered?'grab':'';
+  };
+  canvas.addEventListener('pointermove',updateHover);
   canvas.addEventListener('pointerdown',evt=>{
     if(!manualPegMode()||!previewGroup) return;
     const pr=pointerRay(evt); if(!pr) return;
@@ -214,6 +272,10 @@ function installPegDrag() {
     if(!hit) return;
     const d=hit.object.userData;
     pegDrag={...pr,cutIndex:d.cutIndex,pegIndex:d.pegIndex,handle:d.handleGroup};
+    if(hovered && hovered!==pegDrag.handle) setPegHandleState(hovered,'idle');
+    hovered=pegDrag.handle;
+    setPegHandleState(pegDrag.handle,'drag');
+    canvas.style.cursor='grabbing';
     if(v.controls) v.controls.enabled=false;
     canvas.setPointerCapture?.(evt.pointerId);
     evt.preventDefault(); evt.stopImmediatePropagation();
