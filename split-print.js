@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.65 — manual splitter previews the real exported peg cylinder plus a separate grab handle.
+// SHRINK 3D v2.66 — true-size split pegs use X-ray preview so the whole cylinder stays visible through the model.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -160,8 +160,8 @@ function setPegHandleState(group, state='idle') {
   const glow = state !== 'idle';
   group.children.forEach(o=>{
     if(!o.isMesh) return;
-    // The first child is the true-size peg preview: never scale it.
-    if(o.position.y < 0) o.scale.setScalar(1);
+    // True-size peg preview and outline must never scale on hover/drag.
+    if(o.userData?.truePegPreview || o.position.y < 0) o.scale.setScalar(1);
     else o.scale.setScalar(scale);
   });
   group.traverse(o=>{
@@ -179,22 +179,41 @@ function makePegHandle(cutIndex, pegIndex, point, y, pegRadius, pegDepth, marker
   const color=pegIndex===0?0xffb13b:0x55d9ff;
 
   // The cylinder below the green cut plane is the ACTUAL male peg that will be
-  // exported on the upper section: same radius and same depth. It uses normal
-  // depth testing, so the part buried inside the model disappears behind the
-  // model surface; anything poking outside remains visible.
+  // exported on the upper section: same radius and same depth. Render it X-ray
+  // style so the full peg remains visible through the model while positioning.
   const pegMat=new THREE.MeshBasicMaterial({
     color,
     transparent:true,
-    opacity:.78,
-    depthTest:true,
-    depthWrite:false
+    opacity:.42,
+    depthTest:false,
+    depthWrite:false,
+    side:THREE.DoubleSide
   });
   const actualPeg=new THREE.Mesh(
     new THREE.CylinderGeometry(pegRadius,pegRadius,pegDepth,28,false),
     pegMat
   );
-  actualPeg.userData.baseOpacity=.78;
+  actualPeg.renderOrder=1002;
+  actualPeg.userData.baseOpacity=.42;
+  actualPeg.userData.truePegPreview=true;
   actualPeg.position.y=-pegDepth*.5;
+
+  // Thin bright outline makes the complete cylinder easy to read against pale models.
+  const pegOutline=new THREE.Mesh(
+    new THREE.CylinderGeometry(pegRadius*1.015,pegRadius*1.015,pegDepth*1.005,28,true),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent:true,
+      opacity:.92,
+      depthTest:false,
+      depthWrite:false,
+      wireframe:true
+    })
+  );
+  pegOutline.renderOrder=1003;
+  pegOutline.userData.baseOpacity=.92;
+  pegOutline.userData.truePegPreview=true;
+  pegOutline.position.y=-pegDepth*.5;
 
   // Exact footprint at the cut plane.
   const ringMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.98});
@@ -234,7 +253,7 @@ function makePegHandle(cutIndex, pegIndex, point, y, pegRadius, pegDepth, marker
   hit.userData.pegIndex=pegIndex;
   hit.userData.handleGroup=group;
 
-  group.add(actualPeg,ring,stem,cap,hit);
+  group.add(actualPeg,pegOutline,ring,stem,cap,hit);
   previewGroup.add(group);
   return group;
 }
