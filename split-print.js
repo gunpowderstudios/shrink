@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.68 — show true-size peg previews in Auto and Manual; manual positioning is slider-only.
+// SHRINK 3D v2.69 — true-size peg previews colour any exposed/outside areas pink.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -217,15 +217,73 @@ function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
   if(previewGroup){
     const pegs=previewGroup.children.filter(o=>o.userData?.shrinkPegPreview);
     const target=pegs.find(o=>o.userData.cutIndex===cutIndex&&o.userData.pegIndex===pegIndex);
-    if(target){target.position.x=best.x;target.position.z=best.z;}
+    if(target){
+      target.position.x=best.x;target.position.z=best.z;
+      colourPegExposure(target,sourceModel());
+    }
   }
   window.dispatchEvent(new CustomEvent('shrink:peg-position-changed',{detail:{cutIndex,pegIndex,controls:currentPegControls(cutIndex)}}));
   return currentPegControls(cutIndex);
 }
 
 
+const PINK = new THREE.Color(0xff3f7f);
+const PEG1 = new THREE.Color(0xffb13b);
+const PEG2 = new THREE.Color(0x55d9ff);
+const insideDirs = [
+  new THREE.Vector3(1,.173,.319).normalize(),
+  new THREE.Vector3(-.271,.941,.207).normalize(),
+  new THREE.Vector3(.193,.287,-.938).normalize()
+];
+
+function pointInsideModel(point, model) {
+  if(!model) return false;
+  let insideVotes=0;
+  const raycaster=new THREE.Raycaster();
+  raycaster.firstHitOnly=false;
+  for(const dir of insideDirs){
+    const origin=point.clone().addScaledVector(dir,1e-7);
+    raycaster.set(origin,dir);
+    const hits=raycaster.intersectObject(model,true)
+      .filter(h=>Number.isFinite(h.distance)&&h.distance>1e-6)
+      .sort((a,b)=>a.distance-b.distance);
+    let unique=0,last=-Infinity;
+    for(const h of hits){
+      if(Math.abs(h.distance-last)>1e-5){unique++;last=h.distance;}
+    }
+    if(unique%2===1) insideVotes++;
+  }
+  return insideVotes>=2;
+}
+
+function colourPegExposure(group, model) {
+  if(!group||!model) return;
+  group.updateMatrixWorld(true);
+  const world=new THREE.Vector3();
+  for(const mesh of group.children){
+    if(!mesh.isMesh||!mesh.userData?.truePegPreview||!mesh.geometry?.attributes?.position) continue;
+    const pos=mesh.geometry.attributes.position;
+    let colorAttr=mesh.geometry.getAttribute('color');
+    if(!colorAttr||colorAttr.count!==pos.count){
+      colorAttr=new THREE.BufferAttribute(new Float32Array(pos.count*3),3);
+      mesh.geometry.setAttribute('color',colorAttr);
+    }
+    const base=mesh.userData.basePegColor||PEG1;
+    for(let i=0;i<pos.count;i++){
+      world.fromBufferAttribute(pos,i).applyMatrix4(mesh.matrixWorld);
+      const c=pointInsideModel(world,model)?base:PINK;
+      colorAttr.setXYZ(i,c.r,c.g,c.b);
+    }
+    colorAttr.needsUpdate=true;
+    mesh.material.vertexColors=true;
+    mesh.material.color.set(0xffffff);
+    mesh.material.needsUpdate=true;
+  }
+}
+
 function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
-  const color=pegIndex===0?0xffb13b:0x55d9ff;
+  const colorHex=pegIndex===0?0xffb13b:0x55d9ff;
+  const baseColor=pegIndex===0?PEG1:PEG2;
   const group=new THREE.Group();
   group.position.set(point.x,y,point.z);
   group.renderOrder=1000;
@@ -238,7 +296,8 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
   const peg=new THREE.Mesh(
     new THREE.CylinderGeometry(pegRadius,pegRadius,pegDepth,28,false),
     new THREE.MeshBasicMaterial({
-      color,
+      color:0xffffff,
+      vertexColors:true,
       transparent:true,
       opacity:.44,
       depthTest:false,
@@ -247,13 +306,16 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
     })
   );
   peg.renderOrder=1002;
+  peg.userData.truePegPreview=true;
+  peg.userData.basePegColor=baseColor;
   peg.position.y=-pegDepth*.5;
 
   // A fine edge overlay is part of the peg preview itself, not a control handle.
   const outline=new THREE.Mesh(
     new THREE.CylinderGeometry(pegRadius*1.012,pegRadius*1.012,pegDepth*1.004,28,true),
     new THREE.MeshBasicMaterial({
-      color,
+      color:0xffffff,
+      vertexColors:true,
       transparent:true,
       opacity:.9,
       depthTest:false,
@@ -262,10 +324,13 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
     })
   );
   outline.renderOrder=1003;
+  outline.userData.truePegPreview=true;
+  outline.userData.basePegColor=baseColor;
   outline.position.y=-pegDepth*.5;
 
   group.add(peg,outline);
   previewGroup.add(group);
+  colourPegExposure(group,sourceModel());
   return group;
 }
 
