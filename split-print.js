@@ -2,8 +2,11 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.71 — peg report (green/amber/red per peg), worst-depth auto placement, Find best cut, export uses the pegs shown.
+// SHRINK 3D v2.72 — automatic best cut (non-blocking), single-pass slicer, peg report (green/amber/red), export uses the pegs shown.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
+// If this file is ever loaded twice (two cache keys), only the first copy may wire the page: a second copy would add a
+// second download handler and replace the API with one that has no preview data.
+const DUPLICATE_LOAD = !!window.__shrinkSplitLoaded; window.__shrinkSplitLoaded = true;
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 const say = (msg, error = false) => app()?.setStatus?.(msg, error);
@@ -39,6 +42,7 @@ function cutFractions(n = partCount()) {
 function boundsFor(model) { return new THREE.Box3().setFromObject(model); }
 const manualPegPositions = new Map(); // cut index -> [{x,z}, ...]
 let previewCutData = [];
+let autoCut = true, settingCut = false, autoSig = '', autoTimer = null, bestRun = 0;
 
 function pegPositionMode() { return $('splitPegPosition')?.value || 'auto'; }
 function manualPegMode() { return pegPositionMode() === 'manual' && $('splitJoint')?.value !== 'flat'; }
@@ -80,36 +84,59 @@ function linkLoops(segments, tol) {
 // Slice a hair higher or lower instead (0.02% of the height) so the outline is always clean.
 const CUT_NUDGES = [0, 1, -1, 2.5, -2.5];
 
-function cutLoopsFromModel(model, y) {
-  if (!model) return [];
+// One pass over the mesh puts every triangle (in world space) into height bins, so each cross-section afterwards only
+// looks at the few triangles near that height. Without this, every cross-section re-walked the whole mesh.
+function buildSlicer(model) {
   model.updateMatrixWorld(true);
-  const box = boundsFor(model), size = box.getSize(new THREE.Vector3());
-  const diag = Math.max(size.length(), 1e-6), tol = Math.max(diag * 1e-6, 1e-7), nudge = Math.max(size.y * 2e-4, tol * 50);
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  let n = 0;
+  model.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) { const g = o.geometry; n += Math.floor((g.index ? g.index.count : g.attributes.position.count) / 3); } });
+  const tri = new Float32Array(n * 9), v = new THREE.Vector3();
+  let t = 0, minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  model.traverse(o => {
+    if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    const g = o.geometry, pos = g.attributes.position, idx = g.index, count = idx ? idx.count : pos.count;
+    for (let i = 0; i + 2 < count; i += 3) {
+      for (let k = 0; k < 3; k++) {
+        v.fromBufferAttribute(pos, idx ? idx.getX(i + k) : i + k).applyMatrix4(o.matrixWorld);
+        const q = t * 9 + k * 3; tri[q] = v.x; tri[q + 1] = v.y; tri[q + 2] = v.z;
+        if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x; if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y; if (v.z < minZ) minZ = v.z; if (v.z > maxZ) maxZ = v.z;
+      }
+      t++;
+    }
+  });
+  const diag = Math.max(Math.hypot(maxX - minX, maxY - minY, maxZ - minZ), 1e-6), tol = Math.max(diag * 1e-6, 1e-7);
+  const B = 512, span = Math.max(maxY - minY, 1e-9);
+  const binOf = y => Math.max(0, Math.min(B - 1, Math.floor((y - minY) / span * B)));
+  const start = new Int32Array(B + 1);
+  for (let i = 0; i < t; i++) { const o = i * 9, lo = Math.min(tri[o+1], tri[o+4], tri[o+7]), hi = Math.max(tri[o+1], tri[o+4], tri[o+7]); for (let b = binOf(lo - tol); b <= binOf(hi + tol); b++) start[b + 1]++; }
+  for (let b = 0; b < B; b++) start[b + 1] += start[b];
+  const fill = start.slice(0, B), items = new Int32Array(start[B]);
+  for (let i = 0; i < t; i++) { const o = i * 9, lo = Math.min(tri[o+1], tri[o+4], tri[o+7]), hi = Math.max(tri[o+1], tri[o+4], tri[o+7]); for (let b = binOf(lo - tol); b <= binOf(hi + tol); b++) items[fill[b]++] = i; }
+  return { model, tri, count: t, items, start, binOf, minY, maxY, height: maxY - minY, diag, tol };
+}
+
+function cutLoopsFromModel(model, y, sl = null) {
+  if (!model) return [];
+  if (!sl || sl.model !== model) sl = buildSlicer(model);
+  const { tri, items, start, tol } = sl, nudge = Math.max(sl.height * 2e-4, tol * 50);
   const slice = yy => {
     const segments = []; let touched = false;
-    const intersect = (p,q) => { const dy = q.y-p.y, t = Math.abs(dy) < 1e-20 ? 0 : (yy-p.y)/dy; return {x:p.x+(q.x-p.x)*t, y:yy, z:p.z+(q.z-p.z)*t}; };
-    model.traverse(o => {
-      if (!o.isMesh || !o.geometry?.attributes?.position) return;
-      const g = o.geometry, pos = g.attributes.position, idx = g.index, count = idx ? idx.count : pos.count;
-      for (let i=0; i+2<count; i+=3) {
-        a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(o.matrixWorld);
-        b.fromBufferAttribute(pos, idx ? idx.getX(i+1) : i+1).applyMatrix4(o.matrixWorld);
-        c.fromBufferAttribute(pos, idx ? idx.getX(i+2) : i+2).applyMatrix4(o.matrixWorld);
-        if (Math.min(a.y,b.y,c.y) > yy + tol || Math.max(a.y,b.y,c.y) < yy - tol) continue;   // most triangles never reach the cut
-        if (Math.abs(a.y-yy) <= tol || Math.abs(b.y-yy) <= tol || Math.abs(c.y-yy) <= tol) touched = true;
-        const tri = [a.clone(), b.clone(), c.clone()], hits = [];
-        for (let e=0; e<3; e++) {
-          const p = tri[e], q = tri[(e+1)%3], dp = p.y-yy, dq = q.y-yy;
-          if (Math.abs(dp) <= tol && Math.abs(dq) <= tol) continue;
-          if ((dp < -tol && dq > tol) || (dp > tol && dq < -tol)) hits.push(intersect(p,q));
-          else if (Math.abs(dp) <= tol) hits.push({x:p.x, y:yy, z:p.z});
-        }
-        const unique = [];
-        for (const h of hits) if (!unique.some(v => Math.hypot(v.x-h.x, v.z-h.z) <= tol)) unique.push(h);
-        if (unique.length >= 2) segments.push([unique[0], unique[1]]);
+    const b = sl.binOf(yy);
+    for (let k = start[b]; k < start[b + 1]; k++) {
+      const o = items[k] * 9, ay = tri[o+1], by = tri[o+4], cy = tri[o+7];
+      if (Math.min(ay, by, cy) > yy + tol || Math.max(ay, by, cy) < yy - tol) continue;
+      if (Math.abs(ay-yy) <= tol || Math.abs(by-yy) <= tol || Math.abs(cy-yy) <= tol) touched = true;
+      const hits = [];
+      for (let e = 0; e < 3; e++) {
+        const p = o + e*3, q = o + ((e+1)%3)*3, dp = tri[p+1] - yy, dq = tri[q+1] - yy;
+        if (Math.abs(dp) <= tol && Math.abs(dq) <= tol) continue;
+        if ((dp < -tol && dq > tol) || (dp > tol && dq < -tol)) { const f = (yy - tri[p+1]) / (tri[q+1] - tri[p+1]); hits.push({ x: tri[p] + (tri[q] - tri[p]) * f, y: yy, z: tri[p+2] + (tri[q+2] - tri[p+2]) * f }); }
+        else if (Math.abs(dp) <= tol) hits.push({ x: tri[p], y: yy, z: tri[p+2] });
       }
-    });
+      const unique = [];
+      for (const h of hits) if (!unique.some(v => Math.hypot(v.x-h.x, v.z-h.z) <= tol)) unique.push(h);
+      if (unique.length >= 2) segments.push([unique[0], unique[1]]);
+    }
     return { segments, touched };
   };
   for (const k of CUT_NUDGES) { const r = slice(y + k*nudge); if (!r.touched) return linkLoops(r.segments, tol); }
@@ -319,12 +346,12 @@ const PINK = new THREE.Color(0xff3f7f);
 const PEG1 = new THREE.Color(0xffb13b);
 const PEG2 = new THREE.Color(0x55d9ff);
 
-function makeExposureSlices(model, cutY, pegDepth, count=9) {
+function makeExposureSlices(model, cutY, pegDepth, count=9, sl=null) {
   const slices=[];
   for(let i=0;i<count;i++){
     const t=i/(count-1);
     const y=cutY-pegDepth*t;
-    slices.push({y,loops:cutLoopsFromModel(model,y)});
+    slices.push({y,loops:cutLoopsFromModel(model,y,sl)});
   }
   return slices;
 }
@@ -422,12 +449,12 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth, expos
   return group;
 }
 
-function addPegPreviews(model, cutIndex, y) {
-  const loops=cutLoopsFromModel(model,y);
+function addPegPreviews(model, cutIndex, y, sl) {
+  const loops=cutLoopsFromModel(model,y,sl);
   const sizing=pegSizing(), {radius,depth,safeRadius}=sizing;
   const manual=manualPegMode();
-  const exposureSlices=makeExposureSlices(model,y,depth,9);
-  const aboveSlice={y:y+depth*.35,loops:cutLoopsFromModel(model,y+depth*.35)};
+  const exposureSlices=makeExposureSlices(model,y,depth,9,sl);
+  const aboveSlice={y:y+depth*.35,loops:cutLoopsFromModel(model,y+depth*.35,sl)};
   const auto=previewAutoPegPoints(loops,safeRadius,[...exposureSlices,aboveSlice],radius);
   const points=manual ? manualPointsForCut(cutIndex,auto,loops,safeRadius) : auto;
   previewCutData[cutIndex]={y,loops,safeRadius,points,exposureSlices,aboveSlice,verdicts:[]};
@@ -467,6 +494,7 @@ function updatePreview() {
   }
   const box = boundsFor(model), size = box.getSize(new THREE.Vector3());
   const fractions = cutFractions(n);
+  const slicer = buildSlicer(model);
   previewGroup = new THREE.Group(); previewGroup.name = 'shrink-split-preview';
   previewCutData = [];
   for (let cutIndex=0; cutIndex<fractions.length; cutIndex++) {
@@ -478,7 +506,7 @@ function updatePreview() {
     const plane = new THREE.Mesh(geom, mat); plane.position.y = y; previewGroup.add(plane);
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color: 0x56ff9a, transparent: true, opacity: .9 }));
     edges.position.y = y + size.y * 0.0005; previewGroup.add(edges);
-    if ($('splitJoint')?.value !== 'flat') addPegPreviews(model, cutIndex, y);
+    if ($('splitJoint')?.value !== 'flat') addPegPreviews(model, cutIndex, y, slicer);
   }
   scene.add(previewGroup);
   window.dispatchEvent(new CustomEvent('shrink:peg-preview-updated',{detail:{cuts:previewCutData.length,report:pegReport()}}));
@@ -784,12 +812,13 @@ function injectUI() {
     $('splitPegSettings').hidden = !on || !pegs; $('splitClearanceWrap').hidden = !on || !pegs;
     if ($('splitPegPositionWrap')) $('splitPegPositionWrap').hidden = !on || !pegs;
     if ($('splitPegReset')) $('splitPegReset').hidden = !on || !pegs || !manualPegMode();
-    updateCutLabel(); updatePreview();
+    updateCutLabel(); updatePreview(); scheduleAutoCut();
   };
   ['splitMode','splitMaxHeight','splitCutHeight','splitJoint','splitPegPosition','pegDiameter','pegDepth','pegClearance','figureHeightMm'].forEach(id => $(id)?.addEventListener('input', sync));
   $('splitMode')?.addEventListener('change', sync); $('splitJoint')?.addEventListener('change', sync); $('splitPegPosition')?.addEventListener('change', sync);
   $('splitPegReset')?.addEventListener('click', clearManualPegPositions);
-  window.addEventListener('shrink:model-opened', () => { manualPegPositions.clear(); setTimeout(updatePreview, 0); });
+  window.addEventListener('shrink:model-opened', () => { manualPegPositions.clear(); autoCut = true; autoSig = ''; window.dispatchEvent(new CustomEvent('shrink:autocut-changed', { detail: { on: true } })); setTimeout(() => { updatePreview(); scheduleAutoCut(); }, 0); });
+  $('splitCutHeight')?.addEventListener('input', () => { if (!settingCut && autoCut) { autoCut = false; clearTimeout(autoTimer); bestRun++; window.dispatchEvent(new CustomEvent('shrink:autocut-changed', { detail: { on: false } })); } });
   window.addEventListener('shrink:live-updated', () => { if (partCount()>1) updatePreview(); });
   window.addEventListener('shrink:ui-mode', updatePreview);
   sync();
@@ -797,34 +826,49 @@ function injectUI() {
 
 function wire() { injectUI(); $('saveStlBtn')?.addEventListener('click', exportSplitSTL, true); }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, {once:true}); else wire();
-// "Find best cut": try cut heights near the current one and prefer a cut that goes through ONE solid outline
-// (not a thin arm, axe or cape as well) and leaves room for pegs that stay inside the model.
-function findBestCut() {
+// "Find best cut": try cut heights and prefer a cut that goes through ONE solid outline (not a thin arm, axe or cape as
+// well) and leaves room for pegs that stay inside the model. It runs in small steps so the page never freezes, and it
+// runs by itself when 2 parts is chosen (until the person drags the Cut height slider themselves).
+const yieldUI = () => new Promise(r => setTimeout(r, 0));
+const announce = detail => window.dispatchEvent(new CustomEvent('shrink:autocut', { detail }));
+
+async function findBestCut(onProgress) {
   const model = sourceModel(); if (!model || partCount() !== 2) return null;
-  const box = boundsFor(model), size = box.getSize(new THREE.Vector3()), sizing = pegSizing(), scale = mmPerUnit();
+  const run = ++bestRun;
+  const sl = buildSlicer(model);
+  const size = { y: sl.height }, sizing = pegSizing(), scale = mmPerUnit(), pegsOn = $('splitJoint')?.value !== 'flat';
   const area = loop => { let a = 0; for (let i=0;i<loop.length;i++) { const p=loop[i], q=loop[(i+1)%loop.length]; a += p.x*q.z - q.x*p.z; } return Math.abs(a/2); };
-  const countIslands = ls => { const ar = ls.map(area), mx = Math.max(0, ...ar); return ar.filter(a => a > mx * 0.02).length; };
+  const maxOf = arr => arr.reduce((m, v) => v > m ? v : m, 0);
+  const countIslands = ls => { const ar = ls.map(area), mx = maxOf(ar); return ar.filter(a => a > mx * 0.02).length; };
   const current = Number($('splitCutHeight')?.value || 50);
-  const scoreOf = r => Math.min(r.clearMM, 8) - 3 * (r.islands - 1) + 4 * r.solidShare - Math.abs(r.pct - current) * 0.03 - (r.pegs < 2 ? 1 : 0);
-  // Pass 1: every height, cheaply.
+  const scoreOf = r => Math.min(r.clearMM, 8) - 3 * (Math.min(r.islands, 6) - 1) + 4 * r.solidShare - Math.abs(r.pct - current) * 0.03 - (r.pegs < 2 ? 1 : 0);
+  const step = sl.count > 600000 ? 5 : 2.5;
   const results = [];
-  for (let pct = 20; pct <= 80.001; pct += 2.5) {
-    const y = box.min.y + size.y * pct / 100, loops = cutLoopsFromModel(model, y);
+  for (let pct = 20; pct <= 80.001; pct += step) {
+    if (run !== bestRun) return null;                       // a newer search (or a new model) took over
+    if (results.length % 2 === 0) { onProgress?.((pct - 20) / 60); await yieldUI(); }
+    const y = sl.minY + size.y * pct / 100, loops = cutLoopsFromModel(model, y, sl);
     if (!loops.length) continue;
-    const areas = loops.map(area), big = Math.max(...areas), total = areas.reduce((n,a) => n + a, 0);
-    const slices = [{ loops }, ...makeExposureSlices(model, y, sizing.depth, 3).slice(1), { loops: cutLoopsFromModel(model, y + sizing.depth * .35) }];
-    const pts = previewAutoPegPoints(loops, sizing.safeRadius, slices, sizing.radius);
-    const clear = pts.length ? Math.min(...pts.map(p => worstClearance(p.x, p.z, slices))) : -Infinity;
-    const r = { pct, y, islands: countIslands(loops), solidShare: big / Math.max(total, 1e-9), clearMM: Number.isFinite(clear) ? Math.max(-5, clear * scale) : -5, pegs: pts.length };
+    const areas = loops.map(area), big = maxOf(areas), total = areas.reduce((n,a) => n + a, 0);
+    let clearMM = 8, pegs = 2;
+    if (pegsOn) {
+      const slices = [{ loops }, ...makeExposureSlices(model, y, sizing.depth, 3, sl).slice(1), { loops: cutLoopsFromModel(model, y + sizing.depth * .35, sl) }];
+      const pts = previewAutoPegPoints(loops, sizing.safeRadius, slices, sizing.radius);
+      const clear = pts.length ? pts.reduce((m, p) => Math.min(m, worstClearance(p.x, p.z, slices)), Infinity) : -Infinity;
+      clearMM = Number.isFinite(clear) ? Math.max(-5, clear * scale) : -5; pegs = pts.length;
+    }
+    const r = { pct, y, islands: countIslands(loops), solidShare: big / Math.max(total, 1e-9), clearMM, pegs };
     r.score = scoreOf(r); results.push(r);
   }
   if (!results.length) return null;
-  // Pass 2: the best few again, also looking just above and below, because a cut within ~1% of the height of a ledge,
-  // arm or plank is fragile and counts as crossing it.
+  // Second look at the best few, also just above and below: a cut within ~1% of the height of a ledge, arm or plank
+  // is fragile and counts as crossing it.
   results.sort((a,b) => b.score - a.score);
   const near = size.y * 0.01;
   for (const r of results.slice(0, 6)) {
-    r.islands = Math.max(r.islands, countIslands(cutLoopsFromModel(model, r.y + near)), countIslands(cutLoopsFromModel(model, r.y - near)));
+    if (run !== bestRun) return null;
+    await yieldUI();
+    r.islands = Math.max(r.islands, countIslands(cutLoopsFromModel(model, r.y + near, sl)), countIslands(cutLoopsFromModel(model, r.y - near, sl)));
     r.score = scoreOf(r);
   }
   results.sort((a,b) => b.score - a.score);
@@ -832,15 +876,43 @@ function findBestCut() {
   return { pct, score, islands, clearMM, pegs };
 }
 
-function applyBestCut() {
-  const best = findBestCut(); if (!best) return null;
-  const slider = $('splitCutHeight');
-  if (slider) { slider.value = String(best.pct); slider.dispatchEvent(new Event('input', { bubbles: true })); }
-  return best;
+async function applyBestCut() {
+  announce({ state: 'searching', progress: 0 });
+  try {
+    const best = await findBestCut(p => announce({ state: 'searching', progress: p }));
+    if (!best) { announce({ state: 'failed', error: 'no cut found' }); return null; }
+    const slider = $('splitCutHeight');
+    if (slider) { settingCut = true; try { slider.value = String(best.pct); slider.dispatchEvent(new Event('input', { bubbles: true })); } finally { settingCut = false; } }
+    announce({ state: 'done', best });
+    return best;
+  } catch (err) {
+    console.error('[SHRINK 3D] Best-cut search failed', err);
+    announce({ state: 'failed', error: String(err?.message || err) });
+    return null;
+  }
+}
+
+function setAutoCut(on) {
+  autoCut = !!on; autoSig = '';
+  window.dispatchEvent(new CustomEvent('shrink:autocut-changed', { detail: { on: autoCut } }));
+  scheduleAutoCut();
+}
+
+function scheduleAutoCut() {
+  clearTimeout(autoTimer);
+  const model = sourceModel();
+  if (!autoCut || !model || partCount() !== 2 || !document.body.classList.contains('app-mode-print')) return;
+  const sig = `${model.uuid}|${finishedHeightMM()}`;
+  if (sig === autoSig) return;
+  autoTimer = setTimeout(async () => {
+    if (!autoCut || partCount() !== 2 || sourceModel() !== model) return;
+    autoSig = sig;
+    await applyBestCut();
+  }, 700);
 }
 
 window.__shrinkSplit = {
-  updatePreview, partCount, cutFractions, pegReport, findBestCut, applyBestCut,
+  updatePreview, partCount, cutFractions, pegReport, findBestCut, applyBestCut, setAutoCut, autoCutOn() { return autoCut; },
   resetManualPegPositions: clearManualPegPositions,
   getManualPegControls: currentPegControls,
   moveManualPegAxis: manualPegAxisMove,

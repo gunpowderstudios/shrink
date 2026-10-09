@@ -385,3 +385,5 @@ A good Simple-mode run should:
 - A peg is judged by the worst cross-section down its whole depth (`worstClearance`), not by the cut face alone. Statuses: ok / warn / bad (`assessPeg`).
 - Cut outlines must go through `cutLoopsFromModel` / `cutLoopsFromSolid` (they step off vertex rings with `CUT_NUDGES`). Never slice at an exact height without that.
 - Manual pegs may sit anywhere on material so problems are visible; export skips red pegs and says so.
+- Cross-sections go through `buildSlicer()` (one pass, height bins); pass the slicer along instead of re-walking the mesh. Long searches must `await` between steps.
+- `split-print.js` must stay safe against being loaded twice (`DUPLICATE_LOAD`).

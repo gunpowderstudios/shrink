@@ -2,6 +2,20 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.72 — the best cut is found automatically, and the search no longer freezes the page
+
+### Fixed
+- **"Find best cut" crashed/froze the page on a big model** (v2.71). It re-walked the entire mesh for every cross-section (~175 passes) in one blocking call. Now `buildSlicer()` takes one pass over the mesh and sorts the triangles into 512 height bins; each cross-section only looks at the triangles near its height (preview and search are several times cheaper too). The search runs in small steps (`await` between heights, progress shown, coarser steps above 600k triangles), is cancelled by a newer search, never spreads huge arrays into `Math.max`, and any error is caught and reported on the card instead of crashing.
+- `split-print.js` ignores a second load (`window.__shrinkSplitLoaded`): a duplicate copy used to add a second download handler and replace `__shrinkSplit` with one that had no preview data (this showed up in the test harness, which loads it twice).
+
+### Changed
+- **Best cut is automatic.** Choosing 2 parts picks the cut for you (after a short pause, once per model/height) and the card says what it did. The tick-box "Pick the best cut for me" stays on until you drag Cut height yourself, which switches it off and leaves your cut alone; ticking it again, opening a new model, or **FIND AGAIN** re-runs it.
+
+### Tests
+- Group N renumbered 40–45 (they collided with groups 20–24). New: auto pick on the axe model, drag takes over, FIND AGAIN, re-tick, dense 130k-triangle model finishes with the page still responsive. 217 checks pass.
+
+---
+
 ## v2.71 — split pegs: see at a glance whether they fit, and the file matches the preview
 
 (v2.58–v2.70 were GPT's peg work — draggable pegs, true-size X-ray pegs, axis sliders, pink exposed areas — and are not itemised here. This release builds on it.)
@@ -9,7 +23,7 @@ This file records user-facing workflow and architecture changes. Git history rem
 ### Added
 - **Peg report.** Every peg is checked against the model along its whole depth (the lower part's cross-sections at 9 heights down the peg, plus one just above the cut for the peg's root). The Download card lists each peg in plain words with a green / amber / red dot — "fits inside the model, 16.8 mm of wall", "tight: only 0.3 mm of wall", "sticks out of the model by 2.2 mm (the lowest 6 mm of the peg)", "its socket would break through the surface". A status ring on the cut plane in the viewer uses the same colours; the pink X-ray colouring of exposed areas is kept.
 - **Better automatic placement.** The old preview picked the roomiest point of the cut *face* only. Auto now maximises the worst cross-section anywhere down the peg (grid of candidates, shortlist, then a small pattern search), so the peg sits in the thickest part of the model rather than near the middle of the bounding box.
-- **Find best cut** (2 parts). Scans 20–80% of the height and prefers a cut through ONE solid outline (not a plank, axe or cape as well), with room for two pegs; cuts within ~1% of the height of a ledge/arm are treated as fragile. Moves the Cut height slider.
+- **Find best cut** (2 parts; automatic since v2.72). Scans 20–80% of the height and prefers a cut through ONE solid outline (not a plank, axe or cape as well), with room for two pegs; cuts within ~1% of the height of a ledge/arm are treated as fragile. Moves the Cut height slider.
 - **Manual sliders can go into the red.** A manual peg may be slid anywhere on the material so the problem is visible; red pegs are left out of the files and the message says so. "Snap pegs to safest spot" (the old Reset) returns to the automatic spots.
 
 ### Fixed

@@ -359,7 +359,7 @@ await block(24, async () => {
 /* ============ N. peg report: every peg is checked against the model and shown green / amber / red ============ */
 const setCut = async (page, pct) => { const el = page.$('splitCutHeight'); el.value = String(pct); el.dispatchEvent(new page.w.Event('input', { bubbles: true })); await wait(400); };
 const report = page => page.w.__shrinkSplit.pegReport();
-await block(20, async () => {
+await block(40, async () => {
   const page = await makePage({ model: models.single(), heightMm: 40 });
   await pick(page, '2'); await wait(400);
   const rep = report(page);
@@ -369,7 +369,7 @@ await block(20, async () => {
   const best = page.w.__shrinkSplit.pegReport()[0];
   ok(best.wallMM > 5, `N1 auto placement puts the peg where the wall is thick (${best.wallMM.toFixed(1)} mm)`);
 });
-await block(21, async () => {
+await block(41, async () => {
   // cut so low that the 6 mm peg would hang below the bottom of the sphere: it cannot fit and must be flagged, not exported
   const page = await makePage({ model: models.single(), heightMm: 40 });
   await pick(page, '2'); await setCut(page, 10);
@@ -382,7 +382,7 @@ await block(21, async () => {
   const lower = r.parts[0].stl, upper = r.parts[1].stl;
   ok(upper.minZ >= lower.maxZ - 0.05, `N2 flagged pegs were left out: the upper part starts at the cut (${upper.minZ.toFixed(2)} vs ${lower.maxZ.toFixed(2)})`);
 });
-await block(22, async () => {
+await block(42, async () => {
   // manual: slide a peg towards the edge. It is allowed to go there, turns red, is left out of the file; snapping back fixes it.
   const page = await makePage({ model: models.single(), heightMm: 40 });
   await pick(page, '2');
@@ -402,18 +402,36 @@ await block(22, async () => {
   split.resetManualPegPositions(); await wait(400);
   ok(report(page).every(r => r.status === 'ok'), 'N3 snapping back to the safest spots makes both pegs green again');
 });
-await block(23, async () => {
-  // an axe: a thin plank crossing the cut at mid height. Find best cut should move off it.
+await block(43, async () => {
+  // an axe: a thin plank crossing the cut at mid height. The best cut is picked AUTOMATICALLY when 2 parts is chosen.
   const page = await makePage({ model: models.axe(), heightMm: 40 });
-  await pick(page, '2'); await wait(300);
-  const best = page.w.__shrinkSplit.findBestCut();
-  ok(best && (best.pct < 44 || best.pct > 56) && best.islands === 1, `N4 best cut avoids the plank (${best?.pct}% , ${best?.islands} outline(s))`);
-  page.$('v2BestCut').click(); await wait(600);
-  const f = Number(page.$('splitCutHeight').value);
-  ok(f < 44 || f > 56, 'N4 the cut slider moved to the best cut: ' + f + '%');
+  await pick(page, '2');
+  ok(await waitFor(() => { const f = Number(page.$('splitCutHeight').value); return f < 44 || f > 56; }, 15000, 200), 'N4 choosing 2 parts moved the cut off the plank by itself: ' + page.$('splitCutHeight').value + '%');
+  ok(/Best cut: .*one solid outline/.test(page.$('v2BestCutNote').textContent), 'N4 the card says what it did: ' + page.$('v2BestCutNote').textContent);
+  ok(page.$('v2AutoCut').checked, 'N4 "Pick the best cut for me" stays ticked');
+  await wait(400);
   ok(report(page).length >= 1 && report(page).every(r => r.status !== 'bad'), 'N4 pegs at the new cut stay inside the model');
+  // dragging the slider takes over: auto switches off and the cut stays where the person put it
+  await setCut(page, 50); await wait(1200);
+  ok(!page.$('v2AutoCut').checked && Number(page.$('splitCutHeight').value) === 50, 'N4 dragging Cut height yourself turns auto off and the cut stays at 50%');
+  // FIND AGAIN runs once and leaves the checkbox alone
+  page.$('v2BestCut').click();
+  ok(await waitFor(() => Number(page.$('splitCutHeight').value) !== 50, 15000, 200), 'N4 FIND AGAIN moves the cut back off the plank: ' + page.$('splitCutHeight').value + '%');
+  // ticking the box hands control back
+  await setCut(page, 50); page.$('v2AutoCut').checked = true; page.$('v2AutoCut').dispatchEvent(new page.w.Event('change', { bubbles: true }));
+  ok(await waitFor(() => Number(page.$('splitCutHeight').value) !== 50, 15000, 200), 'N4 ticking the box again lets it choose');
 });
-await block(24, async () => {
+await block(45, async () => {
+  // the search never freezes the page: it works in small steps (timers keep running) and survives a dense model
+  const dense = new THREE.Group(); const m = new THREE.Mesh(new THREE.SphereGeometry(20, 300, 220), new THREE.MeshStandardMaterial()); m.position.y = 20; dense.add(m); dense.updateMatrixWorld(true);
+  const page = await makePage({ model: dense, heightMm: 40 });
+  let ticks = 0; const iv = setInterval(() => ticks++, 20);
+  await pick(page, '2');
+  const t0 = Date.now();
+  ok(await waitFor(() => /Best cut:/.test(page.$('v2BestCutNote').textContent), 40000, 200), 'N6 a 130k-triangle model gets its best cut automatically (' + (Date.now() - t0) + ' ms)');
+  clearInterval(iv); ok(ticks > 10, 'N6 the page stayed responsive while searching (' + ticks + ' timer ticks)');
+});
+await block(44, async () => {
   // a cut landing exactly on a ring of vertices (the sphere's equator) used to find no outline and lose the pegs
   const page = await makePage({ model: models.single(), heightMm: 40 });
   await pick(page, '2'); await wait(300);
