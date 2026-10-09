@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.69 — true-size peg previews colour any exposed/outside areas pink.
+// SHRINK 3D v2.70 — pink peg exposure uses cached cross-sections for smooth slider performance.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -219,7 +219,7 @@ function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
     const target=pegs.find(o=>o.userData.cutIndex===cutIndex&&o.userData.pegIndex===pegIndex);
     if(target){
       target.position.x=best.x;target.position.z=best.z;
-      colourPegExposure(target,sourceModel());
+      colourPegExposure(target,data.exposureSlices);
     }
   }
   window.dispatchEvent(new CustomEvent('shrink:peg-position-changed',{detail:{cutIndex,pegIndex,controls:currentPegControls(cutIndex)}}));
@@ -230,34 +230,28 @@ function manualPegAxisMove(cutIndex,pegIndex,axis,percent) {
 const PINK = new THREE.Color(0xff3f7f);
 const PEG1 = new THREE.Color(0xffb13b);
 const PEG2 = new THREE.Color(0x55d9ff);
-const insideDirs = [
-  new THREE.Vector3(1,.173,.319).normalize(),
-  new THREE.Vector3(-.271,.941,.207).normalize(),
-  new THREE.Vector3(.193,.287,-.938).normalize()
-];
 
-function pointInsideModel(point, model) {
-  if(!model) return false;
-  let insideVotes=0;
-  const raycaster=new THREE.Raycaster();
-  raycaster.firstHitOnly=false;
-  for(const dir of insideDirs){
-    const origin=point.clone().addScaledVector(dir,1e-7);
-    raycaster.set(origin,dir);
-    const hits=raycaster.intersectObject(model,true)
-      .filter(h=>Number.isFinite(h.distance)&&h.distance>1e-6)
-      .sort((a,b)=>a.distance-b.distance);
-    let unique=0,last=-Infinity;
-    for(const h of hits){
-      if(Math.abs(h.distance-last)>1e-5){unique++;last=h.distance;}
-    }
-    if(unique%2===1) insideVotes++;
+function makeExposureSlices(model, cutY, pegDepth, count=9) {
+  const slices=[];
+  for(let i=0;i<count;i++){
+    const t=i/(count-1);
+    const y=cutY-pegDepth*t;
+    slices.push({y,loops:cutLoopsFromModel(model,y)});
   }
-  return insideVotes>=2;
+  return slices;
 }
 
-function colourPegExposure(group, model) {
-  if(!group||!model) return;
+function nearestExposureSlice(y,slices) {
+  let best=null,dist=Infinity;
+  for(const s of slices||[]){
+    const d=Math.abs(s.y-y);
+    if(d<dist){dist=d;best=s;}
+  }
+  return best;
+}
+
+function colourPegExposure(group, slices) {
+  if(!group||!slices?.length) return;
   group.updateMatrixWorld(true);
   const world=new THREE.Vector3();
   for(const mesh of group.children){
@@ -271,7 +265,9 @@ function colourPegExposure(group, model) {
     const base=mesh.userData.basePegColor||PEG1;
     for(let i=0;i<pos.count;i++){
       world.fromBufferAttribute(pos,i).applyMatrix4(mesh.matrixWorld);
-      const c=pointInsideModel(world,model)?base:PINK;
+      const slice=nearestExposureSlice(world.y,slices);
+      const inside=!!slice?.loops?.length && materialAtCut(world.x,world.z,slice.loops);
+      const c=inside?base:PINK;
       colorAttr.setXYZ(i,c.r,c.g,c.b);
     }
     colorAttr.needsUpdate=true;
@@ -281,8 +277,7 @@ function colourPegExposure(group, model) {
   }
 }
 
-function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
-  const colorHex=pegIndex===0?0xffb13b:0x55d9ff;
+function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth, exposureSlices) {
   const baseColor=pegIndex===0?PEG1:PEG2;
   const group=new THREE.Group();
   group.position.set(point.x,y,point.z);
@@ -294,7 +289,7 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
   // This is the actual male peg shape: same radius and depth as the exported STL.
   // X-ray rendering keeps the whole cylinder visible through the model.
   const peg=new THREE.Mesh(
-    new THREE.CylinderGeometry(pegRadius,pegRadius,pegDepth,28,false),
+    new THREE.CylinderGeometry(pegRadius,pegRadius,pegDepth,28,8,false),
     new THREE.MeshBasicMaterial({
       color:0xffffff,
       vertexColors:true,
@@ -312,7 +307,7 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
 
   // A fine edge overlay is part of the peg preview itself, not a control handle.
   const outline=new THREE.Mesh(
-    new THREE.CylinderGeometry(pegRadius*1.012,pegRadius*1.012,pegDepth*1.004,28,true),
+    new THREE.CylinderGeometry(pegRadius*1.012,pegRadius*1.012,pegDepth*1.004,28,8,true),
     new THREE.MeshBasicMaterial({
       color:0xffffff,
       vertexColors:true,
@@ -330,7 +325,7 @@ function makePegPreview(cutIndex, pegIndex, point, y, pegRadius, pegDepth) {
 
   group.add(peg,outline);
   previewGroup.add(group);
-  colourPegExposure(group,sourceModel());
+  colourPegExposure(group,exposureSlices);
   return group;
 }
 
@@ -339,11 +334,12 @@ function addPegPreviews(model, cutIndex, y) {
   const {radius,depth,safeRadius}=pegSizing();
   const manual=manualPegMode();
   const points=manual ? manualPointsForCut(cutIndex,loops,safeRadius) : previewAutoPegPoints(loops,safeRadius);
-  previewCutData[cutIndex]={y,loops,safeRadius,points};
+  const exposureSlices=makeExposureSlices(model,y,depth,9);
+  previewCutData[cutIndex]={y,loops,safeRadius,points,exposureSlices};
 
   points.slice(0,2).forEach((p,i)=>{
     const pegRadius=i===0?radius:radius*.76;
-    makePegPreview(cutIndex,i,p,y,pegRadius,depth);
+    makePegPreview(cutIndex,i,p,y,pegRadius,depth,exposureSlices);
   });
 }
 
