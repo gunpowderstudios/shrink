@@ -1,6 +1,6 @@
-// SHRINK 3D v2.63 — manual draggable split-peg positioning.
+// SHRINK 3D v2.67 — smooth axis sliders for manual split-peg positioning.
 (() => {
-  const VERSION = '2.63';
+  const VERSION = '2.67';
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -409,6 +409,47 @@
     }
   }
 
+  let activePegCut = 0;
+
+  function refreshPegAxisControls() {
+    const manual=$('v2PegPosition')?.value==='manual';
+    if($('v2PegAxisPanel')) $('v2PegAxisPanel').hidden=!manual;
+    if(!manual) return;
+
+    const count=Math.max(1,window.__shrinkSplit?.cutCount?.()||1);
+    activePegCut=Math.max(0,Math.min(count-1,activePegCut));
+    const cutSel=$('v2PegCut');
+    if(cutSel){
+      const needed=Array.from({length:count},(_,i)=>`<option value="${i}">Cut ${i+1}</option>`).join('');
+      if(cutSel.innerHTML!==needed) cutSel.innerHTML=needed;
+      cutSel.value=String(activePegCut);
+      $('v2PegCutWrap').hidden=count<=1;
+    }
+
+    const info=window.__shrinkSplit?.getManualPegControls?.(activePegCut);
+    const pegs=info?.pegs||[];
+    const setSlider=(id,value,enabled=true)=>{
+      const el=$(id); if(!el)return;
+      if(document.activeElement!==el && Number.isFinite(value)) el.value=String(value);
+      el.disabled=!enabled;
+    };
+    setSlider('v2Peg1X',pegs[0]?.leftRight,!!pegs[0]);
+    setSlider('v2Peg1Z',pegs[0]?.backForward,!!pegs[0]);
+    setSlider('v2Peg2X',pegs[1]?.leftRight,!!pegs[1]);
+    setSlider('v2Peg2Z',pegs[1]?.backForward,!!pegs[1]);
+  }
+
+  function movePegFromSlider(pegIndex,axis,id) {
+    const value=Number($(id)?.value);
+    if(!Number.isFinite(value)) return;
+    const info=window.__shrinkSplit?.moveManualPegAxis?.(activePegCut,pegIndex,axis,value);
+    const peg=info?.pegs?.[pegIndex];
+    if(!peg) return;
+    const xId=pegIndex===0?'v2Peg1X':'v2Peg2X', zId=pegIndex===0?'v2Peg1Z':'v2Peg2Z';
+    if(document.activeElement!==$(xId)) $(xId).value=String(peg.leftRight);
+    if(document.activeElement!==$(zId)) $(zId).value=String(peg.backForward);
+  }
+
   function syncSplitControls() {
     const select = $('v2SplitMode');
     if (!select) return;
@@ -420,6 +461,7 @@
     if (pegPos && $('splitPegPosition') && pegPos.value !== $('splitPegPosition').value) pegPos.value = $('splitPegPosition').value;
     if ($('v2PegReset')) $('v2PegReset').hidden = !pegPos || pegPos.value !== 'manual';
     if ($('v2PegHelp')) $('v2PegHelp').hidden = !pegPos || pegPos.value !== 'manual';
+    refreshPegAxisControls();
     // This runs from a MutationObserver on the whole page, so it must only write when something actually changed:
     // rewriting the same text re-triggers the observer and would loop forever.
     const set = (el, prop, value) => { if (el && el[prop] !== value) el[prop] = value; };
@@ -540,7 +582,7 @@
               <div id="v2MaxWrap" class="v2-cut-row" hidden><div><span>Maximum part height</span><strong>mm</strong></div><input id="v2MaxHeight" type="number" min="20" max="500" step="5" value="80"></div>
               <div id="v2CutWrap" class="v2-cut-row" hidden><div><span>Cut height</span><strong id="v2CutLabel">50%</strong></div><input id="v2Cut" type="range" min="10" max="90" step="0.5" value="50"></div>
               <button id="v2DownloadBtn" class="v2-mega v2-red" type="button">DOWNLOAD IT</button>
-              <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg position<select id="v2PegPosition"><option value="auto">Auto — safest position</option><option value="manual">Manual — drag pegs in viewer</option></select></label><button id="v2PegReset" class="v2-peg-reset" type="button" hidden>RESET PEG POSITIONS</button><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label><p id="v2PegHelp" class="v2-peg-help" hidden>Drag the coloured peg markers left/right or forward/back across the green cut plane. Unsafe positions are blocked.</p></div></details>
+              <details class="v2-advanced"><summary>Advanced split settings</summary><div class="v2-advanced-body v2-advanced-grid"><label>Peg position<select id="v2PegPosition"><option value="auto">Auto — safest position</option><option value="manual">Manual — position pegs</option></select></label><button id="v2PegReset" class="v2-peg-reset" type="button" hidden>RESET PEG POSITIONS</button><div id="v2PegAxisPanel" class="v2-peg-axis-panel" hidden><label id="v2PegCutWrap" class="v2-peg-cut" hidden>Cut<select id="v2PegCut"></select></label><div class="v2-peg-axis-group v2-peg1"><strong><i></i> Peg 1</strong><label><span>Left</span><input id="v2Peg1X" type="range" min="0" max="100" step="0.25" value="50"><span>Right</span></label><label><span>Back</span><input id="v2Peg1Z" type="range" min="0" max="100" step="0.25" value="50"><span>Forward</span></label></div><div class="v2-peg-axis-group v2-peg2"><strong><i></i> Peg 2</strong><label><span>Left</span><input id="v2Peg2X" type="range" min="0" max="100" step="0.25" value="50"><span>Right</span></label><label><span>Back</span><input id="v2Peg2Z" type="range" min="0" max="100" step="0.25" value="50"><span>Forward</span></label></div></div><label>Peg diameter (mm)<input id="v2PegDiameter" type="number" min="1" max="20" step="0.5" value="4"></label><label>Peg depth (mm)<input id="v2PegDepth" type="number" min="2" max="30" step="0.5" value="6"></label><label>Socket clearance (mm)<input id="v2PegClearance" type="number" min="0.05" max="1" step="0.05" value="0.20"></label><label class="v2-check"><input id="v2Zup" type="checkbox" checked> Z-up for Lychee / Chitubox</label><p id="v2PegHelp" class="v2-peg-help" hidden>Use the sliders for smooth left/right and forward/back movement. You can still drag the handles in the viewer. Pegs stop automatically at unsafe edges.</p></div></details>
             </section>
           </div>
         </div>
@@ -586,8 +628,16 @@
       const manual=$('v2PegPosition').value==='manual';
       $('v2PegReset').hidden=!manual; $('v2PegHelp').hidden=!manual;
       window.__shrinkSplit?.updatePreview?.();
+      setTimeout(refreshPegAxisControls,0);
     });
-    $('v2PegReset').addEventListener('click', () => window.__shrinkSplit?.resetManualPegPositions?.());
+    $('v2PegReset').addEventListener('click', () => { window.__shrinkSplit?.resetManualPegPositions?.(); setTimeout(refreshPegAxisControls,0); });
+    $('v2PegCut').addEventListener('change', () => { activePegCut=Number($('v2PegCut').value)||0; refreshPegAxisControls(); });
+    $('v2Peg1X').addEventListener('input', () => movePegFromSlider(0,'x','v2Peg1X'));
+    $('v2Peg1Z').addEventListener('input', () => movePegFromSlider(0,'z','v2Peg1Z'));
+    $('v2Peg2X').addEventListener('input', () => movePegFromSlider(1,'x','v2Peg2X'));
+    $('v2Peg2Z').addEventListener('input', () => movePegFromSlider(1,'z','v2Peg2Z'));
+    window.addEventListener('shrink:peg-position-changed', refreshPegAxisControls);
+    window.addEventListener('shrink:peg-preview-updated', refreshPegAxisControls);
     $('v2Cut').addEventListener('input', () => { $('v2CutLabel').textContent = `${$('v2Cut').value}%`; setNative('splitCutHeight', $('v2Cut').value, 'input'); });
     $('v2MaxHeight').addEventListener('input', () => setNative('splitMaxHeight', Math.max(20, Number($('v2MaxHeight').value) || 80), 'input'));
     ['v2PegDiameter','v2PegDepth','v2PegClearance'].forEach(id => $(id).addEventListener('input', syncAdvancedToNative));
