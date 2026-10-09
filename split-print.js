@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.64 — draggable split pegs with larger vertical grab handles and hover/drag feedback.
+// SHRINK 3D v2.65 — manual splitter previews the real exported peg cylinder plus a separate grab handle.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
@@ -49,9 +49,10 @@ function clearManualPegPositions() { manualPegPositions.clear(); updatePreview()
 function pegSizing() {
   const scale = mmPerUnit();
   const radius = Math.max(.5, Number($('pegDiameter')?.value || 4) / 2) / scale;
+  const depth = Math.max(2, Number($('pegDepth')?.value || 6)) / scale;
   const clearance = Math.max(.05, Number($('pegClearance')?.value || .2)) / scale;
   const safetyWall = 0.6 / Math.max(scale, 1e-9);
-  return { radius, clearance, safeRadius: radius + clearance + safetyWall };
+  return { radius, depth, clearance, safeRadius: radius + clearance + safetyWall };
 }
 
 function cutLoopsFromModel(model, y) {
@@ -156,30 +157,56 @@ function manualPointsForCut(cutIndex, loops, safeRadius) {
 function setPegHandleState(group, state='idle') {
   if(!group) return;
   const scale = state === 'drag' ? 1.14 : state === 'hover' ? 1.08 : 1;
-  group.scale.setScalar(scale);
   const glow = state !== 'idle';
+  group.children.forEach(o=>{
+    if(!o.isMesh) return;
+    // The first child is the true-size peg preview: never scale it.
+    if(o.position.y < 0) o.scale.setScalar(1);
+    else o.scale.setScalar(scale);
+  });
   group.traverse(o=>{
     if(!o.isMesh || !o.material || o.userData?.shrinkPegHit) return;
-    if('opacity' in o.material) o.material.opacity = glow ? 1 : (o.userData?.baseOpacity ?? .98);
+    if('opacity' in o.material) o.material.opacity = glow ? Math.min(1,(o.userData?.baseOpacity ?? .98)+.12) : (o.userData?.baseOpacity ?? .98);
   });
 }
 
-function makePegHandle(cutIndex, pegIndex, point, y, markerRadius) {
+function makePegHandle(cutIndex, pegIndex, point, y, pegRadius, pegDepth, markerRadius) {
   const group=new THREE.Group();
   group.position.set(point.x,y,point.z);
   group.renderOrder=1000;
   group.userData.shrinkPegGizmo=true;
 
   const color=pegIndex===0?0xffb13b:0x55d9ff;
-  const ringMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.95});
+
+  // The cylinder below the green cut plane is the ACTUAL male peg that will be
+  // exported on the upper section: same radius and same depth. It uses normal
+  // depth testing, so the part buried inside the model disappears behind the
+  // model surface; anything poking outside remains visible.
+  const pegMat=new THREE.MeshBasicMaterial({
+    color,
+    transparent:true,
+    opacity:.78,
+    depthTest:true,
+    depthWrite:false
+  });
+  const actualPeg=new THREE.Mesh(
+    new THREE.CylinderGeometry(pegRadius,pegRadius,pegDepth,28,false),
+    pegMat
+  );
+  actualPeg.userData.baseOpacity=.78;
+  actualPeg.position.y=-pegDepth*.5;
+
+  // Exact footprint at the cut plane.
+  const ringMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.98});
   const ring=new THREE.Mesh(
-    new THREE.TorusGeometry(markerRadius,markerRadius*.22,10,32),
+    new THREE.TorusGeometry(pegRadius,Math.max(pegRadius*.12,markerRadius*.08),10,32),
     ringMat
   );
-  ring.userData.baseOpacity=.95;
+  ring.userData.baseOpacity=.98;
   ring.rotation.x=Math.PI/2;
 
-  const stemHeight=markerRadius*2.7;
+  // Separate grab stalk above the cut. This is UI only and is never exported.
+  const stemHeight=Math.max(markerRadius*2.7,pegRadius*2.0);
   const stemMat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:.92});
   const stem=new THREE.Mesh(
     new THREE.CylinderGeometry(markerRadius*.20,markerRadius*.20,stemHeight,14),
@@ -207,18 +234,21 @@ function makePegHandle(cutIndex, pegIndex, point, y, markerRadius) {
   hit.userData.pegIndex=pegIndex;
   hit.userData.handleGroup=group;
 
-  group.add(ring,stem,cap,hit);
+  group.add(actualPeg,ring,stem,cap,hit);
   previewGroup.add(group);
   return group;
 }
 
 function addManualPegHandles(model, cutIndex, y, modelSize) {
   const loops=cutLoopsFromModel(model,y);
-  const {safeRadius}=pegSizing();
+  const {radius,depth,safeRadius}=pegSizing();
   const points=manualPointsForCut(cutIndex,loops,safeRadius);
   previewCutData[cutIndex]={y,loops,safeRadius,points};
-  const markerRadius=Math.max(safeRadius*.75,modelSize.length()*.008);
-  points.forEach((p,i)=>makePegHandle(cutIndex,i,p,y+Math.max(modelSize.y*0.002,markerRadius*.08),markerRadius));
+  const markerRadius=Math.max(radius*.85,modelSize.length()*.008);
+  points.forEach((p,i)=>{
+    const pegRadius=i===0?radius:radius*.76;
+    makePegHandle(cutIndex,i,p,y,pegRadius,depth,markerRadius);
+  });
 }
 
 function pointerRay(evt) {
