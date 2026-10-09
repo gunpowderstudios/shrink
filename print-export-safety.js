@@ -2,8 +2,8 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { healthOfModel } from './repair-core.js?v=2.27';
 
-// SHRINK 3D v2.57 — safety layer using the cumulative working model; Make watertight now replaces the working model.
-const VERSION = '2.57';
+// SHRINK 3D v2.63 — safety layer; loads current print helpers including draggable split pegs.
+const VERSION = '2.63';
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
