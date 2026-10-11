@@ -47,23 +47,25 @@ function setRatio(r, { notify = true } = {}) {
 
 function gatherTextures() {
   const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'];
-  const seen = new Map();
+  const seen = new Map(), onlyData = new Map();
   let meshes = 0; const mats = new Set();
   app()?.originalModel?.traverse(o => {
     if (!o.isMesh) return; meshes++;
     for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
       if (!m) continue; mats.add(m);
-      for (const k of maps) { const t = m[k]; const im = t?.image; if (t && im?.width && !seen.has(t.uuid)) seen.set(t.uuid, { w: t.userData?.origW || im.width, h: t.userData?.origH || im.height }); }
+      for (const k of maps) { const t = m[k]; const im = t?.image; if (t && im?.width) { if (!seen.has(t.uuid)) seen.set(t.uuid, { w: t.userData?.origW || im.width, h: t.userData?.origH || im.height }); onlyData.set(t.uuid, (onlyData.get(t.uuid) ?? true) && (k === 'roughnessMap' || k === 'metalnessMap' || k === 'aoMap')); } }
     }
   });
+  for (const [u, v] of seen) v.data = !!onlyData.get(u);
   S.textures = { list: [...seen.values()], meshes, materials: mats.size };
 }
 
 function textureEstimate() {
   const cap = Number(el.textureSize?.value || 1024), webp = el.webp?.checked !== false;
   let gpu = 0, file = 0;
-  for (const { w, h } of S.textures?.list || []) {
-    const s = Math.min(1, cap / Math.max(w, h)), tw = Math.max(1, Math.round(w * s)), th = Math.max(1, Math.round(h * s));
+  const small = window.__shrinkMaterial?.smallData !== false;
+  for (const { w, h, data } of S.textures?.list || []) {
+    const s = Math.min(1, (data && small ? Math.min(cap, 512) : cap) / Math.max(w, h)), tw = Math.max(1, Math.round(w * s)), th = Math.max(1, Math.round(h * s));
     gpu += tw * th * 4 * 1.33; file += tw * th * (webp ? 0.4 : 1.5);
   }
   return { gpu, file, count: S.textures?.list.length || 0, cap };

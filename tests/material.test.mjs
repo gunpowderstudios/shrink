@@ -55,7 +55,7 @@ w.__shrinkApp.originalModel = car2; w.__shrinkApp.optimizedModel = live2;
 w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await new Promise(r => setTimeout(r, 30));
 const sv = L.savings();
 ok(sv.mr.has && sv.ao.has && sv.mr.count === 1 && sv.ao.count === 1, 'savings: the metallic/roughness image and the AO image are each freed on their own');
-ok(Math.abs(sv.mr.file - 1024 * 1024 * 0.4) < 1 && sv.mr.gpu > 5e6, 'savings are sized at the texture cap (1024px, WebP): ' + Math.round(sv.mr.file) + ' bytes file');
+ok(Math.abs(sv.mr.file - 512 * 512 * 0.4) < 1 && sv.mr.gpu > 1e6, 'savings are sized at the data-map size (512px, WebP): ' + Math.round(sv.mr.file) + ' bytes file');
 ok(!$('dropMapsBlock').hidden && /saves/.test($('dropMRRowSave').textContent), 'the Smaller file block shows what each box would save: ' + $('dropMRRowSave').textContent);
 $('dropMR').checked = true; fire($('dropMR'), 'change');
 ok(car2.children[0].material.roughnessMap === null && car2.children[0].material.metalnessMap === null && live2.children[0].material.roughnessMap === null, 'ticking "metallic/roughness" removes the map from the original view and the reduced preview');
@@ -138,5 +138,20 @@ L.setColour({ g: 0.5 }); L.applyToDocument(docC); ok(Math.abs(dm.rf - 0.3) < 1e-
 L.setColour({ g: 1, s: 0 }); const nC = await L.applyColourToDocument(docC);
 ok(nC === 1 && Math.abs(dm.bc[0] - dm.bc[1]) < 0.03 && dm.bc[3] === 1, 'the saved GLB gets the corrected plain colour, alpha kept: ' + dm.bc.map(v => v.toFixed(2)));
 L.setColour({ s: 1 }); const dm2 = mkDocMat(); ok(await L.applyColourToDocument({ getRoot: () => ({ listMaterials: () => [dm2] }) }) === 0 && dm2.bc[1] === 0.5, 'with the colour sliders neutral the saved GLB colours are left alone');
+
+/* ---------- data maps saved at half size ---------- */
+const dtex = { n: 'orm' }, ctex = { n: 'colour' }, ntex = { n: 'normal' };
+const dmat = { getMetallicRoughnessTexture: () => dtex, getOcclusionTexture: () => dtex, getBaseColorTexture: () => ctex, getNormalTexture: () => ntex, getEmissiveTexture: () => null };
+const ddoc = { getRoot: () => ({ listMaterials: () => [dmat] }) };
+ok($('smallData').checked && L.smallData === true, 'the "half size" option starts on');
+ok(L.textureCap(ddoc, dtex, 1024) === 512 && L.textureCap(ddoc, dtex, 256) === 256, 'a metallic/roughness/AO picture is capped at 512px but never enlarged');
+ok(L.textureCap(ddoc, ctex, 1024) === 1024 && L.textureCap(ddoc, ntex, 1024) === 1024, 'colour and normal pictures keep the chosen size');
+const shared = { ...dmat, getBaseColorTexture: () => dtex };
+ok(L.textureCap({ getRoot: () => ({ listMaterials: () => [shared] }) }, dtex, 1024) === 1024, 'an image that is also the base colour keeps the full size');
+w.__shrinkApp.originalModel = car2; w.__shrinkApp.optimizedModel = null; w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await new Promise(r => setTimeout(r, 30));
+$('smallData').checked = false; fire($('smallData'), 'change');
+ok(L.smallData === false && L.textureCap(ddoc, dtex, 1024) === 1024 && Math.abs(L.savings().mr.file - 1024 * 1024 * 0.4) < 1, 'switched off, everything keeps the chosen size and the savings follow');
+w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await new Promise(r => setTimeout(r, 20));
+ok(L.smallData === true && $('smallData').checked, 'a new model starts with it on again');
 
 console.log('all passed'); process.exit(0);

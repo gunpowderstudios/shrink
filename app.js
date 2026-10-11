@@ -858,7 +858,8 @@ async function convertTexturesToWebP(document, maxSize, quality, progressStart =
       console.warn(`Skipping unsupported texture ${i + 1}:`, err);
       continue;
     }
-    const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+    const cap = window.__shrinkMaterial?.textureCap?.(document, texture, maxSize) ?? maxSize;   // data maps may be smaller than colour
+    const scale = Math.min(1, cap / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));
     const height = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = documentCanvas(width, height);

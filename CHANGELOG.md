@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.78 — Smaller GLBs without losing looks: data maps at half size
+
+- Pictures that only feed metallic/roughness or AO are now saved at no more than 512px (never enlarged); colour and normal maps keep the chosen size. These maps hold smooth values, so this is the cheapest saving that is barely visible. On by default, with a tick-box in Material look › Smaller file ("Save these two maps at half size") to turn it off. The file-size estimate and the drop-map savings follow it.
+- A picture that is also used as base colour, normal or emissive keeps the full size.
+- Not run against a real GLB in a browser (the resize happens in the WebP step).
+
 ## v2.77 — Game mode viewer: no more washed-out models
 
 - The preview was lit three ways at once (studio reflections + three bright lamps) and tone-mapped with ACES, which brightens and desaturates colours. Game mode now uses the studio light with low-key lamps and Khronos Neutral tone mapping, so a model looks like its textures. Print mode is unchanged.

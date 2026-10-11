@@ -10,6 +10,8 @@
   let hue = 0, sat = 1, bright = 1, gloss = 1;     // colour correction (degrees / multipliers) and reflection (roughness multiplier, <= 1 = shinier)
   const BAKED = new Map();                         // original base-colour texture -> { key, tex } (a corrected copy for the preview)
   const PREVIEW_PX = 1024;
+  let smallData = true;                            // data maps (metallic/roughness, AO) are saved at no more than DATA_CAP px: they hold smooth values, so it is barely visible
+  const DATA_CAP = 512;
   const MAPS = new WeakMap();                      // original material -> its own maps (textures must not go in userData: clone() would copy them)
 
   /* ---------- colour correction ---------- */
@@ -159,6 +161,18 @@
     return n;
   }
 
+  // Export: how large a texture may be. A picture that only feeds metallic/roughness or AO is capped at 512px; colour and
+  // normal maps keep the chosen size.
+  function textureCap(doc, tex, cap) {
+    if (!smallData || !doc) return cap;
+    let data = false, other = false;
+    for (const m of doc.getRoot().listMaterials()) {
+      if (m.getMetallicRoughnessTexture?.() === tex || m.getOcclusionTexture?.() === tex) data = true;
+      if (m.getBaseColorTexture?.() === tex || m.getNormalTexture?.() === tex || m.getEmissiveTexture?.() === tex) other = true;
+    }
+    return data && !other ? Math.min(cap, DATA_CAP) : cap;
+  }
+
   // What dropping a map would save. A texture is only freed if every slot that uses it is being dropped, and never if
   // it is also the base colour, normal or emissive image.
   function savings() {
@@ -177,7 +191,7 @@
       let file = 0, gpu = 0, count = 0;
       for (const [uuid, e] of tex) {
         if (used.has(uuid) || ![...e.slots].every(sl => want.has(sl))) continue;
-        const sc = Math.min(1, cap / Math.max(e.w, e.h)), w = Math.max(1, Math.round(e.w * sc)), h = Math.max(1, Math.round(e.h * sc));
+        const sc = Math.min(1, (smallData ? Math.min(cap, DATA_CAP) : cap) / Math.max(e.w, e.h)), w = Math.max(1, Math.round(e.w * sc)), h = Math.max(1, Math.round(e.h * sc));
         file += w * h * (webp ? 0.4 : 1.5); gpu += w * h * 4 * 1.33; count++;
       }
       return { file, gpu, count };
@@ -280,6 +294,7 @@
       <div id="dropMapsBlock" class="control-block" hidden><div class="label">Smaller file</div>
         <label id="dropMRRow" class="toggle-row"><span>Drop the metallic/roughness map <small id="dropMRRowSave" class="dim"></small></span><input id="dropMR" type="checkbox"></label>
         <div id="roughWrap" hidden><div class="range-heading"><label for="roughVal">Roughness without the map</label><output id="roughValue">50%</output></div><input id="roughVal" type="range" min="0" max="100" step="1" value="50"></div>
+        <label id="smallDataRow" class="toggle-row"><span>Save these two maps at half size <small class="dim">(recommended: smooth data, barely visible)</small></span><input id="smallData" type="checkbox" checked></label>
         <label id="dropAORow" class="toggle-row"><span>Drop the occlusion (AO) map <small id="dropAORowSave" class="dim"></small></span><input id="dropAO" type="checkbox"></label>
         <div class="hint">Removes the picture and uses one flat value instead. The metallic/roughness map controls where the car is shiny or dull, so check the preview. Applies to the preview and the saved GLB.</div></div></div>`;
     host.insertBefore(d, before);
@@ -294,6 +309,7 @@
       $(id).addEventListener('input', () => { const v = Number($(id).value); setColour({ [key]: key === 'h' ? v : v / 100 }); });
     $('colourReset').addEventListener('click', () => setColour({ h: 0, s: 1, b: 1 }));
     $('dropMR').addEventListener('change', () => setMaps({ mr: $('dropMR').checked }));
+    $('smallData').addEventListener('change', () => { smallData = $('smallData').checked; renderMaps(); window.dispatchEvent(new CustomEvent('shrink:material-look', { detail: { smallData } })); });
     $('dropAO').addEventListener('change', () => setMaps({ ao: $('dropAO').checked }));
     $('roughVal').addEventListener('input', () => setMaps({ r: Number($('roughVal').value) / 100 }));
     for (const id of ['textureSize', 'webpToggle']) $(id)?.addEventListener('change', renderMaps);
@@ -301,9 +317,9 @@
   }
 
   // A newly opened model starts "as in the file". Rebuilt previews (live reducer, texture apply) re-use the current setting.
-  window.addEventListener('shrink:model-opened', () => { scale = 1; hue = 0; sat = 1; bright = 1; gloss = 1; for (const b of BAKED.values()) b.tex.dispose?.(); BAKED.clear(); dropMR = false; dropAO = false; rough = 0.5; setTimeout(() => { const a = app(); if (a) capture(a.originalModel); for (const id of ['dropMR', 'dropAO']) if ($(id)) $(id).checked = false; render(); renderMaps(); renderColour(); }, 0); });
+  window.addEventListener('shrink:model-opened', () => { smallData = true; if ($('smallData')) $('smallData').checked = true; scale = 1; hue = 0; sat = 1; bright = 1; gloss = 1; for (const b of BAKED.values()) b.tex.dispose?.(); BAKED.clear(); dropMR = false; dropAO = false; rough = 0.5; setTimeout(() => { const a = app(); if (a) capture(a.originalModel); for (const id of ['dropMR', 'dropAO']) if ($(id)) $(id).checked = false; render(); renderMaps(); renderColour(); }, 0); });
   for (const ev of ['shrink:live-ready', 'shrink:live-updated', 'shrink:texture-applied', 'shrink:optimized']) window.addEventListener(ev, () => { applyToViewer(); render(); });
 
-  window.__shrinkMaterial = { applyToModel, applyToDocument, applyColourToDocument, applyToViewer, setScale, setColour, colourMatrix, adjustRGBA, setMaps, savings, refresh: renderMaps, get metalScale() { return scale; }, get colour() { return { hue, sat, bright, gloss }; }, get changed() { return Math.abs(scale - 1) > 1e-6 || dropMR || dropAO || !colourIsIdentity() || gloss < 1 - 1e-6; } };
+  window.__shrinkMaterial = { applyToModel, applyToDocument, applyColourToDocument, textureCap, applyToViewer, setScale, setColour, colourMatrix, adjustRGBA, setMaps, savings, refresh: renderMaps, get metalScale() { return scale; }, get smallData() { return smallData; }, get colour() { return { hue, sat, bright, gloss }; }, get changed() { return Math.abs(scale - 1) > 1e-6 || dropMR || dropAO || !colourIsIdentity() || gloss < 1 - 1e-6; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject, { once: true }); else inject();
 })();
