@@ -86,7 +86,7 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">GUNPOWDER STUDIOS</div>
-        <div class="title-row"><h1>SHRINK 3D</h1><span class="version-badge">v2.73</span></div>
+        <div class="title-row"><h1>SHRINK 3D</h1><span class="version-badge">v2.74</span></div>
         <p class="subtitle">An app for reducing and optimising 3D files for gaming or 3D printing.</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
@@ -135,6 +135,7 @@
           <div class="control-block slider-block"><div class="range-heading"><label for="geometry">Detail kept</label><div class="geometry-number"><input id="geometryNumber" type="number" min="1" max="100" step="0.1" value="70" inputmode="decimal" aria-label="Detail kept percentage" /><span>%</span><output id="geometryValue" aria-hidden="true">70%</output></div></div><input id="geometry" type="range" min="1" max="100" step="0.1" value="70" /><div class="slider-ends"><span>Smaller</span><span>More detail</span></div></div>
           <div class="live-card"><div id="liveLine" class="live-line">—</div><div id="verdict" class="verdict" data-level="none"><span class="v-dot"></span><span id="verdictText">Measuring…</span></div><div id="verdictNums" class="verdict-nums"></div></div>
           <div class="detail-row"><button id="autoBtn" class="button small auto-btn" type="button">✨ Find the smallest that still looks the same</button></div>
+          <div class="detail-row game-only"><button id="readyBtn" class="button small auto-btn" type="button">🎮 Make it game-ready</button></div>
           <label class="field tri-field"><span>…or type a triangle count</span><input id="targetTris" type="number" min="1" step="1000" /></label>
           <div id="estimateLine" class="hidden"></div><div id="actualLine" class="hidden"></div><div id="topoLine" class="topo-line print-only" hidden></div>
           <div class="hidden-legacy"><select id="preset"><option value="safe">High quality</option><option value="game" selected>Balanced</option><option value="small">Small file</option><option value="aggressive">Maximum reduction</option><option value="custom">Custom</option></select></div>
@@ -185,8 +186,8 @@
   <script type="module" src="./paint-input-fix.js?v=2.18"></script>
   <script type="module" src="./brush-cursor.js?v=2.18"></script>
   <script type="module" src="./print-tools.js?v=2.58"></script>
-  <script type="module" src="./ui-mode.js?v=2.73"></script>
+  <script type="module" src="./ui-mode.js?v=2.74"></script>
   <script type="module" src="./viewer-auto-button.js?v=2.26"></script>
-  <script type="module" src="./live-ui.js?v=2.57"></script>
+  <script type="module" src="./live-ui.js?v=2.74"></script>
 </body>
 </html>

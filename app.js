@@ -648,8 +648,8 @@ async function downloadEdited() {
   if (!sourceBytes || !sourceFile) return;
   let bytes = sourceBytes;
   const look = window.__shrinkMaterial;
-  if (look && Math.abs(look.metalScale - 1) > 1e-6) {          // Material look changed: write it into the edited GLB too
-    try { const doc = await io.readBinary(sourceBytes); look.applyToDocument(doc); bytes = await io.writeBinary(doc); }
+  if (look?.changed) {          // Material look changed: write it into the edited GLB too
+    try { const doc = await io.readBinary(sourceBytes); look.applyToDocument(doc); await doc.transform(prune()); bytes = await io.writeBinary(doc); }
     catch (err) { console.error(err); setStatus(`Saved without the Material look change: ${err.message}`, true); }
   }
   downloadBytes(bytes, `${baseName()}-edited.glb`);

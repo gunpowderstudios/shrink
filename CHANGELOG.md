@@ -2,6 +2,25 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.74 — Game mode: size breakdown, "Make it game-ready", drop maps that add little
+
+### Why
+On a scanned car at 37k triangles the GLB was still ~5 MB: the mesh is ~0.4 MB, the three 2048px textures are ~4.8 MB (and ~64 MB of graphics memory). More triangle reduction does not help; texture work does.
+
+### Added
+- **Size breakdown** under "GLB file ≈": *of that: textures ≈ X · mesh ≈ Y*.
+- **🎮 Make it game-ready** (Game mode, under "Find the smallest…"): turns WebP + Meshopt on, runs the smallest-that-still-looks-the-same search, never goes above the chosen budget (web 25k / PC 100k / hero 300k), then says where the remaining megabytes are and what else could go (e.g. a smaller "Largest texture size", or the maps below).
+- **Material look → Smaller file**: *Drop the metallic/roughness map* (flat roughness slider, default 50%; metal falls to 20% so the car does not turn chrome without its map) and *Drop the occlusion (AO) map*. Each row says what it would save (file + graphics memory, sized at the current texture cap). A packed ORM image is only freed when both maps are dropped, and the panel says so; an image that is also the base colour/normal/emissive map is never offered. Rows hide when the model has no such map.
+- Applies to the live preview (original and reduced; un-ticking restores the real maps) and to the saved game GLB / Save edited GLB (`prune()` removes the orphaned images).
+
+### Not covered by an automated test
+- The **Make it game-ready** button flow itself (it drives the real reducer's `runExact`); verified by reading only. The size breakdown line and the maps logic are covered (`tests/material.test.mjs`, 245 checks pass overall).
+
+### Version boundaries
+- Visible release **v2.74**; `live-ui.js` key 2.57 → 2.74 in `index.html` (it changed); `live-reduce.js` stays 2.57.
+
+---
+
 ## v2.73 — Game mode: Material look (turn down the metallic effect)
 
 ### Added

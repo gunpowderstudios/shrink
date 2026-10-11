@@ -388,3 +388,4 @@ A good Simple-mode run should:
 - Cross-sections go through `buildSlicer()` (one pass, height bins); pass the slicer along instead of re-walking the mesh. Long searches must `await` between steps.
 - `split-print.js` must stay safe against being loaded twice (`DUPLICATE_LOAD`).
 - Game-mode material tweaks go through `material-look.js` (`__shrinkMaterial`): scale from `userData._shrinkOrigMetal`, never from the current value; the same factor is applied to the glTF-Transform document at export.
+- Dropped maps (metallic/roughness, AO) are a preview + export option in `material-look.js` only; original maps are kept in a `WeakMap`, never in `userData` (material.clone() would copy textures through it).
