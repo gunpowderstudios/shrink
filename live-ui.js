@@ -212,6 +212,23 @@ el.detail?.addEventListener('input', () => scheduleMeasure(500));
 el.height?.addEventListener('input', () => { updateLiveLine(); scheduleMeasure(500); });
 
 /* ---------------- Auto: smallest that still looks the same ---------------- */
+// Game mode: after the search, say where the megabytes are and what else could go. Changes no settings.
+async function gameReport(tris) {
+  await new Promise(r => setTimeout(r, 0));
+  window.__shrinkMaterial?.refresh?.();
+  const tx = textureEstimate();
+  const glb = glbBytesEstimate(tris, { meshopt: el.meshopt?.checked !== false, textureBytes: tx.file });
+  let msg = ` File ≈ ${fmtBytes(glb)} (textures ≈ ${fmtBytes(tx.file)}, mesh ≈ ${fmtBytes(Math.max(0, glb - tx.file))}).`;
+  const t = GAME_TARGETS[S.target];
+  if (t && tris > t.tris) msg += ` That is above your ${fmt(t.tris)} triangle target for ${t.label}; lower "Detail kept" if you need to hit it.`;
+  if (tx.file > glb * 0.6) msg += ' Textures are most of the file — a smaller "Largest texture size" saves more than fewer triangles.';
+  if (el.webp && !el.webp.checked) msg += ' WebP textures are off; turning them on shrinks the file.';
+  if (el.meshopt && !el.meshopt.checked) msg += ' Meshopt is off; turning it on shrinks the mesh.';
+  const sv = window.__shrinkMaterial?.savings?.();
+  const extra = sv && [sv.mr.count && `the metallic/roughness map (≈ ${fmtBytes(sv.mr.file)})`, sv.ao.count && `the occlusion map (≈ ${fmtBytes(sv.ao.file)})`].filter(Boolean);
+  if (extra?.length) msg += ` You could also drop ${extra.join(' and ')} under Material look.`;
+  return msg;
+}
 async function autoFind() {
   if (S.autoRunning || !engine.ready || !S.tris) return;
   S.autoRunning = true; el.auto.disabled = true; engine.lock(true);
@@ -233,7 +250,8 @@ async function autoFind() {
     setRatio(best, { notify: false });
     el.geometry.dispatchEvent(new Event('input', { bubbles: true }));   // labels only: engine is locked
     const tris = Math.round(S.tris * best);
-    say(best >= 0.999 ? 'Every polygon matters here — at this printer detail nothing can be removed without a visible change.' : `Found it: about ${fmt(tris)} triangles (${(best * 100).toFixed(1)}%) looks the same at this ${mode() === 'print' ? 'printer detail' : 'quality bar'}.`);
+    const base = best >= 0.999 ? 'Every polygon matters here — at this printer detail nothing can be removed without a visible change.' : `Found it: about ${fmt(tris)} triangles (${(best * 100).toFixed(1)}%) looks the same at this ${mode() === 'print' ? 'printer detail' : 'quality bar'}.`;
+    say(mode() === 'print' ? base : base + await gameReport(tris));
   } catch (err) {
     console.error(err); say(`Auto search stopped: ${err.message}`, true);
   } finally {
@@ -243,30 +261,6 @@ async function autoFind() {
 }
 el.auto?.addEventListener('click', autoFind);
 
-// One click for a game: compact texture formats on, the smallest mesh that still looks the same, never above the chosen
-// budget, then say where the remaining megabytes are and what else could go.
-async function gameReady() {
-  if (S.autoRunning || !engine.ready || !S.tris || mode() === 'print') return;
-  const btn = $('readyBtn'); if (btn) btn.disabled = true;
-  try {
-    for (const x of [el.webp, el.meshopt]) if (x && !x.checked) { x.checked = true; x.dispatchEvent(new Event('change', { bubbles: true })); }
-    await autoFind();
-    const t = GAME_TARGETS[S.target];
-    if (t && ratio() * S.tris > t.tris) setRatio(t.tris / S.tris);
-    await new Promise(r => setTimeout(r, 0));
-    window.__shrinkMaterial?.refresh?.();
-    const tris = Math.round(S.tris * ratio()), tx = textureEstimate();
-    const glb = glbBytesEstimate(tris, { meshopt: el.meshopt?.checked !== false, textureBytes: tx.file });
-    let msg = `Game-ready: about ${fmt(tris)} triangles · GLB ≈ ${fmtBytes(glb)} (textures ≈ ${fmtBytes(tx.file)}, mesh ≈ ${fmtBytes(Math.max(0, glb - tx.file))}).`;
-    const sv = window.__shrinkMaterial?.savings?.();
-    const extra = sv && [sv.mr.count && `the metallic/roughness map (≈ ${fmtBytes(sv.mr.file)})`, sv.ao.count && `the occlusion map (≈ ${fmtBytes(sv.ao.file)})`].filter(Boolean);
-    if (tx.file > glb * 0.6) msg += ' Textures are most of the file now — a smaller "Largest texture size" saves more than more triangles.';
-    if (extra?.length) msg += ` You could also drop ${extra.join(' and ')} under Material look.`;
-    say(msg);
-  } catch (err) { console.error(err); say(`Could not finish: ${err.message}`, true); }
-  finally { if (btn) btn.disabled = false; }
-}
-$('readyBtn')?.addEventListener('click', gameReady);
 window.addEventListener('shrink:material-look', () => { gatherTextures(); updateLiveLine(S.lastLive?.triangles); });
 
 // Simple mode normally skips the expensive BVH quality measurement. Compare is the explicit exception.

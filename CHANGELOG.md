@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.75 — One button: "Make it game-ready" merged into "Find the smallest…"
+
+- Removed the separate 🎮 button. In Game mode, **Find the smallest that still looks the same** (panel and the red button under the viewer) now also reports the file size split (textures / mesh), warns if above the chosen triangle target, and hints at texture size, WebP/Meshopt if off, and droppable maps.
+- It no longer switches WebP/Meshopt on or caps triangles at the target; it only tells you. Print mode is unchanged (geometry only).
+- Untested in a real browser; the search itself is unchanged.
+
 ## v2.74 — Game mode: size breakdown, "Make it game-ready", drop maps that add little
 
 ### Why
