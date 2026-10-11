@@ -649,7 +649,7 @@ async function downloadEdited() {
   let bytes = sourceBytes;
   const look = window.__shrinkMaterial;
   if (look?.changed) {          // Material look changed: write it into the edited GLB too
-    try { const doc = await io.readBinary(sourceBytes); look.applyToDocument(doc); await doc.transform(prune()); bytes = await io.writeBinary(doc); }
+    try { const doc = await io.readBinary(sourceBytes); look.applyToDocument(doc); await look.applyColourToDocument?.(doc); await doc.transform(prune()); bytes = await io.writeBinary(doc); }
     catch (err) { console.error(err); setStatus(`Saved without the Material look change: ${err.message}`, true); }
   }
   downloadBytes(bytes, `${baseName()}-edited.glb`);
@@ -764,6 +764,7 @@ async function optimizeModel() {
     await MeshoptEncoder.ready;
     const document = await io.readBinary(sourceBytes);
     window.__shrinkMaterial?.applyToDocument?.(document);      // Material look: the saved GLB gets the same metallic setting as the preview
+    await window.__shrinkMaterial?.applyColourToDocument?.(document);   // colour correction repaints the base-colour picture (before it is resized)
     const keepRatio = Number(els.geometry.value) / 100;
 
     lastReduce = null;

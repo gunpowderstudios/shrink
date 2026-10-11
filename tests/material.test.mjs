@@ -84,4 +84,59 @@ ok(L.savings().ao.count === 0, 'an image that is also the base colour is never o
 const plain = new THREE.Group(); plain.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mk2({}))); w.__shrinkApp.originalModel = plain; w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await new Promise(r => setTimeout(r, 30));
 ok($('dropMapsBlock').hidden === true, 'a model with no such maps hides the Smaller file block');
 
+/* ---------- Colour correction + reflection ---------- */
+// jsdom has no canvas: a tiny fake that keeps the pixels so the real maths runs end to end
+w.HTMLCanvasElement.prototype.getContext = function () {
+  const cv = this; return {
+    drawImage(im) { cv._px = new Uint8ClampedArray(im.px); cv._w = cv.width; cv._h = cv.height; },
+    getImageData() { return { data: cv._px, width: cv._w, height: cv._h }; }, putImageData() {} };
+};
+const yellow = [230, 190, 20, 255];
+const mkImg = () => ({ width: 2, height: 2, px: [...yellow, ...yellow, ...yellow, ...yellow] });
+const hsl = ([r, g, b]) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); const d = mx - mn; const h = d === 0 ? 0 : mx === r ? ((g - b) / d + 6) % 6 * 60 : mx === g ? ((b - r) / d + 2) * 60 : ((r - g) / d + 4) * 60; return { h, s: mx === 0 ? 0 : d / mx, v: mx }; };
+// pure maths
+const id = L.colourMatrix(0, 1, 1); ok(id.every((v, i) => Math.abs(v - [1, 0, 0, 0, 1, 0, 0, 0, 1][i]) < 1e-9), 'the neutral colour matrix is the identity');
+const grey = L.adjustRGBA(new Float32Array(yellow), L.colourMatrix(0, 0, 1)); ok(Math.abs(grey[0] - grey[1]) < 1.5 && Math.abs(grey[1] - grey[2]) < 1.5, 'saturation 0 makes yellow grey: ' + [...grey].slice(0, 3).map(Math.round));
+const blue = L.adjustRGBA(new Float32Array(yellow), L.colourMatrix(180, 1, 1)); ok(hsl([...blue]).h > 180 && hsl([...blue]).h < 270, 'hue +180 turns yellow bluish: ' + [...blue].slice(0, 3).map(Math.round));
+const dim = L.adjustRGBA(new Float32Array(yellow), L.colourMatrix(0, 1, 0.5)); ok(Math.abs(dim[0] - 115) < 1 && dim[3] === 255, 'brightness 50% halves the values and leaves alpha alone');
+const pal = L.adjustRGBA(new Float32Array(yellow), L.colourMatrix(0, 1.6, 1)); ok(pal[0] >= 230 && pal[2] < 20 + 1, 'saturation 160% pushes yellow further out and clips at 0..255: ' + [...pal].slice(0, 3).map(Math.round));
+
+// preview: textured material gets a corrected COPY; the original picture is never touched
+const orig = new THREE.Texture(mkImg()); orig.colorSpace = THREE.SRGBColorSpace;
+const paint = new THREE.MeshStandardMaterial({ map: orig, roughness: 0.6, metalness: 0 });
+const plainM = new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(0.8, 0.5, 0.05), roughness: 0.5 });
+const carC = new THREE.Group(); carC.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), paint), new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), plainM));
+const liveC = carC.clone(true); liveC.traverse(o => { if (o.isMesh) o.material = o.material.clone(); });
+w.__shrinkApp.originalModel = carC; w.__shrinkApp.optimizedModel = liveC;
+w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await new Promise(r => setTimeout(r, 30));
+ok(!!$('hueShift') && !!$('satScale') && !!$('brightScale') && !!$('glossScale'), 'the panel has Hue, Saturation, Brightness and Reflection sliders');
+const origPx = [...orig.image.px];
+L.setColour({ s: 0 });
+const pm = carC.children[0].material.map, lm = liveC.children[0].material.map;
+ok(pm && pm !== orig && pm.source !== orig.source && lm === pm, 'saturation 0: the preview uses a corrected copy with its own image source, in both views');
+ok(JSON.stringify([...orig.image.px]) === JSON.stringify(origPx), 'the original picture is not modified');
+ok(Math.abs(pm.image._px[0] - pm.image._px[1]) < 2, 'the corrected picture really is grey now');
+ok(pm.userData.origW === 2, 'the copy remembers the original size so size estimates stay right');
+const c1 = carC.children[1].material.color; ok(Math.abs(c1.r - c1.g) < 0.02, 'a plain colour value is corrected too: ' + [c1.r, c1.g, c1.b].map(v => v.toFixed(2)));
+ok(L.changed === true && $('satScaleValue').textContent === '0%', 'it counts as a change and the label says 0%');
+$('colourReset').click();
+ok(carC.children[0].material.map === orig && Math.abs(carC.children[1].material.color.g - 0.5) < 1e-6 && L.changed === false, 'Reset colour puts the file\'s own picture and colour back exactly');
+$('hueShift').value = '90'; fire($('hueShift'), 'input'); ok(L.colour.hue === 90 && $('hueShiftValue').textContent === '+90°', 'the Hue slider drives the setting');
+$('colourReset').click(); fire($('hueShift'), 'input');   // slider value still 90 in the DOM? reset must also move it
+$('hueShift').value = '0'; L.setColour({ h: 0 });
+
+// reflection = roughness multiplier, from the file's own value
+L.setColour({ g: 0.5 }); ok(Math.abs(carC.children[0].material.roughness - 0.3) < 1e-9 && Math.abs(liveC.children[0].material.roughness - 0.3) < 1e-9, 'Reflection 50% halves the roughness in both views');
+L.setColour({ g: 0.8 }); L.setColour({ g: 1 }); ok(Math.abs(carC.children[0].material.roughness - 0.6) < 1e-9, 'and goes back to exactly the file\'s value');
+
+// export: glTF-Transform fake with factors and a texture
+const mkDocMat = () => ({ bc: [0.8, 0.5, 0.05, 1], rf: 0.6, mf: 1, tex: null, getMetallicFactor() { return this.mf; }, setMetallicFactor(v) { this.mf = v; return this; }, getRoughnessFactor() { return this.rf; }, setRoughnessFactor(v) { this.rf = v; return this; },
+  getMetallicRoughnessTexture: () => null, getOcclusionTexture: () => null, getEmissiveTexture: () => null, getNormalTexture: () => null,
+  getBaseColorTexture() { return this.tex; }, setBaseColorTexture(t) { this.tex = t; return this; }, getBaseColorFactor() { return this.bc; }, setBaseColorFactor(v) { this.bc = v; return this; } });
+const dm = mkDocMat(), docC = { getRoot: () => ({ listMaterials: () => [dm] }) };
+L.setColour({ g: 0.5 }); L.applyToDocument(docC); ok(Math.abs(dm.rf - 0.3) < 1e-9, 'the saved GLB gets the same reflection setting');
+L.setColour({ g: 1, s: 0 }); const nC = await L.applyColourToDocument(docC);
+ok(nC === 1 && Math.abs(dm.bc[0] - dm.bc[1]) < 0.03 && dm.bc[3] === 1, 'the saved GLB gets the corrected plain colour, alpha kept: ' + dm.bc.map(v => v.toFixed(2)));
+L.setColour({ s: 1 }); const dm2 = mkDocMat(); ok(await L.applyColourToDocument({ getRoot: () => ({ listMaterials: () => [dm2] }) }) === 0 && dm2.bc[1] === 0.5, 'with the colour sliders neutral the saved GLB colours are left alone');
+
 console.log('all passed'); process.exit(0);

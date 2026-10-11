@@ -1,4 +1,4 @@
-// SHRINK 3D v2.73 — Material look (Game mode): turn down the metallic effect of a GLB.
+// SHRINK 3D v2.76 — Material look (Game mode): turn down the metallic effect of a GLB.
 // glTF "metallic" makes a surface mirror its surroundings and tint the reflection with its own colour, so a scanned car with
 // metallic = 1 looks like chrome. The slider scales every material's metallic factor (it also scales a metallic texture,
 // because glTF multiplies the two). It changes the live preview AND the saved GLB, never the original upload.
@@ -7,7 +7,58 @@
   const app = () => window.__shrinkApp;
   let scale = 1;                                   // 1 = exactly as in the file
   let dropMR = false, dropAO = false, rough = 0.5; // optional: remove maps that add little, to make the file smaller
+  let hue = 0, sat = 1, bright = 1, gloss = 1;     // colour correction (degrees / multipliers) and reflection (roughness multiplier, <= 1 = shinier)
+  const BAKED = new Map();                         // original base-colour texture -> { key, tex } (a corrected copy for the preview)
+  const PREVIEW_PX = 1024;
   const MAPS = new WeakMap();                      // original material -> its own maps (textures must not go in userData: clone() would copy them)
+
+  /* ---------- colour correction ---------- */
+  // One 3x3 matrix = hue rotation, then saturation, then brightness (the same maths as the CSS hue-rotate/saturate/brightness filters).
+  function colourMatrix(h = hue, s = sat, b = bright) {
+    const a = h * Math.PI / 180, c = Math.cos(a), n = Math.sin(a);
+    const H = [.213 + c * .787 - n * .213, .715 - c * .715 - n * .715, .072 - c * .072 + n * .928,
+               .213 - c * .213 + n * .143, .715 + c * .285 + n * .140, .072 - c * .072 - n * .283,
+               .213 - c * .213 - n * .787, .715 - c * .715 + n * .715, .072 + c * .928 + n * .072];
+    const S = [.213 + .787 * s, .715 - .715 * s, .072 - .072 * s, .213 - .213 * s, .715 + .285 * s, .072 - .072 * s, .213 - .213 * s, .715 - .715 * s, .072 + .928 * s];
+    const M = new Array(9);                          // M = S * H
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) M[r * 3 + k] = (S[r * 3] * H[k] + S[r * 3 + 1] * H[3 + k] + S[r * 3 + 2] * H[6 + k]) * b;
+    return M;
+  }
+  const colourIsIdentity = () => Math.abs(hue) < 1e-6 && Math.abs(sat - 1) < 1e-6 && Math.abs(bright - 1) < 1e-6;
+  const clamp255 = v => v < 0 ? 0 : v > 255 ? 255 : v;
+  function adjustRGBA(data, M = colourMatrix()) {   // in place, sRGB 0-255, alpha untouched
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      data[i] = clamp255(M[0] * r + M[1] * g + M[2] * b); data[i + 1] = clamp255(M[3] * r + M[4] * g + M[5] * b); data[i + 2] = clamp255(M[6] * r + M[7] * g + M[8] * b);
+    }
+    return data;
+  }
+  const toSRGB = c => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  const toLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  function adjustLinear(rgb, M = colourMatrix()) {   // a linear 0-1 colour factor
+    const v = rgb.map(x => toSRGB(Math.max(0, Math.min(1, x))) * 255), d = adjustRGBA(new Float32Array([v[0], v[1], v[2], 255]), M);
+    return [toLinear(d[0] / 255), toLinear(d[1] / 255), toLinear(d[2] / 255)];
+  }
+  const makeCanvas = (w, h) => { if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h); const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+  // Preview copy of a base-colour texture, corrected and capped at 1024px. It gets its OWN image source: Texture.clone() shares
+  // the original's Source, so assigning .image on the clone would overwrite the real picture.
+  function bakeTexture(orig) {
+    const key = `${hue}|${sat}|${bright}`, hit = BAKED.get(orig);
+    if (hit && hit.key === key) return hit.tex;
+    const im = orig.image, w0 = im?.naturalWidth || im?.width, h0 = im?.naturalHeight || im?.height;
+    if (!w0 || !h0) return null;
+    const sc = Math.min(1, PREVIEW_PX / Math.max(w0, h0)), w = Math.max(1, Math.round(w0 * sc)), h = Math.max(1, Math.round(h0 * sc));
+    let data, ctx;
+    try {
+      const cv = makeCanvas(w, h); ctx = cv.getContext('2d', { willReadFrequently: true }); if (!ctx) return null;
+      ctx.drawImage(im, 0, 0, w, h); data = ctx.getImageData(0, 0, w, h); adjustRGBA(data.data); ctx.putImageData(data, 0, 0);
+      const tex = orig.clone(); if (orig.source?.constructor) tex.source = new orig.source.constructor(cv); else tex.image = cv;
+      tex.userData = { origW: w0, origH: h0 }; tex.needsUpdate = true;
+      if (hit) hit.tex.dispose?.();
+      BAKED.set(orig, { key, tex }); return tex;
+    } catch (err) { console.warn('Colour preview skipped:', err); return null; }
+  }
 
   function materialsOf(model) {
     const out = new Set();
@@ -27,7 +78,7 @@
   }
 
   function capture(model) {
-    for (const m of materialsOf(model)) if (!MAPS.has(m)) MAPS.set(m, { roughnessMap: m.roughnessMap || null, metalnessMap: m.metalnessMap || null, aoMap: m.aoMap || null, roughness: m.roughness });
+    for (const m of materialsOf(model)) if (!MAPS.has(m)) MAPS.set(m, { roughnessMap: m.roughnessMap || null, metalnessMap: m.metalnessMap || null, aoMap: m.aoMap || null, roughness: m.roughness, map: m.map || null, color: m.color ? [m.color.r, m.color.g, m.color.b] : null });
   }
 
   // Preview of dropped maps. The reduced preview's materials are clones of the original's, matched by order, so ticking
@@ -41,8 +92,16 @@
       const want = { roughnessMap: dropMR ? null : saved.roughnessMap, metalnessMap: dropMR ? null : saved.metalnessMap, aoMap: dropAO ? null : saved.aoMap };
       let dirty = false;
       for (const k of Object.keys(want)) if ((m[k] || null) !== want[k]) { m[k] = want[k]; dirty = true; }
-      const r = dropMR ? rough : saved.roughness;
+      const r = (dropMR ? rough : saved.roughness) * gloss;
       if (m.roughness !== r) m.roughness = r;
+      // colour: the picture if there is one, otherwise the plain colour value
+      if (saved.map) {
+        const wantMap = colourIsIdentity() ? saved.map : (bakeTexture(saved.map) || saved.map);
+        if (m.map !== wantMap) { m.map = wantMap; dirty = true; }
+      } else if (saved.color && m.color) {
+        const c = colourIsIdentity() ? saved.color : adjustLinear(saved.color);
+        if (m.color.r !== c[0] || m.color.g !== c[1] || m.color.b !== c[2]) m.color.setRGB(c[0], c[1], c[2]);
+      }
       if (dirty) m.needsUpdate = true;
     });
   }
@@ -64,6 +123,38 @@
       }
       if (dropMR && m.getMetallicRoughnessTexture()) { m.setMetallicRoughnessTexture(null); m.setRoughnessFactor(rough); n++; }
       if (dropAO && m.getOcclusionTexture()) { m.setOcclusionTexture(null); n++; }
+      if (gloss < 1 - 1e-6) { m.setRoughnessFactor(Math.max(0, m.getRoughnessFactor() * gloss)); n++; }
+    }
+    return n;
+  }
+
+  // Export, colour part (async: it has to repaint the picture). Run it before the textures are resized.
+  async function decodeToCanvas(tex) {
+    const bmp = await createImageBitmap(new Blob([tex.getImage()], { type: tex.getMimeType() || 'image/png' }));
+    const cv = makeCanvas(bmp.width, bmp.height), ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(bmp, 0, 0); bmp.close?.(); return { cv, ctx, w: cv.width, h: cv.height };
+  }
+  async function toBytes(cv, mime) {
+    const type = mime === 'image/jpeg' ? 'image/jpeg' : 'image/png', blob = cv.convertToBlob ? await cv.convertToBlob({ type, quality: 0.95 }) : await new Promise(r => cv.toBlob(r, type, 0.95));
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), type };
+  }
+  async function applyColourToDocument(doc) {
+    if (!doc || colourIsIdentity()) return 0;
+    const M = colourMatrix(); let n = 0; const done = new Set();
+    for (const m of doc.getRoot().listMaterials()) {
+      const tex = m.getBaseColorTexture();
+      if (!tex) {                                      // a plain colour value
+        const f = m.getBaseColorFactor(), c = adjustLinear(f.slice(0, 3), M); m.setBaseColorFactor([c[0], c[1], c[2], f[3]]); n++; continue;
+      }
+      if (done.has(tex)) continue; done.add(tex);
+      try {
+        const { cv, ctx, w, h } = await decodeToCanvas(tex), img = ctx.getImageData(0, 0, w, h);
+        adjustRGBA(img.data, M); ctx.putImageData(img, 0, 0);
+        const { bytes, type } = await toBytes(cv, tex.getMimeType());
+        const shared = doc.getRoot().listMaterials().some(o => [o.getEmissiveTexture(), o.getNormalTexture(), o.getOcclusionTexture(), o.getMetallicRoughnessTexture()].includes(tex));
+        if (shared) { const copy = doc.createTexture(tex.getName() + '-recoloured').setImage(bytes).setMimeType(type); m.setBaseColorTexture(copy); } else tex.setImage(bytes).setMimeType(type);
+        n++;
+      } catch (err) { console.warn('Colour correction skipped for one texture:', err); }
     }
     return n;
   }
@@ -75,7 +166,7 @@
     const tex = new Map(), used = new Set();
     for (const m of materialsOf(a?.originalModel)) {
       const saved = MAPS.get(m); if (!saved) continue;
-      for (const t of [m.map, m.normalMap, m.emissiveMap]) if (t) used.add(t.uuid);
+      for (const t of [saved.map, m.normalMap, m.emissiveMap]) if (t) used.add(t.uuid);
       for (const [slot, t] of [['mr', saved.roughnessMap], ['mr', saved.metalnessMap], ['ao', saved.aoMap]]) {
         if (!t) continue;
         const e = tex.get(t.uuid) || { w: t.image?.width || 1024, h: t.image?.height || 1024, slots: new Set() };
@@ -140,6 +231,20 @@
     window.dispatchEvent(new CustomEvent('shrink:material-look', { detail: { metalScale: scale, dropMR, dropAO } }));
   }
 
+  function setColour({ h = hue, s = sat, b = bright, g = gloss } = {}) {
+    hue = Math.max(-180, Math.min(180, Number(h))); sat = Math.max(0, Math.min(2, Number(s))); bright = Math.max(0.3, Math.min(1.7, Number(b))); gloss = Math.max(0.1, Math.min(1, Number(g)));
+    for (const v of [hue, sat, bright, gloss]) if (!Number.isFinite(v)) { hue = 0; sat = 1; bright = 1; gloss = 1; break; }
+    applyToViewer(); renderColour();
+    window.dispatchEvent(new CustomEvent('shrink:material-look', { detail: { hue, sat, bright, gloss } }));
+  }
+  function renderColour() {
+    const set = (id, v, label) => { const e = $(id); if (e && Number(e.value) !== v) e.value = String(v); const o = $(id + 'Value'); if (o && o.textContent !== label) o.textContent = label; };
+    set('hueShift', Math.round(hue), hue === 0 ? 'As in the file' : `${hue > 0 ? '+' : ''}${Math.round(hue)}°`);
+    set('satScale', Math.round(sat * 100), Math.round(sat * 100) === 100 ? 'As in the file' : `${Math.round(sat * 100)}%`);
+    set('brightScale', Math.round(bright * 100), Math.round(bright * 100) === 100 ? 'As in the file' : `${Math.round(bright * 100)}%`);
+    set('glossScale', Math.round(gloss * 100), Math.round(gloss * 100) === 100 ? 'As in the file' : `${Math.round(gloss * 100)}%`);
+  }
+
   function setScale(pct, { notify = true } = {}) {
     scale = Math.max(0, Math.min(100, Number(pct))) / 100;
     if (!Number.isFinite(scale)) scale = 1;
@@ -153,6 +258,20 @@
     if (!host || !before) return;
     const d = document.createElement('details'); d.id = 'materialDetails'; d.className = 'fold game-only'; d.open = true;
     d.innerHTML = `<summary>Material look</summary><div class="fold-inner">
+      <div class="control-block"><div class="label">Colour</div>
+        <div class="range-heading"><label for="hueShift">Hue</label><output id="hueShiftValue">As in the file</output></div>
+        <input id="hueShift" type="range" min="-180" max="180" step="1" value="0" aria-label="Hue shift, degrees">
+        <div class="range-heading"><label for="satScale">Saturation</label><output id="satScaleValue">As in the file</output></div>
+        <input id="satScale" type="range" min="0" max="200" step="1" value="100" aria-label="Saturation, percent">
+        <div class="slider-ends"><span>Grey</span><span>As in the file</span><span>Vivid</span></div>
+        <div class="range-heading"><label for="brightScale">Brightness</label><output id="brightScaleValue">As in the file</output></div>
+        <input id="brightScale" type="range" min="30" max="170" step="1" value="100" aria-label="Brightness, percent">
+        <div class="material-presets"><button id="colourReset" class="button ghost small" type="button">Reset colour</button></div>
+        <div class="hint">Changes the colour picture (or the plain colour) of the whole model, in the preview and the saved GLB. It is applied to everything, so a yellow car's yellow windows would shift too.</div></div>
+      <div class="control-block"><div class="range-heading"><label for="glossScale">Reflection (shininess)</label><output id="glossScaleValue">As in the file</output></div>
+      <input id="glossScale" type="range" min="10" max="100" step="1" value="100" aria-label="Surface smoothness, percent of the original roughness">
+      <div class="slider-ends"><span>Mirror-like</span><span>As in the file</span></div>
+      <div class="hint">Lowers the surface roughness so reflections get sharper and glossier. To cut reflections down, use Metallic above. The preview's room lighting is only for viewing; other engines light it their own way.</div></div>
       <div class="control-block"><div class="range-heading"><label for="metalScale">Metallic</label><output id="metalScaleValue">As in the file</output></div>
       <input id="metalScale" type="range" min="0" max="100" step="1" value="100" aria-label="Metallic effect, percent of the original">
       <div class="slider-ends"><span>Matt</span><span>As in the file</span></div></div>
@@ -171,17 +290,20 @@
     $('metalPaint').addEventListener('click', () => setScale(20));
     $('metalMatt').addEventListener('click', () => setScale(0));
     $('metalReset').addEventListener('click', () => setScale(100));
+    for (const [id, key] of [['hueShift', 'h'], ['satScale', 's'], ['brightScale', 'b'], ['glossScale', 'g']])
+      $(id).addEventListener('input', () => { const v = Number($(id).value); setColour({ [key]: key === 'h' ? v : v / 100 }); });
+    $('colourReset').addEventListener('click', () => setColour({ h: 0, s: 1, b: 1 }));
     $('dropMR').addEventListener('change', () => setMaps({ mr: $('dropMR').checked }));
     $('dropAO').addEventListener('change', () => setMaps({ ao: $('dropAO').checked }));
     $('roughVal').addEventListener('input', () => setMaps({ r: Number($('roughVal').value) / 100 }));
     for (const id of ['textureSize', 'webpToggle']) $(id)?.addEventListener('change', renderMaps);
-    render(); renderMaps();
+    render(); renderMaps(); renderColour();
   }
 
   // A newly opened model starts "as in the file". Rebuilt previews (live reducer, texture apply) re-use the current setting.
-  window.addEventListener('shrink:model-opened', () => { scale = 1; dropMR = false; dropAO = false; rough = 0.5; setTimeout(() => { const a = app(); if (a) capture(a.originalModel); for (const id of ['dropMR', 'dropAO']) if ($(id)) $(id).checked = false; render(); renderMaps(); }, 0); });
+  window.addEventListener('shrink:model-opened', () => { scale = 1; hue = 0; sat = 1; bright = 1; gloss = 1; for (const b of BAKED.values()) b.tex.dispose?.(); BAKED.clear(); dropMR = false; dropAO = false; rough = 0.5; setTimeout(() => { const a = app(); if (a) capture(a.originalModel); for (const id of ['dropMR', 'dropAO']) if ($(id)) $(id).checked = false; render(); renderMaps(); renderColour(); }, 0); });
   for (const ev of ['shrink:live-ready', 'shrink:live-updated', 'shrink:texture-applied', 'shrink:optimized']) window.addEventListener(ev, () => { applyToViewer(); render(); });
 
-  window.__shrinkMaterial = { applyToModel, applyToDocument, applyToViewer, setScale, setMaps, savings, refresh: renderMaps, get metalScale() { return scale; }, get changed() { return Math.abs(scale - 1) > 1e-6 || dropMR || dropAO; } };
+  window.__shrinkMaterial = { applyToModel, applyToDocument, applyColourToDocument, applyToViewer, setScale, setColour, colourMatrix, adjustRGBA, setMaps, savings, refresh: renderMaps, get metalScale() { return scale; }, get colour() { return { hue, sat, bright, gloss }; }, get changed() { return Math.abs(scale - 1) > 1e-6 || dropMR || dropAO || !colourIsIdentity() || gloss < 1 - 1e-6; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject, { once: true }); else inject();
 })();

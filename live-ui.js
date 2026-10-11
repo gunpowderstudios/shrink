@@ -53,7 +53,7 @@ function gatherTextures() {
     if (!o.isMesh) return; meshes++;
     for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
       if (!m) continue; mats.add(m);
-      for (const k of maps) { const t = m[k]; const im = t?.image; if (t && im?.width && !seen.has(t.uuid)) seen.set(t.uuid, { w: im.width, h: im.height }); }
+      for (const k of maps) { const t = m[k]; const im = t?.image; if (t && im?.width && !seen.has(t.uuid)) seen.set(t.uuid, { w: t.userData?.origW || im.width, h: t.userData?.origH || im.height }); }
     }
   });
   S.textures = { list: [...seen.values()], meshes, materials: mats.size };

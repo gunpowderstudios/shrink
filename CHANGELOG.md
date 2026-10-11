@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.76 — Material look: colour correction and Reflection
+
+- **Colour** (Game mode, Material look): Hue, Saturation and Brightness sliders plus Reset colour. They repaint the base-colour picture (or the plain colour value) of the whole model, in the preview and in the saved GLB. The preview uses a corrected 1024px copy with its own image source; the original texture is never touched. The export repaints at the texture's own size before it is resized (JPEG stays JPEG, others PNG, then WebP if on).
+- **Reflection (shininess)**: scales roughness down (sharper, glossier reflections), from the file's own value, preview and saved GLB. It cannot make a surface rougher than its roughness map; use Metallic for less reflection.
+- Whole-model only: no masking, so a yellow car's yellow lights shift too.
+- Not tested in a real browser: the canvas repaint path ran against a fake canvas in the tests.
+
 ## v2.75 — One button: "Make it game-ready" merged into "Find the smallest…"
 
 - Removed the separate 🎮 button. In Game mode, **Find the smallest that still looks the same** (panel and the red button under the viewer) now also reports the file size split (textures / mesh), warns if above the chosen triangle target, and hints at texture size, WebP/Meshopt if off, and droppable maps.
