@@ -82,7 +82,7 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 window.__shrinkViewer = { renderer, scene, camera, controls };
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x303540, 2.2));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x303540, 2.2); scene.add(hemi);
 const key = new THREE.DirectionalLight(0xffffff, 3.0); key.position.set(4, 8, 6); scene.add(key);
 const fill = new THREE.DirectionalLight(0xbfd2ff, 1.2); fill.position.set(-6, 3, -4); scene.add(fill);
 
@@ -99,6 +99,11 @@ pmrem.dispose();
 function syncViewerEnvironment(mode = null) {
   const game = mode ? mode === 'game' : !document.body.classList.contains('app-mode-print');
   scene.environment = game ? studioEnvironment : null;
+  // Game mode shows the file as it is: the studio environment already lights the model, so the extra lamps are kept low and the
+  // Khronos "neutral" tone mapping is used (ACES washes out and shifts saturated colours). Print mode keeps its lamp-only look.
+  hemi.intensity = game ? 0.5 : 2.2; key.intensity = game ? 0.9 : 3.0; fill.intensity = game ? 0.3 : 1.2;
+  renderer.toneMapping = game ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = game ? 1.0 : 1.05;
 }
 syncViewerEnvironment('game');
 window.addEventListener('shrink:ui-mode', e => syncViewerEnvironment(e.detail?.mode));

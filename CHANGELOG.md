@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.77 — Game mode viewer: no more washed-out models
+
+- The preview was lit three ways at once (studio reflections + three bright lamps) and tone-mapped with ACES, which brightens and desaturates colours. Game mode now uses the studio light with low-key lamps and Khronos Neutral tone mapping, so a model looks like its textures. Print mode is unchanged.
+- This only changes the preview. The GLB file and the colour sliders are untouched. Not checked in a real browser.
+
 ## v2.76 — Material look: colour correction and Reflection
 
 - **Colour** (Game mode, Material look): Hue, Saturation and Brightness sliders plus Reset colour. They repaint the base-colour picture (or the plain colour value) of the whole model, in the preview and in the saved GLB. The preview uses a corrected 1024px copy with its own image source; the original texture is never touched. The export repaints at the texture's own size before it is resized (JPEG stays JPEG, others PNG, then WebP if on).
