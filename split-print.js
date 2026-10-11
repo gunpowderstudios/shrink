@@ -2,7 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
 import { zipSync } from 'https://esm.sh/fflate@0.8.2';
 
-// SHRINK 3D v2.72 — automatic best cut (non-blocking), single-pass slicer, peg report (green/amber/red), export uses the pegs shown.
+// SHRINK 3D v2.73 — automatic best cut (non-blocking), single-pass slicer, peg report (green/amber/red), export uses the pegs shown.
 // Joint convention: upper section carries downward male pegs; lower section carries matching sockets.
 // If this file is ever loaded twice (two cache keys), only the first copy may wire the page: a second copy would add a
 // second download handler and replace the API with one that has no preview data.

@@ -644,9 +644,15 @@ async function applyTextureToModel() {
   }
 }
 
-function downloadEdited() {
+async function downloadEdited() {
   if (!sourceBytes || !sourceFile) return;
-  downloadBytes(sourceBytes, `${baseName()}-edited.glb`);
+  let bytes = sourceBytes;
+  const look = window.__shrinkMaterial;
+  if (look && Math.abs(look.metalScale - 1) > 1e-6) {          // Material look changed: write it into the edited GLB too
+    try { const doc = await io.readBinary(sourceBytes); look.applyToDocument(doc); bytes = await io.writeBinary(doc); }
+    catch (err) { console.error(err); setStatus(`Saved without the Material look change: ${err.message}`, true); }
+  }
+  downloadBytes(bytes, `${baseName()}-edited.glb`);
 }
 
 async function convertMeshToGlb(file, ext) {
@@ -757,6 +763,7 @@ async function optimizeModel() {
     await MeshoptDecoder.ready;
     await MeshoptEncoder.ready;
     const document = await io.readBinary(sourceBytes);
+    window.__shrinkMaterial?.applyToDocument?.(document);      // Material look: the saved GLB gets the same metallic setting as the preview
     const keepRatio = Number(els.geometry.value) / 100;
 
     lastReduce = null;

@@ -2,6 +2,24 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.73 — Game mode: Material look (turn down the metallic effect)
+
+### Added
+- **Material look → Metallic** slider in the Touch up step (Game mode only), with "Car paint (20%)", "No metal (0%)" and "As in the file" buttons. glTF "metallic" makes a surface mirror the room and tint the reflection with its own colour, so a scanned silver car with metallic = 1 looks like chrome. The slider scales every material's metallic factor (a metallic texture too, since glTF multiplies the two).
+- It drives the **live preview** (original and reduced, so Compare stays fair, and rebuilt live previews inherit it) and is written into the **saved game GLB** (`optimizeModel`) and **Save edited GLB** (`downloadEdited`). The uploaded file is never touched; opening a new model resets it to "As in the file". The panel says how metallic the model is, or that there is nothing to turn down.
+- New file `material-look.js` (loaded from `ui-mode.js`); `app.js` calls `window.__shrinkMaterial.applyToDocument(doc)` at the two write points.
+
+### Not changed
+- Roughness is not adjustable: glTF multiplies roughness by a texture and the factor cannot exceed 1, so a rougher-than-texture surface cannot be written back.
+
+### Tests
+- `tests/material.test.mjs` (13 checks): preview scaling from the file's own value, rebuilt previews, buttons, export factors, reset on new model. 230 checks pass in total.
+
+### Version boundaries
+- Visible release **v2.73**; `app.js` key bumped 2.62 → 2.73 in `index.html` (it changed).
+
+---
+
 ## v2.72 — the best cut is found automatically, and the search no longer freezes the page
 
 ### Fixed
