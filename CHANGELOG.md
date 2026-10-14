@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.85 — One-line header
+
+- The header is now a single row: **SHRINK 3D** [version] · *Reduce your models, keep the detail* … [Runs locally in your browser]. The "GUNPOWDER STUDIOS" line above the title is gone (the footer still credits Gunpowder Studios) and the subtitle no longer changes between Game and Print.
+- Not checked in a real browser.
+
 ## v2.84 — Switching Paint / Clone / Stamp off
 
 - Click the tool that is already on to switch it off again, press **Esc**, or use the new **Done · Esc** button at the right of the brush strip. The model then goes back to plain rotating (the hidden Navigate mode).

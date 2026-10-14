@@ -99,3 +99,13 @@
 .viewer-grip::after { content: ''; position: absolute; left: 50%; top: 6px; width: 64px; height: 4px; margin-left: -32px; border-radius: 4px; background: rgba(255,255,255,.35); }
 .viewer-grip:hover::after, .viewer-grip.dragging::after { background: #ff4e55; }
 @media (min-width: 901px) { .app-mode-game .viewer-grip { display: block; } }
+
+/* v2.85 one-line header: SHRINK 3D [version]  Reduce your models, keep the detail ............ [Runs locally] */
+.topbar { align-items: center !important; margin-bottom: 10px !important; gap: 14px; }
+.brand-line { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; min-width: 0; }
+.brand-line .title-row { align-items: baseline; }
+.brand-line .title-row h1 { font-size: 30px !important; }
+.brand-line .subtitle { margin: 0 !important; font-size: 14px !important; }
+.privacy-pill { padding: 6px 12px !important; }
+@media (max-width: 720px) { .topbar { flex-direction: column; align-items: flex-start !important; gap: 6px; } }
+.brand-line .version-badge { margin-bottom: 0 !important; }
