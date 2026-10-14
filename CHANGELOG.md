@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.81 — Paint: Softness and Spray can
+
+- The brush strip under the viewer toolbar gains **Softness** (edge fade, 2–100%; the old fixed look was 28%; 100% = airbrush) for Paint and Clone, and a **Spray can** tick-box for Paint. Spray makes each dab faint, so colour builds up as you go over a spot again and while you hold the button still (a dab every 60 ms).
+- Paint is still fully opaque by default (Opacity 100%, 28% soft edge): lower Opacity, raise Softness, tick Spray can for a spray-paint feel.
+- Not checked in a real browser.
+
 ## v2.80 — Game mode: bigger viewer, brush options on the viewer
 
 - On a desktop-width window the Game viewer is now the full height of the browser window (minus a small margin) and stays in view while the left panel scrolls.

@@ -116,6 +116,9 @@ function setMode(mode) {
   if (mode !== 'clone') sourceMarker.style.display = 'none';
   optionsBar.hidden = !(mode === 'paint' || mode === 'clone' || mode === 'stamp');
   const sizeRow = optionsBar.querySelector('#vwBrushSizeRow'); if (sizeRow) sizeRow.hidden = mode === 'stamp';
+  const softRow = optionsBar.querySelector('#vwSoftRow'); if (softRow) softRow.hidden = mode === 'stamp';
+  const sprayRow = optionsBar.querySelector('#vwSprayRow'); if (sprayRow) sprayRow.hidden = mode !== 'paint';
+  stopSpray();
 
   if (mode !== 'navigate' && originalBtn && !originalBtn.classList.contains('active')) originalBtn.click();
   window.dispatchEvent(new CustomEvent('shrink:paint-mode', { detail: { mode } }));
@@ -357,7 +360,10 @@ function hexToRgb(hex) {
   return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
 }
 
-function feather(d, r) { return Math.min(1, Math.max(0, (1 - d / r) / 0.28)); }
+// How soft the brush edge is: edge = the fraction of the radius over which it fades (28% = the old fixed look, 100% = airbrush).
+const brush = { edge: 0.28, spray: false, timer: null };
+function feather(d, r) { return Math.min(1, Math.max(0, (1 - d / r) / brush.edge)); }
+const SPRAY_FLOW = 0.14;     // spray: each dab is faint, so colour builds up with strokes and while you hold still
 
 const dirty = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
 function touch(x, y) { if (x < dirty.x0) dirty.x0 = x; if (y < dirty.y0) dirty.y0 = y; if (x > dirty.x1) dirty.x1 = x; if (y > dirty.y1) dirty.y1 = y; }
@@ -384,7 +390,7 @@ function paintSphere(P, r, mapEntry, rgb) {
   const x0 = Math.max(0, Math.floor((P.x - r - gx) / cell)), x1 = Math.min(nx - 1, Math.floor((P.x + r - gx) / cell));
   const y0 = Math.max(0, Math.floor((P.y - r - gy) / cell)), y1 = Math.min(ny - 1, Math.floor((P.y + r - gy) / cell));
   const z0 = Math.max(0, Math.floor((P.z - r - gz) / cell)), z1 = Math.min(nz - 1, Math.floor((P.z + r - gz) / cell));
-  const r2 = r * r, opacity = Number(brushOpacity?.value || 100) / 100;
+  const r2 = r * r, opacity = Number(brushOpacity?.value || 100) / 100 * (brush.spray && state.mode === 'paint' ? SPRAY_FLOW : 1);
   for (let z = z0; z <= z1; z++) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const c = (z * ny + y) * nx + x;
     for (let s = grid.start[c], e = grid.start[c + 1]; s < e; s++) {
@@ -703,6 +709,8 @@ async function handlePointerDown(evt) {
   } else {
     paintDabAtScreen(clientX, clientY);
     flushDirty();
+    stopSpray();
+    if (brush.spray) brush.timer = setInterval(() => { if (state.painting && state.lastScreen) { paintDabAtScreen(state.lastScreen.x, state.lastScreen.y); flushDirty(); } }, 60);
     say(`LIVE PAINT · Texture ${state.activeTextureIndex + 1} · ${paintColor?.value || '#000000'} · 3D brush.`);
   }
   try { v.renderer.domElement.setPointerCapture(pointerId); } catch {}
@@ -723,6 +731,7 @@ function handlePointerMove(evt) {
 }
 
 function stopPaint(evt) {
+  stopSpray();
   if (state.mode === 'stamp') { stampUp(evt); return; }
   state.pointerHeld = false;
   if (!state.painting) return;
@@ -755,9 +764,14 @@ stampBar.innerHTML = `<b>Stamp</b>
 const optionsBar = document.createElement('div');
 optionsBar.className = 'tool-options'; optionsBar.hidden = true;
 optionsBar.innerHTML = `<label id="vwBrushSizeRow">Brush size <input id="vwBrushSize" type="range" aria-label="Brush size"><output id="vwBrushSizeValue"></output></label>
-  <label>Opacity <input id="vwBrushOpacity" type="range" aria-label="Opacity"><output id="vwBrushOpacityValue"></output></label>`;
+  <label>Opacity <input id="vwBrushOpacity" type="range" aria-label="Opacity"><output id="vwBrushOpacityValue"></output></label>
+  <label id="vwSoftRow">Softness <input id="vwSoft" type="range" min="2" max="100" step="1" value="28" aria-label="Edge softness"><output id="vwSoftValue">28%</output></label>
+  <label id="vwSprayRow" title="Faint dabs that build up as you go over the same spot or hold still, like a spray can">Spray can <input id="vwSpray" type="checkbox"></label>`;
 optionsBar.appendChild(stampBar);
 if (toolbar) toolbar.insertAdjacentElement('afterend', optionsBar); else viewer?.prepend(optionsBar);
+optionsBar.querySelector('#vwSoft').addEventListener('input', e => { brush.edge = Math.max(0.02, Number(e.target.value) / 100); optionsBar.querySelector('#vwSoftValue').textContent = `${e.target.value}%`; });
+optionsBar.querySelector('#vwSpray').addEventListener('change', e => { brush.spray = e.target.checked; stopSpray(); });
+function stopSpray() { if (brush.timer) { clearInterval(brush.timer); brush.timer = null; } }
 // the two sliders mirror the ones in the left panel, both ways
 for (const [mine, theirs, unit] of [['vwBrushSize', brushSize, ' px'], ['vwBrushOpacity', brushOpacity, '%']]) {
   const a = optionsBar.querySelector('#' + mine), out = optionsBar.querySelector('#' + mine + 'Value');
