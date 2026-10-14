@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.80 — Game mode: bigger viewer, brush options on the viewer
+
+- On a desktop-width window the Game viewer is now the full height of the browser window (minus a small margin) and stays in view while the left panel scrolls.
+- The big red "Find the smallest…" button under the viewer is gone; the one in the left panel is the only one.
+- A tool-options strip sits under the Paint / Clone / Stamp buttons: **Brush size** and **Opacity** (mirroring the left-panel sliders, both ways) for Paint and Clone; Opacity plus Size / Rotate / Flip for Stamp. It hides in Navigate mode so the model gets the room.
+- Not checked in a real browser.
+
 ## v2.79 — Stamp tool: copy part of the model and paste it somewhere else
 
 - New **Stamp** button next to Clone. Drag a box around something on the model (a number, a badge); that part is copied *as you see it*. Turn the car, aim at the destination (a ghost outline shows size, rotation and flip), click to paste. Paste as many times as you like; Undo works as usual.

@@ -114,6 +114,8 @@ function setMode(mode) {
   viewer?.classList.toggle('direct-paint', mode === 'paint' || mode === 'clone' || mode === 'stamp');
   viewer?.classList.toggle('direct-sample', mode === 'sample');
   if (mode !== 'clone') sourceMarker.style.display = 'none';
+  optionsBar.hidden = !(mode === 'paint' || mode === 'clone' || mode === 'stamp');
+  const sizeRow = optionsBar.querySelector('#vwBrushSizeRow'); if (sizeRow) sizeRow.hidden = mode === 'stamp';
 
   if (mode !== 'navigate' && originalBtn && !originalBtn.classList.contains('active')) originalBtn.click();
   window.dispatchEvent(new CustomEvent('shrink:paint-mode', { detail: { mode } }));
@@ -743,20 +745,37 @@ function stopPaint(evt) {
 const stamp = { patch: null, sel: null, scale: 1, rot: 0, flip: false, busy: false, lastSc: 1 };
 
 const stampBar = document.createElement('div');
-stampBar.className = 'stamp-bar'; stampBar.hidden = true;
+stampBar.className = 'stamp-group'; stampBar.hidden = true;
 stampBar.innerHTML = `<b>Stamp</b>
   <label>Size <input id="stampScale" type="range" min="25" max="300" step="1" value="100"><output id="stampScaleValue">100%</output></label>
   <label>Rotate <input id="stampRot" type="range" min="-180" max="180" step="1" value="0"><output id="stampRotValue">0°</output></label>
   <button id="stampFlip" class="button ghost small" type="button">Flip</button>
   <button id="stampNew" class="button ghost small" type="button">Copy something else</button>
   <span id="stampHint" class="stamp-hint">Drag a box on the model to copy it.</span>`;
-viewer?.appendChild(stampBar);
+const optionsBar = document.createElement('div');
+optionsBar.className = 'tool-options'; optionsBar.hidden = true;
+optionsBar.innerHTML = `<label id="vwBrushSizeRow">Brush size <input id="vwBrushSize" type="range" aria-label="Brush size"><output id="vwBrushSizeValue"></output></label>
+  <label>Opacity <input id="vwBrushOpacity" type="range" aria-label="Opacity"><output id="vwBrushOpacityValue"></output></label>`;
+optionsBar.appendChild(stampBar);
+if (toolbar) toolbar.insertAdjacentElement('afterend', optionsBar); else viewer?.prepend(optionsBar);
+// the two sliders mirror the ones in the left panel, both ways
+for (const [mine, theirs, unit] of [['vwBrushSize', brushSize, ' px'], ['vwBrushOpacity', brushOpacity, '%']]) {
+  const a = optionsBar.querySelector('#' + mine), out = optionsBar.querySelector('#' + mine + 'Value');
+  if (!a || !theirs) continue;
+  a.min = theirs.min; a.max = theirs.max; a.step = theirs.step || 1;
+  const pull = () => { if (a.value !== theirs.value) a.value = theirs.value; out.textContent = theirs.value + unit; };
+  pull();
+  theirs.addEventListener('input', pull);
+  a.addEventListener('input', () => { theirs.value = a.value; theirs.dispatchEvent(new Event('input', { bubbles: true })); out.textContent = a.value + unit; });
+}
 const stampRect = document.createElement('div'); stampRect.className = 'stamp-rect'; stampRect.hidden = true; viewer?.appendChild(stampRect);
 const stampGhost = document.createElement('canvas'); stampGhost.className = 'stamp-ghost'; stampGhost.hidden = true; viewer?.appendChild(stampGhost);
 const stampStyle = document.createElement('style');
-stampStyle.textContent = `.stamp-bar{position:absolute;left:12px;top:12px;z-index:30;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;max-width:calc(100% - 24px);padding:8px 12px;border-radius:12px;background:rgba(10,14,20,.82);border:1px solid rgba(255,255,255,.14);font-size:12px;color:#fff}
-.stamp-bar label{display:flex;gap:6px;align-items:center}.stamp-bar input[type=range]{width:110px}.stamp-bar output{min-width:38px}
-.stamp-hint{flex-basis:100%;opacity:.75}
+stampStyle.textContent = `.tool-options{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:6px 14px 10px;font-size:12px;color:#fff;border-bottom:1px solid rgba(255,255,255,.08)}
+.tool-options[hidden],.stamp-group[hidden],.tool-options label[hidden]{display:none}
+.tool-options label{display:flex;gap:8px;align-items:center;font-weight:700}.tool-options input[type=range]{width:150px}.tool-options output{min-width:44px;font-weight:500;opacity:.85}
+.stamp-group{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.stamp-hint{flex-basis:100%;opacity:.75;font-size:12px}
 .stamp-rect{position:absolute;z-index:28;border:2px dashed #ff4e55;background:rgba(255,78,85,.12);pointer-events:none}
 .stamp-ghost{position:absolute;z-index:27;pointer-events:none;opacity:.6;outline:2px dashed #fff;transform-origin:50% 50%;image-rendering:auto}`;
 document.head.appendChild(stampStyle);
@@ -764,6 +783,7 @@ const $s = id => stampBar.querySelector('#' + id);
 
 function stampModeChanged(on) {
   stampBar.hidden = !on;
+  stampBar.dataset.on = on ? '1' : '';
   if (!on) { stampRect.hidden = true; stampGhost.hidden = true; stamp.sel = null; }
   else updateStampUI();
 }

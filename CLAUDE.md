@@ -269,8 +269,8 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 
 ## Game viewer layout
 - The navigation hint (**Drag to rotate · Scroll to zoom · Right-drag to pan**) belongs inside the 3D viewer canvas.
-- The large red **Find the smallest that still looks the same** button belongs below the viewer in its own row.
-- Do not position both relative to the full viewer panel; that caused them to overlap.
+- (v2.80) The big red **Find the smallest…** button under the viewer was removed on purpose; the button in the left panel is the only one. Do not bring it back.
+- (v2.80) In Game mode on desktop the viewer panel is `calc(100vh - 36px)` tall and sticky. Brush size / Opacity / Stamp options live in the `.tool-options` strip under the viewer toolbar (built in `paint3d.js`), not floating over the model.
 
 ## Viewer/UI rules
 
