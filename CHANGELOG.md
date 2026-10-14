@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.84 — Switching Paint / Clone / Stamp off
+
+- Click the tool that is already on to switch it off again, press **Esc**, or use the new **Done · Esc** button at the right of the brush strip. The model then goes back to plain rotating (the hidden Navigate mode).
+- Not checked in a real browser.
+
 ## v2.83 — Viewer really is full height, with a drag handle
 
 - Why it was still short: `ui-mode.css` forced every viewer to `calc(100vh - 200px) !important`, which beat the v2.80 rule. In Game mode on a desktop-width window the viewer is now `calc(100vh - 36px)` tall (the rule is in `ui-mode.css`, after the old one).

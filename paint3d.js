@@ -126,7 +126,7 @@ function setMode(mode) {
 
   if (help) {
     help.textContent = mode === 'paint'
-      ? 'PAINT · drag on model · hold Cmd / Ctrl to rotate · scroll to zoom'
+      ? 'PAINT · drag on model · hold Cmd / Ctrl to rotate · Esc or click Paint again when done'
       : mode === 'clone'
         ? 'CLONE · Option/Alt-click a clean source · drag to clone · Cmd/Ctrl to rotate'
         : mode === 'stamp'
@@ -144,10 +144,16 @@ function setMode(mode) {
   if (mode === 'sample') say('Pick colour: click the model to sample a colour, then Paint resumes automatically.');
 }
 
-paintModelBtn.addEventListener('click', () => setMode('paint'));
-cloneModelBtn.addEventListener('click', () => setMode('clone'));
-sampleModelBtn.addEventListener('click', () => setMode('sample'));
-stampModelBtn.addEventListener('click', () => setMode('stamp'));
+// Clicking the tool that is already on switches it off again (back to rotating the model); so does Esc or the Done button.
+const toggleMode = m => setMode(state.mode === m ? 'navigate' : m);
+paintModelBtn.addEventListener('click', () => toggleMode('paint'));
+cloneModelBtn.addEventListener('click', () => toggleMode('clone'));
+sampleModelBtn.addEventListener('click', () => toggleMode('sample'));
+stampModelBtn.addEventListener('click', () => toggleMode('stamp'));
+window.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || state.mode === 'navigate' || state.painting || stamp.sel) return;
+  setMode('navigate');
+});
 navigateModelBtn.addEventListener('click', () => setMode('navigate'));
 
 /* ------------------------------------------------------------------ */
@@ -875,10 +881,12 @@ optionsBar.innerHTML = `<label id="vwBrushSizeRow">Brush size <input id="vwBrush
   <label>Opacity <input id="vwBrushOpacity" type="range" aria-label="Opacity"><output id="vwBrushOpacityValue"></output></label>
   <label id="vwSoftRow">Softness <input id="vwSoft" type="range" min="2" max="100" step="1" value="28" aria-label="Edge softness"><output id="vwSoftValue">28%</output></label>
   <label id="vwFlatRow" title="The relief (raised lettering, panel edges) lives in a separate picture, the normal map. With this ticked, painting smooths it out, Stamp smooths what it covers, and Clone copies the source's relief."><span id="vwFlatText">Flatten the bumps too</span> <input id="vwFlat" type="checkbox" checked></label>
+  <button id="vwDone" class="button ghost small" type="button" title="Stop painting and go back to rotating the model (Esc)" style="margin-left:auto">Done · Esc</button>
   <label id="vwSprayRow" title="Faint dabs that build up as you go over the same spot or hold still, like a spray can">Spray can <input id="vwSpray" type="checkbox"></label>`;
 optionsBar.appendChild(stampBar);
 if (toolbar) toolbar.insertAdjacentElement('afterend', optionsBar); else viewer?.prepend(optionsBar);
 optionsBar.querySelector('#vwSoft').addEventListener('input', e => { brush.edge = Math.max(0.02, Number(e.target.value) / 100); optionsBar.querySelector('#vwSoftValue').textContent = `${e.target.value}%`; });
+optionsBar.querySelector('#vwDone').addEventListener('click', () => setMode('navigate'));
 optionsBar.querySelector('#vwFlat').addEventListener('change', e => { flat.on = e.target.checked; });
 optionsBar.querySelector('#vwSpray').addEventListener('change', e => { brush.spray = e.target.checked; stopSpray(); });
 function stopSpray() { if (brush.timer) { clearInterval(brush.timer); brush.timer = null; } }
