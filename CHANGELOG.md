@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.86 — Paint / Clone / Stamp keep your view
+
+- Clicking a paint tool while the Reduced model was showing used to switch to the Original and re-frame the camera. It now switches without re-framing and puts the camera back exactly where you had rotated it.
+- Not checked in a real browser.
+
 ## v2.85 — One-line header
 
 - The header is now a single row: **SHRINK 3D** [version] · *Reduce your models, keep the detail* … [Runs locally in your browser]. The "GUNPOWDER STUDIOS" line above the title is gone (the footer still credits Gunpowder Studios) and the subtitle no longer changes between Game and Print.

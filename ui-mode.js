@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.85';
+  const PRINT_RELEASE = '2.86';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -52,7 +52,7 @@
     mode = mode === 'print' ? 'print' : 'game'; const t=TEXT[mode];
     body.classList.toggle('app-mode-game',mode==='game'); body.classList.toggle('app-mode-print',mode==='print');
     chooser.querySelectorAll('.mode-card').forEach(btn=>{const on=btn.dataset.mode===mode;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',String(on));});
-    steps.innerHTML=t.steps;   /* the header line is fixed text (v2.85) */
+    steps.innerHTML=t.steps;   /* the header line is fixed text (v2.86) */
     ['setupTitle','setupSub','detailSub','extraNum','extraTitle','extraSub','saveNum','saveTitle','saveSub'].forEach(k=>setText(k,t[k]));
     const btn=$('optimizeBtn'); if(btn){btn.dataset.label=t.btn;if(!btn.disabled)btn.textContent=t.btn;}
     const s=dropZone?.querySelector('strong'),sp=dropZone?.querySelector('span'); if(s)s.textContent=t.drop[0];if(sp)sp.textContent=t.drop[1];if(fileInput)fileInput.accept=t.accept;

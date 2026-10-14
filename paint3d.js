@@ -121,7 +121,7 @@ function setMode(mode) {
   const flatText = optionsBar.querySelector('#vwFlatText'); if (flatText) flatText.textContent = mode === 'clone' ? 'Copy the bumps too' : 'Flatten the bumps too';
   stopSpray();
 
-  if (mode !== 'navigate' && originalBtn && !originalBtn.classList.contains('active')) originalBtn.click();
+  if (mode !== 'navigate' && originalBtn && !originalBtn.classList.contains('active')) { const A = window.__shrinkApp, vs = A?.getViewState?.(); if (A?.show) A.show('original'); else originalBtn.click(); if (vs) A?.restoreViewState?.(vs); }
   window.dispatchEvent(new CustomEvent('shrink:paint-mode', { detail: { mode } }));
 
   if (help) {
