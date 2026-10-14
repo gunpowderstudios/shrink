@@ -2,7 +2,7 @@ import './paint-mode-v08.js?v=2.18';
 import './gltf-texture-index.js';
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { ensureBVH, raycasterFor } from './bvh-support.js?v=2.18';
-import { patchCoords, samplePatch, edgeFalloff, pasteRadius, patchStep } from './stamp-core.js?v=2.79';
+import { patchCoords, samplePatch, edgeFalloff, pasteRadius, patchStep, blendNormalBlock, sliceRegion } from './stamp-core.js?v=2.82';
 
 /* Shrink 3D paint engine (v1.5)
  *  - fast raycasting (BVH) so painting stays live on very dense meshes
@@ -118,6 +118,7 @@ function setMode(mode) {
   const sizeRow = optionsBar.querySelector('#vwBrushSizeRow'); if (sizeRow) sizeRow.hidden = mode === 'stamp';
   const softRow = optionsBar.querySelector('#vwSoftRow'); if (softRow) softRow.hidden = mode === 'stamp';
   const sprayRow = optionsBar.querySelector('#vwSprayRow'); if (sprayRow) sprayRow.hidden = mode !== 'paint';
+  const flatText = optionsBar.querySelector('#vwFlatText'); if (flatText) flatText.textContent = mode === 'clone' ? 'Copy the bumps too' : 'Flatten the bumps too';
   stopSpray();
 
   if (mode !== 'navigate' && originalBtn && !originalBtn.classList.contains('active')) originalBtn.click();
@@ -353,6 +354,106 @@ async function ensurePaintMap(index) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Bumps: the normal map is edited together with the colour (flatten for Paint / Stamp, copy for Clone) */
+/* ------------------------------------------------------------------ */
+const flat = { on: true, layers: new Map(), cur: null, undo: new Map(), serial: null };
+const FLAT_RGB = [128, 128, 255];          // a perfectly flat surface in a normal map
+
+// A private, editable copy of a material's normal map (kept per glTF texture index; every material using it points at the copy).
+function normalLayerFor(material) {
+  const nm = material?.normalMap;
+  if (!nm) return null;
+  const idx = nm.userData?.gltfTextureIndex;
+  if (!Number.isInteger(idx)) return null;
+  let L = flat.layers.get(idx);
+  if (L) { if (material.normalMap !== L.texture) { material.normalMap = L.texture; material.needsUpdate = true; } return L; }
+  const img = nm.image, w = img?.naturalWidth || img?.width, h = img?.naturalHeight || img?.height;
+  if (!w || !h) return null;
+  const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  try { ctx.drawImage(img, 0, 0); } catch { return null; }
+  const live = new THREE.CanvasTexture(canvas);
+  live.flipY = nm.flipY; live.colorSpace = nm.colorSpace; live.wrapS = nm.wrapS; live.wrapT = nm.wrapT;
+  live.magFilter = nm.magFilter; live.minFilter = nm.minFilter; live.anisotropy = nm.anisotropy;
+  live.offset.copy(nm.offset); live.repeat.copy(nm.repeat); live.center.copy(nm.center); live.rotation = nm.rotation;
+  live.userData = { ...(nm.userData || {}) };
+  live.needsUpdate = true;
+  L = { idx, canvas, ctx, w, h, texture: live, orig: nm, dirty: false, work: null, before: null, box: null, pend: null, cw: 1, ch: 1 };
+  flat.layers.set(idx, L);
+  getViewerState()?.scene?.traverse(o => {
+    if (!o.isMesh) return;
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) if (m && m.normalMap === nm) { m.normalMap = live; m.needsUpdate = true; }
+  });
+  return L;
+}
+
+function beginNormalStroke(material) {
+  flat.cur = null;
+  if (!flat.on) return;
+  const L = normalLayerFor(material);
+  if (!L) return;
+  L.work = L.ctx.getImageData(0, 0, L.w, L.h);
+  L.before = new Uint8ClampedArray(L.work.data);
+  L.box = null; L.pend = null; L.cw = textureCanvas.width; L.ch = textureCanvas.height;
+  flat.cur = L;
+}
+
+const grow = (b, x0, y0, x1, y1) => b ? { x0: Math.min(b.x0, x0), y0: Math.min(b.y0, y0), x1: Math.max(b.x1, x1), y1: Math.max(b.y1, y1) } : { x0, y0, x1, y1 };
+
+// Blend the normal map towards `rgb` at the place that colour texel (px, py) covers.
+function normalBlend(px, py, w, rgb) {
+  const L = flat.cur;
+  if (!L || !L.work) return;
+  const r = blendNormalBlock(L.work.data, L.w, L.h, L.cw, L.ch, px, py, w, rgb);
+  if (r) { L.box = grow(L.box, r.x0, r.y0, r.x1, r.y1); L.pend = grow(L.pend, r.x0, r.y0, r.x1, r.y1); }
+}
+
+// The normal-map colour at the source of a clone (read from the picture as it was when the stroke began).
+function normalSource(cx, cy) {
+  const L = flat.cur;
+  if (!L || !L.before) return null;
+  const x = Math.min(L.w - 1, Math.max(0, Math.floor(cx * L.w / L.cw))), y = Math.min(L.h - 1, Math.max(0, Math.floor(cy * L.h / L.ch))), o = (y * L.w + x) * 4;
+  return [L.before[o], L.before[o + 1], L.before[o + 2]];
+}
+
+function flushNormal() {
+  const L = flat.cur;
+  if (!L || !L.pend || !L.work) return;
+  const b = L.pend; L.pend = null;
+  L.ctx.putImageData(L.work, 0, 0, b.x0, b.y0, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1);
+  L.texture.needsUpdate = true;
+}
+
+// End of a stroke: remember just the changed rectangle so Undo can put it back.
+function finishNormalStroke() {
+  const L = flat.cur;
+  if (!L) return;
+  flushNormal();
+  flat.cur = null;
+  const b = L.box;
+  if (b) {
+    const w = b.x1 - b.x0 + 1, h = b.y1 - b.y0 + 1, keep = sliceRegion(L.before, L.w, b);
+    if (flat.serial != null) {
+      flat.undo.set(flat.serial, { idx: L.idx, x: b.x0, y: b.y0, w, h, data: keep });
+      while (flat.undo.size > 25) flat.undo.delete(flat.undo.keys().next().value);
+    }
+    L.dirty = true;
+  }
+  L.work = null; L.before = null; L.box = null; L.pend = null;
+}
+
+window.addEventListener('shrink:paint-undo', e => {
+  const u = flat.undo.get(e.detail?.serial);
+  if (!u) return;
+  flat.undo.delete(e.detail.serial);
+  const L = flat.layers.get(u.idx);
+  if (!L) return;
+  L.ctx.putImageData(new ImageData(u.data, u.w, u.h), u.x, u.y);
+  L.texture.needsUpdate = true;
+});
+window.addEventListener('shrink:paint-undo-cleared', () => flat.undo.clear());
+
+/* ------------------------------------------------------------------ */
 /* Brush stamps (all pixel work happens on a CPU mirror, then only the dirty rectangle is pushed to the canvas) */
 /* ------------------------------------------------------------------ */
 function hexToRgb(hex) {
@@ -369,6 +470,7 @@ const dirty = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
 function touch(x, y) { if (x < dirty.x0) dirty.x0 = x; if (y < dirty.y0) dirty.y0 = y; if (x > dirty.x1) dirty.x1 = x; if (y > dirty.y1) dirty.y1 = y; }
 
 function flushDirty() {
+  flushNormal();
   if (!state.mirror || dirty.x1 < dirty.x0) return;
   const x = Math.max(0, dirty.x0), y = Math.max(0, dirty.y0);
   const w = Math.min(state.mirror.width - 1, dirty.x1) - x + 1, h = Math.min(state.mirror.height - 1, dirty.y1) - y + 1;
@@ -410,6 +512,7 @@ function paintSphere(P, r, mapEntry, rgb) {
           data[o + 1] = data[o + 1] * (1 - w) + rgb[1] * w;
           data[o + 2] = data[o + 2] * (1 - w) + rgb[2] * w;
           touch(px, py);
+          if (flat.cur) normalBlend(px, py, w, FLAT_RGB);
         }
       }
     }
@@ -453,6 +556,7 @@ function cloneDabAtScreen(x, y) {
       const rs = Math.max(1.5, step * worldPerPixel(dest.distance) * tpw * 1.1);
       const w = opacity * feather(dist, Rpx);
       const cr = snapshot.data[si], cg = snapshot.data[si + 1], cb = snapshot.data[si + 2];
+      const nrgb = flat.cur ? normalSource(sp.x, sp.y) : null;
       const cxp = Math.round(dp.x), cyp = Math.round(dp.y);
       const rr = Math.ceil(rs);
       for (let ty = Math.max(0, cyp - rr); ty <= Math.min(H - 1, cyp + rr); ty++) {
@@ -463,6 +567,7 @@ function cloneDabAtScreen(x, y) {
           const o = (ty * W + tx) * 4;
           data[o] = data[o] * (1 - ww) + cr * ww; data[o + 1] = data[o + 1] * (1 - ww) + cg * ww; data[o + 2] = data[o + 2] * (1 - ww) + cb * ww;
           touch(tx, ty);
+          if (nrgb) normalBlend(tx, ty, ww, nrgb);
         }
       }
     }
@@ -696,6 +801,8 @@ async function handlePointerDown(evt) {
   state.mirror = state.undoImage ? new ImageData(new Uint8ClampedArray(state.undoImage.data), state.undoImage.width, state.undoImage.height) : null;
   if (!state.mirror) { say('Could not read the texture for painting.', true); return; }
   attachLiveCanvas(material);
+  flat.serial = window.__shrinkUndoSerial ?? null;
+  beginNormalStroke(material);
   state.painting = true;
   state.lastScreen = { x: clientX, y: clientY };
 
@@ -743,6 +850,7 @@ function stopPaint(evt) {
   state.lastScreen = null;
   state.cloneOffset = null;
   state.cloneSnapshot = null;
+  finishNormalStroke();
   state.mirror = null;
   try { getViewerState()?.renderer?.domElement?.releasePointerCapture(evt.pointerId); } catch {}
 }
@@ -766,10 +874,12 @@ optionsBar.className = 'tool-options'; optionsBar.hidden = true;
 optionsBar.innerHTML = `<label id="vwBrushSizeRow">Brush size <input id="vwBrushSize" type="range" aria-label="Brush size"><output id="vwBrushSizeValue"></output></label>
   <label>Opacity <input id="vwBrushOpacity" type="range" aria-label="Opacity"><output id="vwBrushOpacityValue"></output></label>
   <label id="vwSoftRow">Softness <input id="vwSoft" type="range" min="2" max="100" step="1" value="28" aria-label="Edge softness"><output id="vwSoftValue">28%</output></label>
+  <label id="vwFlatRow" title="The relief (raised lettering, panel edges) lives in a separate picture, the normal map. With this ticked, painting smooths it out, Stamp smooths what it covers, and Clone copies the source's relief."><span id="vwFlatText">Flatten the bumps too</span> <input id="vwFlat" type="checkbox" checked></label>
   <label id="vwSprayRow" title="Faint dabs that build up as you go over the same spot or hold still, like a spray can">Spray can <input id="vwSpray" type="checkbox"></label>`;
 optionsBar.appendChild(stampBar);
 if (toolbar) toolbar.insertAdjacentElement('afterend', optionsBar); else viewer?.prepend(optionsBar);
 optionsBar.querySelector('#vwSoft').addEventListener('input', e => { brush.edge = Math.max(0.02, Number(e.target.value) / 100); optionsBar.querySelector('#vwSoftValue').textContent = `${e.target.value}%`; });
+optionsBar.querySelector('#vwFlat').addEventListener('change', e => { flat.on = e.target.checked; });
 optionsBar.querySelector('#vwSpray').addEventListener('change', e => { brush.spray = e.target.checked; stopSpray(); });
 function stopSpray() { if (brush.timer) { clearInterval(brush.timer); brush.timer = null; } }
 // the two sliders mirror the ones in the left panel, both ways
@@ -871,7 +981,8 @@ async function captureStamp(x0, y0, w, h) {
     const material = materialForHit(hit);
     if (!material?.map) { say('That part of the model does not use an image colour texture.', true); return; }
     if (!await ensureTextureForMaterial(material)) return;
-    const snap = paintCtx.getImageData(0, 0, textureCanvas.width, textureCanvas.height), TW = snap.width, TH = snap.height;
+    const tmp = document.createElement('canvas'); tmp.width = textureCanvas.width; tmp.height = textureCanvas.height; tmp.getContext('2d').drawImage(textureCanvas, 0, 0);   // a copy, so reading it does not count as a paint stroke for Undo
+    const snap = tmp.getContext('2d').getImageData(0, 0, tmp.width, tmp.height), TW = snap.width;
     const s = patchStep(w, h), pw = Math.max(1, Math.round(w / s)), ph = Math.max(1, Math.round(h / s));
     const data = new Uint8ClampedArray(pw * ph * 4);
     let got = 0;
@@ -911,6 +1022,8 @@ async function pasteStamp(cx, cy) {
     state.mirror = state.undoImage ? new ImageData(new Uint8ClampedArray(state.undoImage.data), state.undoImage.width, state.undoImage.height) : null;
     if (!state.mirror) { say('Could not read the texture for pasting.', true); return; }
     attachLiveCanvas(material);
+    flat.serial = window.__shrinkUndoSerial ?? null;
+    beginNormalStroke(material);
 
     const sc = (P.wpp0 / worldPerPixel(centre.distance)) * stamp.scale, opts = { scale: sc, rotDeg: stamp.rot, flip: stamp.flip, pw: P.pw, ph: P.ph, s: P.s };
     const R = pasteRadius(P.pw, P.ph, P.s, sc);
@@ -936,15 +1049,17 @@ async function pasteStamp(cx, cy) {
             const ww = w * (1 - q * q), o = (ty * W + tx) * 4;
             data[o] = data[o] * (1 - ww) + rgb[0] * ww; data[o + 1] = data[o + 1] * (1 - ww) + rgb[1] * ww; data[o + 2] = data[o + 2] * (1 - ww) + rgb[2] * ww;
             touch(tx, ty);
+            if (flat.cur) normalBlend(tx, ty, ww, FLAT_RGB);
           }
         }
         n++;
       }
     }
     flushDirty();
+    finishNormalStroke();
     state.mirror = null;
     say(n ? 'Pasted. Rotate the car to check it, click again to paste another copy, or Undo.' : 'Nothing was pasted: the target did not land on the model.', !n);
-  } catch (err) { console.error(err); state.mirror = null; say(`Could not paste: ${err.message}`, true); }
+  } catch (err) { console.error(err); finishNormalStroke(); state.mirror = null; say(`Could not paste: ${err.message}`, true); }
   finally { stamp.busy = false; }
 }
 
@@ -988,6 +1103,7 @@ function collectDirtyLayers() {
     if (index === Number(textureSelect?.value)) continue;     // the editor itself commits the selected texture
     if (layer.dirty && layer.canvas) out.push({ index, canvas: layer.canvas });
   }
+  for (const L of flat.layers.values()) if (L.dirty && L.idx !== Number(textureSelect?.value)) out.push({ index: L.idx, canvas: L.canvas });
   return out;
 }
 
@@ -999,6 +1115,7 @@ function resetAfterModelChange() {
   state.activeTextureIndex = Number(textureSelect?.value ?? -1);
   state.cloneSource = null; state.cloneOffset = null; state.cloneSnapshot = null;
   stamp.patch = null; stampGhost.hidden = true;
+  flat.layers.clear(); flat.undo.clear(); flat.cur = null;
   state.layers.clear();
   state.paintMaps.clear();
   sourceMarker.style.display = 'none';
@@ -1006,6 +1123,6 @@ function resetAfterModelChange() {
 window.addEventListener('shrink:texture-applied', () => { resetAfterModelChange(); setMode('paint'); });
 window.addEventListener('shrink:model-opened', () => { resetAfterModelChange(); state.activeTextureIndex = null; if (state.mode !== 'navigate') setMode('navigate'); });
 
-window.__shrinkPaint = { stamp: () => ({ hasPatch: !!stamp.patch, scale: stamp.scale, rot: stamp.rot, flip: stamp.flip }), setMode, getMode: () => state.mode, collectDirtyLayers, hasEdits: () => [...state.layers.values()].some(l => l.dirty) };
+window.__shrinkPaint = { stamp: () => ({ hasPatch: !!stamp.patch, scale: stamp.scale, rot: stamp.rot, flip: stamp.flip }), setMode, getMode: () => state.mode, collectDirtyLayers, hasEdits: () => [...state.layers.values()].some(l => l.dirty) || [...flat.layers.values()].some(l => l.dirty), flat: () => ({ on: flat.on, layers: [...flat.layers.values()].map(l => ({ idx: l.idx, w: l.w, h: l.h, dirty: l.dirty })) }) };
 
 setMode('navigate');

@@ -1,5 +1,5 @@
 // Stamp maths: where a pasted screen pixel lands in the copied patch, and how the patch is sampled.
-import { patchCoords, samplePatch, edgeFalloff, pasteRadius, patchStep, MAX_PATCH } from '../stamp-core.js';
+import { patchCoords, samplePatch, edgeFalloff, pasteRadius, patchStep, MAX_PATCH, blendNormalBlock, sliceRegion } from '../stamp-core.js';
 import { ok } from './helpers.mjs';
 const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
 
@@ -41,4 +41,29 @@ ok(patchStep(100, 50) === 1 && patchStep(MAX_PATCH * 3, 10) === 3 && patchStep(M
   }
   ok(got.get('0,-1') === 'R' && got.get('0,1') === 'B' && !got.has('3,0'), 'a 4x2 patch pasted at 90° becomes 2 wide and 4 tall, red on top and blue below');
 }
+/* ---------- bumps: flatten / copy the normal map ---------- */
+{
+  const mkN = (w, h) => { const d = new Uint8ClampedArray(w * h * 4); for (let i = 0; i < w * h; i++) d.set([200, 90, 240, 255], i * 4); return d; };
+  const FLAT = [128, 128, 255];
+  let d = mkN(4, 4), b = blendNormalBlock(d, 4, 4, 4, 4, 1, 2, 1, FLAT);
+  ok(b.x0 === 1 && b.x1 === 1 && b.y0 === 2 && b.y1 === 2 && d[(2 * 4 + 1) * 4] === 128 && d[(2 * 4 + 1) * 4 + 2] === 255 && d[0] === 200, 'same size: one colour texel flattens exactly one normal texel and nothing else');
+  d = mkN(8, 8); b = blendNormalBlock(d, 8, 8, 4, 4, 1, 1, 1, FLAT);
+  ok(b.x0 === 2 && b.x1 === 3 && b.y0 === 2 && b.y1 === 3 && d[(2 * 8 + 2) * 4] === 128 && d[(3 * 8 + 3) * 4] === 128 && d[(4 * 8 + 4) * 4] === 200, 'a normal map twice as big: one colour texel covers a 2x2 block');
+  d = mkN(2, 2); b = blendNormalBlock(d, 2, 2, 4, 4, 3, 3, 1, FLAT);
+  ok(b.x0 === 1 && b.y0 === 1 && d[(1 * 2 + 1) * 4] === 128 && d[0] === 200, 'a normal map half the size: four colour texels share one');
+  d = mkN(4, 4); blendNormalBlock(d, 4, 4, 4, 4, 0, 0, 0.5, FLAT);
+  ok(d[0] === 164 && d[1] === 109 && Math.abs(d[2] - 247.5) < 1 && d[3] === 255, 'half strength moves halfway to flat and leaves alpha alone');
+  ok(blendNormalBlock(mkN(4, 4), 4, 4, 4, 4, 9, 9, 1, FLAT) === null && blendNormalBlock(mkN(4, 4), 4, 4, 4, 4, 1, 1, 0, FLAT) === null, 'outside the picture, or at zero strength, nothing happens');
+  // clone: copying the source's normal colour
+  d = mkN(4, 4); d.set([10, 20, 30, 255], 0); const src = [d[0], d[1], d[2]]; blendNormalBlock(d, 4, 4, 4, 4, 3, 3, 1, src);
+  ok(d[(3 * 4 + 3) * 4] === 10 && d[(3 * 4 + 3) * 4 + 1] === 20, 'clone copies the source normal colour to the destination');
+  // undo: slice the rectangle that was changed
+  const before = mkN(4, 4); before.set([1, 2, 3, 255], (1 * 4 + 2) * 4);
+  const part = sliceRegion(before, 4, { x0: 1, y0: 1, x1: 2, y1: 2 });
+  ok(part.length === 2 * 2 * 4 && part[4] === 1 && part[5] === 2 && part[0] === 200, 'the undo slice is exactly the changed rectangle: ' + part.slice(0, 8));
+  const back = mkN(4, 4); blendNormalBlock(back, 4, 4, 4, 4, 2, 1, 1, FLAT);
+  for (let y = 0; y < 2; y++) back.set(part.subarray(y * 8, y * 8 + 8), ((1 + y) * 4 + 1) * 4);
+  ok(back[(1 * 4 + 2) * 4] === 1, 'putting the slice back restores the pixels');
+}
+
 console.log('all passed'); process.exit(0);

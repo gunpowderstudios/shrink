@@ -37,3 +37,25 @@ export const pasteRadius = (pw, ph, s, scale) => Math.hypot(pw * s * scale, ph *
 // Longest side of a patch is kept at or below this many patch pixels.
 export const MAX_PATCH = 160;
 export const patchStep = (w, h) => Math.max(1, Math.ceil(Math.max(w, h) / MAX_PATCH));
+
+/* ---------- bumps (normal map) helpers, shared with paint3d.js ---------- */
+// Blend the pixels of a w x h RGBA normal map that colour texel (px, py) of a cw x ch colour picture covers towards rgb.
+// Returns the rectangle it touched ({x0,y0,x1,y1}) or null.
+export function blendNormalBlock(d, w, h, cw, ch, px, py, wt, rgb) {
+  if (wt <= 0) return null;
+  const sx = w / cw, sy = h / ch;
+  const x0 = Math.floor(px * sx), x1 = Math.max(x0, Math.ceil((px + 1) * sx) - 1), y0 = Math.floor(py * sy), y1 = Math.max(y0, Math.ceil((py + 1) * sy) - 1);
+  if (x0 >= w || y0 >= h || x0 < 0 || y0 < 0) return null;
+  const ex = Math.min(x1, w - 1), ey = Math.min(y1, h - 1);
+  for (let y = y0; y <= ey; y++) for (let x = x0; x <= ex; x++) {
+    const o = (y * w + x) * 4;
+    d[o] = d[o] * (1 - wt) + rgb[0] * wt; d[o + 1] = d[o + 1] * (1 - wt) + rgb[1] * wt; d[o + 2] = d[o + 2] * (1 - wt) + rgb[2] * wt;
+  }
+  return { x0, y0, x1: ex, y1: ey };
+}
+// Copy a rectangle out of an RGBA buffer (for Undo).
+export function sliceRegion(buf, w, b) {
+  const rw = b.x1 - b.x0 + 1, rh = b.y1 - b.y0 + 1, out = new Uint8ClampedArray(rw * rh * 4);
+  for (let y = 0; y < rh; y++) out.set(buf.subarray(((b.y0 + y) * w + b.x0) * 4, ((b.y0 + y) * w + b.x0 + rw) * 4), y * rw * 4);
+  return out;
+}

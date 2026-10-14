@@ -10,6 +10,7 @@
   const status = document.getElementById('status');
   const history = [];
   let restoring = false;
+  let serialCounter = 0;      // every undo step gets a number so other tools (the bumps layer in paint3d.js) can keep their own part of it
   let undoBtn = null;
 
   function say(message, error = false) {
@@ -30,6 +31,7 @@
   function clearHistory() {
     history.length = 0;
     updateButton();
+    window.dispatchEvent(new CustomEvent('shrink:paint-undo-cleared'));
   }
 
   function imageDataToBlob(imageData) {
@@ -69,8 +71,10 @@
         textureIndex: Number(textureSelect?.value ?? 0),
         width: sw,
         height: sh,
-        blobPromise: imageDataToBlob(imageData)
+        blobPromise: imageDataToBlob(imageData),
+        serial: ++serialCounter
       };
+      window.__shrinkUndoSerial = entry.serial;
       history.push(entry);
       while (history.length > MAX_UNDOS) history.shift();
       updateButton();
@@ -118,6 +122,7 @@
       ctx.drawImage(bitmap, 0, 0);
       bitmap.close?.();
       refreshLiveTexture();
+      window.dispatchEvent(new CustomEvent('shrink:paint-undo', { detail: { serial: entry.serial } }));
       say(`Undo complete · ${history.length} ${history.length === 1 ? 'undo' : 'undos'} remaining.`);
     } catch (err) {
       console.warn('Multi-step undo failed:', err);

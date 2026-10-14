@@ -2,6 +2,14 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.82 — Paint, Stamp and Clone now handle the bumps too
+
+- The raised lettering and panel edges that stayed visible under repainted areas live in the **normal map**, which 3D painting never touched. A new tick-box in the brush strip, **Flatten the bumps too** (on by default), makes Paint smooth the relief under the paint (gradually when Opacity is low or Spray can is on), makes Stamp smooth what it covers, and makes Clone (**Copy the bumps too**) copy the source area's relief along with its colour.
+- The change is made on a private copy of the normal map, shown live, and written into the GLB by **Apply texture to model** along with the colour edits. Undo restores it step by step (multi-undo now numbers its steps and announces undo events).
+- The first stroke on a texture reads the whole normal map once, so on a 4096px map it can pause for a moment.
+- Stamp's copy no longer adds a spurious entry to the Undo list.
+- The pure parts (normal blending across different texture sizes, undo rectangles) are tested in `stamp.test.mjs`; the 3D parts were not run in a real browser. Not handled: a normal map that uses a different UV set from the colour map.
+
 ## v2.81 — Paint: Softness and Spray can
 
 - The brush strip under the viewer toolbar gains **Softness** (edge fade, 2–100%; the old fixed look was 28%; 100% = airbrush) for Paint and Clone, and a **Spray can** tick-box for Paint. Spray makes each dab faint, so colour builds up as you go over a spot again and while you hold the button still (a dab every 60 ms).

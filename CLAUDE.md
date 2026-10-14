@@ -392,4 +392,4 @@ A good Simple-mode run should:
 
 ## Stamp (v2.79)
 - `paint3d.js` owns the Stamp tool; `stamp-core.js` holds the pure maths (patch coordinates, bilinear sampling, edge fade) and is tested by `stamp.test.mjs`. The patch is captured by raycasting the screen and reading the active colour texture, and pasted by raycasting the destination: keep it a screen-space projection, do not turn it into a UV copy.
-- 3D painting (Paint, Clone, Stamp) only touches the colour texture of a material (`material.map`). Normal and metallic/roughness pictures can only be edited in the flat editor.
+- 3D painting (Paint, Clone, Stamp) edits the colour texture (`material.map`) and, since v2.82, the normal map too (the `flat` layer in `paint3d.js`: flatten for Paint/Stamp, copy for Clone). The normal map is edited on its own private canvas, handed to Apply through `collectDirtyLayers`, and undone per step via `shrink:paint-undo` events from `multi-undo.js`. Metallic/roughness pictures can still only be edited in the flat editor.
