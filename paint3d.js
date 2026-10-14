@@ -2,6 +2,7 @@ import './paint-mode-v08.js?v=2.18';
 import './gltf-texture-index.js';
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { ensureBVH, raycasterFor } from './bvh-support.js?v=2.18';
+import { patchCoords, samplePatch, edgeFalloff, pasteRadius, patchStep } from './stamp-core.js?v=2.79';
 
 /* Shrink 3D paint engine (v1.5)
  *  - fast raycasting (BVH) so painting stays live on very dense meshes
@@ -64,11 +65,12 @@ const controls = document.createElement('div');
 controls.className = 'model-paint-controls';
 const paintModelBtn = makeButton('paintModelBtn', 'Paint');
 const cloneModelBtn = makeButton('cloneModelBtn', 'Clone');
+const stampModelBtn = makeButton('stampModelBtn', 'Stamp');
 const sampleModelBtn = makeButton('sampleModelBtn', 'Pick colour');
 const navigateModelBtn = makeButton('navigateModelBtn', 'Navigate');
 const undo3DBtn = makeButton('undo3DBtn', 'Undo');
 undo3DBtn.disabled = true;
-controls.append(paintModelBtn, cloneModelBtn, sampleModelBtn, navigateModelBtn, undo3DBtn);
+controls.append(paintModelBtn, cloneModelBtn, stampModelBtn, sampleModelBtn, navigateModelBtn, undo3DBtn);
 
 if (toolbar) {
   const actions = toolbar.querySelector('.viewer-actions');
@@ -105,9 +107,11 @@ function setMode(mode) {
   state.cloneSnapshot = null;
   paintModelBtn.classList.toggle('active', mode === 'paint');
   cloneModelBtn.classList.toggle('active', mode === 'clone');
+  stampModelBtn.classList.toggle('active', mode === 'stamp');
+  stampModeChanged(mode === 'stamp');
   sampleModelBtn.classList.toggle('active', mode === 'sample');
   navigateModelBtn.classList.toggle('active', mode === 'navigate');
-  viewer?.classList.toggle('direct-paint', mode === 'paint' || mode === 'clone');
+  viewer?.classList.toggle('direct-paint', mode === 'paint' || mode === 'clone' || mode === 'stamp');
   viewer?.classList.toggle('direct-sample', mode === 'sample');
   if (mode !== 'clone') sourceMarker.style.display = 'none';
 
@@ -119,7 +123,9 @@ function setMode(mode) {
       ? 'PAINT · drag on model · hold Cmd / Ctrl to rotate · scroll to zoom'
       : mode === 'clone'
         ? 'CLONE · Option/Alt-click a clean source · drag to clone · Cmd/Ctrl to rotate'
-        : mode === 'sample'
+        : mode === 'stamp'
+          ? 'STAMP · drag a box to copy · click to paste · Option/Alt-drag copies again · Cmd/Ctrl to rotate'
+          : mode === 'sample'
           ? 'PICK COLOUR · click the model to sample its texture colour'
           : 'Drag to rotate · Scroll to zoom · Right-drag to pan';
   }
@@ -128,12 +134,14 @@ function setMode(mode) {
   if (mode === 'clone') say(state.cloneSource
     ? 'Clone mode: drag to clone from the saved source. Option/Alt-click anywhere to choose a new source.'
     : 'Clone mode: Option-click (Mac) or Alt-click (Windows) a clean area of the car to set the source.');
+  if (mode === 'stamp') say(stamp.patch ? 'Stamp mode: aim at the destination and click to paste. Option/Alt-drag copies something new.' : 'Stamp mode: drag a box around what you want to copy (for example a number).');
   if (mode === 'sample') say('Pick colour: click the model to sample a colour, then Paint resumes automatically.');
 }
 
 paintModelBtn.addEventListener('click', () => setMode('paint'));
 cloneModelBtn.addEventListener('click', () => setMode('clone'));
 sampleModelBtn.addEventListener('click', () => setMode('sample'));
+stampModelBtn.addEventListener('click', () => setMode('stamp'));
 navigateModelBtn.addEventListener('click', () => setMode('navigate'));
 
 /* ------------------------------------------------------------------ */
@@ -634,6 +642,7 @@ async function handlePointerDown(evt) {
   if (evt.target !== v.renderer.domElement) return;
   evt.preventDefault();
   evt.stopImmediatePropagation();
+  if (state.mode === 'stamp') { stampPointerDown(evt, v); return; }
   state.pointerHeld = true;
   const pointerId = evt.pointerId, clientX = evt.clientX, clientY = evt.clientY, altKey = evt.altKey;
 
@@ -698,6 +707,7 @@ async function handlePointerDown(evt) {
 }
 
 function handlePointerMove(evt) {
+  if (state.mode === 'stamp') { stampMove(evt); return; }
   if (state.mode === 'clone' && state.cloneSource && !state.painting) {
     const sp = getViewerState() ? projectToClient(state.cloneSource.point) : null;
     if (sp) showSourceMarker(sp.x, sp.y);
@@ -711,6 +721,7 @@ function handlePointerMove(evt) {
 }
 
 function stopPaint(evt) {
+  if (state.mode === 'stamp') { stampUp(evt); return; }
   state.pointerHeld = false;
   if (!state.painting) return;
   if (state.mode !== 'navigate' && !modifierOrbit(evt)) {
@@ -723,6 +734,184 @@ function stopPaint(evt) {
   state.cloneSnapshot = null;
   state.mirror = null;
   try { getViewerState()?.renderer?.domElement?.releasePointerCapture(evt.pointerId); } catch {}
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Stamp: copy a box of the model as you see it, paste it somewhere else (any angle, size, flipped)       */
+/* ------------------------------------------------------------------ */
+const stamp = { patch: null, sel: null, scale: 1, rot: 0, flip: false, busy: false, lastSc: 1 };
+
+const stampBar = document.createElement('div');
+stampBar.className = 'stamp-bar'; stampBar.hidden = true;
+stampBar.innerHTML = `<b>Stamp</b>
+  <label>Size <input id="stampScale" type="range" min="25" max="300" step="1" value="100"><output id="stampScaleValue">100%</output></label>
+  <label>Rotate <input id="stampRot" type="range" min="-180" max="180" step="1" value="0"><output id="stampRotValue">0°</output></label>
+  <button id="stampFlip" class="button ghost small" type="button">Flip</button>
+  <button id="stampNew" class="button ghost small" type="button">Copy something else</button>
+  <span id="stampHint" class="stamp-hint">Drag a box on the model to copy it.</span>`;
+viewer?.appendChild(stampBar);
+const stampRect = document.createElement('div'); stampRect.className = 'stamp-rect'; stampRect.hidden = true; viewer?.appendChild(stampRect);
+const stampGhost = document.createElement('canvas'); stampGhost.className = 'stamp-ghost'; stampGhost.hidden = true; viewer?.appendChild(stampGhost);
+const stampStyle = document.createElement('style');
+stampStyle.textContent = `.stamp-bar{position:absolute;left:12px;top:12px;z-index:30;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;max-width:calc(100% - 24px);padding:8px 12px;border-radius:12px;background:rgba(10,14,20,.82);border:1px solid rgba(255,255,255,.14);font-size:12px;color:#fff}
+.stamp-bar label{display:flex;gap:6px;align-items:center}.stamp-bar input[type=range]{width:110px}.stamp-bar output{min-width:38px}
+.stamp-hint{flex-basis:100%;opacity:.75}
+.stamp-rect{position:absolute;z-index:28;border:2px dashed #ff4e55;background:rgba(255,78,85,.12);pointer-events:none}
+.stamp-ghost{position:absolute;z-index:27;pointer-events:none;opacity:.6;outline:2px dashed #fff;transform-origin:50% 50%;image-rendering:auto}`;
+document.head.appendChild(stampStyle);
+const $s = id => stampBar.querySelector('#' + id);
+
+function stampModeChanged(on) {
+  stampBar.hidden = !on;
+  if (!on) { stampRect.hidden = true; stampGhost.hidden = true; stamp.sel = null; }
+  else updateStampUI();
+}
+function updateStampUI() {
+  $s('stampScaleValue').textContent = `${Math.round(stamp.scale * 100)}%`;
+  $s('stampRotValue').textContent = `${Math.round(stamp.rot)}°`;
+  $s('stampHint').textContent = stamp.patch
+    ? 'Aim at where it should go and click. Hold Cmd/Ctrl and drag to turn the car first. Option/Alt-drag copies something new.'
+    : 'Drag a box on the model to copy it (for example a number on a sign).';
+  if (stamp.patch) { stampGhost.hidden = false; layoutGhost(stamp.lastPos); } else stampGhost.hidden = true;
+}
+$s('stampScale').addEventListener('input', () => { stamp.scale = Number($s('stampScale').value) / 100; updateStampUI(); });
+$s('stampRot').addEventListener('input', () => { stamp.rot = Number($s('stampRot').value); updateStampUI(); });
+$s('stampFlip').addEventListener('click', () => { stamp.flip = !stamp.flip; $s('stampFlip').classList.toggle('active', stamp.flip); updateStampUI(); });
+$s('stampNew').addEventListener('click', () => { stamp.patch = null; stampGhost.hidden = true; updateStampUI(); say('Drag a box around what you want to copy.'); });
+
+function layoutGhost(pos) {
+  if (!stamp.patch || !pos || !viewer) return;
+  const { pw, ph, s } = stamp.patch, sc = stamp.lastSc * stamp.scale, w = pw * s * sc, h = ph * s * sc;
+  const r = viewer.getBoundingClientRect();
+  stampGhost.style.width = `${w}px`; stampGhost.style.height = `${h}px`;
+  stampGhost.style.left = `${pos.x - r.left - w / 2}px`; stampGhost.style.top = `${pos.y - r.top - h / 2}px`;
+  stampGhost.style.transform = `rotate(${stamp.rot}deg)${stamp.flip ? ' scaleX(-1)' : ''}`;
+}
+
+function stampPointerDown(evt, v) {
+  if (stamp.busy) return;
+  if (evt.altKey || !stamp.patch) {
+    stamp.sel = { x0: evt.clientX, y0: evt.clientY, x1: evt.clientX, y1: evt.clientY };
+    try { v.renderer.domElement.setPointerCapture(evt.pointerId); } catch {}
+    return;
+  }
+  pasteStamp(evt.clientX, evt.clientY);
+}
+
+function stampMove(evt) {
+  if (stamp.sel) {
+    stamp.sel.x1 = evt.clientX; stamp.sel.y1 = evt.clientY;
+    const r = viewer.getBoundingClientRect(), s = stamp.sel;
+    stampRect.hidden = false;
+    stampRect.style.left = `${Math.min(s.x0, s.x1) - r.left}px`; stampRect.style.top = `${Math.min(s.y0, s.y1) - r.top}px`;
+    stampRect.style.width = `${Math.abs(s.x1 - s.x0)}px`; stampRect.style.height = `${Math.abs(s.y1 - s.y0)}px`;
+    evt.preventDefault(); evt.stopImmediatePropagation();
+    return;
+  }
+  if (!stamp.patch || modifierOrbit(evt) || evt.target !== getViewerState()?.renderer?.domElement) return;
+  stamp.lastPos = { x: evt.clientX, y: evt.clientY };
+  const hit = rayAt(evt.clientX, evt.clientY);
+  if (hit) stamp.lastSc = stamp.patch.wpp0 / worldPerPixel(hit.distance);     // same real-world size as the original
+  layoutGhost(stamp.lastPos);
+}
+
+function stampUp(evt) {
+  state.pointerHeld = false;
+  const sel = stamp.sel; if (!sel) return;
+  stamp.sel = null; stampRect.hidden = true;
+  try { getViewerState()?.renderer?.domElement?.releasePointerCapture(evt.pointerId); } catch {}
+  const x0 = Math.min(sel.x0, sel.x1), y0 = Math.min(sel.y0, sel.y1), w = Math.abs(sel.x1 - sel.x0), h = Math.abs(sel.y1 - sel.y0);
+  if (w < 8 || h < 8) { say('That box is too small. Drag a larger one around what you want to copy.', true); return; }
+  captureStamp(x0, y0, w, h);
+}
+
+async function captureStamp(x0, y0, w, h) {
+  stamp.busy = true;
+  try {
+    const v = getViewerState();
+    await ensureBVH(v.scene, say);
+    let hit = rayAt(x0 + w / 2, y0 + h / 2);
+    for (let i = 0; !hit && i < 12; i++) hit = rayAt(x0 + ((i % 4) + 0.5) / 4 * w, y0 + (Math.floor(i / 4) + 0.5) / 3 * h);
+    if (!hit) { say('There is no model inside that box.', true); return; }
+    const material = materialForHit(hit);
+    if (!material?.map) { say('That part of the model does not use an image colour texture.', true); return; }
+    if (!await ensureTextureForMaterial(material)) return;
+    const snap = paintCtx.getImageData(0, 0, textureCanvas.width, textureCanvas.height), TW = snap.width, TH = snap.height;
+    const s = patchStep(w, h), pw = Math.max(1, Math.round(w / s)), ph = Math.max(1, Math.round(h / s));
+    const data = new Uint8ClampedArray(pw * ph * 4);
+    let got = 0;
+    for (let j = 0; j < ph; j++) for (let i = 0; i < pw; i++) {
+      const hh = rayAt(x0 + (i + 0.5) * s, y0 + (j + 0.5) * s);
+      if (!hh) continue;
+      const m = materialForHit(hh);
+      if (!m?.map || textureIndexOfMaterial(m) !== state.activeTextureIndex) continue;
+      const tp = texturePoint(hh, m); if (!tp) continue;
+      const si = (Math.round(tp.y) * TW + Math.round(tp.x)) * 4, o = (j * pw + i) * 4;
+      data[o] = snap.data[si]; data[o + 1] = snap.data[si + 1]; data[o + 2] = snap.data[si + 2]; data[o + 3] = 255; got++;
+    }
+    if (got < 20) { say('Not enough of the model on this texture inside that box.', true); return; }
+    stamp.patch = { pw, ph, s, data, texIndex: state.activeTextureIndex, wpp0: worldPerPixel(hit.distance) };
+    stampGhost.width = pw; stampGhost.height = ph;
+    stampGhost.getContext('2d').putImageData(new ImageData(data, pw, ph), 0, 0);
+    stamp.lastSc = 1; stamp.lastPos = { x: x0 + w / 2, y: y0 + h / 2 };
+    updateStampUI();
+    say('Copied. Turn the car to where it should go, aim, and click to paste. Use Size, Rotate and Flip first if needed. Undo works as usual.');
+  } catch (err) { console.error(err); say(`Could not copy: ${err.message}`, true); }
+  finally { stamp.busy = false; }
+}
+
+async function pasteStamp(cx, cy) {
+  if (stamp.busy || !stamp.patch) return;
+  stamp.busy = true;
+  try {
+    const v = getViewerState(), P = stamp.patch;
+    await ensureBVH(v.scene, say);
+    const centre = rayAt(cx, cy);
+    if (!centre) { say('Aim at the model to paste.', true); return; }
+    const material = materialForHit(centre);
+    if (!material?.map) { say('That part of the model does not use an image colour texture.', true); return; }
+    if (!await ensureTextureForMaterial(material)) return;
+    if (state.activeTextureIndex !== P.texIndex) { say('That surface uses a different texture from the copied one, so it cannot be pasted there.', true); return; }
+    saveUndo();
+    state.mirror = state.undoImage ? new ImageData(new Uint8ClampedArray(state.undoImage.data), state.undoImage.width, state.undoImage.height) : null;
+    if (!state.mirror) { say('Could not read the texture for pasting.', true); return; }
+    attachLiveCanvas(material);
+
+    const sc = (P.wpp0 / worldPerPixel(centre.distance)) * stamp.scale, opts = { scale: sc, rotDeg: stamp.rot, flip: stamp.flip, pw: P.pw, ph: P.ph, s: P.s };
+    const R = pasteRadius(P.pw, P.ph, P.s, sc);
+    let step = 1.5; while ((2 * R / step) ** 2 > 120000) step *= 1.25;
+    const opacity = Number(brushOpacity?.value || 100) / 100, data = state.mirror.data, W = state.mirror.width, H = state.mirror.height, rgb = [0, 0, 0];
+    let n = 0;
+    for (let dy = -R; dy <= R; dy += step) {
+      for (let dx = -R; dx <= R; dx += step) {
+        const { u, v: pv } = patchCoords(dx, dy, opts);
+        if (u < 0 || pv < 0 || u > P.pw || pv > P.ph) continue;
+        const a = samplePatch(P, u, pv, rgb); if (a <= 0.02) continue;
+        const dest = rayAt(cx + dx, cy + dy);
+        if (!dest || materialForHit(dest) !== state.activeMaterial) continue;
+        const dp = texturePoint(dest, state.activeMaterial); if (!dp) continue;
+        const tpw = texelsPerWorld(dest) || Math.sqrt(W * H);
+        const rs = Math.max(1.5, step * worldPerPixel(dest.distance) * tpw * 1.1);
+        const w = opacity * a * edgeFalloff(u, pv, P.pw, P.ph);
+        if (w <= 0) continue;
+        const cxp = Math.round(dp.x), cyp = Math.round(dp.y), rr = Math.ceil(rs);
+        for (let ty = Math.max(0, cyp - rr); ty <= Math.min(H - 1, cyp + rr); ty++) {
+          for (let tx = Math.max(0, cxp - rr); tx <= Math.min(W - 1, cxp + rr); tx++) {
+            const q = Math.hypot(tx - cxp, ty - cyp) / rs; if (q > 1) continue;
+            const ww = w * (1 - q * q), o = (ty * W + tx) * 4;
+            data[o] = data[o] * (1 - ww) + rgb[0] * ww; data[o + 1] = data[o + 1] * (1 - ww) + rgb[1] * ww; data[o + 2] = data[o + 2] * (1 - ww) + rgb[2] * ww;
+            touch(tx, ty);
+          }
+        }
+        n++;
+      }
+    }
+    flushDirty();
+    state.mirror = null;
+    say(n ? 'Pasted. Rotate the car to check it, click again to paste another copy, or Undo.' : 'Nothing was pasted: the target did not land on the model.', !n);
+  } catch (err) { console.error(err); state.mirror = null; say(`Could not paste: ${err.message}`, true); }
+  finally { stamp.busy = false; }
 }
 
 viewer?.addEventListener('pointerdown', handlePointerDown, true);
@@ -775,6 +964,7 @@ function resetAfterModelChange() {
   state.liveTexture = null;
   state.activeTextureIndex = Number(textureSelect?.value ?? -1);
   state.cloneSource = null; state.cloneOffset = null; state.cloneSnapshot = null;
+  stamp.patch = null; stampGhost.hidden = true;
   state.layers.clear();
   state.paintMaps.clear();
   sourceMarker.style.display = 'none';
@@ -782,6 +972,6 @@ function resetAfterModelChange() {
 window.addEventListener('shrink:texture-applied', () => { resetAfterModelChange(); setMode('paint'); });
 window.addEventListener('shrink:model-opened', () => { resetAfterModelChange(); state.activeTextureIndex = null; if (state.mode !== 'navigate') setMode('navigate'); });
 
-window.__shrinkPaint = { setMode, getMode: () => state.mode, collectDirtyLayers, hasEdits: () => [...state.layers.values()].some(l => l.dirty) };
+window.__shrinkPaint = { stamp: () => ({ hasPatch: !!stamp.patch, scale: stamp.scale, rot: stamp.rot, flip: stamp.flip }), setMode, getMode: () => state.mode, collectDirtyLayers, hasEdits: () => [...state.layers.values()].some(l => l.dirty) };
 
 setMode('navigate');

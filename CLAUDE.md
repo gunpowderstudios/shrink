@@ -389,3 +389,7 @@ A good Simple-mode run should:
 - `split-print.js` must stay safe against being loaded twice (`DUPLICATE_LOAD`).
 - Game-mode material tweaks go through `material-look.js` (`__shrinkMaterial`): scale from `userData._shrinkOrigMetal`, never from the current value; the same factor is applied to the glTF-Transform document at export.
 - Dropped maps (metallic/roughness, AO) are a preview + export option in `material-look.js` only; original maps are kept in a `WeakMap`, never in `userData` (material.clone() would copy textures through it).
+
+## Stamp (v2.79)
+- `paint3d.js` owns the Stamp tool; `stamp-core.js` holds the pure maths (patch coordinates, bilinear sampling, edge fade) and is tested by `stamp.test.mjs`. The patch is captured by raycasting the screen and reading the active colour texture, and pasted by raycasting the destination: keep it a screen-space projection, do not turn it into a UV copy.
+- 3D painting (Paint, Clone, Stamp) only touches the colour texture of a material (`material.map`). Normal and metallic/roughness pictures can only be edited in the flat editor.

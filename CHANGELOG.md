@@ -2,6 +2,14 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.79 — Stamp tool: copy part of the model and paste it somewhere else
+
+- New **Stamp** button next to Clone. Drag a box around something on the model (a number, a badge); that part is copied *as you see it*. Turn the car, aim at the destination (a ghost outline shows size, rotation and flip), click to paste. Paste as many times as you like; Undo works as usual.
+- Size (25–300%, 100% = same real-world size as the original), Rotate (-180…180°) and Flip are in a small bar over the viewer. Option/Alt-drag copies something new.
+- The copy is a projection, so it comes out upright however the texture's pieces are laid out (unlike Clone, which only works within one view).
+- Works on the colour texture only (the one painted in 3D). Details held in the normal or metallic/roughness pictures are not changed.
+- The maths is in `stamp-core.js` and tested (`stamp.test.mjs`). The 3D copy/paste itself (raycasting, painting) was not run in a real browser.
+
 ## v2.78 — Smaller GLBs without losing looks: data maps at half size
 
 - Pictures that only feed metallic/roughness or AO are now saved at no more than 512px (never enlarged); colour and normal maps keep the chosen size. These maps hold smooth values, so this is the cheapest saving that is barely visible. On by default, with a tick-box in Material look › Smaller file ("Save these two maps at half size") to turn it off. The file-size estimate and the drop-map savings follow it.
