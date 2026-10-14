@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.83 — Viewer really is full height, with a drag handle
+
+- Why it was still short: `ui-mode.css` forced every viewer to `calc(100vh - 200px) !important`, which beat the v2.80 rule. In Game mode on a desktop-width window the viewer is now `calc(100vh - 36px)` tall (the rule is in `ui-mode.css`, after the old one).
+- New **drag handle** along the bottom edge of the viewer: drag down to make it taller (up to 2.5 screens), drag up to shrink it, double-click to reset. It is not remembered between visits.
+- `style.css` and `ui-mode.css` now carry the release as their cache key (`?v=2.83`), so a changed style sheet is not served stale.
+- Not checked in a real browser.
+
 ## v2.82 — Paint, Stamp and Clone now handle the bumps too
 
 - The raised lettering and panel edges that stayed visible under repainted areas live in the **normal map**, which 3D painting never touched. A new tick-box in the brush strip, **Flatten the bumps too** (on by default), makes Paint smooth the relief under the paint (gradually when Opacity is low or Spray can is on), makes Stamp smooth what it covers, and makes Clone (**Copy the bumps too**) copy the source area's relief along with its colour.

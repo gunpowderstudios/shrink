@@ -102,11 +102,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 9px 0 4p
 .button.save-edited { width: 100%; margin-top: 8px; font-size: 12px; }
 .paint-hint { margin-top: 9px; }
 
-/* Game mode: the viewer takes the full height of the window and stays in view while the left panel scrolls. */
-@media (min-width: 901px) {
-  .app-mode-game .viewer-panel { height: calc(100vh - 36px); min-height: 560px; }
-  .app-mode-game .viewer { min-height: 0; }
-}
 @media (max-width: 900px) {
   .topbar { align-items: flex-start; flex-direction: column; }
   .workspace { grid-template-columns: 1fr; }

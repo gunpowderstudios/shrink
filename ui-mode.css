@@ -92,3 +92,10 @@
 .export-row { display: grid !important; grid-template-columns: 1fr; gap: 8px; }
 .viewer-panel { height: calc(100vh - 200px) !important; min-height: 520px !important; }
 @media (max-width: 900px) { .viewer-panel { height: 70vh !important; } }
+/* v2.83 Game mode on a desktop-width window: the viewer uses (almost) the whole window height. This must come after the rule above, which is !important. */
+@media (min-width: 901px) { .app-mode-game .viewer-panel { height: calc(100vh - 36px) !important; min-height: 560px !important; top: 18px; } }
+/* drag handle along the bottom edge of the viewer (Game mode, desktop) */
+.viewer-grip { position: absolute; left: 0; right: 0; bottom: 0; height: 16px; cursor: ns-resize; z-index: 40; display: none; touch-action: none; }
+.viewer-grip::after { content: ''; position: absolute; left: 50%; top: 6px; width: 64px; height: 4px; margin-left: -32px; border-radius: 4px; background: rgba(255,255,255,.35); }
+.viewer-grip:hover::after, .viewer-grip.dragging::after { background: #ff4e55; }
+@media (min-width: 901px) { .app-mode-game .viewer-grip { display: block; } }
