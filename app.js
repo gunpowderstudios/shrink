@@ -653,8 +653,9 @@ async function downloadEdited() {
   if (!sourceBytes || !sourceFile) return;
   let bytes = sourceBytes;
   const look = window.__shrinkMaterial;
-  if (look?.changed) {          // Material look changed: write it into the edited GLB too
-    try { const doc = await io.readBinary(sourceBytes); look.applyToDocument(doc); await look.applyColourToDocument?.(doc); await doc.transform(prune()); bytes = await io.writeBinary(doc); }
+  const wheels = window.__shrinkWheels?.enabled && window.__shrinkUI?.getMode?.() !== 'print';
+  if (look?.changed || wheels) {          // Material look changed or wheels to separate: write it into the edited GLB too
+    try { const doc = await io.readBinary(sourceBytes); if (look?.changed) { look.applyToDocument(doc); await look.applyColourToDocument?.(doc); } if (wheels) window.__shrinkWheels.apply(doc); await doc.transform(prune()); bytes = await io.writeBinary(doc); }
     catch (err) { console.error(err); setStatus(`Saved without the Material look change: ${err.message}`, true); }
   }
   downloadBytes(bytes, `${baseName()}-edited.glb`);
@@ -788,6 +789,11 @@ async function optimizeModel() {
     }
 
     const printMode = window.__shrinkUI?.getMode?.() === 'print';
+    if (!printMode && window.__shrinkWheels?.enabled) {        // "Separate the wheels": cut the four wheels out as their own nodes (after reduction, before prune)
+      setProgress(48, 'Separating the wheels…');
+      const wr = window.__shrinkWheels.apply(document);
+      if (wr && !wr.found) setStatus(`No wheels separated: ${wr.reason}`);
+    }
     if (els.webpToggle.checked && !printMode) {
       setProgress(52, 'Resizing and compressing textures…');
       await convertTexturesToWebP(document, Number(els.textureSize.value), Number(els.textureQuality.value) / 100, 52, 72);

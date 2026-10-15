@@ -391,14 +391,13 @@ A good Simple-mode run should:
 - Game-mode material tweaks go through `material-look.js` (`__shrinkMaterial`): scale from `userData._shrinkOrigMetal`, never from the current value; the same factor is applied to the glTF-Transform document at export.
 - Dropped maps (metallic/roughness, AO) are a preview + export option in `material-look.js` only; original maps are kept in a `WeakMap`, never in `userData` (material.clone() would copy textures through it).
 
-## Tron (beta, v2.87)
-- `tron-core.js` is pure maths (no DOM, no imports; the simplifier is injected) and is tested by `tron.test.mjs`; `tron-worker.js` runs it off the main thread; `tron-ui.js` is the Game-mode panel and is tested by `tron-ui.test.mjs` (real three, stand-in Worker).
-- Tron never edits the loaded model. It hides `currentModel`, adds a `TronCar` group to the viewer scene, and removes it again on Back / Original / Reduced / Compare / `shrink:model-opened` / `shrink:live-updated` / `shrink:optimized`. Do not route it through `setPreview` (that would fight the live reducer).
-- Colours and the surface snap both read the original skin through the same spatial index and only use points facing the same way as the face/vertex (needs normals: `tron-core.js` computes them when the model's are missing or zero). Do not drop the facing test, the car's interior would bleed through.
-- Fill the car slice by slice (`fillSlices`), not with a 3D flood: real cars have open windows and the flood leaks.
-- Baked colours (`opt.bake` in `flattenCar`): five orthographic views splatted from the original's skin points (front layer only, `tol` a few pixels), packed in one sheet; each face uses the view it faces most. UVs count down from the top and the texture has `flipY = false` (the glTF way). The saved body is the compact indexed one (no normals); keep it that way for file size.
-- Real-browser check lives in `tests/browser/` (headless Chromium + local bundles). Jsdom has no canvas, so the baked picture is only checked there (and the fallback to flat colours is tested in `tron-ui.test.mjs`).
-- Output convention: length along X, Y up, width along Z; wheel nodes are centred on their own origin with the axle along Z.
+## Wheel splitter (v2.90)
+- Game mode only. Tim's "Car wheels" panel (`wheel-split.js`, default off) sets `window.__shrinkWheels.enabled`; `app.js` calls `__shrinkWheels.apply(document)` in `optimizeModel()` after simplify and before `prune()`/meshopt/quantize, and in `downloadEdited()`. The cutting is `wheel-split-core.js` (no DOM; tested in Node by `wheel-split.test.mjs` with a real glTF-Transform Document).
+- It works on the saved document, so the original material, textures, PBR maps, normals and UVs go with the triangles. The live preview still shows the reduced model without separate wheels: do not swap the preview to show them (it fights the live reducer). Check the saved GLB instead.
+- Wheels are found as circles in the side view (both axles share one radius), the tyre width is measured at the ground contact so spats/arch panels stay on the body, and the front is the side opposite the cabin's middle (`cabinMid`, percentile-based so it does not depend on triangle density; an earlier "median of top vertices" version flipped on reduced meshes).
+- Output: nodes `Wheel_FL/FR/RL/RR` at the scene root, translation = wheel centre in world space, geometry recentred on it, `extras = { wheel, axle ('z' when the car's length is along X, else 'x'), radius, width }`. A failure leaves the model untouched and says why in `#wheelSplitNote`.
+- Real-browser check: `tests/browser/` (`run-wheels.py`).
+- Tron (v2.87–v2.89, voxel flattening) was removed in v2.90; it could not represent arches or spats and lost the PBR maps.
 
 ## Stamp (v2.79)
 - `paint3d.js` owns the Stamp tool; `stamp-core.js` holds the pure maths (patch coordinates, bilinear sampling, edge fade) and is tested by `stamp.test.mjs`. The patch is captured by raycasting the screen and reading the active colour texture, and pasted by raycasting the destination: keep it a screen-space projection, do not turn it into a UV copy.

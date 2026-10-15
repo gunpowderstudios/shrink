@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.90 — Separate the wheels; Tron removed
+
+- **Car wheels panel (Game mode).** Tick "Separate the wheels" and press Optimize (or download an edited GLB): the four wheels are cut out of the car as their own parts, `Wheel_FL`, `Wheel_FR`, `Wheel_RL`, `Wheel_RR`, each with its pivot at the wheel's centre, so a game can spin and steer them. It runs on the normal reduce path, so the car keeps its real shape, arches, textures and reflections. Off by default. If no wheels are found the model is saved as it was and the panel says why.
+- The preview looks the same as before; the wheels are separate in the saved file only.
+- **Tron removed** (tron-core/ui/worker and tests). It could not hold concave shapes such as wheel arches and lost the reflection maps.
+- New `wheel-split-core.js` + `wheel-split.js`, test `wheel-split.test.mjs`. Real-browser harness renamed `tests/browser/run-wheels.py`.
+
 ## v2.89 — Tron: Baked picture, much smaller files
 
 - **Baked picture (new default).** Tron now paints the original car's colours onto the flat body as one small image. Each face is looked at from the side it faces most (front, back, left, right, top) and takes its picture coordinates from that flat view, so window rims, grille, headlights, door lines and the number plate are as sharp as the picture, instead of one colour per triangle (which gave the jagged, speckled look). "Flat colour per triangle" stays as an option; a **Picture size** menu (512 / 1024 / 2048) sets the image size.

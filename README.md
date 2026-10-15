@@ -1,9 +1,12 @@
-# SHRINK 3D v2.57
+# SHRINK 3D v2.90
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.90 — Separate the wheels (Game mode)
+- New **Car wheels** panel: tick *Separate the wheels* and Optimize; the four wheels become their own parts (`Wheel_FL/FR/RL/RR`, pivot at the wheel centre) in the saved GLB. Tron was removed.
 
 ## v2.57 — the Detail kept slider drives the picture again
 - Fixes a v2.56 regression: after SHRINK IT the slider changed the numbers but not the model on screen. The tidy of edges the reduction disturbed now happens inside the live preview itself, so the slider, Compare and the working model are one and the same.
