@@ -2,6 +2,14 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.89 — Tron: Baked picture, much smaller files
+
+- **Baked picture (new default).** Tron now paints the original car's colours onto the flat body as one small image. Each face is looked at from the side it faces most (front, back, left, right, top) and takes its picture coordinates from that flat view, so window rims, grille, headlights, door lines and the number plate are as sharp as the picture, instead of one colour per triangle (which gave the jagged, speckled look). "Flat colour per triangle" stays as an option; a **Picture size** menu (512 / 1024 / 2048) sets the image size.
+- **Much smaller files.** The saved body now shares corners between neighbouring faces, stores no normals (any viewer flat-shades without them) and stores colours as bytes. Flat colours: 3,000 triangles about 160 KB, 5,650 about 250 KB (was roughly 3x that). Baked at 1024 is about 600 KB, nearly all of it the picture.
+- Default is now 3,000 triangles. The wheels, snap and slider are unchanged.
+- Real-browser check: `tests/browser/` (headless Chromium with local bundles of the esm.sh libraries). The 1.6M-triangle Mini takes about 6 s in the real page.
+- Note: the cream roof Tim saw in v2.88 was the real colour of his 2CV model, not a bug.
+
 ## v2.88 — Tron much closer to the real car
 
 - Tron's slider now runs **300 to 20,000 triangles** (logarithmic, so both ends have room) and a higher setting uses a finer voxel grid.

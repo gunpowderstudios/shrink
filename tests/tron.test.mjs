@@ -91,6 +91,28 @@ for (const bad of [null, new Float32Array(src.normals.length)]) {
   for (let t = 0; t < b.faces; t++) { const cy = (b.positions[t * 9 + 1] + b.positions[t * 9 + 4] + b.positions[t * 9 + 7]) / 3; if (cy > 1 && b.normals[t * 9 + 1] > 0.8 && b.colors[t * 9] > 180 && b.colors[t * 9 + 2] < 90) gold++; }
   ok(gold > 0, `with ${bad ? 'all-zero' : 'no'} normals the roof is still gold (${gold})`);
 }
+// ---- bake: the original's colours as one picture, looked up through picture coordinates ----
+{
+  const rb = flattenCar(src, { faces: 800, bake: { px: 512 }, simplifier: MeshoptSimplifier }), k = rb.baked, A = k.atlas;
+  ok(!!k && A.width > 100 && A.height > 100 && A.data.length === A.width * A.height * 4, `a picture is made (${A.width}x${A.height})`);
+  ok(k.uvs.every(v => v >= 0 && v <= 1), 'all picture coordinates are inside the picture');
+  ok(k.indices.length / 3 === rb.body.faces && k.indices.every(i => i < k.positions.length / 3), 'the baked mesh has the same faces, with valid corner numbers');
+  ok(k.positions.length / 3 <= rb.body.faces * 3 && rb.compact.positions.length / 3 < rb.body.faces * 3, `corners are shared (${k.positions.length / 3} baked / ${rb.compact.positions.length / 3} flat for ${rb.body.faces} faces)`);
+  ok(rb.compact.indices.length === rb.body.faces * 3 && rb.compact.colors.length === rb.compact.positions.length, 'the compact flat-colour body is indexed with one colour per corner');
+  // look each face up in the picture at its centre: the cabin roof must come out gold, the lower body side red, the cabin side blue
+  let gold = 0, red = 0, blue = 0;
+  for (let f = 0; f < rb.body.faces; f++) {
+    let u = 0, v = 0, y = 0, z = 0, ny = 0;
+    for (let q = 0; q < 3; q++) { const i = k.indices[f * 3 + q]; u += k.uvs[i * 2] / 3; v += k.uvs[i * 2 + 1] / 3; y += k.positions[i * 3 + 1] / 3; z += k.positions[i * 3 + 2] / 3; }
+    ny = rb.body.normals[f * 9 + 1];
+    const o = (Math.min(A.height - 1, Math.floor(v * A.height)) * A.width + Math.min(A.width - 1, Math.floor(u * A.width))) * 4, r = A.data[o], g = A.data[o + 1], b = A.data[o + 2];
+    if (y > 1 && ny > 0.8 && r > 180 && g > 150 && b < 110) gold++;
+    if (y < 0.4 && Math.abs(z) > 0.7 && r > 170 && g < 90) red++;
+    if (y > 0.6 && y < 1 && Math.abs(z) > 0.6 && b > 140 && r < 110) blue++;
+  }
+  ok(gold > 0 && red > 0 && blue > 0, `faces find their own colours in the picture (gold ${gold}, red ${red}, blue ${blue})`);
+  ok(flattenCar(src, { faces: 800, simplifier: MeshoptSimplifier }).baked === null, 'no picture unless asked for');
+}
 // a model with no wheels still gives a body (wheelsFound false, no wheel list)
 {
   const q = { positions: [], normals: [], colors: [], indices: [] };

@@ -1,10 +1,10 @@
-// SHRINK 3D v2.88 — Tron (beta), Game mode: turn a car into a solid, flat-faced low-poly version with four separate wheels.
+// SHRINK 3D v2.89 — Tron (beta), Game mode: turn a car into a solid, flat-faced low-poly version with four separate wheels.
 // The maths is in tron-core.js (run in tron-worker.js). This file gathers the model's triangles and colours, shows the result in the viewer
 // in place of the model, and saves it as a GLB. It never changes the loaded model: "Back to the normal model" (or any other viewer button) returns to it.
 (() => {
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
-  const VERSION = '2.88';
+  const VERSION = '2.89';
   const fmt = n => Number(n).toLocaleString('en-GB');
   // The slider is logarithmic: 300 to 20,000 triangles, so the low end (flat, chunky) and the high end (close to the real car) both get room.
   const MIN_F = 300, MAX_F = 20000;
@@ -79,7 +79,7 @@
     catch { workerFailed = true; worker = null; }
     return worker;
   }
-  async function runFlatten(faces, onProgress) {
+  async function runFlatten(faces, bake, onProgress) {
     const id = ++jobId;
     const w = startWorker();
     if (w) {
@@ -92,25 +92,41 @@
         };
         const onErr = () => { w.removeEventListener('message', on); workerFailed = true; worker = null; cache.sent = false; reject(new Error('worker')); };
         w.addEventListener('message', on); w.addEventListener('error', onErr, { once: true });
-        w.postMessage({ type: 'run', id, faces });
-      }).catch(async err => { if (err.message !== 'worker') throw err; return runOnPage(faces, onProgress); });
+        w.postMessage({ type: 'run', id, faces, bake });
+      }).catch(async err => { if (err.message !== 'worker') throw err; return runOnPage(faces, bake, onProgress); });
     }
-    return runOnPage(faces, onProgress);
+    return runOnPage(faces, bake, onProgress);
   }
-  async function runOnPage(faces, onProgress) {
+  async function runOnPage(faces, bake, onProgress) {
     const [core, mod] = await Promise.all([import(`./tron-core.js?v=${VERSION}`), import('meshoptimizer')]);
     await mod.MeshoptSimplifier.ready; await new Promise(r => setTimeout(r, 30));
-    return core.flattenCar(cache.data, { faces, simplifier: mod.MeshoptSimplifier, onProgress });
+    return core.flattenCar(cache.data, { faces, bake, simplifier: mod.MeshoptSimplifier, onProgress });
   }
 
   /* ---------- show / hide the result in the viewer ---------- */
   const SRGB = new Float32Array(256); for (let i = 0; i < 256; i++) { const c = i / 255; SRGB[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
-  function build(result) {
+  // The body is saved compact: shared corners, no stored normals (any viewer flat-shades without them), colours as bytes.
+  // Baked: the original's colours as one picture, looked up through picture coordinates. Flat: one colour per face, no picture.
+  function build(result, wantBaked) {
     const THREE = app().THREE, root = new THREE.Group(); root.name = 'TronCar';
-    const b = result.body, geo = new THREE.BufferGeometry(), lin = new Float32Array(b.colors.length);
-    for (let i = 0; i < lin.length; i++) lin[i] = SRGB[b.colors[i]];
-    geo.setAttribute('position', new THREE.BufferAttribute(b.positions, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(b.normals, 3)); geo.setAttribute('color', new THREE.BufferAttribute(lin, 3));
-    const body = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 })); body.name = 'Body'; root.add(body);
+    const geo = new THREE.BufferGeometry(); let mat = null, usedBaked = false;
+    if (wantBaked && result.baked) {
+      try {
+        const a = result.baked.atlas, cv = document.createElement('canvas'); cv.width = a.width; cv.height = a.height;
+        const ctx = cv.getContext('2d'); if (!ctx) throw new Error('no canvas');
+        ctx.putImageData(new ImageData(a.data, a.width, a.height), 0, 0);
+        const tex = new THREE.CanvasTexture(cv); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.userData.mimeType = 'image/jpeg';
+        geo.setAttribute('position', new THREE.BufferAttribute(result.baked.positions, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(result.baked.uvs, 2)); geo.setIndex(new THREE.BufferAttribute(result.baked.indices, 1));
+        mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0, flatShading: true }); usedBaked = true;
+      } catch (e) { console.warn('[Tron] could not make the picture, using flat colours', e); }
+    }
+    if (!usedBaked) {
+      const c = result.compact, lin = new Uint8Array(c.colors.length);
+      for (let i = 0; i < lin.length; i++) lin[i] = Math.round(SRGB[c.colors[i]] * 255);
+      geo.setAttribute('position', new THREE.BufferAttribute(c.positions, 3)); geo.setAttribute('color', new THREE.BufferAttribute(lin, 3, true)); geo.setIndex(new THREE.BufferAttribute(c.indices, 1));
+      mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, flatShading: true });
+    }
+    const body = new THREE.Mesh(geo, mat); body.name = 'Body'; root.add(body); root.userData.baked = usedBaked;
     const tyreMat = new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(38 / 255, 38 / 255, 40 / 255, THREE.SRGBColorSpace), roughness: 0.85, flatShading: true });
     const hubMat = new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(170 / 255, 170 / 255, 175 / 255, THREE.SRGBColorSpace), roughness: 0.5, metalness: 0.3, flatShading: true });
     for (const w of result.wheels) {
@@ -152,11 +168,13 @@
       setStatus('Reading the model…'); await new Promise(r => setTimeout(r, 30));
       if (!cache || cache.key !== model.uuid) { cache = { key: model.uuid, sent: false, ...collect(model) }; }
       const t0 = performance.now();
-      const result = await runFlatten(faces, t => setStatus(t));
+      const wantBaked = $('tronColour').value === 'baked', bake = wantBaked ? { px: Number($('tronTex').value) } : null;
+      const result = await runFlatten(faces, bake, t => setStatus(t));
       lastResult = result; lastResult.turned = cache.turned;
-      showPreview(build(result));
+      const built = build(result, wantBaked); showPreview(built);
       const secs = ((performance.now() - t0) / 1000).toFixed(1);
-      setStatus(`${fmt(result.body.faces)} triangles in the body${result.wheels.length ? ' + 4 separate wheels' : ' · no wheels found, so the body is one piece'} · ${fmt(cache.triangles)} before · ${secs}s` + (cache.turned ? ' · turned so the length runs along X' : ''));
+      const pic = built.userData.baked ? ` · picture ${result.baked.atlas.width}×${result.baked.atlas.height}` : (wantBaked ? ' · picture failed, flat colours used' : '');
+      setStatus(`${fmt(result.body.faces)} triangles in the body${pic}${result.wheels.length ? ' + 4 separate wheels' : ' · no wheels found, so the body is one piece'} · ${fmt(cache.triangles)} before · ${secs}s` + (cache.turned ? ' · turned so the length runs along X' : ''));
     } catch (err) {
       console.warn('[Tron]', err); setStatus(`Tron could not finish: ${err.message}`, true);
     } finally { busy = false; $('tronMake').disabled = false; syncButtons(); }
@@ -180,9 +198,11 @@
     const d = document.createElement('details'); d.id = 'tronDetails'; d.className = 'fold game-only';
     d.innerHTML = `<summary>Tron <span class="dim">(beta)</span></summary><div class="fold-inner">
       <div class="hint">Turns a car into a solid, flat-faced low-poly version for games: true to the shape, painted in the original colours, with four separate wheels you can spin and steer. Best on a car that sits on its wheels. The interior, wipers and aerial are dropped. More triangles follow the real car more closely (door handles, lights, number plate) and take a little longer.</div>
-      <div class="control-block"><div class="range-heading"><label for="tronFaces">Triangles</label><output id="tronFacesValue">800</output></div>
-        <input id="tronFaces" type="range" min="0" max="100" step="1" value="${posForFaces(800)}" aria-label="Triangles in the body">
+      <div class="control-block"><div class="range-heading"><label for="tronFaces">Triangles</label><output id="tronFacesValue">3,000</output></div>
+        <input id="tronFaces" type="range" min="0" max="100" step="1" value="${posForFaces(3000)}" aria-label="Triangles in the body">
         <div class="slider-ends"><span>Flatter</span><span>Closer to the real car</span></div></div>
+      <div class="control-block"><label for="tronColour">Colours</label><select id="tronColour"><option value="baked" selected>Baked picture: sharpest, a small image</option><option value="flat">Flat colour per triangle: no image</option></select>
+        <label for="tronTex" style="margin-top:8px;display:block">Picture size</label><select id="tronTex"><option value="512">Small (512)</option><option value="1024" selected>Medium (1024)</option><option value="2048">Large (2048)</option></select></div>
       <div class="material-presets"><button id="tronMake" class="button small tron-go" type="button">Make Tron version</button><button id="tronDownload" class="button ghost small" type="button" hidden>Download Tron GLB</button><button id="tronBack" class="button ghost small" type="button" hidden>Back to the normal model</button></div>
       <div id="tronStatus" class="hint" aria-live="polite"></div></div>`;
     host.insertBefore(d, before);
@@ -191,6 +211,7 @@
     document.head.appendChild(style);
     $('tronFaces').addEventListener('input', () => { $('tronFacesValue').textContent = fmt(facesForPos($('tronFaces').value)); });
     $('tronFaces').addEventListener('change', () => { if (previewRoot) { clearTimeout(timer); timer = setTimeout(make, 250); } });   // once a Tron car is showing, the slider re-makes it
+    for (const id of ['tronColour', 'tronTex']) $(id).addEventListener('change', () => { if (previewRoot) { clearTimeout(timer); timer = setTimeout(make, 250); } });
     $('tronMake').addEventListener('click', make);
     $('tronDownload').addEventListener('click', download);
     $('tronBack').addEventListener('click', () => { hidePreview(); setStatus(''); });

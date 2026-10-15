@@ -396,6 +396,8 @@ A good Simple-mode run should:
 - Tron never edits the loaded model. It hides `currentModel`, adds a `TronCar` group to the viewer scene, and removes it again on Back / Original / Reduced / Compare / `shrink:model-opened` / `shrink:live-updated` / `shrink:optimized`. Do not route it through `setPreview` (that would fight the live reducer).
 - Colours and the surface snap both read the original skin through the same spatial index and only use points facing the same way as the face/vertex (needs normals: `tron-core.js` computes them when the model's are missing or zero). Do not drop the facing test, the car's interior would bleed through.
 - Fill the car slice by slice (`fillSlices`), not with a 3D flood: real cars have open windows and the flood leaks.
+- Baked colours (`opt.bake` in `flattenCar`): five orthographic views splatted from the original's skin points (front layer only, `tol` a few pixels), packed in one sheet; each face uses the view it faces most. UVs count down from the top and the texture has `flipY = false` (the glTF way). The saved body is the compact indexed one (no normals); keep it that way for file size.
+- Real-browser check lives in `tests/browser/` (headless Chromium + local bundles). Jsdom has no canvas, so the baked picture is only checked there (and the fallback to flat colours is tested in `tron-ui.test.mjs`).
 - Output convention: length along X, Y up, width along Z; wheel nodes are centred on their own origin with the axle along Z.
 
 ## Stamp (v2.79)

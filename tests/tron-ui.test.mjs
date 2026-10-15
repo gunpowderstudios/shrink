@@ -58,12 +58,16 @@ ok($('stepExtra').firstElementChild === $('tronDetails') || $('tronDetails').nex
 ok(/beta/i.test($('tronDetails').querySelector('summary').textContent), 'it is labelled beta');
 const T = win.__shrinkTron;
 ok(T.facesForPos(0) === 300 && T.facesForPos(100) === 20000, 'the slider runs 300 to 20,000 triangles');
-ok(T.facesForPos($('tronFaces').value) === 800, 'it starts at 800');
+ok(T.facesForPos($('tronFaces').value) === 3000, 'it starts at 3,000');
+ok($('tronColour').value === 'baked' && $('tronTex').value === '1024', 'colours start on the baked picture at medium size');
 ok(T.facesForPos(T.posForFaces(5000)) >= 4900 && T.facesForPos(T.posForFaces(5000)) <= 5100, 'positions and triangle counts convert back and forth');
 ok($('tronDownload').hidden && $('tronBack').hidden, 'download and back are hidden until there is a result');
 $('tronFaces').value = String(T.posForFaces(900)); $('tronFaces').dispatchEvent(new win.Event('input'));
 ok(/^9[0-9]{2}$/.test($('tronFacesValue').textContent) || $('tronFacesValue').textContent === '900', 'the slider shows its triangle count: ' + $('tronFacesValue').textContent);
 
+await win.__shrinkTron.make();   // baked is the default; jsdom has no canvas, so it must fall back to flat colours and say so
+ok(/picture failed, flat colours used/.test($('tronStatus').textContent), 'with no canvas available the baked picture falls back to flat colours and says so');
+$('tronColour').value = 'flat';
 await win.__shrinkTron.make();
 const tc = scene.getObjectByName('TronCar');
 ok(!!tc, 'a Tron car is added to the viewer');
@@ -73,7 +77,8 @@ const wfl = tc.getObjectByName('Wheel_FL');
 ok(wfl.children.length === 2 && wfl.position.x < 0 && Math.abs(wfl.position.y + 0.1) < 0.2, 'each wheel is its own node, sitting at the wheel position');
 const body = tc.getObjectByName('Body');
 ok(body.geometry.attributes.color && body.material.vertexColors, 'the body is painted with per-face colours');
-const nTri = body.geometry.attributes.position.count / 3;
+ok(!body.geometry.attributes.normal && body.geometry.index && body.material.flatShading, 'the body is saved compact: shared corners, indexed, no stored normals');
+const nTri = body.geometry.index.count / 3;
 ok(nTri > 100 && nTri <= 1000 * 1.25, `the body has about the triangles asked for (${nTri} for ~900)`);
 ok(/triangles in the body/.test($('tronStatus').textContent) && !$('tronStatus').classList.contains('bad'), 'the status says what was made: ' + $('tronStatus').textContent);
 ok(!$('tronDownload').hidden && !$('tronBack').hidden, 'download and back appear');
@@ -82,7 +87,7 @@ ok(!$('tronDownload').hidden && !$('tronBack').hidden, 'download and back appear
 $('tronFaces').value = String(T.posForFaces(400)); $('tronFaces').dispatchEvent(new win.Event('change'));
 await new Promise(r => setTimeout(r, 900));
 const tc2 = scene.getObjectByName('TronCar');
-ok(tc2 && tc2 !== tc && tc2.getObjectByName('Body').geometry.attributes.position.count / 3 < nTri, 'moving the slider makes a new, flatter car');
+ok(tc2 && tc2 !== tc && tc2.getObjectByName('Body').geometry.index.count / 3 < nTri, 'moving the slider makes a new, flatter car');
 ok(scene.children.filter(c => c.name === 'TronCar').length === 1, 'only one Tron car is ever in the scene');
 
 // save
@@ -94,6 +99,7 @@ ok(saved && saved.size > 1000, `a GLB is saved (${saved?.size} bytes)`);
   const jl = dv.getUint32(12, true), json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)));
   ok(['Body', 'Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR'].every(n => json.nodes.some(x => x.name === n)), 'the saved GLB has the Body and four wheel nodes');
   ok(json.meshes.some(m => m.primitives.some(p => p.attributes.COLOR_0 !== undefined)), 'the face colours are saved as vertex colours');
+ok(!json.meshes.some(m => m.primitives.some(p => p.attributes.NORMAL !== undefined && m.name === 'Body')), 'no normals are stored for the body');
   ok(!(json.images || []).length, 'no textures in the saved file');
 }
 

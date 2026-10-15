@@ -192,7 +192,7 @@ function fitAxle(Q, nv, sx, L, ymin, W, rfix) {
 
 /* ---------- the whole thing ---------- */
 // src: { positions: Float32Array xyz, indices: Uint32Array, normals?: Float32Array, colors?: Uint8Array rgb (0-255, sRGB) }
-// opt: { faces, res?, simplifier: { simplify(indices, positions, 3, targetIndexCount, targetError, flags) -> [indices, error] }, onProgress?(text) }
+// opt: { faces, res?, bake?: { px } (also paint the original's colours onto the body as one picture), simplifier: { simplify(indices, positions, 3, targetIndexCount, targetError, flags) -> [indices, error] }, onProgress?(text) }
 export function flattenCar(src, opt) {
   const { positions: P0, indices: I0, colors: C0 } = src;
   const faces = Math.round(Math.min(TRON_MAX_FACES, Math.max(TRON_MIN_FACES, opt.faces || 800)));
@@ -399,9 +399,92 @@ export function flattenCar(src, opt) {
     for (let q = 0; q < 3; q++) { bodyCol[t * 9 + q * 3] = rgb[0]; bodyCol[t * 9 + q * 3 + 1] = rgb[1]; bodyCol[t * 9 + q * 3 + 2] = rgb[2]; }
   }
 
+  // 6. compact body for saving: neighbouring faces of one colour share their corners, no stored normals (a viewer flat-shades without them),
+  //    colours as bytes. The unwelded body above stays for the tests and for anything that wants per-face data.
+  const compact = (() => {
+    const map = new Map(), pos = [], col = [], idx = new Uint32Array(nf * 3);
+    for (let t = 0; t < nf; t++) for (let q = 0; q < 3; q++) {
+      const vi = SI[t * 3 + q], r = bodyCol[t * 9], g = bodyCol[t * 9 + 1], b = bodyCol[t * 9 + 2], key = vi * 16777216 + r * 65536 + g * 256 + b;
+      let k = map.get(key);
+      if (k === undefined) { k = pos.length / 3; map.set(key, k); pos.push(SP[vi * 3] + ox, SP[vi * 3 + 1], SP[vi * 3 + 2] + oz); col.push(r, g, b); }
+      idx[t * 3 + q] = k;
+    }
+    return { positions: Float32Array.from(pos), colors: Uint8Array.from(col), indices: idx };
+  })();
+
+  // 7. optional bake: the original's colours painted onto the flat body as one small picture. Each face is looked at from the side it faces most
+  //    (front, back, left, right or top) and takes its picture coordinates from that flat view, so a window rim or a number plate is as sharp as the
+  //    picture is, whatever the triangles do. The picture is made by splatting the original's skin points (nearest to that view wins).
+  let baked = null;
+  if (opt.bake && SC) {
+    say('Baking the picture…');
+    const px = Math.max(256, Math.min(4096, Math.round(opt.bake.px || 1024))), ppu = px / L, pad = 3 * res;
+    const mn = [bx0 - pad, by0 - pad, bz0 - pad], mx = [bx1 + pad, by1 + pad, bz1 + pad];
+    // five views: +X, -X, +Y (top), +Z, -Z. d = the way the view looks in from, ua/va = the picture's right/down axes.
+    const VIEWS = [{ a: 0, s: 1, ua: 2, va: 1 }, { a: 0, s: -1, ua: 2, va: 1 }, { a: 1, s: 1, ua: 0, va: 2 }, { a: 2, s: 1, ua: 0, va: 1 }, { a: 2, s: -1, ua: 0, va: 1 }];
+    for (const V of VIEWS) { V.w = Math.ceil((mx[V.ua] - mn[V.ua]) * ppu) + 1; V.h = Math.ceil((mx[V.va] - mn[V.va]) * ppu) + 1; }
+    // shelf-pack the five pictures into one sheet
+    const order = VIEWS.slice().sort((p, q) => q.h - p.h), area = VIEWS.reduce((t, V) => t + (V.w + 2) * (V.h + 2), 0);
+    let W = Math.ceil(Math.sqrt(area * 1.2)); W = Math.max(W, ...VIEWS.map(V => V.w + 2)); W = Math.ceil(W / 4) * 4;
+    let cx = 0, cy = 0, rowH = 0;
+    for (const V of order) { if (cx + V.w + 2 > W) { cx = 0; cy += rowH; rowH = 0; } V.ox = cx + 1; V.oy = cy + 1; cx += V.w + 2; rowH = Math.max(rowH, V.h + 2); }
+    const H = Math.ceil((cy + rowH) / 4) * 4;
+    if (W > 8192 || H > 8192) throw new Error('The picture would be too big: use a smaller texture size.');
+    const rgba = new Uint8ClampedArray(W * H * 4), have = new Uint8Array(W * H);
+    let mr = 0, mg = 0, mb = 0, mc = 0;
+    for (let i = 0; i < ns; i += Math.max(1, Math.floor(ns / 20000))) if (vertOk[i]) { mr += SC[i * 3]; mg += SC[i * 3 + 1]; mb += SC[i * 3 + 2]; mc++; }
+    const avg = mc ? [mr / mc, mg / mc, mb / mc] : [160, 160, 160], tol = Math.max(3 / ppu, 0.15 * res);   // only the front layer in each pixel (a few pixels deep): mixing layers smears dark rubber seals and the interior into the paint
+    for (const V of VIEWS) {
+      const depth = new Float32Array(V.w * V.h).fill(-Infinity), acc = new Float32Array(V.w * V.h * 4);
+      const at = i => { const p = [SQ[i * 3], SQ[i * 3 + 1], SQ[i * 3 + 2]]; return [Math.floor((p[V.ua] - mn[V.ua]) * ppu), Math.floor((mx[V.va] - p[V.va]) * ppu), V.s * p[V.a]]; };
+      for (let pass = 0; pass < 2; pass++) for (let i = 0; i < ns; i++) {
+        if (!vertOk[i] || V.s * SN[i * 3 + V.a] < 0.2) continue;
+        const [iu, iv, d] = at(i); if (iu < 0 || iv < 0 || iu >= V.w || iv >= V.h) continue;
+        const k = iv * V.w + iu;
+        if (pass === 0) { if (d > depth[k]) depth[k] = d; }
+        else if (d >= depth[k] - tol) { acc[k * 4] += SC[i * 3]; acc[k * 4 + 1] += SC[i * 3 + 1]; acc[k * 4 + 2] += SC[i * 3 + 2]; acc[k * 4 + 3]++; }
+      }
+      const val = new Uint8Array(V.w * V.h), col = new Float32Array(V.w * V.h * 3);
+      for (let k = 0; k < val.length; k++) if (acc[k * 4 + 3] > 0) { val[k] = 1; col[k * 3] = acc[k * 4] / acc[k * 4 + 3]; col[k * 3 + 1] = acc[k * 4 + 1] / acc[k * 4 + 3]; col[k * 3 + 2] = acc[k * 4 + 2] / acc[k * 4 + 3]; }
+      for (let it = 0; it < 12; it++) {   // fill holes from their neighbours, a pixel at a time
+        const nv2 = val.slice(), nc = col.slice();
+        for (let y = 0; y < V.h; y++) for (let x = 0; x < V.w; x++) {
+          const k = y * V.w + x; if (val[k]) continue;
+          let r = 0, g = 0, b = 0, n = 0;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= V.w || yy >= V.h) continue; const kk = yy * V.w + xx; if (val[kk]) { r += col[kk * 3]; g += col[kk * 3 + 1]; b += col[kk * 3 + 2]; n++; } }
+          if (n) { nv2[k] = 1; nc[k * 3] = r / n; nc[k * 3 + 1] = g / n; nc[k * 3 + 2] = b / n; }
+        }
+        val.set(nv2); col.set(nc);
+      }
+      for (let y = -1; y <= V.h; y++) for (let x = -1; x <= V.w; x++) {   // copy into the sheet, with a one-pixel border so filtering never reaches the next picture
+        const sx = Math.min(V.w - 1, Math.max(0, x)), sy = Math.min(V.h - 1, Math.max(0, y)), k = sy * V.w + sx, o = ((V.oy + y) * W + (V.ox + x)) * 4;
+        rgba[o] = val[k] ? col[k * 3] : avg[0]; rgba[o + 1] = val[k] ? col[k * 3 + 1] : avg[1]; rgba[o + 2] = val[k] ? col[k * 3 + 2] : avg[2]; rgba[o + 3] = 255; have[(V.oy + y) * W + V.ox + x] = 1;
+      }
+    }
+    for (let k = 0; k < W * H; k++) if (!have[k]) { rgba[k * 4] = avg[0]; rgba[k * 4 + 1] = avg[1]; rgba[k * 4 + 2] = avg[2]; rgba[k * 4 + 3] = 255; }
+    // each face picks its view, then the corners get their picture coordinates (v counts down from the top, the glTF way)
+    const wmap = new Map(), pos = [], uv = [], idx = new Uint32Array(nf * 3);
+    for (let t = 0; t < nf; t++) {
+      let best = 0, bd = -2;
+      for (let k = 0; k < VIEWS.length; k++) { const d = VIEWS[k].s * fnor[t * 3 + VIEWS[k].a]; if (d > bd) { bd = d; best = k; } }
+      const V = VIEWS[best];
+      for (let q = 0; q < 3; q++) {
+        const vi = SI[t * 3 + q], key = vi * 8 + best; let k = wmap.get(key);
+        if (k === undefined) {
+          k = pos.length / 3; wmap.set(key, k);
+          pos.push(SP[vi * 3] + ox, SP[vi * 3 + 1], SP[vi * 3 + 2] + oz);
+          const p = [SP[vi * 3], SP[vi * 3 + 1], SP[vi * 3 + 2]];
+          uv.push((V.ox + (p[V.ua] - mn[V.ua]) * ppu) / W, (V.oy + (mx[V.va] - p[V.va]) * ppu) / H);
+        }
+        idx[t * 3 + q] = k;
+      }
+    }
+    baked = { positions: Float32Array.from(pos), uvs: Float32Array.from(uv), indices: idx, atlas: { width: W, height: H, data: rgba } };
+  }
+
   const out = [];
   for (const w of wheels) for (const sz of [-1, 1]) {
     out.push({ name: `Wheel_${w.x * frontSign > 0 ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`, x: w.x + ox, y: w.y, z: sz * (z0 + z1) / 2 + oz, radius: w.r, width: z1 - z0 });
   }
-  return { body: { positions: bodyPos, normals: bodyNor, colors: bodyCol, faces: nf }, wheels: out, info: { faces: nf, res: res / L, grid: [nx, ny, nz], wheelsFound: wheels.length > 0, frontSign, colours: colourSet.size, length: L } };
+  return { body: { positions: bodyPos, normals: bodyNor, colors: bodyCol, faces: nf }, compact, baked, wheels: out, info: { faces: nf, res: res / L, grid: [nx, ny, nz], wheelsFound: wheels.length > 0, frontSign, colours: colourSet.size, length: L } };
 }
