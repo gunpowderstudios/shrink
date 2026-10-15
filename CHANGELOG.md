@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.102 — Wheel size up to 150%
+
+- The Wheel size slider now goes 70–150% (was 70–130%). The core had no limit, only the slider.
+
 ## v2.101 — Wheel finder: lopsided wheelbases and grounded wheels
 
 - The wheel finder only looked for axles 0.22–0.42 body-lengths from the middle on BOTH ends. A motorhome (cab hanging out past the front wheels: front axle ~0.17) failed with "No clear wheel circles". Search now covers 0.10–0.45.
