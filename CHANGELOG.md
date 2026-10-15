@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.91 — Wheel splitter tells you what it did
+
+- After Optimize with "Separate the wheels" ticked, a green "Wheels separated!" line shows in the Car wheels panel, under the result card and in the status line (or "No wheels separated: <reason>"). The panel opens by itself.
+- **Show / Hide wheel markers** button: coloured discs in the viewer at the wheels it found (FL red, FR blue, RL amber, RR green). They are for looking only and are never saved.
+- Checked on the Dodge GLB Tim sent: its saved file already had Wheel_FR/FL/RR/RL as separate parts; there was just no feedback.
+
 ## v2.90 — Separate the wheels; Tron removed
 
 - **Car wheels panel (Game mode).** Tick "Separate the wheels" and press Optimize (or download an edited GLB): the four wheels are cut out of the car as their own parts, `Wheel_FL`, `Wheel_FR`, `Wheel_RL`, `Wheel_RR`, each with its pivot at the wheel's centre, so a game can spin and steer them. It runs on the normal reduce path, so the car keeps its real shape, arches, textures and reflections. Off by default. If no wheels are found the model is saved as it was and the panel says why.

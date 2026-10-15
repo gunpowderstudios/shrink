@@ -46,7 +46,7 @@ def main(shot, model='/mnt/user-data/uploads/mini.glb'):
         pg.screenshot(path=shot+'_wheels.png',timeout=240000)
         with pg.expect_download(timeout=120000) as dl:
             pg.click('#downloadBtn')
-        path=shot+'_wheels.glb'; dl.value.save_as(path); print('GLB',os.path.getsize(path)//1024,'KB',dl.value.suggested_filename)
+        path=shot+'_wheels.glb'; dl.value.save_as(path); print(pg.evaluate("document.getElementById('status').textContent"));print('GLB',os.path.getsize(path)//1024,'KB',dl.value.suggested_filename)
         print('\n'.join(logs[-15:]))
         b.close()
 main(sys.argv[1],*(sys.argv[2:3]))

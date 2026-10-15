@@ -832,7 +832,7 @@ async function optimizeModel() {
     els.resultCard.classList.remove('hidden'); els.showOptimizedBtn.disabled = false; els.downloadBtn.disabled = false;
     if (!keepLivePreview) showModel(optimizedModel, 'optimized');
     setProgress(100, 'Finished');
-    setStatus('Done — use Compare or Detail loss in the viewer to see exactly what changed.');
+    setStatus((window.__shrinkWheels?.enabled && window.__shrinkWheels.message?.() ? window.__shrinkWheels.message() + ' ' : '') + 'Done — use Compare or Detail loss in the viewer to see exactly what changed.');
     window.dispatchEvent(new CustomEvent('shrink:optimized', { detail: { reduce: lastReduce, bytes: optimizedBytes.byteLength, triangles: optimizedStats.triangles } }));
     setTimeout(hideProgress, 1200);
     return true;
