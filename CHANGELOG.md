@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.96 — Wheel width
+
+- Adjust wheels: **Front wheel width** and **Rear wheel width** sliders (40–160%). The width decides how far in and out from the tyre's middle triangles count as wheel; markers show it live. `splitWheels(doc, adj)` takes `widthFront` / `widthRear` (factors). Making a wheel wider than the tyre takes in arch/body triangles.
+
 ## v2.95 — Plain Game download name
 
 - Game mode saves as `<name>-SHRINK.glb` (no height/adjustment tag like `H953p6`). The Print tools keep their own naming.

@@ -59,6 +59,12 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
  assert.ok(Math.abs(y(r,'Wheel_FR')-y(base,'Wheel_FR')-0.3*base.radius)<1e-4,'front right up');
  assert.ok(Math.abs(y(r,'Wheel_RR')-y(base,'Wheel_RR')+0.2*base.radius)<1e-4,'rear down');
  assert.ok(Math.abs(y(r,'Wheel_RL')-y(base,'Wheel_RL')-(-0.2+0.1)*base.radius)<1e-4,'one rear wheel on top of the axle');console.log('ok up/down');}
+// width: narrower rear wheels take fewer triangles; the width is reported
+{const base=splitWheels(car(false,null).doc);const r=splitWheels(car(false,null).doc,{widthRear:0.5,widthFront:1.5});
+ const g=(res,n)=>res.wheels.find(w=>w.name===n);
+ assert.ok(Math.abs(g(r,'Wheel_RL').width/g(base,'Wheel_RL').width-0.5)<1e-6,'rear width halved');
+ assert.ok(g(r,'Wheel_RL').triangles<g(base,'Wheel_RL').triangles,'rear takes fewer triangles when narrower');
+ assert.ok(Math.abs(g(r,'Wheel_FL').width/g(base,'Wheel_FL').width-1.5)<1e-6,'front width up');console.log('ok width');}
 // not a car
 {const doc=new Document(),b=doc.createBuffer(),P=[],I=[];box(-1,1,0,1,-1,1,P,I);
  for(let i=0;i<30;i++)box(-1,1,0,1,-1,1,P,I);

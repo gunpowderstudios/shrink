@@ -86,13 +86,18 @@ export function detectWheels(P, adj = {}) {
   });
   const wheels = []; let k = 0;
   for (const a of axles) for (const sz of [-1, 1]) {
-    const name = `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`, cy = a.y + ((adj.dyW && adj.dyW[name]) || 0) * a.r0;
-    wheels.push({ index: k++, axle: a, role: a.role, sz, name, cx: a.x, cy, centre: fromDet(a.x, cy, sz * (z0 + z1) / 2), radius: a.r, width: z1 - z0 });
+    const name = `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`, wf = (a.role === 'front' ? adj.widthFront : adj.widthRear) > 0 ? (a.role === 'front' ? adj.widthFront : adj.widthRear) : 1, cy = a.y + ((adj.dyW && adj.dyW[name]) || 0) * a.r0;
+    wheels.push({ index: k++, axle: a, role: a.role, sz, name, cx: a.x, cy, centre: fromDet(a.x, cy, sz * (z0 + z1) / 2), radius: a.r, width: (z1 - z0) * wf, wf });
   }
+  // a wheel takes the triangles inside its circle (side view) and inside its tyre width; wf scales the width about the tyre's middle
+  const zc = (z0 + z1) / 2;
   const classify = (x, y, z) => {
     const [X, Y, Z] = toDet(x, y, z), az = Math.abs(Z);
-    if (az < z0 * 0.94 || az > z1 * 1.04) return -1;
-    for (const w of wheels) if (Math.sign(Z) === w.sz && w.axle.sx * X > 0 && Math.hypot(X - w.cx, Y - w.cy) < w.radius * 1.06) return w.index;
+    for (const w of wheels) {
+      if (Math.sign(Z) !== w.sz || w.axle.sx * X <= 0) continue;
+      if (az < zc - (zc - z0 * 0.94) * w.wf || az > zc + (z1 * 1.04 - zc) * w.wf) continue;
+      if (Math.hypot(X - w.cx, Y - w.cy) < w.radius * 1.06) return w.index;
+    }
     return -1;
   };
   return { found: true, axle: alongZ ? 'x' : 'z', lengthAxis: alongZ ? 'z' : 'x', wheels, classify, frontSign, length: L, info: { radius: wheels[0].radius, width: z1 - z0, alongZ } };
@@ -195,7 +200,7 @@ export function splitWheels(doc, adj = {}) {
     if (!perWheel[k].length) return;
     const mesh = doc.createMesh(w.name); for (const pr of perWheel[k]) mesh.addPrimitive(pr);
     const nd = doc.createNode(w.name).setTranslation(w.centre).setMesh(mesh).setExtras({ wheel: true, axle: det.axle, radius: w.radius, width: w.width });
-    scene.addChild(nd); made.push({ name: w.name, role: w.role, triangles: counts[k], centre: w.centre });
+    scene.addChild(nd); made.push({ name: w.name, role: w.role, triangles: counts[k], centre: w.centre, width: w.width });
   });
   if (made.length < 4) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
   return { found: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
