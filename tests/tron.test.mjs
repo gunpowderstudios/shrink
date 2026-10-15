@@ -46,7 +46,7 @@ const src = { positions: Float32Array.from(P), normals: Float32Array.from(N), co
   const s = fillInside(g, n, n, n); let cnt = 0; for (const v of s) cnt += v;
   ok(cnt > 900, `a hollow box with a hole in its wall is filled solid (${cnt} cells)`);
 }
-ok(resFor(2500) < resFor(800) && resFor(300) <= 0.03 && resFor(5000) >= 0.008, 'more triangles -> a finer grid, within limits');
+ok(resFor(2500) < resFor(800) && resFor(5000) < resFor(2500) && resFor(300) <= 0.03 && resFor(20000) >= 0.004, 'more triangles -> a finer grid, within limits');
 
 // ---- the whole pipeline ----
 const r800 = flattenCar(src, { faces: 800, simplifier: MeshoptSimplifier });
@@ -84,7 +84,13 @@ ok(r800.body.faces <= 800 * 1.25 && r800.body.faces >= 100, `the body has about 
 const r2500 = flattenCar(src, { faces: 2500, simplifier: MeshoptSimplifier }), r300 = flattenCar(src, { faces: 300, simplifier: MeshoptSimplifier }), again = flattenCar(src, { faces: 800, simplifier: MeshoptSimplifier });
 ok(r300.body.faces <= r800.body.faces && r800.body.faces <= r2500.body.faces, `slider moves the count: ${r300.body.faces} <= ${r800.body.faces} <= ${r2500.body.faces}`);
 ok(again.body.faces === r800.body.faces && again.body.positions.every((v, i) => v === r800.body.positions[i]), 'same settings give the same car');
-ok(TRON_MIN_FACES === 300 && TRON_MAX_FACES === 5000, 'slider limits are 300 and 5000');
+ok(TRON_MIN_FACES === 300 && TRON_MAX_FACES === 20000, 'slider limits are 300 and 20,000');
+// a model with no normals (or all-zero ones) still gets the right colours: the roof is gold, not the colour of whatever is inside
+for (const bad of [null, new Float32Array(src.normals.length)]) {
+  const r = flattenCar({ ...src, normals: bad }, { faces: 800, simplifier: MeshoptSimplifier }), b = r.body; let gold = 0;
+  for (let t = 0; t < b.faces; t++) { const cy = (b.positions[t * 9 + 1] + b.positions[t * 9 + 4] + b.positions[t * 9 + 7]) / 3; if (cy > 1 && b.normals[t * 9 + 1] > 0.8 && b.colors[t * 9] > 180 && b.colors[t * 9 + 2] < 90) gold++; }
+  ok(gold > 0, `with ${bad ? 'all-zero' : 'no'} normals the roof is still gold (${gold})`);
+}
 // a model with no wheels still gives a body (wheelsFound false, no wheel list)
 {
   const q = { positions: [], normals: [], colors: [], indices: [] };

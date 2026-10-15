@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.88 — Tron much closer to the real car
+
+- Tron's slider now runs **300 to 20,000 triangles** (logarithmic, so both ends have room) and a higher setting uses a finer voxel grid.
+- New **snap** step: after the flat faces are made, every vertex is moved along its normal onto the real skin of the original (the average of the original's points facing the same way), so edges, door handles, lights, window frames and the number plate come back. The Mini at 5,000 triangles now shows them; at 12,000 it is crisp. About 4-5 s in Node for the 1.6M-triangle Mini.
+- Colour fix: a model whose normals are missing or all zero (the viewer's copy can be) now gets normals computed, so the roof is no longer painted with the colour of the interior lining.
+- The **Make Tron version** button was white (no colour): it now uses the accent colour.
+
 ## v2.87 — Tron (beta): flat low-poly cars
 
 - New **Tron (beta)** panel in Game mode (left column, above Retouch textures). It turns a dense car (e.g. a Meshy download) into a solid, flat-faced low-poly car with **four separate wheels** (`Wheel_FL/FR/RL/RR`, origin at the wheel centre, axle along Z, so rotate about Z to spin and about Y to steer). A slider sets the body triangles, 300 to 5,000; a finer slider setting also uses a finer voxel grid.

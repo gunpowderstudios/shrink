@@ -394,6 +394,7 @@ A good Simple-mode run should:
 ## Tron (beta, v2.87)
 - `tron-core.js` is pure maths (no DOM, no imports; the simplifier is injected) and is tested by `tron.test.mjs`; `tron-worker.js` runs it off the main thread; `tron-ui.js` is the Game-mode panel and is tested by `tron-ui.test.mjs` (real three, stand-in Worker).
 - Tron never edits the loaded model. It hides `currentModel`, adds a `TronCar` group to the viewer scene, and removes it again on Back / Original / Reduced / Compare / `shrink:model-opened` / `shrink:live-updated` / `shrink:optimized`. Do not route it through `setPreview` (that would fight the live reducer).
+- Colours and the surface snap both read the original skin through the same spatial index and only use points facing the same way as the face/vertex (needs normals: `tron-core.js` computes them when the model's are missing or zero). Do not drop the facing test, the car's interior would bleed through.
 - Fill the car slice by slice (`fillSlices`), not with a 3D flood: real cars have open windows and the flood leaks.
 - Output convention: length along X, Y up, width along Z; wheel nodes are centred on their own origin with the axle along Z.
 

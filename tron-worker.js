@@ -1,6 +1,6 @@
-// SHRINK 3D v2.87 — Tron (beta) worker: runs the flatten off the page's main thread so the viewer stays smooth.
+// SHRINK 3D v2.88 — Tron (beta) worker: runs the flatten off the page's main thread so the viewer stays smooth.
 import { MeshoptSimplifier } from 'https://esm.sh/meshoptimizer@0.24.0';
-import { flattenCar } from './tron-core.js?v=2.87';
+import { flattenCar } from './tron-core.js?v=2.88';
 
 let data = null, ready = null;
 self.onmessage = async e => {

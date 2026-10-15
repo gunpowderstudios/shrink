@@ -1,11 +1,15 @@
-// SHRINK 3D v2.87 — Tron (beta), Game mode: turn a car into a solid, flat-faced low-poly version with four separate wheels.
+// SHRINK 3D v2.88 — Tron (beta), Game mode: turn a car into a solid, flat-faced low-poly version with four separate wheels.
 // The maths is in tron-core.js (run in tron-worker.js). This file gathers the model's triangles and colours, shows the result in the viewer
 // in place of the model, and saves it as a GLB. It never changes the loaded model: "Back to the normal model" (or any other viewer button) returns to it.
 (() => {
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
-  const VERSION = '2.87';
+  const VERSION = '2.88';
   const fmt = n => Number(n).toLocaleString('en-GB');
+  // The slider is logarithmic: 300 to 20,000 triangles, so the low end (flat, chunky) and the high end (close to the real car) both get room.
+  const MIN_F = 300, MAX_F = 20000;
+  const facesForPos = p => Math.min(MAX_F, Math.max(MIN_F, Math.round(MIN_F * Math.pow(MAX_F / MIN_F, Number(p) / 100) / 50) * 50));
+  const posForFaces = f => Math.round(100 * Math.log(f / MIN_F) / Math.log(MAX_F / MIN_F));
   let worker = null, workerFailed = false, jobId = 0, cache = null, lastResult = null, previewRoot = null, hiddenModel = null, busy = false, timer = null;
 
   /* ---------- gather the model: world-space positions, normals, per-vertex sRGB colour ---------- */
@@ -143,7 +147,7 @@
     if (busy) return;
     const A = app(), model = A?.originalModel;
     if (!model) { setStatus('Open a model first.', true); return; }
-    busy = true; $('tronMake').disabled = true; const faces = Number($('tronFaces').value);
+    busy = true; $('tronMake').disabled = true; const faces = facesForPos($('tronFaces').value);
     try {
       setStatus('Reading the model…'); await new Promise(r => setTimeout(r, 30));
       if (!cache || cache.key !== model.uuid) { cache = { key: model.uuid, sent: false, ...collect(model) }; }
@@ -175,17 +179,17 @@
     const host = $('stepExtra'), before = $('retouchDetails'); if (!host || !before) return;
     const d = document.createElement('details'); d.id = 'tronDetails'; d.className = 'fold game-only';
     d.innerHTML = `<summary>Tron <span class="dim">(beta)</span></summary><div class="fold-inner">
-      <div class="hint">Turns a car into a solid, flat-faced low-poly version for games: true to the shape, painted in the original colours, with four separate wheels you can spin and steer. Best on a car that sits on its wheels. The interior, wipers and aerial are dropped.</div>
+      <div class="hint">Turns a car into a solid, flat-faced low-poly version for games: true to the shape, painted in the original colours, with four separate wheels you can spin and steer. Best on a car that sits on its wheels. The interior, wipers and aerial are dropped. More triangles follow the real car more closely (door handles, lights, number plate) and take a little longer.</div>
       <div class="control-block"><div class="range-heading"><label for="tronFaces">Triangles</label><output id="tronFacesValue">800</output></div>
-        <input id="tronFaces" type="range" min="300" max="5000" step="100" value="800" aria-label="Triangles in the body">
+        <input id="tronFaces" type="range" min="0" max="100" step="1" value="${posForFaces(800)}" aria-label="Triangles in the body">
         <div class="slider-ends"><span>Flatter</span><span>Closer to the real car</span></div></div>
-      <div class="material-presets"><button id="tronMake" class="button small" type="button">Make Tron version</button><button id="tronDownload" class="button ghost small" type="button" hidden>Download Tron GLB</button><button id="tronBack" class="button ghost small" type="button" hidden>Back to the normal model</button></div>
+      <div class="material-presets"><button id="tronMake" class="button small tron-go" type="button">Make Tron version</button><button id="tronDownload" class="button ghost small" type="button" hidden>Download Tron GLB</button><button id="tronBack" class="button ghost small" type="button" hidden>Back to the normal model</button></div>
       <div id="tronStatus" class="hint" aria-live="polite"></div></div>`;
     host.insertBefore(d, before);
     const style = document.createElement('style');
-    style.textContent = '#tronStatus.bad{color:#ff9d8f}#tronDetails .material-presets{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}';
+    style.textContent = '.button.tron-go{background:var(--accent);color:#fff;font-weight:800}.button.tron-go:hover{background:#ff5d5d}#tronStatus.bad{color:#ff9d8f}#tronDetails .material-presets{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}';
     document.head.appendChild(style);
-    $('tronFaces').addEventListener('input', () => { $('tronFacesValue').textContent = fmt($('tronFaces').value); });
+    $('tronFaces').addEventListener('input', () => { $('tronFacesValue').textContent = fmt(facesForPos($('tronFaces').value)); });
     $('tronFaces').addEventListener('change', () => { if (previewRoot) { clearTimeout(timer); timer = setTimeout(make, 250); } });   // once a Tron car is showing, the slider re-makes it
     $('tronMake').addEventListener('click', make);
     $('tronDownload').addEventListener('click', download);
@@ -197,6 +201,6 @@
   window.addEventListener('shrink:model-opened', () => { hidePreview(); cache = null; lastResult = null; textureCache.clear(); setStatus(''); syncButtons(); });
   window.addEventListener('shrink:material-look', () => { cache = null; textureCache.clear(); });
   for (const ev of ['shrink:live-updated', 'shrink:optimized']) window.addEventListener(ev, () => { if (previewRoot) hidePreview(); });
-  window.__shrinkTron = { make, hide: hidePreview, get showing() { return !!previewRoot; } };
+  window.__shrinkTron = { facesForPos, posForFaces, make, hide: hidePreview, get showing() { return !!previewRoot; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject, { once: true }); else inject();
 })();

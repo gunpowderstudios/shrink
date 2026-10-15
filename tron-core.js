@@ -9,10 +9,10 @@
 // Expects: Y up, the car's length along X (the page rotates a car that is long in Z), width along Z.
 // Everything is deterministic: the same input gives the same car.
 
-export const TRON_MIN_FACES = 300, TRON_MAX_FACES = 5000;
+export const TRON_MIN_FACES = 300, TRON_MAX_FACES = 20000;
 
-// More triangles asked for -> a finer voxel grid, so the extra triangles have shape to follow. 800 -> 0.02, 2500 -> 0.0113 of the car length.
-export function resFor(faces) { return Math.min(0.03, Math.max(0.008, 0.02 * Math.sqrt(800 / faces))); }
+// More triangles asked for -> a finer voxel grid, so the extra triangles have shape to follow. 800 -> 0.012, 2500 -> 0.0071, 5000 -> 0.0053, 20000 -> 0.004 of the car length.
+export function resFor(faces) { return Math.min(0.016, Math.max(0.004, 0.012 * Math.pow(800 / faces, 0.45))); }
 
 /* ---------- small grid helpers (6-connected, like scipy's default) ---------- */
 function dilate6(g, nx, ny, nz) {
@@ -143,6 +143,25 @@ export function signedVolume(P, I) {
   return s / 6;
 }
 
+/* ---------- vertex normals, for a model that has none (or has unusable ones) ---------- */
+export function vertexNormals(P, I) {
+  const N = new Float32Array(P.length);
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
+    const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;   // area-weighted
+    for (const o of [a, b, c]) { N[o] += nx; N[o + 1] += ny; N[o + 2] += nz; }
+  }
+  for (let i = 0; i < N.length; i += 3) { const l = Math.hypot(N[i], N[i + 1], N[i + 2]) || 1; N[i] /= l; N[i + 1] /= l; N[i + 2] /= l; }
+  return N;
+}
+function usableNormals(N, nv) {
+  if (!N || N.length < nv * 3) return false;
+  let good = 0, n = 0; const step = Math.max(1, Math.floor(nv / 500));
+  for (let i = 0; i < nv; i += step) { n++; if (Math.abs(Math.hypot(N[i * 3], N[i * 3 + 1], N[i * 3 + 2]) - 1) < 0.2) good++; }
+  return good > n * 0.9;
+}
+
 /* ---------- wheel detection ---------- */
 function percentile(arr, q) { if (!arr.length) return 0; const s = Float32Array.from(arr).sort(); return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))]; }
 // Best circle in the side view (x,y) for one end of the car; ring density minus what lies just outside it. rfix keeps a radius shared with the other axle.
@@ -175,7 +194,7 @@ function fitAxle(Q, nv, sx, L, ymin, W, rfix) {
 // src: { positions: Float32Array xyz, indices: Uint32Array, normals?: Float32Array, colors?: Uint8Array rgb (0-255, sRGB) }
 // opt: { faces, res?, simplifier: { simplify(indices, positions, 3, targetIndexCount, targetError, flags) -> [indices, error] }, onProgress?(text) }
 export function flattenCar(src, opt) {
-  const { positions: P0, indices: I0, normals: N0, colors: C0 } = src;
+  const { positions: P0, indices: I0, colors: C0 } = src;
   const faces = Math.round(Math.min(TRON_MAX_FACES, Math.max(TRON_MIN_FACES, opt.faces || 800)));
   const nv = P0.length / 3, nt = I0.length / 3, say = opt.onProgress || (() => {});
   if (nt < 10) throw new Error('This model has too few triangles to flatten.');
@@ -184,6 +203,7 @@ export function flattenCar(src, opt) {
     const x = P0[i * 3], y = P0[i * 3 + 1], z = P0[i * 3 + 2];
     if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y; if (z < minz) minz = z; if (z > maxz) maxz = z;
   }
+  const N0 = usableNormals(src.normals, nv) ? src.normals : vertexNormals(P0, I0);   // the colour and snap steps need which way the skin faces
   const L = maxx - minx, ymin = miny, W = (maxz - minz) / 2, ox = (minx + maxx) / 2, oz = (minz + maxz) / 2;
   if (!(L > 0) || !(W > 0)) throw new Error('This model is flat or empty.');
   const Q = new Float32Array(P0.length);   // centred in X and Z: the wheel search then looks the same at both ends
@@ -247,16 +267,16 @@ export function flattenCar(src, opt) {
     const a = I0[t * 3] * 3, b = I0[t * 3 + 1] * 3, c = I0[t * 3 + 2] * 3;
     mark(Q[a], Q[a + 1], Q[a + 2]); mark(Q[b], Q[b + 1], Q[b + 2]); mark(Q[c], Q[c + 1], Q[c + 2]);
     const e = Math.max(Math.hypot(Q[a] - Q[b], Q[a + 1] - Q[b + 1], Q[a + 2] - Q[b + 2]), Math.hypot(Q[a] - Q[c], Q[a + 1] - Q[c + 1], Q[a + 2] - Q[c + 2]), Math.hypot(Q[b] - Q[c], Q[b + 1] - Q[c + 1], Q[b + 2] - Q[c + 2]));
-    const n = Math.min(48, Math.ceil(e / (0.7 * res)));
+    const n = Math.min(300, Math.ceil(e / (0.7 * res)));
     if (n <= 1) { mark((Q[a] + Q[b] + Q[c]) / 3, (Q[a + 1] + Q[b + 1] + Q[c + 1]) / 3, (Q[a + 2] + Q[b + 2] + Q[c + 2]) / 3); continue; }
-    const ia = I0[t * 3], ib = I0[t * 3 + 1], ic = I0[t * 3 + 2], keepX = C0 && exX.length < 6e6 && e > 1.5 * res;
+    const ia = I0[t * 3], ib = I0[t * 3 + 1], ic = I0[t * 3 + 2], keepX = exX.length < 6e6 && e > 1.5 * res;
     for (let i = 0; i <= n; i++) for (let j = 0; j <= n - i; j++) {
       const u = i / n, v = j / n, w = 1 - u - v;
       const x = Q[a] * w + Q[b] * u + Q[c] * v, y = Q[a + 1] * w + Q[b + 1] * u + Q[c + 1] * v, z = Q[a + 2] * w + Q[b + 2] * u + Q[c + 2] * v;
       mark(x, y, z);
       if (keepX && i % 2 === 0 && j % 2 === 0) {
         exX.push(x, y, z);
-        for (let q = 0; q < 3; q++) { exC.push(C0[ia * 3 + q] * w + C0[ib * 3 + q] * u + C0[ic * 3 + q] * v); exN.push(N0 ? N0[ia * 3 + q] * w + N0[ib * 3 + q] * u + N0[ic * 3 + q] * v : 0); }
+        for (let q = 0; q < 3; q++) { if (C0) exC.push(C0[ia * 3 + q] * w + C0[ib * 3 + q] * u + C0[ic * 3 + q] * v); exN.push(N0[ia * 3 + q] * w + N0[ib * 3 + q] * u + N0[ic * 3 + q] * v); }
       }
     }
   }
@@ -276,7 +296,7 @@ export function flattenCar(src, opt) {
 
   // 3. mesh + simplify
   say('Making the flat faces…');
-  const field = blur(solid, nx, ny, nz, 2);
+  const field = blur(solid, nx, ny, nz, res < 0.009 * L ? 1 : 2);
   const mesh = surfaceNets(field, nx, ny, nz, 0.5, lo, res);
   if (mesh.indices.length < 12) throw new Error('Could not make a surface from this model.');
   let { positions: SP, indices: SI } = mesh;
@@ -284,9 +304,64 @@ export function flattenCar(src, opt) {
     const out = opt.simplifier.simplify(SI, SP, 3, faces * 3, 1, []);
     SI = out[0];
   }
-  // keep only the vertices that are used
-  const remap = new Int32Array(SP.length / 3).fill(-1), used = [];
-  for (let t = 0; t < SI.length; t++) if (remap[SI[t]] < 0) { remap[SI[t]] = used.length; used.push(SI[t]); }
+  // The original skin as a cloud of points (its vertices plus samples on big triangles) in a coarse grid: used to snap the flat faces
+  // onto the real surface and to pick their colours.
+  const ne = exX.length / 3, ns = nv + ne, SQ = new Float32Array(ns * 3), SN = new Float32Array(ns * 3), SC = C0 ? new Float32Array(ns * 3) : null;
+  SQ.set(Q); SQ.set(exX, nv * 3); SN.set(N0); SN.set(exN, nv * 3); if (SC) { SC.set(C0); SC.set(exC, nv * 3); }
+  const cs = res * 1.5, sxn = Math.max(1, Math.ceil((bx1 - bx0) / cs) + 3), syn = Math.max(1, Math.ceil((by1 - by0) / cs) + 3), szn = Math.max(1, Math.ceil((bz1 - bz0) / cs) + 3);
+  const cellOf = (x, y, z) => [Math.min(sxn - 1, Math.max(0, Math.floor((x - bx0) / cs) + 1)), Math.min(syn - 1, Math.max(0, Math.floor((y - by0) / cs) + 1)), Math.min(szn - 1, Math.max(0, Math.floor((z - bz0) / cs) + 1))];
+  const vertOk = new Uint8Array(ns).fill(1); vertOk.fill(0, 0, nv);
+  for (let t = 0; t < nt; t++) if (keepTri[t]) for (let q = 0; q < 3; q++) vertOk[I0[t * 3 + q]] = 1;
+  const start = new Int32Array(sxn * syn * szn + 1), cellIdx = new Int32Array(ns).fill(-1);
+  for (let i = 0; i < ns; i++) if (vertOk[i]) { const [a, b, c] = cellOf(SQ[i * 3], SQ[i * 3 + 1], SQ[i * 3 + 2]); cellIdx[i] = (c * syn + b) * sxn + a; start[cellIdx[i] + 1]++; }
+  for (let i = 0; i < start.length - 1; i++) start[i + 1] += start[i];
+  const fillAt = start.slice(0, -1), items = new Int32Array(start[start.length - 1]);
+  for (let i = 0; i < ns; i++) if (cellIdx[i] >= 0) items[fillAt[cellIdx[i]]++] = i;
+  const cand = [];   // skin points within rad of (x,y,z) that face roughly the way (nx,ny,nz) does (minDot <= -1: any way)
+  const gather = (x, y, z, rad, nx0, ny0, nz0, minDot) => {
+    cand.length = 0;
+    const rr = Math.ceil(rad / cs), [ci, cj, ck] = cellOf(x, y, z);
+    for (let c = Math.max(0, ck - rr); c <= Math.min(szn - 1, ck + rr); c++) for (let b = Math.max(0, cj - rr); b <= Math.min(syn - 1, cj + rr); b++) for (let a = Math.max(0, ci - rr); a <= Math.min(sxn - 1, ci + rr); a++) {
+      const cellId = (c * syn + b) * sxn + a;
+      for (let q = start[cellId]; q < start[cellId + 1]; q++) {
+        const i = items[q];
+        if (Math.hypot(SQ[i * 3] - x, SQ[i * 3 + 1] - y, SQ[i * 3 + 2] - z) > rad) continue;
+        if (minDot > -1 && SN[i * 3] * nx0 + SN[i * 3 + 1] * ny0 + SN[i * 3 + 2] * nz0 < minDot) continue;
+        cand.push(i);
+      }
+    }
+    return cand;
+  };
+
+  // 3b. snap: the voxel surface is a little soft and stepped. Move every vertex along its own normal onto the real skin next to it
+  //     (the average of the original skin points that face the same way), so edges, lights and panel lines come back.
+  const nVert = SP.length / 3;
+  say('Snapping to the real surface…');
+  for (let pass = 0; pass < 2; pass++) {
+    const VN = new Float32Array(nVert * 3);
+    for (let t = 0; t < SI.length; t += 3) {
+      const a = SI[t] * 3, b = SI[t + 1] * 3, c = SI[t + 2] * 3;
+      const ux = SP[b] - SP[a], uy = SP[b + 1] - SP[a + 1], uz = SP[b + 2] - SP[a + 2], vx = SP[c] - SP[a], vy = SP[c + 1] - SP[a + 1], vz = SP[c + 2] - SP[a + 2];
+      const fx = uy * vz - uz * vy, fy = uz * vx - ux * vz, fz = ux * vy - uy * vx;
+      for (const o of [a, b, c]) { VN[o] += fx; VN[o + 1] += fy; VN[o + 2] += fz; }
+    }
+    const moved = new Float32Array(SP);
+    const used = new Uint8Array(nVert); for (let t = 0; t < SI.length; t++) used[SI[t]] = 1;
+    for (let i = 0; i < nVert; i++) {
+      if (!used[i]) continue;
+      const l = Math.hypot(VN[i * 3], VN[i * 3 + 1], VN[i * 3 + 2]); if (l < 1e-12) continue;
+      const nx0 = VN[i * 3] / l, ny0 = VN[i * 3 + 1] / l, nz0 = VN[i * 3 + 2] / l, x = SP[i * 3], y = SP[i * 3 + 1], z = SP[i * 3 + 2];
+      gather(x, y, z, 1.6 * res, nx0, ny0, nz0, 0.75);
+      if (cand.length < 3) continue;
+      const stepc = Math.max(1, Math.ceil(cand.length / 64)); let sum = 0, cnt = 0;
+      for (let q = 0; q < cand.length; q += stepc) { const k = cand[q]; sum += (SQ[k * 3] - x) * nx0 + (SQ[k * 3 + 1] - y) * ny0 + (SQ[k * 3 + 2] - z) * nz0; cnt++; }
+      const d = Math.max(-1.5 * res, Math.min(1.5 * res, sum / cnt));
+      moved[i * 3] = x + nx0 * d; moved[i * 3 + 1] = y + ny0 * d; moved[i * 3 + 2] = z + nz0 * d;
+    }
+    SP = moved;
+  }
+
+  // 4. flat faces
   const nf = SI.length / 3, bodyPos = new Float32Array(nf * 9), bodyNor = new Float32Array(nf * 9), bodyCol = new Uint8Array(nf * 9);
   const cen = new Float32Array(nf * 3), fnor = new Float32Array(nf * 3);
   for (let t = 0; t < nf; t++) {
@@ -301,50 +376,28 @@ export function flattenCar(src, opt) {
     });
   }
 
-  // 4. each face takes the colour of the original skin next to it (facing the same way, so the inside of the roof is ignored)
+  // 5. each face takes the colour of the original skin next to it (facing the same way, so the inside of the roof is ignored)
   say('Painting the faces…');
   const colourSet = new Set();
-  if (C0) {
-    const ne = exX.length / 3, ns = nv + ne, SQ = new Float32Array(ns * 3), SC = new Float32Array(ns * 3), SN = N0 ? new Float32Array(ns * 3) : null;
-    SQ.set(Q); SC.set(C0); if (SN) SN.set(N0); SQ.set(exX, nv * 3); SC.set(exC, nv * 3); if (SN) SN.set(exN, nv * 3);
-    const cs = res * 1.5, sxn = Math.max(1, Math.ceil((bx1 - bx0) / cs) + 3), syn = Math.max(1, Math.ceil((by1 - by0) / cs) + 3), szn = Math.max(1, Math.ceil((bz1 - bz0) / cs) + 3);
-    const cellOf = (x, y, z) => [Math.min(sxn - 1, Math.max(0, Math.floor((x - bx0) / cs) + 1)), Math.min(syn - 1, Math.max(0, Math.floor((y - by0) / cs) + 1)), Math.min(szn - 1, Math.max(0, Math.floor((z - bz0) / cs) + 1))];
-    const start = new Int32Array(sxn * syn * szn + 1), vertOk = new Uint8Array(ns).fill(1); vertOk.fill(0, 0, nv);
-    for (let t = 0; t < nt; t++) if (keepTri[t]) for (let q = 0; q < 3; q++) vertOk[I0[t * 3 + q]] = 1;
-    const cellIdx = new Int32Array(ns).fill(-1);
-    for (let i = 0; i < ns; i++) if (vertOk[i]) { const [a, b, c] = cellOf(SQ[i * 3], SQ[i * 3 + 1], SQ[i * 3 + 2]); cellIdx[i] = (c * syn + b) * sxn + a; start[cellIdx[i] + 1]++; }
-    for (let i = 0; i < start.length - 1; i++) start[i + 1] += start[i];
-    const fillAt = start.slice(0, -1), items = new Int32Array(start[start.length - 1]);
-    for (let i = 0; i < ns; i++) if (cellIdx[i] >= 0) items[fillAt[cellIdx[i]]++] = i;
-    const cand = [];
-    for (let t = 0; t < nf; t++) {
+  const med = arr => { arr.sort((x, y) => x - y); return arr[arr.length >> 1]; };
+  for (let t = 0; t < nf; t++) {
+    let rgb = null;
+    if (SC) {
       const cx = cen[t * 3], cy = cen[t * 3 + 1], cz = cen[t * 3 + 2], nx0 = fnor[t * 3], ny0 = fnor[t * 3 + 1], nz0 = fnor[t * 3 + 2];
-      let rgb = null;
       for (let pass = 0; pass < 4 && !rgb; pass++) {
-        const rad = cs * (pass === 3 ? 1.5 : 1) * (pass === 0 ? 0.75 : pass === 1 ? 1.2 : 2.2) , useN = N0 && pass < 3;
-        const rr = Math.ceil(rad / cs), [ci, cj, ck] = cellOf(cx, cy, cz); cand.length = 0;
-        for (let c = Math.max(0, ck - rr); c <= Math.min(szn - 1, ck + rr); c++) for (let b = Math.max(0, cj - rr); b <= Math.min(syn - 1, cj + rr); b++) for (let a = Math.max(0, ci - rr); a <= Math.min(sxn - 1, ci + rr); a++) {
-          const cellId = (c * syn + b) * sxn + a;
-          for (let q = start[cellId]; q < start[cellId + 1]; q++) {
-            const i = items[q];
-            if (Math.hypot(SQ[i * 3] - cx, SQ[i * 3 + 1] - cy, SQ[i * 3 + 2] - cz) > rad) continue;
-            if (useN && SN[i * 3] * nx0 + SN[i * 3 + 1] * ny0 + SN[i * 3 + 2] * nz0 < 0.5) continue;
-            cand.push(i);
-          }
-        }
+        gather(cx, cy, cz, cs * (pass === 0 ? 0.75 : pass === 1 ? 1.2 : pass === 2 ? 2.2 : 3.3), nx0, ny0, nz0, pass < 3 ? 0.5 : -2);
         if (cand.length >= (pass < 3 ? 5 : 1)) {
           const stepc = Math.max(1, Math.ceil(cand.length / 64)), r = [], g = [], b = [];
           for (let q = 0; q < cand.length; q += stepc) { const i = cand[q]; r.push(SC[i * 3]); g.push(SC[i * 3 + 1]); b.push(SC[i * 3 + 2]); }
-          const med = arr => { arr.sort((x, y) => x - y); return arr[arr.length >> 1]; };
           rgb = [med(r), med(g), med(b)];
         }
       }
-      if (!rgb) rgb = [160, 160, 160];
-      rgb = rgb.map(v => Math.min(255, Math.floor(v / 12) * 12 + 6));   // a few steps per channel: flatter, fewer colours
-      colourSet.add(rgb.join(','));
-      for (let q = 0; q < 3; q++) { bodyCol[t * 9 + q * 3] = rgb[0]; bodyCol[t * 9 + q * 3 + 1] = rgb[1]; bodyCol[t * 9 + q * 3 + 2] = rgb[2]; }
     }
-  } else bodyCol.fill(160);
+    if (!rgb) rgb = [160, 160, 160];
+    rgb = rgb.map(v => Math.min(255, Math.floor(v / 12) * 12 + 6));   // a few steps per channel: flatter, fewer colours
+    colourSet.add(rgb.join(','));
+    for (let q = 0; q < 3; q++) { bodyCol[t * 9 + q * 3] = rgb[0]; bodyCol[t * 9 + q * 3 + 1] = rgb[1]; bodyCol[t * 9 + q * 3 + 2] = rgb[2]; }
+  }
 
   const out = [];
   for (const w of wheels) for (const sz of [-1, 1]) {

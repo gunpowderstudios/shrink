@@ -56,10 +56,13 @@ const $ = id => document.getElementById(id);
 ok($('tronDetails') && $('tronDetails').classList.contains('game-only'), 'the Tron panel is added, for Game mode');
 ok($('stepExtra').firstElementChild === $('tronDetails') || $('tronDetails').nextElementSibling === $('retouchDetails'), 'it sits in the left panel just before Retouch textures');
 ok(/beta/i.test($('tronDetails').querySelector('summary').textContent), 'it is labelled beta');
-ok($('tronFaces').min === '300' && $('tronFaces').max === '5000', 'the slider runs 300 to 5000');
+const T = win.__shrinkTron;
+ok(T.facesForPos(0) === 300 && T.facesForPos(100) === 20000, 'the slider runs 300 to 20,000 triangles');
+ok(T.facesForPos($('tronFaces').value) === 800, 'it starts at 800');
+ok(T.facesForPos(T.posForFaces(5000)) >= 4900 && T.facesForPos(T.posForFaces(5000)) <= 5100, 'positions and triangle counts convert back and forth');
 ok($('tronDownload').hidden && $('tronBack').hidden, 'download and back are hidden until there is a result');
-$('tronFaces').value = '900'; $('tronFaces').dispatchEvent(new win.Event('input'));
-ok($('tronFacesValue').textContent === '900', 'the slider shows its value');
+$('tronFaces').value = String(T.posForFaces(900)); $('tronFaces').dispatchEvent(new win.Event('input'));
+ok(/^9[0-9]{2}$/.test($('tronFacesValue').textContent) || $('tronFacesValue').textContent === '900', 'the slider shows its triangle count: ' + $('tronFacesValue').textContent);
 
 await win.__shrinkTron.make();
 const tc = scene.getObjectByName('TronCar');
@@ -71,12 +74,12 @@ ok(wfl.children.length === 2 && wfl.position.x < 0 && Math.abs(wfl.position.y + 
 const body = tc.getObjectByName('Body');
 ok(body.geometry.attributes.color && body.material.vertexColors, 'the body is painted with per-face colours');
 const nTri = body.geometry.attributes.position.count / 3;
-ok(nTri > 100 && nTri <= 900 * 1.25, `the body has about the triangles asked for (${nTri})`);
+ok(nTri > 100 && nTri <= 1000 * 1.25, `the body has about the triangles asked for (${nTri} for ~900)`);
 ok(/triangles in the body/.test($('tronStatus').textContent) && !$('tronStatus').classList.contains('bad'), 'the status says what was made: ' + $('tronStatus').textContent);
 ok(!$('tronDownload').hidden && !$('tronBack').hidden, 'download and back appear');
 
 // the slider re-makes it
-$('tronFaces').value = '400'; $('tronFaces').dispatchEvent(new win.Event('change'));
+$('tronFaces').value = String(T.posForFaces(400)); $('tronFaces').dispatchEvent(new win.Event('change'));
 await new Promise(r => setTimeout(r, 900));
 const tc2 = scene.getObjectByName('TronCar');
 ok(tc2 && tc2 !== tc && tc2.getObjectByName('Body').geometry.attributes.position.count / 3 < nTri, 'moving the slider makes a new, flatter car');
