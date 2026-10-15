@@ -11,9 +11,9 @@
 const percentile = (arr, q) => { if (!arr.length) return 0; const s = Float32Array.from(arr).sort(); return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))]; };
 
 // Best circle in the side view for one end of the car (ring density minus what lies just outside it). rfix shares a radius with the other axle.
-function fitAxle(Q, n, sx, L, ymin, W, rfix) {
-  const cand = [];
-  for (let i = 0; i < n; i++) { const x = Q[i * 3], y = Q[i * 3 + 1], z = Q[i * 3 + 2]; if (x * sx > 0 && y < ymin + 0.25 * L && Math.abs(z) > 0.6 * W) cand.push(i); }
+function fitAxle(Q, n, sx, L, ymin, W, rfix, centre) {
+  const cand = [];   // centre: a single wheel on the middle line (three-wheelers); otherwise the outer pair
+  for (let i = 0; i < n; i++) { const x = Q[i * 3], y = Q[i * 3 + 1], z = Q[i * 3 + 2]; if (x * sx > 0 && y < ymin + 0.25 * L && (centre ? Math.abs(z) < 0.35 * W : Math.abs(z) > 0.6 * W)) cand.push(i); }
   const step = Math.max(1, Math.ceil(cand.length / 3000)), xs = [], ys = [];
   for (let t = 0; t < cand.length; t += step) { xs.push(Q[cand[t] * 3]); ys.push(Q[cand[t] * 3 + 1]); }
   let best = null; const m = xs.length;
@@ -36,6 +36,53 @@ function fitAxle(Q, n, sx, L, ymin, W, rfix) {
   return best;
 }
 
+// Tyre width where the tyre touches the ground; arr is |z| for a pair, signed z for a single wheel.
+function groundZ(Q, n, f, ymin, W, centre) {
+  const arr = [];
+  const ok = z => centre ? Math.abs(z) < 0.35 * W : true;
+  for (let i = 0; i < n; i++) if (Q[i * 3 + 1] < ymin + 0.3 * f.r && Math.abs(Q[i * 3] - f.x) < f.r * 0.7 && ok(Q[i * 3 + 2])) arr.push(centre ? Q[i * 3 + 2] : Math.abs(Q[i * 3 + 2]));
+  if (arr.length < 20) { arr.length = 0; for (let i = 0; i < n; i++) if (Math.hypot(Q[i * 3] - f.x, Q[i * 3 + 1] - f.y) < f.r * 1.05 && (centre ? Math.abs(Q[i * 3 + 2]) < 0.35 * W : Math.abs(Q[i * 3 + 2]) > 0.5 * W)) arr.push(centre ? Q[i * 3 + 2] : Math.abs(Q[i * 3 + 2])); }
+  return [percentile(arr, 0.03), percentile(arr, 0.97)];
+}
+
+// Two axles, a wheel at each side of each (an ordinary car).
+function layout4(Q, n, L, W, ymin, maxy) {
+  const fits = { '-1': fitAxle(Q, n, -1, L, ymin, W), '1': fitAxle(Q, n, 1, L, ymin, W) };
+  if (!fits['-1'] || !fits['1']) return { found: false, reason: 'No wheels found (is the car sitting on its wheels?).' };
+  const good = fits['-1'].score >= fits['1'].score ? -1 : 1;
+  fits[-good] = fitAxle(Q, n, -good, L, ymin, W, fits[good].r) || fits[-good];
+  if (fits['-1'].score < 40 || fits['1'].score < 40) return { found: false, reason: 'No clear wheel circles found in the side view.' };
+  const zr = [-1, 1].map(sx => groundZ(Q, n, fits[sx], ymin, W, false));
+  const z0 = (zr[0][0] + zr[1][0]) / 2, z1 = (zr[0][1] + zr[1][1]) / 2;
+  if (!(z1 - z0 > 0.02 * L)) return { found: false, reason: 'Could not measure the tyres.' };
+  // front: the cabin (roof and glass) sits nearer the rear, so the front is on the other side of the middle of the car. The cabin's span is
+  // measured on the upper part of the body (5th..95th percentile of x), which does not depend on how densely the roof is triangulated.
+  const ytop = ymin + 0.7 * (maxy - ymin), xs = []; for (let i = 0; i < n; i++) if (Q[i * 3 + 1] > ytop) xs.push(Q[i * 3]);
+  const cabinMid = xs.length >= 3 ? (percentile(xs, 0.05) + percentile(xs, 0.95)) / 2 : 0;
+  const zc = (z0 + z1) / 2, tyreW = z1 - z0;
+  const tyres = [-1, 1].map(sx => ({ sx, f: fits[sx], single: false, zc, lo: zc - z0 * 0.94, hi: z1 * 1.04 - zc, tyreW }));
+  return { found: true, layout: '4', frontSign: cabinMid > 0 ? -1 : 1, tyres };
+}
+
+// Three wheels: one on the middle line at the front, a pair at the back (a Reliant-style three-wheeler).
+function layout3(Q, n, L, W, ymin) {
+  let best = null;
+  for (const s of [-1, 1]) {
+    const single = fitAxle(Q, n, s, L, ymin, W, undefined, true), pair = fitAxle(Q, n, -s, L, ymin, W);
+    if (!single || !pair) continue;
+    // a wheel stands on the ground: its lowest point must be near the bottom of the car, or it is a lump on the underside
+    if (single.y - single.r - ymin > 0.35 * single.r || pair.y - pair.r - ymin > 0.35 * pair.r) continue;
+    const score = single.score + pair.score; if (!best || score > best.score) best = { s, single, pair, score };
+  }
+  if (!best || best.single.score < 40 || best.pair.score < 40) return { found: false, reason: 'No clear wheels found for a three-wheel layout (one at the front, two at the back).' };
+  const [pz0, pz1] = groundZ(Q, n, best.pair, ymin, W, false), [sz0, sz1] = groundZ(Q, n, best.single, ymin, W, true);
+  if (!(pz1 - pz0 > 0.02 * L) || !(sz1 - sz0 > 0.02 * L)) return { found: false, reason: 'Could not measure the tyres.' };
+  const pzc = (pz0 + pz1) / 2, szm = (sz0 + sz1) / 2, sHalf = (sz1 - sz0) / 2;
+  return { found: true, layout: '3', frontSign: best.s, tyres: [
+    { sx: best.s, f: best.single, single: true, zmid: szm, lo: sHalf * 1.1, hi: sHalf * 1.1, tyreW: sz1 - sz0 },
+    { sx: -best.s, f: best.pair, single: false, zc: pzc, lo: pzc - pz0 * 0.94, hi: pz1 * 1.04 - pzc, tyreW: pz1 - pz0 } ] };
+}
+
 // P: Float32Array of world-space x,y,z. Returns { found, reason?, ... }. When found: wheels[] (name, centre[3] in world space, radius, width, index),
 // axle ('z' when the car's length is along X, 'x' when along Z) and classify(x, y, z) -> wheel index or -1 for a WORLD-space point.
 export function detectWheels(P, adj = {}) {
@@ -55,52 +102,39 @@ export function detectWheels(P, adj = {}) {
   const L = alongZ ? maxz - minz : maxx - minx, W = (alongZ ? maxx - minx : maxz - minz) / 2, ymin = miny;
   if (!(L > 0) || !(W > 0)) return { found: false, reason: 'The model is flat.' };
 
-  const fits = { '-1': fitAxle(Q, n, -1, L, ymin, W), '1': fitAxle(Q, n, 1, L, ymin, W) };
-  if (!fits['-1'] || !fits['1']) return { found: false, reason: 'No wheels found (is the car sitting on its wheels?).' };
-  const good = fits['-1'].score >= fits['1'].score ? -1 : 1;
-  fits[-good] = fitAxle(Q, n, -good, L, ymin, W, fits[good].r) || fits[-good];
-  if (fits['-1'].score < 40 || fits['1'].score < 40) return { found: false, reason: 'No clear wheel circles found in the side view.' };
-
-  // tyre width: measured at the bottom of the tyre, where it touches the ground, so panels outside the tyre are not counted
-  const zr = [];
-  for (const sx of [-1, 1]) {
-    const f = fits[sx], arr = [];
-    for (let i = 0; i < n; i++) if (Q[i * 3 + 1] < ymin + 0.3 * f.r && Math.abs(Q[i * 3] - f.x) < f.r * 0.7) arr.push(Math.abs(Q[i * 3 + 2]));
-    if (arr.length < 20) { for (let i = 0; i < n; i++) if (Math.hypot(Q[i * 3] - f.x, Q[i * 3 + 1] - f.y) < f.r * 1.05 && Math.abs(Q[i * 3 + 2]) > 0.5 * W) arr.push(Math.abs(Q[i * 3 + 2])); }
-    zr.push([percentile(arr, 0.03), percentile(arr, 0.97)]);
-  }
-  const z0 = (zr[0][0] + zr[1][0]) / 2, z1 = (zr[0][1] + zr[1][1]) / 2;
-  if (!(z1 - z0 > 0.02 * L)) return { found: false, reason: 'Could not measure the tyres.' };
-
-  // front: the cabin (roof and glass) sits nearer the rear, so the front is on the other side of the middle of the car. The cabin's span is
-  // measured on the upper part of the body (5th..95th percentile of x), which does not depend on how densely the roof is triangulated.
-  const ytop = ymin + 0.7 * (maxy - ymin), xs = []; for (let i = 0; i < n; i++) if (Q[i * 3 + 1] > ytop) xs.push(Q[i * 3]);
-  const cabinMid = xs.length >= 3 ? (percentile(xs, 0.05) + percentile(xs, 0.95)) / 2 : 0;
-  const frontSign = cabinMid > 0 ? -1 : 1;
+  const three = adj.layout === '3' || adj.layout === 3;
+  let spec = three ? layout3(Q, n, L, W, ymin) : layout4(Q, n, L, W, ymin, maxy);
+  if (!spec.found && (adj.layout === 'auto')) { const t = layout3(Q, n, L, W, ymin); if (t.found) spec = t; }
+  if (!spec.found) return spec;
+  const { frontSign, tyres } = spec;   // tyres: [{ sx, f:{x,y,r}, single, zmid?, lo, hi, zc? }]
 
   // manual nudges, in tyre radii: adj.front / adj.rear move that axle forward (+) or back (-); adj.dyFront / adj.dyRear raise (+) or lower (-) that axle;
-  // adj.dyW = { Wheel_FL: n, ... } raises or lowers one wheel on top of that; adj.dy (older) moves all four; adj.size scales the wheel (1 = as found)
-  const axles = [-1, 1].map(sx => {
-    const f = fits[sx], role = sx * frontSign > 0 ? 'front' : 'rear', size = adj.size > 0 ? adj.size : 1;
-    return { sx, role, r0: f.r, x: f.x + frontSign * (adj[role] || 0) * f.r, y: f.y + ((adj.dy || 0) + ((role === 'front' ? adj.dyFront : adj.dyRear) || 0)) * f.r, r: f.r * size };
+  // adj.dyW = { Wheel_FL: n, ... } raises or lowers one wheel on top of that; adj.dy (older) moves all; adj.size scales the wheel (1 = as found)
+  const size = adj.size > 0 ? adj.size : 1;
+  const axles = tyres.map(t => {
+    const role = t.sx * frontSign > 0 ? 'front' : 'rear';
+    return { sx: t.sx, role, single: !!t.single, t, r0: t.f.r, x: t.f.x + frontSign * (adj[role] || 0) * t.f.r, y: t.f.y + ((adj.dy || 0) + ((role === 'front' ? adj.dyFront : adj.dyRear) || 0)) * t.f.r, r: t.f.r * size };
   });
   const wheels = []; let k = 0;
-  for (const a of axles) for (const sz of [-1, 1]) {
-    const name = `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`, wf = (a.role === 'front' ? adj.widthFront : adj.widthRear) > 0 ? (a.role === 'front' ? adj.widthFront : adj.widthRear) : 1, cy = a.y + ((adj.dyW && adj.dyW[name]) || 0) * a.r0;
-    wheels.push({ index: k++, axle: a, role: a.role, sz, name, cx: a.x, cy, centre: fromDet(a.x, cy, sz * (z0 + z1) / 2), radius: a.r, width: (z1 - z0) * wf, wf });
+  for (const a of axles) for (const sz of (a.single ? [0] : [-1, 1])) {
+    const name = a.single ? 'Wheel_F' : `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`;
+    const wk = a.role === 'front' ? adj.widthFront : adj.widthRear, wf = wk > 0 ? wk : 1, cy = a.y + ((adj.dyW && adj.dyW[name]) || 0) * a.r0;
+    const zmid = a.single ? a.t.zmid : sz * a.t.zc;
+    wheels.push({ index: k++, axle: a, role: a.role, sz, single: a.single, name, cx: a.x, cy, zmid, centre: fromDet(a.x, cy, zmid), radius: a.r, width: a.t.tyreW * wf, wf, lo: a.t.lo, hi: a.t.hi });
   }
   // a wheel takes the triangles inside its circle (side view) and inside its tyre width; wf scales the width about the tyre's middle
-  const zc = (z0 + z1) / 2;
   const classify = (x, y, z) => {
-    const [X, Y, Z] = toDet(x, y, z), az = Math.abs(Z);
+    const [X, Y, Z] = toDet(x, y, z);
     for (const w of wheels) {
-      if (Math.sign(Z) !== w.sz || w.axle.sx * X <= 0) continue;
-      if (az < zc - (zc - z0 * 0.94) * w.wf || az > zc + (z1 * 1.04 - zc) * w.wf) continue;
+      if (w.axle.sx * X <= 0) continue;
+      let t;
+      if (w.single) t = Z - w.zmid; else if (Math.sign(Z) === w.sz) t = Math.abs(Z) - Math.abs(w.zmid); else continue;
+      if (t < -w.lo * w.wf || t > w.hi * w.wf) continue;
       if (Math.hypot(X - w.cx, Y - w.cy) < w.radius * 1.06) return w.index;
     }
     return -1;
   };
-  return { found: true, axle: alongZ ? 'x' : 'z', lengthAxis: alongZ ? 'z' : 'x', wheels, classify, frontSign, length: L, info: { radius: wheels[0].radius, width: z1 - z0, alongZ } };
+  return { found: true, axle: alongZ ? 'x' : 'z', lengthAxis: alongZ ? 'z' : 'x', wheels, classify, frontSign, length: L, layout: spec.layout, info: { radius: wheels[0].radius, width: wheels[0].width / (wheels[0].wf || 1), alongZ } };
 }
 
 /* ---------- glTF-Transform document surgery ---------- */
@@ -202,6 +236,6 @@ export function splitWheels(doc, adj = {}) {
     const nd = doc.createNode(w.name).setTranslation(w.centre).setMesh(mesh).setExtras({ wheel: true, axle: det.axle, radius: w.radius, width: w.width });
     scene.addChild(nd); made.push({ name: w.name, role: w.role, triangles: counts[k], centre: w.centre, width: w.width });
   });
-  if (made.length < 4) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
+  if (made.length < det.wheels.length) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
   return { found: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
 }

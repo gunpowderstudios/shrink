@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.97 — Three-wheelers
+
+- Car wheels panel: **Wheel layout** = 4 wheels (default), 3 wheels (one on the middle line at the front, two at the back) or Auto (try 4, then 3). The three-wheeler gives `Wheel_F`, `Wheel_RL`, `Wheel_RR`; the sliders work on the single front wheel too (a "Front wheel (single)" up/down slider appears in the 3-wheel layout). A single wheel must stand on the ground; a lump on the underside is refused.
+- Tested on a synthetic three-wheeler and the Mini (forcing 3 wheels on a four-wheeler is refused). Not yet tried on a real three-wheeler GLB.
+
 ## v2.96 — Wheel width
 
 - Adjust wheels: **Front wheel width** and **Rear wheel width** sliders (40–160%). The width decides how far in and out from the tyre's middle triangles count as wheel; markers show it live. `splitWheels(doc, adj)` takes `widthFront` / `widthRear` (factors). Making a wheel wider than the tyre takes in arch/body triangles.
