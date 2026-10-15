@@ -391,6 +391,12 @@ A good Simple-mode run should:
 - Game-mode material tweaks go through `material-look.js` (`__shrinkMaterial`): scale from `userData._shrinkOrigMetal`, never from the current value; the same factor is applied to the glTF-Transform document at export.
 - Dropped maps (metallic/roughness, AO) are a preview + export option in `material-look.js` only; original maps are kept in a `WeakMap`, never in `userData` (material.clone() would copy textures through it).
 
+## Tron (beta, v2.87)
+- `tron-core.js` is pure maths (no DOM, no imports; the simplifier is injected) and is tested by `tron.test.mjs`; `tron-worker.js` runs it off the main thread; `tron-ui.js` is the Game-mode panel and is tested by `tron-ui.test.mjs` (real three, stand-in Worker).
+- Tron never edits the loaded model. It hides `currentModel`, adds a `TronCar` group to the viewer scene, and removes it again on Back / Original / Reduced / Compare / `shrink:model-opened` / `shrink:live-updated` / `shrink:optimized`. Do not route it through `setPreview` (that would fight the live reducer).
+- Fill the car slice by slice (`fillSlices`), not with a 3D flood: real cars have open windows and the flood leaks.
+- Output convention: length along X, Y up, width along Z; wheel nodes are centred on their own origin with the axle along Z.
+
 ## Stamp (v2.79)
 - `paint3d.js` owns the Stamp tool; `stamp-core.js` holds the pure maths (patch coordinates, bilinear sampling, edge fade) and is tested by `stamp.test.mjs`. The patch is captured by raycasting the screen and reading the active colour texture, and pasted by raycasting the destination: keep it a screen-space projection, do not turn it into a UV copy.
 - 3D painting (Paint, Clone, Stamp) edits the colour texture (`material.map`) and, since v2.82, the normal map too (the `flat` layer in `paint3d.js`: flatten for Paint/Stamp, copy for Clone). The normal map is edited on its own private canvas, handed to Apply through `collectDirtyLayers`, and undone per step via `shrink:paint-undo` events from `multi-undo.js`. Metallic/roughness pictures can still only be edited in the flat editor.

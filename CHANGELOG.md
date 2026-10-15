@@ -2,6 +2,14 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.87 — Tron (beta): flat low-poly cars
+
+- New **Tron (beta)** panel in Game mode (left column, above Retouch textures). It turns a dense car (e.g. a Meshy download) into a solid, flat-faced low-poly car with **four separate wheels** (`Wheel_FL/FR/RL/RR`, origin at the wheel centre, axle along Z, so rotate about Z to spin and about Y to steer). A slider sets the body triangles, 300 to 5,000; a finer slider setting also uses a finer voxel grid.
+- Each face is painted one flat colour sampled from the original (facing the same way, so the inside of the roof is ignored). The interior, wipers and aerial are dropped. The loaded model is never changed: Tron shows its car in place of the model, and **Back to the normal model** (or Original/Reduced/Compare, a new model, or a reduction) returns to it. **Download Tron GLB** saves it with vertex colours and no textures (`<name>-TRON<faces>.glb`).
+- A car that is long in Z is turned a quarter turn so the output is always length-along-X, Y up. The front is guessed from where the roof sits (the roof is nearer the rear); rename the wheels if it guessed wrong.
+- The maths is `tron-core.js` (pure, runs in `tron-worker.js`): wheel fit -> voxel skin from the triangles -> close gaps, fill slice by slice (a real car is not watertight, a 3D flood would leak) -> open (drops spikes) -> cut wheel arches -> blur + Surface Nets -> meshoptimizer simplify -> per-face colours. The 1.6M-triangle test Mini takes about 3 s in Node.
+- New tests: `tron.test.mjs` (maths on a made-up car) and `tron-ui.test.mjs` (panel, wheels, slider, save, leaving Tron). Not checked in a real browser: the worker start-up, the texture colour sampling from a real GLB, and the viewer swap are the parts to watch.
+
 ## v2.86 — Paint / Clone / Stamp keep your view
 
 - Clicking a paint tool while the Reduced model was showing used to switch to the Original and re-frame the camera. It now switches without re-framing and puts the camera back exactly where you had rotated it.

@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.86';
+  const PRINT_RELEASE = '2.87';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -10,6 +10,7 @@
 
   import(`./print-export-safety.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Optional print tools did not load`, err));
   import(`./material-look.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Material look did not load`, err));
+  import(`./tron-ui.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Tron (beta) did not load`, err));
   import(`./game-save-guard.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game save verification did not load`, err));
   import(`./game-protection-fix.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err));
   import(`./print-v2-ui.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
@@ -52,7 +53,7 @@
     mode = mode === 'print' ? 'print' : 'game'; const t=TEXT[mode];
     body.classList.toggle('app-mode-game',mode==='game'); body.classList.toggle('app-mode-print',mode==='print');
     chooser.querySelectorAll('.mode-card').forEach(btn=>{const on=btn.dataset.mode===mode;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',String(on));});
-    steps.innerHTML=t.steps;   /* the header line is fixed text (v2.86) */
+    steps.innerHTML=t.steps;   /* the header line is fixed text (v2.87) */
     ['setupTitle','setupSub','detailSub','extraNum','extraTitle','extraSub','saveNum','saveTitle','saveSub'].forEach(k=>setText(k,t[k]));
     const btn=$('optimizeBtn'); if(btn){btn.dataset.label=t.btn;if(!btn.disabled)btn.textContent=t.btn;}
     const s=dropZone?.querySelector('strong'),sp=dropZone?.querySelector('span'); if(s)s.textContent=t.drop[0];if(sp)sp.textContent=t.drop[1];if(fileInput)fileInput.accept=t.accept;
