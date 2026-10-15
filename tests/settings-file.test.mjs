@@ -1,7 +1,7 @@
 // settings-file.js: save the left-panel controls to JSON and load them back (jsdom, real module).
 import { JSDOM } from 'jsdom';
 let bad = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; };
-const dom = new JSDOM(`<body><div id="stepSave"></div><div id="flowNote"></div><div id="fileName">car.glb</div>
+const dom = new JSDOM(`<body><section id="dropZone"></section><div id="stepSave"></div><div id="flowNote"></div><div id="fileName">car.glb</div>
 <aside class="control-panel">
  <button class="target-card active" data-target="pc"></button><button class="target-card" data-target="hero"></button>
  <input id="geometry" type="range" min="1" max="100" value="70"><input id="geometryNumber" value="70">
@@ -11,7 +11,7 @@ const dom = new JSDOM(`<body><div id="stepSave"></div><div id="flowNote"></div><
  <input id="fileInput" type="file"><input id="brushSize" type="range" value="32">
  <div id="textureEditor"><input id="inEditor" type="range" value="5"></div>
 </aside></body>`);
-Object.assign(globalThis, { window: dom.window, document: dom.window.document, Event: dom.window.Event });
+Object.assign(globalThis, { window: dom.window, document: dom.window.document, Event: dom.window.Event, MutationObserver: dom.window.MutationObserver });
 const $ = id => document.getElementById(id);
 const events = []; // what the page's own handlers would see
 $('wheelFront').addEventListener('input', () => events.push('front'));
@@ -45,4 +45,17 @@ let msg = ''; try { S.apply({ hello: 1 }); } catch (e) { msg = e.message; }
 ok(/not a SHRINK settings file/.test(msg), 'other JSON refused with a plain message');
 msg = ''; try { S.apply({ ...saved, version: 99 }); } catch (e) { msg = e.message; }
 ok(/newer/.test(msg), 'newer file version refused');
+// Start screen (no model yet): the file is kept, then applied once the model has opened and the live preview is ready.
+ok(!!$('settingsStartLoad') && !!$('settingsLoadInput'), 'start-screen Load settings button and file input exist');
+$('geometry').value = '70'; $('wheelFront').value = '0';
+const asFile = obj => ({ text: async () => JSON.stringify(obj) });
+await S.takeFile(asFile({ ...saved, values: { geometry: '41', wheelFront: '15' } }));
+ok($('geometry').value === '70', 'no model yet: nothing applied straight away');
+ok(/Now choose your model/.test($('settingsStartNote').textContent), 'start note tells the person to choose a model');
+window.__shrinkApp = { sourceFile: { name: 'car.glb' } };
+window.dispatchEvent(new window.Event('shrink:model-opened')); window.dispatchEvent(new window.Event('shrink:live-ready'));
+await new Promise(r => setTimeout(r, 400));
+ok($('geometry').value === '41' && $('wheelFront').value === '15', 'applied after the model opened');
+await S.takeFile({ text: async () => '{"hello":1}' });
+ok(/not a SHRINK settings file/.test($('settingsStartNote').textContent), 'wrong JSON file reported on the start screen');
 console.log(bad ? `\n${bad} FAILED` : '\nall passed'); process.exit(bad ? 1 : 0);

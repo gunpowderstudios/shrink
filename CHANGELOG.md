@@ -2,6 +2,14 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.100 — Paint/stamp fixes, Redo, colour swatches, settings from the start screen
+
+- **Stamp**: one click pastes and the stamp is finished (ghost gone, Stamp switches off, the copied patch is kept; press Stamp again to paste another, or hold **Shift** while clicking to keep Stamp on). The ghost only shows while aiming and hides when the pointer leaves the viewer.
+- **Esc / lost mouse-up**: Esc now always ends a stroke in progress and leaves the tool; a mouse-up anywhere in the window (e.g. over the wheel sliders), a lost pointer capture or the window losing focus also ends the stroke. Before, a missed mouse-up left the brush (especially Spray) painting and Esc was ignored.
+- **Undo / Redo**: Redo button + Ctrl/Cmd+Shift+Z (or Ctrl+Y); 20 steps each way (was undo only). Ctrl/Cmd+Z now works in any mode, not only while a paint tool is on. A new stroke clears Redo. The bumps (normal map) part of a stroke follows undo and redo too.
+- **Colours**: Paint now has a colour picker in the tool strip with swatches of the last 12 colours used or picked (this browser only); click one to use it again.
+- **Settings file**: "Load settings" is also under the drop zone on the start screen; the file is applied once the model has opened. Saving settings while there is paint says the paint is not in that file (Download GLB keeps the painted model).
+
 ## v2.99 — Save / load settings (JSON)
 
 - Under the Optimise button (Game mode): **Save settings** writes `name-SHRINK-settings.json`; **Load settings** reads one back. It stores the target card, Detail kept, texture size/quality, WebP/quantize/meshopt, protect options and every Car wheels setting (on/off, layout, all sliders).

@@ -99,12 +99,20 @@ const sourceMarker = document.createElement('div');
 sourceMarker.className = 'clone-source-marker';
 viewer?.appendChild(sourceMarker);
 
-function setMode(mode) {
-  state.mode = mode;
-  state.painting = false;
+// End whatever is in progress right now (brush stroke, spray timer, stamp box) without waiting for a mouse-up that may never arrive.
+function abortStroke() {
+  stopSpray();
+  if (state.painting) { state.painting = false; finishNormalStroke(); state.mirror = null; }
+  state.pointerHeld = false;
   state.lastScreen = null;
   state.cloneOffset = null;
   state.cloneSnapshot = null;
+  if (stamp.sel) { stamp.sel = null; stampRect.hidden = true; }
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  abortStroke();
   paintModelBtn.classList.toggle('active', mode === 'paint');
   cloneModelBtn.classList.toggle('active', mode === 'clone');
   stampModelBtn.classList.toggle('active', mode === 'stamp');
@@ -118,6 +126,7 @@ function setMode(mode) {
   const sizeRow = optionsBar.querySelector('#vwBrushSizeRow'); if (sizeRow) sizeRow.hidden = mode === 'stamp';
   const softRow = optionsBar.querySelector('#vwSoftRow'); if (softRow) softRow.hidden = mode === 'stamp';
   const sprayRow = optionsBar.querySelector('#vwSprayRow'); if (sprayRow) sprayRow.hidden = mode !== 'paint';
+  const colorRow = optionsBar.querySelector('#vwColorRow'); if (colorRow) colorRow.hidden = mode !== 'paint';
   const flatText = optionsBar.querySelector('#vwFlatText'); if (flatText) flatText.textContent = mode === 'clone' ? 'Copy the bumps too' : 'Flatten the bumps too';
   stopSpray();
 
@@ -151,8 +160,8 @@ cloneModelBtn.addEventListener('click', () => toggleMode('clone'));
 sampleModelBtn.addEventListener('click', () => toggleMode('sample'));
 stampModelBtn.addEventListener('click', () => toggleMode('stamp'));
 window.addEventListener('keydown', e => {
-  if (e.key !== 'Escape' || state.mode === 'navigate' || state.painting || stamp.sel) return;
-  setMode('navigate');
+  if (e.key !== 'Escape' || state.mode === 'navigate') return;
+  setMode('navigate');          // also ends a stroke that is still running (a lost mouse-up used to leave the brush painting)
 });
 navigateModelBtn.addEventListener('click', () => setMode('navigate'));
 
@@ -448,16 +457,21 @@ function finishNormalStroke() {
   L.work = null; L.before = null; L.box = null; L.pend = null;
 }
 
-window.addEventListener('shrink:paint-undo', e => {
-  const u = flat.undo.get(e.detail?.serial);
-  if (!u) return;
-  flat.undo.delete(e.detail.serial);
-  const L = flat.layers.get(u.idx);
-  if (!L) return;
+// Undo / redo of the bumps (normal map) part of a stroke: each step swaps the saved region with what is there now, so the same record serves both directions.
+flat.redo = new Map();
+function swapRegion(from, to, serial) {
+  const u = from.get(serial); if (!u) return;
+  from.delete(serial);
+  const L = flat.layers.get(u.idx); if (!L) return;
+  const now = L.ctx.getImageData(u.x, u.y, u.w, u.h);
   L.ctx.putImageData(new ImageData(u.data, u.w, u.h), u.x, u.y);
-  L.texture.needsUpdate = true;
-});
-window.addEventListener('shrink:paint-undo-cleared', () => flat.undo.clear());
+  L.texture.needsUpdate = true; L.dirty = true;
+  to.set(serial, { ...u, data: now.data });
+}
+window.addEventListener('shrink:paint-undo', e => swapRegion(flat.undo, flat.redo, e.detail?.serial));
+window.addEventListener('shrink:paint-redo', e => swapRegion(flat.redo, flat.undo, e.detail?.serial));
+window.addEventListener('shrink:paint-redo-cleared', () => flat.redo.clear());
+window.addEventListener('shrink:paint-undo-cleared', () => { flat.undo.clear(); flat.redo.clear(); });
 
 /* ------------------------------------------------------------------ */
 /* Brush stamps (all pixel work happens on a CPU mirror, then only the dirty rectangle is pushed to the canvas) */
@@ -729,6 +743,7 @@ function sampleAt(point) {
   const px = paintCtx.getImageData(x, y, 1, 1).data;
   const hex = `#${[px[0], px[1], px[2]].map(v => v.toString(16).padStart(2, '0')).join('')}`;
   if (paintColor) paintColor.value = hex;
+  vwColor.value = hex; rememberColour(hex);
   say(`Picked ${hex} from the model. Paint mode is active again.`);
   setMode('paint');
 }
@@ -804,6 +819,7 @@ async function handlePointerDown(evt) {
   if (!state.pointerHeld) return;
 
   saveUndo();
+  if (state.mode === 'paint') { vwColor.value = paintColor?.value || vwColor.value; rememberColour(paintColor?.value); }
   state.mirror = state.undoImage ? new ImageData(new Uint8ClampedArray(state.undoImage.data), state.undoImage.width, state.undoImage.height) : null;
   if (!state.mirror) { say('Could not read the texture for painting.', true); return; }
   attachLiveCanvas(material);
@@ -882,6 +898,7 @@ optionsBar.innerHTML = `<label id="vwBrushSizeRow">Brush size <input id="vwBrush
   <label id="vwSoftRow">Softness <input id="vwSoft" type="range" min="2" max="100" step="1" value="28" aria-label="Edge softness"><output id="vwSoftValue">28%</output></label>
   <label id="vwFlatRow" title="The relief (raised lettering, panel edges) lives in a separate picture, the normal map. With this ticked, painting smooths it out, Stamp smooths what it covers, and Clone copies the source's relief."><span id="vwFlatText">Flatten the bumps too</span> <input id="vwFlat" type="checkbox" checked></label>
   <button id="vwDone" class="button ghost small" type="button" title="Stop painting and go back to rotating the model (Esc)" style="margin-left:auto">Done · Esc</button>
+  <span id="vwColorRow" class="vw-colours" title="Paint colour. Colours you use or pick are kept here; click one to use it again."><label>Colour <input id="vwColor" type="color" value="#000000" aria-label="Paint colour"></label><span id="vwSwatches" class="vw-swatches"></span></span>
   <label id="vwSprayRow" title="Faint dabs that build up as you go over the same spot or hold still, like a spray can">Spray can <input id="vwSpray" type="checkbox"></label>`;
 optionsBar.appendChild(stampBar);
 if (toolbar) toolbar.insertAdjacentElement('afterend', optionsBar); else viewer?.prepend(optionsBar);
@@ -900,12 +917,34 @@ for (const [mine, theirs, unit] of [['vwBrushSize', brushSize, ' px'], ['vwBrush
   theirs.addEventListener('input', pull);
   a.addEventListener('input', () => { theirs.value = a.value; theirs.dispatchEvent(new Event('input', { bubbles: true })); out.textContent = a.value + unit; });
 }
+/* Colours: the picker here mirrors the one in the left panel; every colour you paint with or pick is kept as a swatch (this browser only). */
+const vwColor = optionsBar.querySelector('#vwColor'), vwSwatches = optionsBar.querySelector('#vwSwatches');
+const MAX_SW = 12; let recent = [];
+try { const j = JSON.parse(localStorage.getItem('shrink-paint-colours') || '[]'); if (Array.isArray(j)) recent = j.filter(c => /^#[0-9a-f]{6}$/i.test(c)).slice(0, MAX_SW); } catch {}
+function renderSwatches() {
+  const cur = (paintColor?.value || '').toLowerCase();
+  vwSwatches.replaceChildren(...recent.map(c => { const b = document.createElement('button'); b.type = 'button'; b.className = 'vw-sw' + (c === cur ? ' on' : ''); b.style.background = c; b.title = c; b.setAttribute('aria-label', 'Use colour ' + c); b.dataset.c = c; return b; }));
+}
+function rememberColour(hex) {
+  hex = String(hex || '').toLowerCase(); if (!/^#[0-9a-f]{6}$/.test(hex)) return;
+  if (recent[0] !== hex) { recent = [hex, ...recent.filter(c => c !== hex)].slice(0, MAX_SW); try { localStorage.setItem('shrink-paint-colours', JSON.stringify(recent)); } catch {} }
+  renderSwatches();
+}
+function setPaintColour(hex) { if (paintColor) { paintColor.value = hex; paintColor.dispatchEvent(new Event('input', { bubbles: true })); } vwColor.value = hex; renderSwatches(); }
+vwColor.addEventListener('input', () => { if (paintColor) { paintColor.value = vwColor.value; paintColor.dispatchEvent(new Event('input', { bubbles: true })); } renderSwatches(); });
+vwColor.addEventListener('change', () => rememberColour(vwColor.value));
+paintColor?.addEventListener('change', () => { vwColor.value = paintColor.value; rememberColour(paintColor.value); });
+vwSwatches.addEventListener('click', e => { const b = e.target.closest('.vw-sw'); if (b) { setPaintColour(b.dataset.c); rememberColour(b.dataset.c); } });
+if (paintColor) vwColor.value = paintColor.value;
+renderSwatches();
 const stampRect = document.createElement('div'); stampRect.className = 'stamp-rect'; stampRect.hidden = true; viewer?.appendChild(stampRect);
 const stampGhost = document.createElement('canvas'); stampGhost.className = 'stamp-ghost'; stampGhost.hidden = true; viewer?.appendChild(stampGhost);
 const stampStyle = document.createElement('style');
 stampStyle.textContent = `.tool-options{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:6px 14px 10px;font-size:12px;color:#fff;border-bottom:1px solid rgba(255,255,255,.08)}
 .tool-options[hidden],.stamp-group[hidden],.tool-options label[hidden]{display:none}
 .tool-options label{display:flex;gap:8px;align-items:center;font-weight:700}.tool-options input[type=range]{width:150px}.tool-options output{min-width:44px;font-weight:500;opacity:.85}
+.vw-colours{display:flex;gap:8px;align-items:center;font-weight:700}.vw-colours[hidden]{display:none}.vw-colours input[type=color]{width:34px;height:24px;padding:0;border:1px solid rgba(255,255,255,.35);border-radius:5px;background:none}
+.vw-swatches{display:flex;gap:4px;flex-wrap:wrap}.vw-sw{width:20px;height:20px;padding:0;border-radius:5px;border:1px solid rgba(255,255,255,.4);cursor:pointer}.vw-sw.on{outline:2px solid #fff;outline-offset:1px}
 .stamp-group{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
 .stamp-hint{flex-basis:100%;opacity:.75;font-size:12px}
 .stamp-rect{position:absolute;z-index:28;border:2px dashed #ff4e55;background:rgba(255,78,85,.12);pointer-events:none}
@@ -925,7 +964,7 @@ function updateStampUI() {
   $s('stampHint').textContent = stamp.patch
     ? 'Aim at where it should go and click. Hold Cmd/Ctrl and drag to turn the car first. Option/Alt-drag copies something new.'
     : 'Drag a box on the model to copy it (for example a number on a sign).';
-  if (stamp.patch) { stampGhost.hidden = false; layoutGhost(stamp.lastPos); } else stampGhost.hidden = true;
+  if (stamp.patch && !stampGhost.hidden) layoutGhost(stamp.lastPos); else if (!stamp.patch) stampGhost.hidden = true;     // the ghost only shows while aiming (after a copy, or once the pointer moves)
 }
 $s('stampScale').addEventListener('input', () => { stamp.scale = Number($s('stampScale').value) / 100; updateStampUI(); });
 $s('stampRot').addEventListener('input', () => { stamp.rot = Number($s('stampRot').value); updateStampUI(); });
@@ -948,7 +987,7 @@ function stampPointerDown(evt, v) {
     try { v.renderer.domElement.setPointerCapture(evt.pointerId); } catch {}
     return;
   }
-  pasteStamp(evt.clientX, evt.clientY);
+  pasteStamp(evt.clientX, evt.clientY, evt.shiftKey);
 }
 
 function stampMove(evt) {
@@ -966,6 +1005,7 @@ function stampMove(evt) {
   const hit = rayAt(evt.clientX, evt.clientY);
   if (hit) stamp.lastSc = stamp.patch.wpp0 / worldPerPixel(hit.distance);     // same real-world size as the original
   layoutGhost(stamp.lastPos);
+  stampGhost.hidden = false;
 }
 
 function stampUp(evt) {
@@ -1008,13 +1048,13 @@ async function captureStamp(x0, y0, w, h) {
     stampGhost.width = pw; stampGhost.height = ph;
     stampGhost.getContext('2d').putImageData(new ImageData(data, pw, ph), 0, 0);
     stamp.lastSc = 1; stamp.lastPos = { x: x0 + w / 2, y: y0 + h / 2 };
-    updateStampUI();
+    updateStampUI(); stampGhost.hidden = false; layoutGhost(stamp.lastPos);
     say('Copied. Turn the car to where it should go, aim, and click to paste. Use Size, Rotate and Flip first if needed. Undo works as usual.');
   } catch (err) { console.error(err); say(`Could not copy: ${err.message}`, true); }
   finally { stamp.busy = false; }
 }
 
-async function pasteStamp(cx, cy) {
+async function pasteStamp(cx, cy, keepOn = false) {
   if (stamp.busy || !stamp.patch) return;
   stamp.busy = true;
   try {
@@ -1066,7 +1106,11 @@ async function pasteStamp(cx, cy) {
     flushDirty();
     finishNormalStroke();
     state.mirror = null;
-    say(n ? 'Pasted. Rotate the car to check it, click again to paste another copy, or Undo.' : 'Nothing was pasted: the target did not land on the model.', !n);
+    if (n && !keepOn) {
+      stampGhost.hidden = true;
+      setMode('navigate');      // the stamp is finished: ghost gone, car can be rotated. The copied patch is kept for the next time Stamp is switched on.
+      say('Pasted. Press Stamp to paste it again (hold Shift while clicking to keep Stamp on), or Undo.');
+    } else say(n ? 'Pasted. Shift is held, so Stamp stays on: click to paste another copy, or Undo.' : 'Nothing was pasted: the target did not land on the model.', !n);
   } catch (err) { console.error(err); finishNormalStroke(); state.mirror = null; say(`Could not paste: ${err.message}`, true); }
   finally { stamp.busy = false; }
 }
@@ -1075,7 +1119,12 @@ viewer?.addEventListener('pointerdown', handlePointerDown, true);
 viewer?.addEventListener('pointermove', handlePointerMove, true);
 viewer?.addEventListener('pointerup', stopPaint, true);
 viewer?.addEventListener('pointercancel', stopPaint, true);
-viewer?.addEventListener('pointerleave', evt => { if ((evt.buttons & 1) === 0) stopPaint(evt); }, true);
+viewer?.addEventListener('pointerleave', evt => { if ((evt.buttons & 1) === 0) stopPaint(evt); if (state.mode === 'stamp') stampGhost.hidden = true; }, true);
+window.addEventListener('pointerup', evt => { if (state.painting || state.pointerHeld || stamp.sel) stopPaint(evt); }, true);
+window.addEventListener('pointercancel', evt => { if (state.painting || state.pointerHeld || stamp.sel) stopPaint(evt); }, true);
+window.addEventListener('pointermove', evt => { if (state.painting && (evt.buttons & 1) === 0) stopPaint(evt); }, true);
+window.addEventListener('blur', () => { if (state.painting || state.pointerHeld) abortStroke(); });
+viewer?.addEventListener('lostpointercapture', evt => { if (state.painting && (evt.buttons & 1) === 0) stopPaint(evt); }, true);
 
 undo3DBtn.addEventListener('click', () => {
   if (!state.undoImage || !paintCtx) return;

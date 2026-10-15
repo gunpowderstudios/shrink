@@ -1,9 +1,13 @@
-# SHRINK 3D v2.99
+# SHRINK 3D v2.100
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.100 — Paint tools
+
+Stamp finishes after one paste, Esc always stops painting, Undo/Redo (20 each way, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z), paint colour swatches, and Load settings on the start screen.
 
 ## v2.99 — Save / load settings
 
