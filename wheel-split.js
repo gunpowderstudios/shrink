@@ -1,5 +1,5 @@
 // SHRINK 3D v2.90 — "Separate the wheels" panel (Game mode). The cutting is in wheel-split-core.js; this is the switch and the message. The live preview keeps showing the reduced model; the split exists in the saved GLB only.
-import { splitWheels } from './wheel-split-core.js?v=2.102';
+import { splitWheels } from './wheel-split-core.js?v=2.103';
 
 const $ = id => document.getElementById(id);
 function fresh(layout) { return { layout: layout || '4', shiftFront: 0, shiftRear: 0, track: 0, front: 0, rear: 0, dyFront: 0, dyRear: 0, dyW: { Wheel_FL: 0, Wheel_FR: 0, Wheel_RL: 0, Wheel_RR: 0, Wheel_F: 0 }, size: 1, widthFront: 1, widthRear: 1 }; }
@@ -80,7 +80,7 @@ function inject() {
       <div class="range-heading"><label for="wheelDyRear">Rear wheels up / down</label><output id="wheelDyRearV">0</output></div><input id="wheelDyRear" type="range" min="-100" max="100" step="1" value="0">
       <div class="range-heading"><label for="wheelWidthFront">Front wheel width</label><output id="wheelWidthFrontV">100%</output></div><input id="wheelWidthFront" type="range" min="40" max="160" step="1" value="100">
       <div class="range-heading"><label for="wheelWidthRear">Rear wheel width</label><output id="wheelWidthRearV">100%</output></div><input id="wheelWidthRear" type="range" min="40" max="160" step="1" value="100">
-      <div class="range-heading"><label for="wheelSize">Wheel size</label><output id="wheelSizeV">100%</output></div><input id="wheelSize" type="range" min="70" max="150" step="1" value="100">
+      <div class="range-heading"><label for="wheelSize">Wheel size</label><output id="wheelSizeV">100%</output></div><input id="wheelSize" type="range" min="50" max="150" step="1" value="100">
       <details class="fold tiny"><summary>Each wheel up / down</summary><div class="fold-inner">
         <div id="wheelDy4"><div class="range-heading"><label for="wheelDyFL">Front left</label><output id="wheelDyFLV">0</output></div><input id="wheelDyFL" type="range" min="-100" max="100" step="1" value="0">
         <div class="range-heading"><label for="wheelDyFR">Front right</label><output id="wheelDyFRV">0</output></div><input id="wheelDyFR" type="range" min="-100" max="100" step="1" value="0"></div>

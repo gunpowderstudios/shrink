@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.103 — Wheel size 50–150%
+
+- The Wheel size slider now runs 50–150% (was 70–150%).
+
 ## v2.102 — Wheel size up to 150%
 
 - The Wheel size slider now goes 70–150% (was 70–130%). The core had no limit, only the slider.
