@@ -1,5 +1,5 @@
 // SHRINK 3D v2.90 — "Separate the wheels" panel (Game mode). The cutting is in wheel-split-core.js; this is the switch and the message. The live preview keeps showing the reduced model; the split exists in the saved GLB only.
-import { splitWheels } from './wheel-split-core.js?v=2.92';
+import { splitWheels } from './wheel-split-core.js?v=2.93';
 
 const $ = id => document.getElementById(id);
 const api = window.__shrinkWheels = { enabled: false, last: null, adj: { front: 0, rear: 0, dy: 0, size: 1 } };
@@ -55,7 +55,6 @@ function placeMarkers() {
 function report(r) {
   const el = $('wheelSplitNote'); if (el) el.textContent = text(r);
   const d = $('wheelDetails'); if (d && r) d.open = true;
-  const c = $('wheelResult'); if (c) { c.textContent = r ? text(r) : ''; c.hidden = !r; c.classList.toggle('error', !!r && !r.found); }
 }
 window.addEventListener('shrink:optimized', () => { if (api.enabled && api.last) { report(api.last); showMarkers(api.last); } });
 
@@ -65,24 +64,21 @@ function inject() {
   const d = document.createElement('details'); d.id = 'wheelDetails'; d.className = 'fold game-only';
   d.innerHTML = `<summary>Car wheels</summary><div class="fold-inner">
     <label class="check"><input id="wheelSplit" type="checkbox"> Separate the wheels</label>
-    <div class="hint">For car models: when you press Optimize, the four wheels are cut out as their own parts (Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR), each pivoting around its own centre so a game can spin and steer them. Everything else stays exactly as it is. The car must sit on its wheels. The preview looks the same; the wheels are separate in the saved file.</div>
-    <div class="control-block">
+    <div class="hint">Cuts the four wheels out as their own parts (Wheel_FL/FR/RL/RR), each pivoting on its own centre, so a game can spin and steer them. The car must sit on its wheels. The preview looks the same; the wheels are separate in the saved file.</div>
+    <details id="wheelAdjust" class="fold tiny"><summary>Adjust wheels (only if the markers look wrong)</summary><div class="fold-inner">
       <div class="range-heading"><label for="wheelFront">Front wheels forward / back</label><output id="wheelFrontV">0</output></div><input id="wheelFront" type="range" min="-100" max="100" step="1" value="0">
       <div class="range-heading"><label for="wheelRear">Rear wheels forward / back</label><output id="wheelRearV">0</output></div><input id="wheelRear" type="range" min="-100" max="100" step="1" value="0">
       <div class="range-heading"><label for="wheelDy">All wheels up / down</label><output id="wheelDyV">0</output></div><input id="wheelDy" type="range" min="-100" max="100" step="1" value="0">
       <div class="range-heading"><label for="wheelSize">Wheel size</label><output id="wheelSizeV">100%</output></div><input id="wheelSize" type="range" min="70" max="130" step="1" value="100">
-      <div class="hint">Show the markers, move the sliders until they sit on the wheels, then press Optimize again. 100 = one tyre radius. Markers hidden by the car are depth-tested, so turn the car to check the far side.</div>
-      <div class="material-presets"><button id="wheelAdjReset" class="button ghost small" type="button">Reset adjustments</button></div></div>
-    <div class="material-presets"><button id="wheelMarkers" class="button ghost small" type="button">Show wheel markers</button></div>
+      <div class="hint">Move the sliders until the markers sit on the wheels, then press Optimise again. 100 = one tyre radius. Markers hidden by the car are depth-tested, so turn the car to check the far side.</div>
+      <div class="material-presets"><button id="wheelMarkers" class="button ghost small" type="button">Show wheel markers</button><button id="wheelAdjReset" class="button ghost small" type="button">Reset adjustments</button></div></div></details>
     <div id="wheelSplitNote" class="hint"></div></div>`;
   host.insertBefore(d, before);
   $('wheelSplit').addEventListener('change', e => { api.enabled = e.target.checked; if (!api.enabled) { clearMarkers(); report(null); } });
   const bind = (id, key, scale, label) => $(id).addEventListener('input', e => { const v = Number(e.target.value); api.adj[key] = v / scale; $(id + 'V').textContent = label(v); placeMarkers(); });
   bind('wheelFront', 'front', 100, v => String(v)); bind('wheelRear', 'rear', 100, v => String(v)); bind('wheelDy', 'dy', 100, v => String(v)); bind('wheelSize', 'size', 100, v => v + '%');
   $('wheelAdjReset').addEventListener('click', () => { api.adj = { front: 0, rear: 0, dy: 0, size: 1 }; for (const [id, v] of [['wheelFront', 0], ['wheelRear', 0], ['wheelDy', 0], ['wheelSize', 100]]) { $(id).value = v; $(id).dispatchEvent(new Event('input')); } });
-  $('wheelMarkers').addEventListener('click', () => { if (markers.length) clearMarkers(); else if (api.last?.found) showMarkers(api.last); else $('wheelSplitNote').textContent = 'Press Optimize with “Separate the wheels” ticked first.'; });
-  // a visible result line under the Optimize results, where you are already looking
-  const rc = $('resultCard'); if (rc && !$('wheelResult')) { const p = document.createElement('div'); p.id = 'wheelResult'; p.hidden = true; p.style.cssText = 'margin:8px 0;padding:8px 10px;border-radius:8px;background:rgba(80,224,112,.15);font-size:13px'; rc.appendChild(p); }
+  $('wheelMarkers').addEventListener('click', () => { if (markers.length) clearMarkers(); else if (api.last?.found) showMarkers(api.last); else $('wheelSplitNote').textContent = 'Press Optimise with “Separate the wheels” ticked first.'; });
   return true;
 }
 document.addEventListener('shrink:model-opened', () => { clearMarkers(); api.last = null; report(null); });

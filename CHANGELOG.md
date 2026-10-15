@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.93 — Game mode: one Optimise button
+
+- New `game-flow.js`. The Save card is now a sticky bar at the bottom of the left panel with **Optimise** and **Download GLB**. Optimise builds the file and no longer downloads it by itself in Game mode.
+- Button states: green **Optimise** (nothing built yet), **✔ Optimised** (the built file matches every setting), red **Optimise again** (a setting changed since the build; Download is disabled). Putting a setting back turns it green again. It compares a signature of the left-panel controls on input/change/click; no page-wide observer.
+- "Wheels separated!" now shows under the bar. The wheel sliders, markers and reset moved into an "Adjust wheels (only if the markers look wrong)" fold inside Car wheels.
+- Print mode is untouched.
+
 ## v2.92 — Adjust the wheels
 
 - Car wheels panel: sliders for **front wheels forward/back**, **rear wheels forward/back**, **all wheels up/down** and **wheel size**. With the markers showing they move live; press Optimize again and the split uses the adjusted wheels (`splitWheels(doc, adj)`, units of one tyre radius).

@@ -1,9 +1,12 @@
-# SHRINK 3D v2.92
+# SHRINK 3D v2.93
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.93 — One Optimise button (Game mode)
+- Optimise / Download bar that turns red when settings change.
 
 ## v2.92 — Wheel adjust sliders
 - Car wheels panel can nudge the wheels (front/rear/up-down/size) before splitting.

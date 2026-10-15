@@ -395,7 +395,7 @@ async function buildAndSave() {
     await applyTextureToModel();
   }
   const ok = await optimizeModel();
-  if (ok && optimizedBytes) downloadOptimized();
+  if (ok && optimizedBytes && !window.__shrinkGameFlow?.active?.()) downloadOptimized();   // Game mode: Optimise builds, the Download button saves
 }
 els.optimizeBtn.addEventListener('click', buildAndSave);
 els.downloadBtn.addEventListener('click', downloadOptimized);
@@ -832,7 +832,7 @@ async function optimizeModel() {
     els.resultCard.classList.remove('hidden'); els.showOptimizedBtn.disabled = false; els.downloadBtn.disabled = false;
     if (!keepLivePreview) showModel(optimizedModel, 'optimized');
     setProgress(100, 'Finished');
-    setStatus((window.__shrinkWheels?.enabled && window.__shrinkWheels.message?.() ? window.__shrinkWheels.message() + ' ' : '') + 'Done — use Compare or Detail loss in the viewer to see exactly what changed.');
+    setStatus('Done — use Compare or Detail loss in the viewer to see exactly what changed.');
     window.dispatchEvent(new CustomEvent('shrink:optimized', { detail: { reduce: lastReduce, bytes: optimizedBytes.byteLength, triangles: optimizedStats.triangles } }));
     setTimeout(hideProgress, 1200);
     return true;

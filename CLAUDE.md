@@ -400,6 +400,11 @@ A good Simple-mode run should:
 - Real-browser check: `tests/browser/` (`run-wheels.py`).
 - Tron (v2.87–v2.89, voxel flattening) was removed in v2.90; it could not represent arches or spats and lost the PBR maps.
 
+## Game flow bar (v2.93)
+- `game-flow.js` owns the Game-mode Optimise/Download bar (`#flowBar`, `#flowDownload`). In Game mode `buildAndSave()` in `app.js` does NOT auto-download (`__shrinkGameFlow.active()`); Download is the bar's button (it clicks the hidden `#downloadBtn`). Print mode keeps its old behaviour.
+- State is `new | done | stale`, from a signature of the left-panel inputs taken at `shrink:optimized`. If you add a control that changes the saved file, make sure it is an input/select in `.control-panel` (or add it to `signature()`); mirrors of other controls go in `SKIP`.
+- `app.js` writes the button text after a build from `dataset.label`, so `game-flow.js` keeps `dataset.label` in step with the state.
+
 ## Stamp (v2.79)
 - `paint3d.js` owns the Stamp tool; `stamp-core.js` holds the pure maths (patch coordinates, bilinear sampling, edge fade) and is tested by `stamp.test.mjs`. The patch is captured by raycasting the screen and reading the active colour texture, and pasted by raycasting the destination: keep it a screen-space projection, do not turn it into a UV copy.
 - 3D painting (Paint, Clone, Stamp) edits the colour texture (`material.map`) and, since v2.82, the normal map too (the `flat` layer in `paint3d.js`: flatten for Paint/Stamp, copy for Clone). The normal map is edited on its own private canvas, handed to Apply through `collectDirtyLayers`, and undone per step via `shrink:paint-undo` events from `multi-undo.js`. Metallic/roughness pictures can still only be edited in the flat editor.
