@@ -903,7 +903,9 @@ function downloadBytes(bytes, filename) {
 
 function downloadOptimized() {
   if (!optimizedBytes || !sourceFile) return;
-  downloadBytes(optimizedBytes, `${window.__shrinkDownloadStem?.(baseName()) || `${baseName()}-SHRINK`}.glb`);
+  // Game downloads are simply <name>-SHRINK.glb; the height / FUSED / SPLIT naming belongs to the Print tools
+  const stem = window.__shrinkUI?.getMode?.() === 'print' ? (window.__shrinkDownloadStem?.(baseName()) || `${baseName()}-SHRINK`) : `${baseName()}-SHRINK`;
+  downloadBytes(optimizedBytes, `${stem}.glb`);
 }
 
 applyPreset('game');

@@ -1,5 +1,5 @@
 // SHRINK 3D v2.90 — "Separate the wheels" panel (Game mode). The cutting is in wheel-split-core.js; this is the switch and the message. The live preview keeps showing the reduced model; the split exists in the saved GLB only.
-import { splitWheels } from './wheel-split-core.js?v=2.94';
+import { splitWheels } from './wheel-split-core.js?v=2.95';
 
 const $ = id => document.getElementById(id);
 function fresh() { return { front: 0, rear: 0, dyFront: 0, dyRear: 0, dyW: { Wheel_FL: 0, Wheel_FR: 0, Wheel_RL: 0, Wheel_RR: 0 }, size: 1 }; }

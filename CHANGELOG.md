@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.95 — Plain Game download name
+
+- Game mode saves as `<name>-SHRINK.glb` (no height/adjustment tag like `H953p6`). The Print tools keep their own naming.
+
 ## v2.94 — Wheel height per axle and per wheel
 
 - "All wheels up / down" is replaced by **Front wheels up / down** and **Rear wheels up / down**, plus an "Each wheel up / down" fold with a slider for each of the four wheels (added on top of the axle setting). Markers follow live. `splitWheels(doc, adj)` takes `dyFront`, `dyRear` and `dyW: { Wheel_FL, ... }` (tyre radii); the older `dy` still works.
