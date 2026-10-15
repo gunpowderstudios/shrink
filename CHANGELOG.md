@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.98 — Wheels left / right, on by default
+
+- Adjust wheels: **Front wheels left / right**, **Rear wheels left / right** (shift the axle's wheels sideways) and **Wheels in / out** (wider or narrower track for every pair). Markers move live. `splitWheels(doc, adj)` takes `shiftFront`, `shiftRear`, `track` (tyre radii; positive = the car's right / outward).
+- "Separate the wheels" is now ticked by default and the Car wheels box starts open. On a model with no wheels the note says nothing was separated and the model is saved as it was.
+
 ## v2.97 — Three-wheelers
 
 - Car wheels panel: **Wheel layout** = 4 wheels (default), 3 wheels (one on the middle line at the front, two at the back) or Auto (try 4, then 3). The three-wheeler gives `Wheel_F`, `Wheel_RL`, `Wheel_RR`; the sliders work on the single front wheel too (a "Front wheel (single)" up/down slider appears in the 3-wheel layout). A single wheel must stand on the ground; a lump on the underside is refused.

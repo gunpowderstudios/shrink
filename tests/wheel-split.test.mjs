@@ -77,6 +77,13 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
  // a front single wheel can be nudged
  const up=splitWheels(car(false,null,true).doc,{layout:'3',dyW:{Wheel_F:0.5}});assert.ok(Math.abs(up.wheels.find(w=>w.name==='Wheel_F').centre[1]-f.centre[1]-0.5*r.radius)<1e-4,'single wheel up');
  console.log('ok three-wheeler');}
+// sideways: the front wheels shifted to the car's right by half a radius, all pairs 0.2 radius outward
+{const base=splitWheels(car(false,null).doc);const r=splitWheels(car(false,null).doc,{shiftFront:0.5,track:0.2});
+ const g=(res,n)=>res.wheels.find(w=>w.name===n).centre[2];
+ const fsign=base.frontSign; // right = frontSign direction along z in this car
+ assert.ok(Math.abs((g(r,'Wheel_FL')-g(base,'Wheel_FL'))-(fsign*0.5*base.radius+(g(base,'Wheel_FL')<0?-1:1)*0.2*base.radius))<1e-4,'front left moved '+(g(r,'Wheel_FL')-g(base,'Wheel_FL')));
+ assert.ok(Math.abs((g(r,'Wheel_RR')-g(base,'Wheel_RR'))-((g(base,'Wheel_RR')<0?-1:1)*0.2*base.radius))<1e-4,'rear only moved outward');
+ const tris=r.wheels.reduce((a,w)=>a+w.triangles,0);assert.ok(tris>0,'still cuts wheels');console.log('ok sideways');}
 // not a car
 {const doc=new Document(),b=doc.createBuffer(),P=[],I=[];box(-1,1,0,1,-1,1,P,I);
  for(let i=0;i<30;i++)box(-1,1,0,1,-1,1,P,I);

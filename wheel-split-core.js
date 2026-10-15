@@ -119,16 +119,17 @@ export function detectWheels(P, adj = {}) {
   for (const a of axles) for (const sz of (a.single ? [0] : [-1, 1])) {
     const name = a.single ? 'Wheel_F' : `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`;
     const wk = a.role === 'front' ? adj.widthFront : adj.widthRear, wf = wk > 0 ? wk : 1, cy = a.y + ((adj.dyW && adj.dyW[name]) || 0) * a.r0;
-    const zmid = a.single ? a.t.zmid : sz * a.t.zc;
-    wheels.push({ index: k++, axle: a, role: a.role, sz, single: a.single, name, cx: a.x, cy, zmid, centre: fromDet(a.x, cy, zmid), radius: a.r, width: a.t.tyreW * wf, wf, lo: a.t.lo, hi: a.t.hi });
+    // sideways: adj.shiftFront / adj.shiftRear move the axle's wheels to the car's right (+) or left (-); adj.track moves every pair outward (+) or inward (-); tyre radii
+    const shift = frontSign * ((a.role === 'front' ? adj.shiftFront : adj.shiftRear) || 0) * a.r0 + sz * (adj.track || 0) * a.r0;
+    const zmid = (a.single ? a.t.zmid : sz * a.t.zc) + shift;
+    wheels.push({ index: k++, axle: a, role: a.role, sz: a.single ? 1 : sz, single: a.single, name, cx: a.x, cy, zmid, centre: fromDet(a.x, cy, zmid), radius: a.r, width: a.t.tyreW * wf, wf, lo: a.t.lo, hi: a.t.hi });
   }
   // a wheel takes the triangles inside its circle (side view) and inside its tyre width; wf scales the width about the tyre's middle
   const classify = (x, y, z) => {
     const [X, Y, Z] = toDet(x, y, z);
     for (const w of wheels) {
       if (w.axle.sx * X <= 0) continue;
-      let t;
-      if (w.single) t = Z - w.zmid; else if (Math.sign(Z) === w.sz) t = Math.abs(Z) - Math.abs(w.zmid); else continue;
+      const t = w.sz * (Z - w.zmid);   // distance from the tyre's middle, positive towards the outside of the car
       if (t < -w.lo * w.wf || t > w.hi * w.wf) continue;
       if (Math.hypot(X - w.cx, Y - w.cy) < w.radius * 1.06) return w.index;
     }
@@ -234,7 +235,7 @@ export function splitWheels(doc, adj = {}) {
     if (!perWheel[k].length) return;
     const mesh = doc.createMesh(w.name); for (const pr of perWheel[k]) mesh.addPrimitive(pr);
     const nd = doc.createNode(w.name).setTranslation(w.centre).setMesh(mesh).setExtras({ wheel: true, axle: det.axle, radius: w.radius, width: w.width });
-    scene.addChild(nd); made.push({ name: w.name, role: w.role, triangles: counts[k], centre: w.centre, width: w.width });
+    scene.addChild(nd); made.push({ name: w.name, role: w.role, sz: w.sz, single: w.single, triangles: counts[k], centre: w.centre, width: w.width });
   });
   if (made.length < det.wheels.length) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
   return { found: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };

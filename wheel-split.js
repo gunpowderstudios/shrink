@@ -1,9 +1,9 @@
 // SHRINK 3D v2.90 — "Separate the wheels" panel (Game mode). The cutting is in wheel-split-core.js; this is the switch and the message. The live preview keeps showing the reduced model; the split exists in the saved GLB only.
-import { splitWheels } from './wheel-split-core.js?v=2.97';
+import { splitWheels } from './wheel-split-core.js?v=2.98';
 
 const $ = id => document.getElementById(id);
-function fresh(layout) { return { layout: layout || '4', front: 0, rear: 0, dyFront: 0, dyRear: 0, dyW: { Wheel_FL: 0, Wheel_FR: 0, Wheel_RL: 0, Wheel_RR: 0, Wheel_F: 0 }, size: 1, widthFront: 1, widthRear: 1 }; }
-const api = window.__shrinkWheels = { enabled: false, last: null, adj: fresh() };
+function fresh(layout) { return { layout: layout || '4', shiftFront: 0, shiftRear: 0, track: 0, front: 0, rear: 0, dyFront: 0, dyRear: 0, dyW: { Wheel_FL: 0, Wheel_FR: 0, Wheel_RL: 0, Wheel_RR: 0, Wheel_F: 0 }, size: 1, widthFront: 1, widthRear: 1 }; }
+const api = window.__shrinkWheels = { enabled: true, last: null, adj: fresh() };
 
 // Called by app.js on the document that is about to be saved. Never throws: a failure leaves the model as it was.
 api.apply = function (doc) {
@@ -48,6 +48,8 @@ function placeMarkers() {
     const w = m.userData.w, c = [...w.centre], rad = r.radius / ((a0.size > 0) ? a0.size : 1);
     c[lead] += r.frontSign * ((a[w.role] || 0) - (a0[w.role] || 0)) * rad; const dyk = w.role === 'front' ? 'dyFront' : 'dyRear';
     c[1] += (((a[dyk] || 0) - (a0[dyk] || 0)) + ((a.dyW?.[w.name] || 0) - (a0.dyW?.[w.name] || 0))) * rad;
+    const sk = w.role === 'front' ? 'shiftFront' : 'shiftRear', wide = r.axle === 'z' ? 2 : 0, wsign = r.axle === 'z' ? 1 : -1;
+    c[wide] += wsign * (r.frontSign * ((a[sk] || 0) - (a0[sk] || 0)) + (w.single ? 0 : w.sz * ((a.track || 0) - (a0.track || 0)))) * rad;
     const wk = w.role === 'front' ? 'widthFront' : 'widthRear', Wd = w.width * (a[wk] || 1) / (a0[wk] || 1) * 1.1, R = rad * a.size;
     m.position.set(c[0], c[1], c[2]);
     if (r.axle === 'z') m.scale.set(R, R, Wd); else m.scale.set(Wd, R, R);
@@ -63,14 +65,17 @@ window.addEventListener('shrink:optimized', () => { if (api.enabled && api.last)
 function inject() {
   if ($('wheelDetails')) return true;
   const host = $('stepExtra'), before = $('retouchDetails'); if (!host || !before) return false;
-  const d = document.createElement('details'); d.id = 'wheelDetails'; d.className = 'fold game-only';
+  const d = document.createElement('details'); d.id = 'wheelDetails'; d.className = 'fold game-only'; d.open = true;
   d.innerHTML = `<summary>Car wheels</summary><div class="fold-inner">
-    <label class="check"><input id="wheelSplit" type="checkbox"> Separate the wheels</label>
+    <label class="check"><input id="wheelSplit" type="checkbox" checked> Separate the wheels</label>
     <div class="control-block compact"><label for="wheelLayout">Wheel layout</label><select id="wheelLayout"><option value="4">4 wheels (two axles)</option><option value="3">3 wheels (one at the front, two at the back)</option><option value="auto">Auto (try 4, then 3)</option></select></div>
     <div class="hint">Cuts the wheels out as their own parts (Wheel_FL/FR/RL/RR, or Wheel_F + Wheel_RL/RR on a three-wheeler), each pivoting on its own centre, so a game can spin and steer them. The car must sit on its wheels. The preview looks the same; the wheels are separate in the saved file.</div>
     <details id="wheelAdjust" class="fold tiny"><summary>Adjust wheels (only if the markers look wrong)</summary><div class="fold-inner">
       <div class="range-heading"><label for="wheelFront">Front wheels forward / back</label><output id="wheelFrontV">0</output></div><input id="wheelFront" type="range" min="-100" max="100" step="1" value="0">
       <div class="range-heading"><label for="wheelRear">Rear wheels forward / back</label><output id="wheelRearV">0</output></div><input id="wheelRear" type="range" min="-100" max="100" step="1" value="0">
+      <div class="range-heading"><label for="wheelShiftFront">Front wheels left / right</label><output id="wheelShiftFrontV">0</output></div><input id="wheelShiftFront" type="range" min="-150" max="150" step="1" value="0">
+      <div class="range-heading"><label for="wheelShiftRear">Rear wheels left / right</label><output id="wheelShiftRearV">0</output></div><input id="wheelShiftRear" type="range" min="-150" max="150" step="1" value="0">
+      <div class="range-heading"><label for="wheelTrack">Wheels in / out (wider or narrower track)</label><output id="wheelTrackV">0</output></div><input id="wheelTrack" type="range" min="-100" max="100" step="1" value="0">
       <div class="range-heading"><label for="wheelDyFront">Front wheels up / down</label><output id="wheelDyFrontV">0</output></div><input id="wheelDyFront" type="range" min="-100" max="100" step="1" value="0">
       <div class="range-heading"><label for="wheelDyRear">Rear wheels up / down</label><output id="wheelDyRearV">0</output></div><input id="wheelDyRear" type="range" min="-100" max="100" step="1" value="0">
       <div class="range-heading"><label for="wheelWidthFront">Front wheel width</label><output id="wheelWidthFrontV">100%</output></div><input id="wheelWidthFront" type="range" min="40" max="160" step="1" value="100">
@@ -89,9 +94,9 @@ function inject() {
   host.insertBefore(d, before);
   $('wheelSplit').addEventListener('change', e => { api.enabled = e.target.checked; if (!api.enabled) { clearMarkers(); report(null); } });
   const bind = (id, key, scale, label) => $(id).addEventListener('input', e => { const v = Number(e.target.value); api.adj[key] = v / scale; $(id + 'V').textContent = label(v); placeMarkers(); });
-  bind('wheelFront', 'front', 100, v => String(v)); bind('wheelRear', 'rear', 100, v => String(v)); bind('wheelDyFront', 'dyFront', 100, v => String(v)); bind('wheelDyRear', 'dyRear', 100, v => String(v)); bind('wheelSize', 'size', 100, v => v + '%'); bind('wheelWidthFront', 'widthFront', 100, v => v + '%'); bind('wheelWidthRear', 'widthRear', 100, v => v + '%');
+  bind('wheelFront', 'front', 100, v => String(v)); bind('wheelShiftFront', 'shiftFront', 100, v => String(v)); bind('wheelShiftRear', 'shiftRear', 100, v => String(v)); bind('wheelTrack', 'track', 100, v => String(v)); bind('wheelRear', 'rear', 100, v => String(v)); bind('wheelDyFront', 'dyFront', 100, v => String(v)); bind('wheelDyRear', 'dyRear', 100, v => String(v)); bind('wheelSize', 'size', 100, v => v + '%'); bind('wheelWidthFront', 'widthFront', 100, v => v + '%'); bind('wheelWidthRear', 'widthRear', 100, v => v + '%');
   for (const k of ['FL', 'FR', 'RL', 'RR', 'F']) $('wheelDy' + k).addEventListener('input', e => { const v = Number(e.target.value); api.adj.dyW['Wheel_' + k] = v / 100; $('wheelDy' + k + 'V').textContent = String(v); placeMarkers(); });
-  $('wheelAdjReset').addEventListener('click', () => { api.adj = fresh(api.adj.layout); for (const id of ['wheelFront', 'wheelRear', 'wheelDyFront', 'wheelDyRear', 'wheelDyFL', 'wheelDyFR', 'wheelDyRL', 'wheelDyRR', 'wheelDyF', 'wheelSize', 'wheelWidthFront', 'wheelWidthRear']) { const e = $(id); e.value = /Size|Width/.test(id) ? 100 : 0; e.dispatchEvent(new Event('input')); } });
+  $('wheelAdjReset').addEventListener('click', () => { api.adj = fresh(api.adj.layout); for (const id of ['wheelFront', 'wheelRear', 'wheelShiftFront', 'wheelShiftRear', 'wheelTrack', 'wheelDyFront', 'wheelDyRear', 'wheelDyFL', 'wheelDyFR', 'wheelDyRL', 'wheelDyRR', 'wheelDyF', 'wheelSize', 'wheelWidthFront', 'wheelWidthRear']) { const e = $(id); e.value = /Size|Width/.test(id) ? 100 : 0; e.dispatchEvent(new Event('input')); } });
   $('wheelLayout').addEventListener('change', e => { api.adj.layout = e.target.value; const three = e.target.value === '3'; $('wheelDy4').hidden = three; $('wheelDy3').hidden = !three; });
   $('wheelMarkers').addEventListener('click', () => { if (markers.length) clearMarkers(); else if (api.last?.found) showMarkers(api.last); else $('wheelSplitNote').textContent = 'Press Optimise with “Separate the wheels” ticked first.'; });
   return true;
