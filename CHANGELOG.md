@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.92 — Adjust the wheels
+
+- Car wheels panel: sliders for **front wheels forward/back**, **rear wheels forward/back**, **all wheels up/down** and **wheel size**. With the markers showing they move live; press Optimize again and the split uses the adjusted wheels (`splitWheels(doc, adj)`, units of one tyre radius).
+- Markers are now depth-tested. Before, the far-side wheels were drawn through the car and, seen at an angle, looked misplaced when they were not (the detector puts both wheels of an axle at the same position by construction). Turn the car to check the far side.
+
 ## v2.91 — Wheel splitter tells you what it did
 
 - After Optimize with "Separate the wheels" ticked, a green "Wheels separated!" line shows in the Car wheels panel, under the result card and in the status line (or "No wheels separated: <reason>"). The panel opens by itself.

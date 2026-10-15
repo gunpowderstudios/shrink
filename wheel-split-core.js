@@ -38,7 +38,7 @@ function fitAxle(Q, n, sx, L, ymin, W, rfix) {
 
 // P: Float32Array of world-space x,y,z. Returns { found, reason?, ... }. When found: wheels[] (name, centre[3] in world space, radius, width, index),
 // axle ('z' when the car's length is along X, 'x' when along Z) and classify(x, y, z) -> wheel index or -1 for a WORLD-space point.
-export function detectWheels(P) {
+export function detectWheels(P, adj = {}) {
   const n = P.length / 3;
   if (n < 100) return { found: false, reason: 'The model is too small to hold a car.' };
   let minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity, minz = Infinity, maxz = -Infinity;
@@ -78,11 +78,15 @@ export function detectWheels(P) {
   const cabinMid = xs.length >= 3 ? (percentile(xs, 0.05) + percentile(xs, 0.95)) / 2 : 0;
   const frontSign = cabinMid > 0 ? -1 : 1;
 
-  const axles = [-1, 1].map(sx => ({ sx, x: fits[sx].x, y: fits[sx].y, r: fits[sx].r }));
+  // manual nudges, in tyre radii: adj.front / adj.rear move that axle forward (+) or back (-), adj.dy up (+) or down (-); adj.size scales the wheel (1 = as found)
+  const axles = [-1, 1].map(sx => {
+    const f = fits[sx], role = sx * frontSign > 0 ? 'front' : 'rear', size = adj.size > 0 ? adj.size : 1;
+    return { sx, role, x: f.x + frontSign * (adj[role] || 0) * f.r, y: f.y + (adj.dy || 0) * f.r, r: f.r * size };
+  });
   const wheels = []; let k = 0;
   for (const a of axles) for (const sz of [-1, 1]) {
     const c = fromDet(a.x, a.y, sz * (z0 + z1) / 2);
-    wheels.push({ index: k++, axle: a, sz, name: `Wheel_${a.x * frontSign > 0 ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`, centre: c, radius: a.r, width: z1 - z0 });
+    wheels.push({ index: k++, axle: a, role: a.role, sz, name: `Wheel_${a.x * frontSign > 0 ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`, centre: c, radius: a.r, width: z1 - z0 });
   }
   const classify = (x, y, z) => {
     const [X, Y, Z] = toDet(x, y, z), az = Math.abs(Z);
@@ -90,7 +94,7 @@ export function detectWheels(P) {
     for (const w of wheels) if (Math.sign(Z) === w.sz && w.axle.sx * X > 0 && Math.hypot(X - w.axle.x, Y - w.axle.y) < w.radius * 1.06) return w.index;
     return -1;
   };
-  return { found: true, axle: alongZ ? 'x' : 'z', wheels, classify, frontSign, length: L, info: { radius: wheels[0].radius, width: z1 - z0, alongZ } };
+  return { found: true, axle: alongZ ? 'x' : 'z', lengthAxis: alongZ ? 'z' : 'x', wheels, classify, frontSign, length: L, info: { radius: wheels[0].radius, width: z1 - z0, alongZ } };
 }
 
 /* ---------- glTF-Transform document surgery ---------- */
@@ -119,9 +123,9 @@ export function collectWorldPositions(doc) {
 
 // Cut the wheels out of the document: new nodes Wheel_xx at the scene root, each wheel's triangles moved out of the body primitives.
 // Returns { found, reason?, wheels: [{name, triangles, centre}], bodyTriangles }.
-export function splitWheels(doc) {
+export function splitWheels(doc, adj = {}) {
   const { P, parts } = collectWorldPositions(doc);
-  const det = detectWheels(P);
+  const det = detectWheels(P, adj);
   if (!det.found) return { found: false, reason: det.reason };
   const root = doc.getRoot(), buffer = root.listBuffers()[0] || doc.createBuffer(), scene = root.listScenes()[0];
   if (!scene) return { found: false, reason: 'The file has no scene.' };
@@ -190,8 +194,8 @@ export function splitWheels(doc) {
     if (!perWheel[k].length) return;
     const mesh = doc.createMesh(w.name); for (const pr of perWheel[k]) mesh.addPrimitive(pr);
     const nd = doc.createNode(w.name).setTranslation(w.centre).setMesh(mesh).setExtras({ wheel: true, axle: det.axle, radius: w.radius, width: w.width });
-    scene.addChild(nd); made.push({ name: w.name, triangles: counts[k], centre: w.centre });
+    scene.addChild(nd); made.push({ name: w.name, role: w.role, triangles: counts[k], centre: w.centre });
   });
-  if (made.length < 4) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign };
-  return { found: true, wheels: made, bodyTriangles, axle: det.axle, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign };
+  if (made.length < 4) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
+  return { found: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
 }

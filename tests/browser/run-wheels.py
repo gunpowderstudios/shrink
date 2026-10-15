@@ -43,6 +43,8 @@ def main(shot, model='/mnt/user-data/uploads/mini.glb'):
         pg.wait_for_function("!document.getElementById('downloadBtn').disabled",timeout=240000)
         time.sleep(3)
         print(pg.evaluate("document.getElementById('wheelSplitNote').textContent"))
+        pg.evaluate("(()=>{const e=document.getElementById('wheelFront');e.value=60;e.dispatchEvent(new Event('input'));const d=document.getElementById('wheelSize');d.value=85;d.dispatchEvent(new Event('input'))})()")
+        time.sleep(1)
         pg.screenshot(path=shot+'_wheels.png',timeout=240000)
         with pg.expect_download(timeout=120000) as dl:
             pg.click('#downloadBtn')

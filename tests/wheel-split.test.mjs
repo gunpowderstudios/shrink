@@ -46,6 +46,12 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
   assert.equal(body.getIndices().getCount()/3,r.bodyTriangles,label+' body count');assert.ok(body.getAttribute('TEXCOORD_0'));
   console.log('ok',label,r.wheels.map(w=>w.name+':'+w.triangles).join(' '));
 }
+// manual adjustment: front axle forward by 0.5 radius, wheels 20% bigger
+{const {doc}=car(false,null);const base=splitWheels(car(false,null).doc);const r=splitWheels(doc,{front:0.5,size:1.2});
+ const f0=base.wheels.find(w=>w.name==='Wheel_FL').centre,f1=r.wheels.find(w=>w.name==='Wheel_FL').centre;
+ assert.ok(Math.abs((f1[0]-f0[0])-(-0.5*base.radius))<0.02,'front axle moved forward (-x) '+(f1[0]-f0[0]));
+ const rr0=base.wheels.find(w=>w.name==='Wheel_RL').centre,rr1=r.wheels.find(w=>w.name==='Wheel_RL').centre;assert.ok(Math.abs(rr1[0]-rr0[0])<1e-6,'rear untouched');
+ assert.ok(Math.abs(r.radius/base.radius-1.2)<0.01,'size');console.log('ok adjustment');}
 // not a car
 {const doc=new Document(),b=doc.createBuffer(),P=[],I=[];box(-1,1,0,1,-1,1,P,I);
  for(let i=0;i<30;i++)box(-1,1,0,1,-1,1,P,I);
