@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.99 — Save / load settings (JSON)
+
+- Under the Optimise button (Game mode): **Save settings** writes `name-SHRINK-settings.json`; **Load settings** reads one back. It stores the target card, Detail kept, texture size/quality, WebP/quantize/meshopt, protect options and every Car wheels setting (on/off, layout, all sliders).
+- Loading sets the controls and fires their normal events, so the markers move and the button turns red ("Optimise again"). It does not build or download by itself.
+- Not in the file: the model itself, paint edits and Look (material) changes. Unknown or invalid entries are skipped; other JSON files and files from a newer SHRINK are refused with a plain message.
+- `settings-file.js` (+ `tests/settings-file.test.mjs`).
+
 ## v2.98 — Wheels left / right, on by default
 
 - Adjust wheels: **Front wheels left / right**, **Rear wheels left / right** (shift the axle's wheels sideways) and **Wheels in / out** (wider or narrower track for every pair). Markers move live. `splitWheels(doc, adj)` takes `shiftFront`, `shiftRear`, `track` (tyre radii; positive = the car's right / outward).

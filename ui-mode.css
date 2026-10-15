@@ -124,6 +124,8 @@
 .app-mode-game .flow-bar .flow-download:disabled { cursor: not-allowed; }
 .flow-note { margin-top: 8px; min-height: 0; color: #8fe0b0; }
 .flow-note.stale { color: #ff9a9a; }
+.settings-file-row { display: flex; gap: 8px; margin-top: 8px; }
+.settings-file-row .button { flex: 1; }
 .flow-note:empty { display: none; }
 .app-mode-print #flowBar .flow-download, .app-mode-print #flowNote { display: none; }
 .app-mode-print #flowBar { display: block; }
