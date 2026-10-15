@@ -52,6 +52,13 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
  assert.ok(Math.abs((f1[0]-f0[0])-(-0.5*base.radius))<0.02,'front axle moved forward (-x) '+(f1[0]-f0[0]));
  const rr0=base.wheels.find(w=>w.name==='Wheel_RL').centre,rr1=r.wheels.find(w=>w.name==='Wheel_RL').centre;assert.ok(Math.abs(rr1[0]-rr0[0])<1e-6,'rear untouched');
  assert.ok(Math.abs(r.radius/base.radius-1.2)<0.01,'size');console.log('ok adjustment');}
+// per-axle and per-wheel up/down
+{const base=splitWheels(car(false,null).doc);const r=splitWheels(car(false,null).doc,{dyFront:0.3,dyRear:-0.2,dyW:{Wheel_RL:0.1}});
+ const y=(res,n)=>res.wheels.find(w=>w.name===n).centre[1];
+ assert.ok(Math.abs(y(r,'Wheel_FL')-y(base,'Wheel_FL')-0.3*base.radius)<1e-4,'front up');
+ assert.ok(Math.abs(y(r,'Wheel_FR')-y(base,'Wheel_FR')-0.3*base.radius)<1e-4,'front right up');
+ assert.ok(Math.abs(y(r,'Wheel_RR')-y(base,'Wheel_RR')+0.2*base.radius)<1e-4,'rear down');
+ assert.ok(Math.abs(y(r,'Wheel_RL')-y(base,'Wheel_RL')-(-0.2+0.1)*base.radius)<1e-4,'one rear wheel on top of the axle');console.log('ok up/down');}
 // not a car
 {const doc=new Document(),b=doc.createBuffer(),P=[],I=[];box(-1,1,0,1,-1,1,P,I);
  for(let i=0;i<30;i++)box(-1,1,0,1,-1,1,P,I);

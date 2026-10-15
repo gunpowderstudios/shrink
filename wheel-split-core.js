@@ -78,20 +78,21 @@ export function detectWheels(P, adj = {}) {
   const cabinMid = xs.length >= 3 ? (percentile(xs, 0.05) + percentile(xs, 0.95)) / 2 : 0;
   const frontSign = cabinMid > 0 ? -1 : 1;
 
-  // manual nudges, in tyre radii: adj.front / adj.rear move that axle forward (+) or back (-), adj.dy up (+) or down (-); adj.size scales the wheel (1 = as found)
+  // manual nudges, in tyre radii: adj.front / adj.rear move that axle forward (+) or back (-); adj.dyFront / adj.dyRear raise (+) or lower (-) that axle;
+  // adj.dyW = { Wheel_FL: n, ... } raises or lowers one wheel on top of that; adj.dy (older) moves all four; adj.size scales the wheel (1 = as found)
   const axles = [-1, 1].map(sx => {
     const f = fits[sx], role = sx * frontSign > 0 ? 'front' : 'rear', size = adj.size > 0 ? adj.size : 1;
-    return { sx, role, x: f.x + frontSign * (adj[role] || 0) * f.r, y: f.y + (adj.dy || 0) * f.r, r: f.r * size };
+    return { sx, role, r0: f.r, x: f.x + frontSign * (adj[role] || 0) * f.r, y: f.y + ((adj.dy || 0) + ((role === 'front' ? adj.dyFront : adj.dyRear) || 0)) * f.r, r: f.r * size };
   });
   const wheels = []; let k = 0;
   for (const a of axles) for (const sz of [-1, 1]) {
-    const c = fromDet(a.x, a.y, sz * (z0 + z1) / 2);
-    wheels.push({ index: k++, axle: a, role: a.role, sz, name: `Wheel_${a.x * frontSign > 0 ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`, centre: c, radius: a.r, width: z1 - z0 });
+    const name = `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`, cy = a.y + ((adj.dyW && adj.dyW[name]) || 0) * a.r0;
+    wheels.push({ index: k++, axle: a, role: a.role, sz, name, cx: a.x, cy, centre: fromDet(a.x, cy, sz * (z0 + z1) / 2), radius: a.r, width: z1 - z0 });
   }
   const classify = (x, y, z) => {
     const [X, Y, Z] = toDet(x, y, z), az = Math.abs(Z);
     if (az < z0 * 0.94 || az > z1 * 1.04) return -1;
-    for (const w of wheels) if (Math.sign(Z) === w.sz && w.axle.sx * X > 0 && Math.hypot(X - w.axle.x, Y - w.axle.y) < w.radius * 1.06) return w.index;
+    for (const w of wheels) if (Math.sign(Z) === w.sz && w.axle.sx * X > 0 && Math.hypot(X - w.cx, Y - w.cy) < w.radius * 1.06) return w.index;
     return -1;
   };
   return { found: true, axle: alongZ ? 'x' : 'z', lengthAxis: alongZ ? 'z' : 'x', wheels, classify, frontSign, length: L, info: { radius: wheels[0].radius, width: z1 - z0, alongZ } };
