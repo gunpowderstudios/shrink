@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.101 — Wheel finder: lopsided wheelbases and grounded wheels
+
+- The wheel finder only looked for axles 0.22–0.42 body-lengths from the middle on BOTH ends. A motorhome (cab hanging out past the front wheels: front axle ~0.17) failed with "No clear wheel circles". Search now covers 0.10–0.45.
+- A wheel must stand on the ground: circles whose lowest point is not near the lowest point of the model (−0.02…+0.035 of the body length) are tried only if nothing grounded fits. This also fixed a bad fit on a previously saved Dodge (r 0.22 high on the body instead of 0.10 on the tyre). Mini and Dodge results are unchanged.
+- Known limit: on a model whose tyres have few vertices (motorhome: sparse tyre mesh, twin rear tyres, tight wheel arches) the circle can still be off in size/position; the markers show it and the sliders correct it. Tried and rejected: lower-half-only ring scoring and inner-band scoring (both worse on the Dodge).
+- Test: lopsided wheelbase (`wheel-split.test.mjs`).
+
 ## v2.100 — Paint/stamp fixes, Redo, colour swatches, settings from the start screen
 
 - **Stamp**: one click pastes and the stamp is finished (ghost gone, Stamp switches off, the copied patch is kept; press Stamp again to paste another, or hold **Shift** while clicking to keep Stamp on). The ghost only shows while aiming and hides when the pointer leaves the viewer.

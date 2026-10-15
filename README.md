@@ -1,9 +1,13 @@
-# SHRINK 3D v2.100
+# SHRINK 3D v2.101
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.101 — Wheel finder
+
+Finds wheels on lopsided vehicles (motorhome) and prefers circles that stand on the ground.
 
 ## v2.100 — Paint tools
 

@@ -7,11 +7,11 @@ function box(x0,x1,y0,y1,z0,z1,P,I){const b=P.length/3;for(const x of[x0,x1])for
 function cyl(cx,cy,cz,r,w,P,I){const b=P.length/3,N=24;for(let i=0;i<N;i++){const a=i/N*Math.PI*2;for(const z of[-w/2,w/2])P.push(cx+Math.cos(a)*r,cy+Math.sin(a)*r,cz+z);}
  for(let i=0;i<N;i++){const j=(i+1)%N,a=b+i*2,c=b+j*2;I.push(a,c,a+1,c,c+1,a+1);}
  const ca=P.length/3;P.push(cx,cy,cz-w/2,cx,cy,cz+w/2);for(let i=0;i<N;i++){const j=(i+1)%N;I.push(ca,b+j*2,b+i*2,ca+1,b+i*2+1,b+j*2+1);}}
-function car(alongZ,nodeT,three){
+function car(alongZ,nodeT,three,axles){
   const P=[],I=[],r=0.35,L=4,w=0.25;
   box(-2,2,0.35,1.0,-0.8,0.8,P,I); box(-0.6,1.0,1.0,1.5,-0.7,0.7,P,I);   // roof nearer the rear (+x is rear here)
   const nBody=I.length/3;
-  if(three){cyl(-1.3,r,0,r,w,P,I);for(const z of[-0.75,0.75])cyl(1.3,r,z,r,w,P,I);}else for(const x of[-1.3,1.3])for(const z of[-0.75,0.75])cyl(x,r,z,r,w,P,I);
+  if(three){cyl(-1.3,r,0,r,w,P,I);for(const z of[-0.75,0.75])cyl(1.3,r,z,r,w,P,I);}else for(const x of(axles||[-1.3,1.3]))for(const z of[-0.75,0.75])cyl(x,r,z,r,w,P,I);
   if(alongZ)for(let i=0;i<P.length;i+=3){const x=P[i],z=P[i+2];P[i]=-z;P[i+2]=x;}
   const doc=new Document(),buf=doc.createBuffer();
   const pos=doc.createAccessor().setType('VEC3').setArray(new Float32Array(P)).setBuffer(buf);
@@ -46,6 +46,11 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
   assert.equal(body.getIndices().getCount()/3,r.bodyTriangles,label+' body count');assert.ok(body.getAttribute('TEXCOORD_0'));
   console.log('ok',label,r.wheels.map(w=>w.name+':'+w.triangles).join(' '));
 }
+// lopsided wheelbase (a motorhome: the cab hangs far out past the front wheels): front axle only 0.175 body-lengths from the middle, rear 0.325
+{const {doc,nTri}=car(false,null,false,[-0.7,1.3]);const r=splitWheels(doc);
+ assert.ok(r.found&&!r.partial,'lopsided wheelbase found '+JSON.stringify(r).slice(0,200));
+ const f=r.wheels.find(w=>w.name==='Wheel_FL').centre,b=r.wheels.find(w=>w.name==='Wheel_RL').centre;
+ assert.ok(Math.abs(f[0]+0.7)<0.1&&Math.abs(b[0]-1.3)<0.1,'axles at -0.7 and 1.3: '+f[0]+' '+b[0]);console.log('ok lopsided wheelbase');}
 // manual adjustment: front axle forward by 0.5 radius, wheels 20% bigger
 {const {doc}=car(false,null);const base=splitWheels(car(false,null).doc);const r=splitWheels(doc,{front:0.5,size:1.2});
  const f0=base.wheels.find(w=>w.name==='Wheel_FL').centre,f1=r.wheels.find(w=>w.name==='Wheel_FL').centre;

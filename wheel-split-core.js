@@ -11,16 +11,20 @@
 const percentile = (arr, q) => { if (!arr.length) return 0; const s = Float32Array.from(arr).sort(); return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))]; };
 
 // Best circle in the side view for one end of the car (ring density minus what lies just outside it). rfix shares a radius with the other axle.
-function fitAxle(Q, n, sx, L, ymin, W, rfix, centre) {
+// ground: only circles that stand on the ground (the lowest point of the tyre near the bottom of the model) are tried. A tyre has far fewer vertices than the
+// body above it, so without this a big circle along the wheel arch and door can out-score the real, small tyre (a motorhome did exactly that).
+function fitAxle(Q, n, sx, L, ymin, W, rfix, centre, ground) {
   const cand = [];   // centre: a single wheel on the middle line (three-wheelers); otherwise the outer pair
   for (let i = 0; i < n; i++) { const x = Q[i * 3], y = Q[i * 3 + 1], z = Q[i * 3 + 2]; if (x * sx > 0 && y < ymin + 0.25 * L && (centre ? Math.abs(z) < 0.35 * W : Math.abs(z) > 0.6 * W)) cand.push(i); }
   const step = Math.max(1, Math.ceil(cand.length / 3000)), xs = [], ys = [];
   for (let t = 0; t < cand.length; t += step) { xs.push(Q[cand[t] * 3]); ys.push(Q[cand[t] * 3 + 1]); }
   let best = null; const m = xs.length;
-  for (let cx = 0.22 * L; cx <= 0.42 * L; cx += 0.005 * L) {
+  for (let cx = 0.10 * L; cx <= 0.45 * L; cx += 0.005 * L) {
     const X = cx * sx;
     for (let cy = ymin + 0.05 * L; cy <= ymin + 0.22 * L; cy += 0.005 * L) {
-      const rs = rfix ? [rfix] : []; if (!rfix) for (let r = 0.05 * L; r <= 0.13 * L; r += 0.0025 * L) rs.push(r);
+      let rs = rfix ? [rfix] : []; if (!rfix) for (let r = 0.05 * L; r <= 0.13 * L; r += 0.0025 * L) rs.push(r);
+      if (ground) rs = rs.filter(r => cy - r >= ymin - 0.02 * L && cy - r <= ymin + 0.035 * L);
+      if (!rs.length) continue;
       const cnt = new Float64Array(rs.length * 2);
       for (let t = 0; t < m; t++) {
         const d = Math.hypot(xs[t] - X, ys[t] - cy);
@@ -46,11 +50,17 @@ function groundZ(Q, n, f, ymin, W, centre) {
 }
 
 // Two axles, a wheel at each side of each (an ordinary car).
-function layout4(Q, n, L, W, ymin, maxy) {
-  const fits = { '-1': fitAxle(Q, n, -1, L, ymin, W), '1': fitAxle(Q, n, 1, L, ymin, W) };
-  if (!fits['-1'] || !fits['1']) return { found: false, reason: 'No wheels found (is the car sitting on its wheels?).' };
+function twoAxles(Q, n, L, W, ymin, ground) {
+  const fits = { '-1': fitAxle(Q, n, -1, L, ymin, W, undefined, false, ground), '1': fitAxle(Q, n, 1, L, ymin, W, undefined, false, ground) };
+  if (!fits['-1'] || !fits['1']) return null;
   const good = fits['-1'].score >= fits['1'].score ? -1 : 1;
-  fits[-good] = fitAxle(Q, n, -good, L, ymin, W, fits[good].r) || fits[-good];
+  fits[-good] = fitAxle(Q, n, -good, L, ymin, W, fits[good].r, false, ground) || fits[-good];
+  return fits;
+}
+function layout4(Q, n, L, W, ymin, maxy) {
+  let fits = twoAxles(Q, n, L, W, ymin, true);
+  if (!fits || fits['-1'].score < 40 || fits['1'].score < 40) fits = twoAxles(Q, n, L, W, ymin, false);     // not standing on its wheels: search every height
+  if (!fits) return { found: false, reason: 'No wheels found (is the car sitting on its wheels?).' };
   if (fits['-1'].score < 40 || fits['1'].score < 40) return { found: false, reason: 'No clear wheel circles found in the side view.' };
   const zr = [-1, 1].map(sx => groundZ(Q, n, fits[sx], ymin, W, false));
   const z0 = (zr[0][0] + zr[1][0]) / 2, z1 = (zr[0][1] + zr[1][1]) / 2;
