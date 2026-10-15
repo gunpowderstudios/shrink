@@ -51,6 +51,23 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
  assert.ok(r.found&&!r.partial,'lopsided wheelbase found '+JSON.stringify(r).slice(0,200));
  const f=r.wheels.find(w=>w.name==='Wheel_FL').centre,b=r.wheels.find(w=>w.name==='Wheel_RL').centre;
  assert.ok(Math.abs(f[0]+0.7)<0.1&&Math.abs(b[0]-1.3)<0.1,'axles at -0.7 and 1.3: '+f[0]+' '+b[0]);console.log('ok lopsided wheelbase');}
+// whole shells: a tyre with a flange wider than the wheel's zone (joined to the tyre by shared vertices) must go with the wheel completely, not be cut at the zone's edge
+{const P=[],I=[],r=0.35,w=0.25,N=24;
+ box(-2,2,0.35,1.0,-0.8,0.8,P,I);box(-0.6,1.0,1.0,1.5,-0.7,0.7,P,I);const nBody=I.length/3;
+ for(const x of[-1.3,1.3])for(const z of[-0.75,0.75]){cyl(x,r,z,r,w,P,I);
+  // a flange: a ring from the tyre's rim (same vertex positions as the tyre's end ring) out to 1.6 r, on the outer end of the tyre
+  const side=z>0?1:-1,zz=z+side*w/2,b=P.length/3;
+  for(let i=0;i<N;i++){const a=i/N*Math.PI*2;P.push(x+Math.cos(a)*r,r+Math.sin(a)*r,zz);}
+  for(let i=0;i<N;i++){const a=i/N*Math.PI*2;P.push(x+Math.cos(a)*r*1.6,r+Math.sin(a)*r*1.6,zz);}
+  for(let i=0;i<N;i++){const j=(i+1)%N;I.push(b+i,b+j,b+N+i,b+j,b+N+j,b+N+i);}}
+ const doc=new Document(),buf=doc.createBuffer();
+ const pos=doc.createAccessor().setType('VEC3').setArray(new Float32Array(P)).setBuffer(buf);
+ const idx=doc.createAccessor().setType('SCALAR').setArray(new Uint16Array(I)).setBuffer(buf);
+ const prim=doc.createPrimitive().setAttribute('POSITION',pos).setIndices(idx);
+ doc.createScene().addChild(doc.createNode('car').setMesh(doc.createMesh('m').addPrimitive(prim)));
+ const r1=splitWheels(doc);
+ assert.ok(r1.found&&!r1.partial,'flange car found '+JSON.stringify(r1).slice(0,160));
+ assert.equal(r1.bodyTriangles,nBody,'every flange triangle went with its wheel (body keeps only the '+nBody+' body triangles, has '+r1.bodyTriangles+')');console.log('ok whole shells');}
 // manual adjustment: front axle forward by 0.5 radius, wheels 20% bigger
 {const {doc}=car(false,null);const base=splitWheels(car(false,null).doc);const r=splitWheels(doc,{front:0.5,size:1.2});
  const f0=base.wheels.find(w=>w.name==='Wheel_FL').centre,f1=r.wheels.find(w=>w.name==='Wheel_FL').centre;

@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.104 — Wheels take whole tyre shells (no half tyres left on the body)
+
+- A wheel used to take only the triangles whose centre was inside its cut zone. A tyre that sticks out of the zone (the inner tyre of a twin rear wheel, a wide flange) was cut at the edge, leaving half of it on the body: stray texture pieces next to the spinning wheel (motorhome). Now a connected piece of the mesh that is mostly (>= 50%) inside one wheel's zone goes with that wheel completely.
+- Pieces welded to the body are one big component, never mostly inside a wheel, so they are still cut per triangle (as before). A hand-set tyre width (Front/Rear width sliders) keeps the plain cut for that axle. Skipped above 800,000 triangles (the Mini is unchanged).
+- Motorhome: each rear wheel gains its inner tyre (+~700 triangles); Mini and Dodge splits are identical.
+- Test: "whole shells" (flange car) in `wheel-split.test.mjs`.
+
 ## v2.103 — Wheel size 50–150%
 
 - The Wheel size slider now runs 50–150% (was 70–150%).

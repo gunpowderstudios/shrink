@@ -1,9 +1,13 @@
-# SHRINK 3D v2.103
+# SHRINK 3D v2.104
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.104 — Whole tyre shells
+
+A tyre that sticks out of a wheel's cut zone now moves with the wheel completely instead of being cut in half.
 
 ## v2.103 — Wheel size slider 50–150%
 

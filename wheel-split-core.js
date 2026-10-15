@@ -192,11 +192,28 @@ export function splitWheels(doc, adj = {}) {
     const W3 = normalMatrix(W), wp = new Float32Array(pos.getCount() * 3);
     for (let i = 0; i < pos.getCount(); i++) { pos.getElement(i, v); const w = transformPoint(W, v[0], v[1], v[2]); wp[i * 3] = w[0]; wp[i * 3 + 1] = w[1]; wp[i * 3 + 2] = w[2]; }
     const groups = [[]].concat(det.wheels.map(() => []));   // groups[0] = body, groups[1+k] = wheel k
+    const cls = new Int32Array(nTri), corner = (t, q) => ia ? ia[t * 3 + q] : t * 3 + q;
     for (let t = 0; t < nTri; t++) {
-      const a = ia ? ia[t * 3] : t * 3, b = ia ? ia[t * 3 + 1] : t * 3 + 1, c = ia ? ia[t * 3 + 2] : t * 3 + 2;
+      const a = corner(t, 0), b = corner(t, 1), c = corner(t, 2);
       const cx = (wp[a * 3] + wp[b * 3] + wp[c * 3]) / 3, cy = (wp[a * 3 + 1] + wp[b * 3 + 1] + wp[c * 3 + 1]) / 3, cz = (wp[a * 3 + 2] + wp[b * 3 + 2] + wp[c * 3 + 2]) / 3;
-      groups[1 + det.classify(cx, cy, cz)].push(a, b, c);   // classify gives -1 for body -> groups[0]
+      cls[t] = det.classify(cx, cy, cz);   // -1 = body
     }
+    // Whole shells: a connected piece of the mesh (a tyre, a hub, the inner tyre of a twin pair) that lies mostly inside one wheel's zone belongs to that wheel
+    // completely. Cutting it at the zone's edge left half a tyre stuck to the body, which showed as stray texture pieces next to the spinning wheel.
+    // Pieces welded to the body (their own vertices are shared with it) are one big component that is never mostly inside a wheel, so they are still cut per triangle.
+    if (nTri <= 800000 && pos.getCount() <= 800000) {
+      const cell = Math.max(det.length * 2e-4, 1e-9), wid = new Map(), rep = new Int32Array(pos.getCount());
+      for (let i = 0; i < pos.getCount(); i++) { const k = Math.round(wp[i * 3] / cell) + ',' + Math.round(wp[i * 3 + 1] / cell) + ',' + Math.round(wp[i * 3 + 2] / cell); let id = wid.get(k); if (id === undefined) { id = wid.size; wid.set(k, id); } rep[i] = id; }
+      const par = new Int32Array(wid.size); for (let i = 0; i < par.length; i++) par[i] = i;
+      const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+      for (let t = 0; t < nTri; t++) { const ra = find(rep[corner(t, 0)]), rb = find(rep[corner(t, 1)]), rc = find(rep[corner(t, 2)]); par[rb] = ra; par[find(rc)] = find(ra); }
+      const nW = det.wheels.length, tally = new Map();
+      for (let t = 0; t < nTri; t++) { const r = find(rep[corner(t, 0)]); let e = tally.get(r); if (!e) { e = new Int32Array(nW + 1); tally.set(r, e); } e[0]++; if (cls[t] >= 0) e[1 + cls[t]]++; }
+      const owner = new Map();
+      for (const [r, e] of tally) { if (e[0] < 12) continue; let best = -1, bn = 0; for (let k = 0; k < nW; k++) if (e[1 + k] > bn) { bn = e[1 + k]; best = k; } if (best >= 0 && bn >= 0.5 * e[0] && det.wheels[best].wf === 1) owner.set(r, best); }   // a hand-set tyre width (adj.widthFront / widthRear) keeps the plain cut
+      if (owner.size) for (let t = 0; t < nTri; t++) { const o = owner.get(find(rep[corner(t, 0)])); if (o !== undefined) cls[t] = o; }
+    }
+    for (let t = 0; t < nTri; t++) groups[1 + cls[t]].push(corner(t, 0), corner(t, 1), corner(t, 2));
     const semantics = prim.listSemantics();
     // build a primitive's worth of accessors from a list of triangle corners, optionally moving the geometry
     const subset = (corners, wheel) => {
