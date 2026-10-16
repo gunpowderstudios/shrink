@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.105 — Front / rear axle width, sliders grouped Front then Rear
+
+- "Wheels in / out" is now two sliders: **Front axle width** and **Rear axle width** (`trackFront`, `trackRear`; the old `track` still works in the core and in old code, but the panel no longer has it, so an older settings file's `wheelTrack` entry is skipped).
+- Adjust wheels is grouped: All wheels (size), then every Front slider (forward/back, left/right, axle width, up/down, tyre width), then every Rear slider. Markers follow the new sliders live.
+- Test: "axle width front / rear".
+
 ## v2.104 — Wheels take whole tyre shells (no half tyres left on the body)
 
 - A wheel used to take only the triangles whose centre was inside its cut zone. A tyre that sticks out of the zone (the inner tyre of a twin rear wheel, a wide flange) was cut at the edge, leaving half of it on the body: stray texture pieces next to the spinning wheel (motorhome). Now a connected piece of the mesh that is mostly (>= 50%) inside one wheel's zone goes with that wheel completely.

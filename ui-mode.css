@@ -129,3 +129,6 @@
 .flow-note:empty { display: none; }
 .app-mode-print #flowBar .flow-download, .app-mode-print #flowNote { display: none; }
 .app-mode-print #flowBar { display: block; }
+
+.wheel-group { margin: 12px 0 2px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #cfd6df; }
+.wheel-group:first-child { border-top: 0; margin-top: 4px; }

@@ -129,8 +129,8 @@ export function detectWheels(P, adj = {}) {
   for (const a of axles) for (const sz of (a.single ? [0] : [-1, 1])) {
     const name = a.single ? 'Wheel_F' : `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`;
     const wk = a.role === 'front' ? adj.widthFront : adj.widthRear, wf = wk > 0 ? wk : 1, cy = a.y + ((adj.dyW && adj.dyW[name]) || 0) * a.r0;
-    // sideways: adj.shiftFront / adj.shiftRear move the axle's wheels to the car's right (+) or left (-); adj.track moves every pair outward (+) or inward (-); tyre radii
-    const shift = frontSign * ((a.role === 'front' ? adj.shiftFront : adj.shiftRear) || 0) * a.r0 + sz * (adj.track || 0) * a.r0;
+    // sideways: adj.shiftFront / adj.shiftRear move the axle's wheels to the car's right (+) or left (-); adj.trackFront / adj.trackRear move that axle's pair outward (+) or inward (-) (the axle's width); adj.track (older) moves both; tyre radii
+    const shift = frontSign * ((a.role === 'front' ? adj.shiftFront : adj.shiftRear) || 0) * a.r0 + sz * (((a.role === 'front' ? adj.trackFront : adj.trackRear) || 0) + (adj.track || 0)) * a.r0;
     const zmid = (a.single ? a.t.zmid : sz * a.t.zc) + shift;
     wheels.push({ index: k++, axle: a, role: a.role, sz: a.single ? 1 : sz, single: a.single, name, cx: a.x, cy, zmid, centre: fromDet(a.x, cy, zmid), radius: a.r, width: a.t.tyreW * wf, wf, lo: a.t.lo, hi: a.t.hi });
   }

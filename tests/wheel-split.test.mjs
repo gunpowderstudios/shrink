@@ -46,6 +46,14 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
   assert.equal(body.getIndices().getCount()/3,r.bodyTriangles,label+' body count');assert.ok(body.getAttribute('TEXCOORD_0'));
   console.log('ok',label,r.wheels.map(w=>w.name+':'+w.triangles).join(' '));
 }
+// axle width: the front and rear pairs move in / out independently
+{const base=splitWheels(car(false,null).doc);const r=splitWheels(car(false,null).doc,{trackFront:0.4,trackRear:-0.2});
+ const g=(res,n)=>res.wheels.find(w=>w.name===n).centre[2];
+ const out=(n)=>g(base,n)<0?-1:1;
+ assert.ok(Math.abs((g(r,'Wheel_FL')-g(base,'Wheel_FL'))-out('Wheel_FL')*0.4*base.radius)<1e-4,'front pair moved out');
+ assert.ok(Math.abs((g(r,'Wheel_FR')-g(base,'Wheel_FR'))-out('Wheel_FR')*0.4*base.radius)<1e-4,'front pair moved out (right)');
+ assert.ok(Math.abs((g(r,'Wheel_RL')-g(base,'Wheel_RL'))-out('Wheel_RL')*-0.2*base.radius)<1e-4,'rear pair moved in');
+ assert.ok(Math.abs((g(r,'Wheel_RR')-g(base,'Wheel_RR'))-out('Wheel_RR')*-0.2*base.radius)<1e-4,'rear pair moved in (right)');console.log('ok axle width front / rear');}
 // lopsided wheelbase (a motorhome: the cab hangs far out past the front wheels): front axle only 0.175 body-lengths from the middle, rear 0.325
 {const {doc,nTri}=car(false,null,false,[-0.7,1.3]);const r=splitWheels(doc);
  assert.ok(r.found&&!r.partial,'lopsided wheelbase found '+JSON.stringify(r).slice(0,200));
