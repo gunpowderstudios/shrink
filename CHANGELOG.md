@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.107 — Result box fits the left column
+
+- Game mode result box: file + saved % on one row, Triangles / Vertices in two equal columns, Kept line wraps. It no longer overflows into the viewer on a narrow column (CSS only).
+
 ## v2.106 — Front / rear wheel size, shallower Optimise bar
 
 - **Wheel size** is now **Front wheel size** and **Rear wheel size** (`sizeFront`, `sizeRear`, 50–150%), each inside its Front / Rear group. The old single `size` still works in the core and multiplies both. The "All wheels" group is gone. Each split wheel now reports its own `radius`; markers scale per axle.
