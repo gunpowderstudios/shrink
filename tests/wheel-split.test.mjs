@@ -82,6 +82,11 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
  assert.ok(Math.abs((f1[0]-f0[0])-(-0.5*base.radius))<0.02,'front axle moved forward (-x) '+(f1[0]-f0[0]));
  const rr0=base.wheels.find(w=>w.name==='Wheel_RL').centre,rr1=r.wheels.find(w=>w.name==='Wheel_RL').centre;assert.ok(Math.abs(rr1[0]-rr0[0])<1e-6,'rear untouched');
  assert.ok(Math.abs(r.radius/base.radius-1.2)<0.01,'size');console.log('ok adjustment');}
+// front and rear wheel size are separate
+{const base=splitWheels(car(false,null).doc);const r=splitWheels(car(false,null).doc,{sizeFront:1.3,sizeRear:0.8});
+ const rad=(res,n)=>res.wheels.find(w=>w.name===n).radius;
+ assert.ok(Math.abs(rad(r,'Wheel_FL')/rad(base,'Wheel_FL')-1.3)<0.01&&Math.abs(rad(r,'Wheel_FR')/rad(base,'Wheel_FR')-1.3)<0.01,'front size');
+ assert.ok(Math.abs(rad(r,'Wheel_RL')/rad(base,'Wheel_RL')-0.8)<0.01&&Math.abs(rad(r,'Wheel_RR')/rad(base,'Wheel_RR')-0.8)<0.01,'rear size');console.log('ok front/rear size');}
 // per-axle and per-wheel up/down
 {const base=splitWheels(car(false,null).doc);const r=splitWheels(car(false,null).doc,{dyFront:0.3,dyRear:-0.2,dyW:{Wheel_RL:0.1}});
  const y=(res,n)=>res.wheels.find(w=>w.name===n).centre[1];

@@ -119,11 +119,11 @@ export function detectWheels(P, adj = {}) {
   const { frontSign, tyres } = spec;   // tyres: [{ sx, f:{x,y,r}, single, zmid?, lo, hi, zc? }]
 
   // manual nudges, in tyre radii: adj.front / adj.rear move that axle forward (+) or back (-); adj.dyFront / adj.dyRear raise (+) or lower (-) that axle;
-  // adj.dyW = { Wheel_FL: n, ... } raises or lowers one wheel on top of that; adj.dy (older) moves all; adj.size scales the wheel (1 = as found)
-  const size = adj.size > 0 ? adj.size : 1;
+  // adj.dyW = { Wheel_FL: n, ... } raises or lowers one wheel on top of that; adj.dy (older) moves all; adj.sizeFront / adj.sizeRear scale that axle's wheels (adj.size, older, scales all; 1 = as found)
+  const sizeOf = role => (adj.size > 0 ? adj.size : 1) * ((role === 'front' ? adj.sizeFront : adj.sizeRear) > 0 ? (role === 'front' ? adj.sizeFront : adj.sizeRear) : 1);
   const axles = tyres.map(t => {
     const role = t.sx * frontSign > 0 ? 'front' : 'rear';
-    return { sx: t.sx, role, single: !!t.single, t, r0: t.f.r, x: t.f.x + frontSign * (adj[role] || 0) * t.f.r, y: t.f.y + ((adj.dy || 0) + ((role === 'front' ? adj.dyFront : adj.dyRear) || 0)) * t.f.r, r: t.f.r * size };
+    return { sx: t.sx, role, single: !!t.single, t, r0: t.f.r, x: t.f.x + frontSign * (adj[role] || 0) * t.f.r, y: t.f.y + ((adj.dy || 0) + ((role === 'front' ? adj.dyFront : adj.dyRear) || 0)) * t.f.r, r: t.f.r * sizeOf(role) };
   });
   const wheels = []; let k = 0;
   for (const a of axles) for (const sz of (a.single ? [0] : [-1, 1])) {
@@ -262,7 +262,7 @@ export function splitWheels(doc, adj = {}) {
     if (!perWheel[k].length) return;
     const mesh = doc.createMesh(w.name); for (const pr of perWheel[k]) mesh.addPrimitive(pr);
     const nd = doc.createNode(w.name).setTranslation(w.centre).setMesh(mesh).setExtras({ wheel: true, axle: det.axle, radius: w.radius, width: w.width });
-    scene.addChild(nd); made.push({ name: w.name, role: w.role, sz: w.sz, single: w.single, triangles: counts[k], centre: w.centre, width: w.width });
+    scene.addChild(nd); made.push({ name: w.name, role: w.role, sz: w.sz, single: w.single, triangles: counts[k], centre: w.centre, width: w.width, radius: w.radius });
   });
   if (made.length < det.wheels.length) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
   return { found: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };

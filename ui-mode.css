@@ -132,3 +132,22 @@
 
 .wheel-group { margin: 12px 0 2px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #cfd6df; }
 .wheel-group:first-child { border-top: 0; margin-top: 4px; }
+
+/* v2.106 Game mode: a shallower Optimise bar and result box */
+.app-mode-game .flow-bar { gap: 8px; }
+.app-mode-game .flow-bar .save-main, .app-mode-game .flow-bar .flow-download { min-height: 40px; padding-top: 6px; padding-bottom: 6px; font-size: 15px; }
+.app-mode-game #stepSave { padding-top: 8px; padding-bottom: 8px; }
+.app-mode-game #stepSave .status { min-height: 0; padding-top: 4px; font-size: 11px; }
+.app-mode-game #stepSave .progress-wrap { margin-top: 6px; }
+.app-mode-game .flow-note { margin-top: 4px; font-size: 11px; line-height: 1.35; }
+.app-mode-game .settings-file-row { margin-top: 4px; gap: 6px; }
+.app-mode-game .settings-file-row .button { padding-top: 4px; padding-bottom: 4px; font-size: 11.5px; }
+.app-mode-game #resultCard { margin-top: 6px; padding: 7px 10px; border-radius: 10px; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; row-gap: 2px; }
+.app-mode-game #resultCard .result-top { display: flex; align-items: center; gap: 8px; margin: 0; }
+.app-mode-game #resultCard span { display: inline; margin: 0 5px 0 0; font-size: 10px; }
+.app-mode-game #resultCard strong { font-size: 15px; }
+.app-mode-game #resultCard .saving-badge { padding: 3px 8px; font-size: 11px; }
+.app-mode-game #resultCard .stats-grid { display: flex; gap: 12px; margin: 0; justify-content: flex-end; }
+.app-mode-game #resultCard .stat { white-space: nowrap; }
+.app-mode-game #resultCard .kept-line { grid-column: 1 / -1; margin: 2px 0 0; padding: 4px 7px; font-size: 11px; line-height: 1.35; }
+.app-mode-game #resultCard .stat { padding: 2px 8px; border-radius: 8px; }

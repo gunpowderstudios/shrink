@@ -1,9 +1,13 @@
-# SHRINK 3D v2.105
+# SHRINK 3D v2.106
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.106 — Front / rear wheel size, shallower Optimise bar
+
+Wheel size is now a Front slider and a Rear slider. In Game mode the Optimise bar and the percentage-saved box are much shallower.
 
 ## v2.105 — Front / rear axle width
 

@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.106 — Front / rear wheel size, shallower Optimise bar
+
+- **Wheel size** is now **Front wheel size** and **Rear wheel size** (`sizeFront`, `sizeRear`, 50–150%), each inside its Front / Rear group. The old single `size` still works in the core and multiplies both. The "All wheels" group is gone. Each split wheel now reports its own `radius`; markers scale per axle.
+- Old settings files with `wheelSize` skip that id (unknown control); re-save to get the two new sliders.
+- Game mode: Optimise / Download buttons 54 -> 40px high, tighter note and settings row, and the result box is a compact two-row grid (file + saved % on one line with triangles and vertices). CSS only (`ui-mode.css`, v2.106 block).
+- Test: "front/rear size".
+
 ## v2.105 — Front / rear axle width, sliders grouped Front then Rear
 
 - "Wheels in / out" is now two sliders: **Front axle width** and **Rear axle width** (`trackFront`, `trackRear`; the old `track` still works in the core and in old code, but the panel no longer has it, so an older settings file's `wheelTrack` entry is skipped).
