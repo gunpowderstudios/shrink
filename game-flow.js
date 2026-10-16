@@ -69,6 +69,7 @@ window.addEventListener('shrink:optimized', e => {
   baseline = signature(); setState('done');
 });
 window.addEventListener('shrink:model-opened', () => { baseline = null; setState('new'); });
+window.addEventListener('shrink:source-replaced', () => { baseline = null; setState('new'); });   // the Remove brush changed the source file
 window.addEventListener('shrink:ui-mode', () => { init(); });
 window.addEventListener('shrink:material-look', () => setTimeout(check, 60));
 window.addEventListener('shrink:paint-undo', () => setTimeout(check, 60));

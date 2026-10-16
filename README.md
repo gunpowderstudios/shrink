@@ -1,9 +1,13 @@
-# SHRINK 3D v2.108
+# SHRINK 3D v2.109
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
 After deploying, hard-refresh (Cmd+Shift+R).
+
+## v2.109 — Remove brush
+
+Game mode has a **Remove** tool in the viewer toolbar: brush over a part (a wing mirror, an aerial) so it turns red, press **Remove selected**, and those triangles are cut out. Up to 5 removals can be undone.
 
 ## v2.108 — One-axle wheel layout
 

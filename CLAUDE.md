@@ -408,6 +408,11 @@ A good Simple-mode run should:
 - State is `new | done | stale`, from a signature of the left-panel inputs taken at `shrink:optimized`. If you add a control that changes the saved file, make sure it is an input/select in `.control-panel` (or add it to `signature()`); mirrors of other controls go in `SKIP`.
 - `app.js` writes the button text after a build from `dataset.label`, so `game-flow.js` keeps `dataset.label` in step with the state.
 
+## Remove brush (v2.109)
+- `remove-part.js` (UI) + `remove-part-core.js` (no DOM, tested by `remove-part.test.mjs`). Selection lives on the glTF-Transform *document* triangles in world space, never on three.js triangle indices: `ensureBVH` reorders the preview's index buffer, so those indices do not match the file. Do not map by three.js index.
+- Removal edits a doc read from `app.sourceBytes`, prunes, writes, and goes through `app.replaceSource(bytes)` (clears any build, reloads the preview, fires `shrink:texture-applied` + `shrink:source-replaced`). The paint tool answers `texture-applied` by switching Paint on, so `swapIn` sets it back to navigate. Paint edits are applied into the model before the brush starts.
+- It owns the left mouse button while on (viewer capture + stopPropagation); Cmd/Ctrl swaps OrbitControls' LEFT to PAN to rotate, as the paint tools do. Right-drag/wheel are untouched.
+
 ## Settings file (v2.99)
 - `settings-file.js` saves/loads the `.control-panel` inputs by element id (so new controls and wheel sliders are included automatically; mirrors and painting tools are in its `SKIP`). Loading only sets values and fires `input`/`change`; it never builds. Target card is clicked first, `geometry` applied last. Paint edits and Look are deliberately not stored. Print-mode state (FUSE IT etc.) is not covered.
 

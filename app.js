@@ -649,6 +649,23 @@ async function applyTextureToModel() {
   }
 }
 
+// Swap in a changed source GLB (the Remove brush cuts triangles out of it): clear any build made from the old one and reload the preview, like applying a texture.
+async function replaceSource(bytes) {
+  sourceBytes = bytes; optimizedBytes = null;
+  if (compareOn) leaveCompare();
+  disposeReduced();
+  if (optimizedURL) { URL.revokeObjectURL(optimizedURL); optimizedURL = null; }
+  els.showOptimizedBtn.disabled = true;
+  els.resultCard.classList.add('hidden');
+  els.originalSize.textContent = formatBytes(sourceBytes.byteLength);
+  await reloadOriginalPreview(false);
+  textureDirty = false;
+  const stats = getModelStats(originalModel);
+  els.triangleCount.textContent = num(stats.triangles); els.vertexCount.textContent = num(stats.vertices); els.textureCount.textContent = num(stats.textures);
+  window.dispatchEvent(new Event('shrink:texture-applied'));
+  window.dispatchEvent(new Event('shrink:source-replaced'));
+}
+
 async function downloadEdited() {
   if (!sourceBytes || !sourceFile) return;
   let bytes = sourceBytes;
@@ -921,6 +938,10 @@ window.__shrinkApp = {
   get optimizedBytes() { return optimizedBytes; },
   get sourceKind() { return sourceKind; },
   get sourceFile() { return sourceFile; },
+  readDoc: () => io.readBinary(sourceBytes),
+  writeDoc: doc => io.writeBinary(doc),
+  pruneDoc: doc => doc.transform(prune()),
+  replaceSource,
   get lastReduce() { return lastReduce; },
   get wireframe() { return wireframeEnabled; },
   baseName,

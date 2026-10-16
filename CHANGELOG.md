@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.109 — Remove brush (Game mode)
+
+- New **Remove** button in the viewer toolbar (`remove-part.js`, loaded by `ui-mode.js`). Brush over triangles (they turn red, Alt-drag or Unselect un-picks, "Only what I can see" limits it to faces pointing at you), then **Remove selected** cuts them out of the source GLB. Unused vertices are dropped; a primitive that loses every triangle is removed. **Undo remove** restores up to the last 5 cuts.
+- The cut is written into the source file (`app.replaceSource`, the same route as applying a texture edit), so Optimise, the wheel split and Download all use the trimmed model. Paint on the model is applied first so it is not lost. No hole-filling: a cut leaves an open edge.
+- Picking works on the *document's* triangles (`remove-part-core.js`: `prepare` / `select` / `removeSelected`), never on three.js indices, because the BVH reorders the preview's index buffer.
+- `game-flow.js` goes back to "Optimise" on `shrink:source-replaced`. Test: `remove-part.test.mjs`.
+
 ## v2.108 — One-axle wheel layout (caravans, trailers)
 
 - New Wheel layout **2 wheels (one axle)** (`adj.layout = '2'`). `layout2()` searches the axle anywhere in -0.35..+0.35 body lengths with radii from 0.03 L (`fitAxle` got an `opts` range), grounded first, then free. Nodes `Wheel_L` / `Wheel_R`; there is no front/back, so the **Front** sliders drive the axle and the Rear pair of per-wheel sliders is hidden. Per-wheel up/down: Left wheel / Right wheel.
