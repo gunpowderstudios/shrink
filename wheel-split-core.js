@@ -13,16 +13,17 @@ const percentile = (arr, q) => { if (!arr.length) return 0; const s = Float32Arr
 // Best circle in the side view for one end of the car (ring density minus what lies just outside it). rfix shares a radius with the other axle.
 // ground: only circles that stand on the ground (the lowest point of the tyre near the bottom of the model) are tried. A tyre has far fewer vertices than the
 // body above it, so without this a big circle along the wheel arch and door can out-score the real, small tyre (a motorhome did exactly that).
-function fitAxle(Q, n, sx, L, ymin, W, rfix, centre, ground) {
+// opts { x0, x1, rmin, rmax }: search signed axle positions x0..x1 over the whole length (a one-axle trailer), instead of one end of the car.
+function fitAxle(Q, n, sx, L, ymin, W, rfix, centre, ground, opts) {
   const cand = [];   // centre: a single wheel on the middle line (three-wheelers); otherwise the outer pair
-  for (let i = 0; i < n; i++) { const x = Q[i * 3], y = Q[i * 3 + 1], z = Q[i * 3 + 2]; if (x * sx > 0 && y < ymin + 0.25 * L && (centre ? Math.abs(z) < 0.35 * W : Math.abs(z) > 0.6 * W)) cand.push(i); }
+  for (let i = 0; i < n; i++) { const x = Q[i * 3], y = Q[i * 3 + 1], z = Q[i * 3 + 2]; if ((opts || x * sx > 0) && y < ymin + 0.25 * L && (centre ? Math.abs(z) < 0.35 * W : Math.abs(z) > 0.6 * W)) cand.push(i); }
   const step = Math.max(1, Math.ceil(cand.length / 3000)), xs = [], ys = [];
   for (let t = 0; t < cand.length; t += step) { xs.push(Q[cand[t] * 3]); ys.push(Q[cand[t] * 3 + 1]); }
   let best = null; const m = xs.length;
-  for (let cx = 0.10 * L; cx <= 0.45 * L; cx += 0.005 * L) {
-    const X = cx * sx;
+  for (let cx = opts ? opts.x0 : 0.10 * L; cx <= (opts ? opts.x1 : 0.45 * L); cx += 0.005 * L) {
+    const X = opts ? cx : cx * sx;
     for (let cy = ymin + 0.05 * L; cy <= ymin + 0.22 * L; cy += 0.005 * L) {
-      let rs = rfix ? [rfix] : []; if (!rfix) for (let r = 0.05 * L; r <= 0.13 * L; r += 0.0025 * L) rs.push(r);
+      let rs = rfix ? [rfix] : []; if (!rfix) for (let r = opts ? opts.rmin : 0.05 * L; r <= (opts ? opts.rmax : 0.13 * L); r += 0.0025 * L) rs.push(r);
       if (ground) rs = rs.filter(r => cy - r >= ymin - 0.02 * L && cy - r <= ymin + 0.035 * L);
       if (!rs.length) continue;
       const cnt = new Float64Array(rs.length * 2);
@@ -74,6 +75,18 @@ function layout4(Q, n, L, W, ymin, maxy) {
   return { found: true, layout: '4', frontSign: cabinMid > 0 ? -1 : 1, tyres };
 }
 
+// Two wheels: a single axle (a caravan or trailer). The axle may sit anywhere along the length; there is no front or back, so the wheels are Wheel_L / Wheel_R.
+function layout2(Q, n, L, W, ymin) {
+  const opts = { x0: -0.35 * L, x1: 0.35 * L, rmin: 0.03 * L, rmax: 0.13 * L };
+  let f = fitAxle(Q, n, 1, L, ymin, W, undefined, false, true, opts);
+  if (!f || f.score < 40) f = fitAxle(Q, n, 1, L, ymin, W, undefined, false, false, opts);
+  if (!f || f.score < 40) return { found: false, reason: 'No clear wheel circles found for a one-axle layout (a caravan or trailer).' };
+  const [z0, z1] = groundZ(Q, n, f, ymin, W, false);
+  if (!(z1 - z0 > 0.01 * L)) return { found: false, reason: 'Could not measure the tyres.' };
+  const zc = (z0 + z1) / 2;
+  return { found: true, layout: '2', frontSign: 1, tyres: [{ sx: 1, anyX: true, f, single: false, zc, lo: zc - z0 * 0.94, hi: z1 * 1.04 - zc, tyreW: z1 - z0 }] };
+}
+
 // Three wheels: one on the middle line at the front, a pair at the back (a Reliant-style three-wheeler).
 function layout3(Q, n, L, W, ymin) {
   let best = null;
@@ -113,8 +126,8 @@ export function detectWheels(P, adj = {}) {
   if (!(L > 0) || !(W > 0)) return { found: false, reason: 'The model is flat.' };
 
   const three = adj.layout === '3' || adj.layout === 3;
-  let spec = three ? layout3(Q, n, L, W, ymin) : layout4(Q, n, L, W, ymin, maxy);
-  if (!spec.found && (adj.layout === 'auto')) { const t = layout3(Q, n, L, W, ymin); if (t.found) spec = t; }
+  let spec = three ? layout3(Q, n, L, W, ymin) : (adj.layout === '2' || adj.layout === 2) ? layout2(Q, n, L, W, ymin) : layout4(Q, n, L, W, ymin, maxy);
+  if (!spec.found && (adj.layout === 'auto')) { const t = layout3(Q, n, L, W, ymin); if (t.found) spec = t; else { const t2 = layout2(Q, n, L, W, ymin); if (t2.found) spec = t2; } }
   if (!spec.found) return spec;
   const { frontSign, tyres } = spec;   // tyres: [{ sx, f:{x,y,r}, single, zmid?, lo, hi, zc? }]
 
@@ -127,7 +140,7 @@ export function detectWheels(P, adj = {}) {
   });
   const wheels = []; let k = 0;
   for (const a of axles) for (const sz of (a.single ? [0] : [-1, 1])) {
-    const name = a.single ? 'Wheel_F' : `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`;
+    const name = spec.layout === '2' ? `Wheel_${sz === frontSign ? 'R' : 'L'}` : a.single ? 'Wheel_F' : `Wheel_${a.role === 'front' ? 'F' : 'R'}${sz === frontSign ? 'R' : 'L'}`;
     const wk = a.role === 'front' ? adj.widthFront : adj.widthRear, wf = wk > 0 ? wk : 1, cy = a.y + ((adj.dyW && adj.dyW[name]) || 0) * a.r0;
     // sideways: adj.shiftFront / adj.shiftRear move the axle's wheels to the car's right (+) or left (-); adj.trackFront / adj.trackRear move that axle's pair outward (+) or inward (-) (the axle's width); adj.track (older) moves both; tyre radii
     const shift = frontSign * ((a.role === 'front' ? adj.shiftFront : adj.shiftRear) || 0) * a.r0 + sz * (((a.role === 'front' ? adj.trackFront : adj.trackRear) || 0) + (adj.track || 0)) * a.r0;
@@ -138,7 +151,7 @@ export function detectWheels(P, adj = {}) {
   const classify = (x, y, z) => {
     const [X, Y, Z] = toDet(x, y, z);
     for (const w of wheels) {
-      if (w.axle.sx * X <= 0) continue;
+      if (!w.axle.t.anyX && w.axle.sx * X <= 0) continue;
       const t = w.sz * (Z - w.zmid);   // distance from the tyre's middle, positive towards the outside of the car
       if (t < -w.lo * w.wf || t > w.hi * w.wf) continue;
       if (Math.hypot(X - w.cx, Y - w.cy) < w.radius * 1.06) return w.index;

@@ -87,6 +87,17 @@ for(const [label,alongZ,t] of [['length along X',false,null],['length along Z',t
  const rad=(res,n)=>res.wheels.find(w=>w.name===n).radius;
  assert.ok(Math.abs(rad(r,'Wheel_FL')/rad(base,'Wheel_FL')-1.3)<0.01&&Math.abs(rad(r,'Wheel_FR')/rad(base,'Wheel_FR')-1.3)<0.01,'front size');
  assert.ok(Math.abs(rad(r,'Wheel_RL')/rad(base,'Wheel_RL')-0.8)<0.01&&Math.abs(rad(r,'Wheel_RR')/rad(base,'Wheel_RR')-0.8)<0.01,'rear size');console.log('ok front/rear size');}
+// one axle (a caravan): layout '2', axle off-centre or centred, length along X or Z
+for(const [ax,alongZ] of [[[0.1],false],[[-0.5],false],[[0.4],true]]){
+ const {doc,nTri}=car(alongZ,null,false,ax);const r=splitWheels(doc,{layout:'2'});
+ assert.ok(r.found&&!r.partial,'one axle found '+JSON.stringify(r).slice(0,200));
+ assert.deepEqual(r.wheels.map(w=>w.name).sort(),['Wheel_L','Wheel_R'],'one-axle names');
+ assert.ok(Math.abs(r.radius-0.35)<0.04,'one-axle radius '+r.radius);
+ const w0=r.wheels[0];assert.ok(w0.triangles>=60,'one-axle wheel has triangles');
+ assert.equal(r.wheels.reduce((a,w)=>a+w.triangles,0)+r.bodyTriangles,nTri,'one-axle triangles conserved');
+ const mv=splitWheels(car(alongZ,null,false,ax).doc,{layout:'2',dyW:{Wheel_L:0.2},sizeFront:1.2});
+ assert.ok(mv.found,'one-axle adjustable');}
+console.log('ok one axle');
 // per-axle and per-wheel up/down
 {const base=splitWheels(car(false,null).doc);const r=splitWheels(car(false,null).doc,{dyFront:0.3,dyRear:-0.2,dyW:{Wheel_RL:0.1}});
  const y=(res,n)=>res.wheels.find(w=>w.name===n).centre[1];

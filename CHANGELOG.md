@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.108 — One-axle wheel layout (caravans, trailers)
+
+- New Wheel layout **2 wheels (one axle)** (`adj.layout = '2'`). `layout2()` searches the axle anywhere in -0.35..+0.35 body lengths with radii from 0.03 L (`fitAxle` got an `opts` range), grounded first, then free. Nodes `Wheel_L` / `Wheel_R`; there is no front/back, so the **Front** sliders drive the axle and the Rear pair of per-wheel sliders is hidden. Per-wheel up/down: Left wheel / Right wheel.
+- **Auto** now tries 4, then 3, then 2. A caravan can still fool the 4-wheel search, so pick the 2-wheel layout by hand if Auto gets it wrong.
+- Test: "one axle" (centred, off-centre, length along Z).
+
 ## v2.107 — Result box fits the left column
 
 - Game mode result box: file + saved % on one row, Triangles / Vertices in two equal columns, Kept line wraps. It no longer overflows into the viewer on a narrow column (CSS only).
