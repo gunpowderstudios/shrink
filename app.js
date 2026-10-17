@@ -3,8 +3,8 @@ import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/control
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://esm.sh/three@0.180.0/examples/jsm/environments/RoomEnvironment.js';
 import { WebIO, Document } from '@gltf-transform/core';
-import { stripEmpty } from './remove-part-core.js?v=2.112';
-import { mergePart as mergePartCore } from './add-part-core.js?v=2.112';
+import { stripEmpty } from './remove-part-core.js?v=2.113';
+import { mergePart as mergePartCore } from './add-part-core.js?v=2.113';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt, mergeDocuments } from '@gltf-transform/functions';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';

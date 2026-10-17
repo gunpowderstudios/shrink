@@ -201,10 +201,8 @@ function texturePoint(hit, material) {
 }
 
 function ringRadiusPx() {
-  const viewWidth = viewer?.clientWidth || 700;
-  const textureWidth = textureCanvas?.width || 2048;
-  const size = Number(brushSize?.value || 32);
-  return Math.max(8, Math.min(140, size * viewWidth / textureWidth)) / 2;
+  // radius in screen pixels = half the Brush size slider (the ring drawn by brush-cursor.js has that diameter)
+  return Math.max(4, Number(brushSize?.value || 32)) / 2;
 }
 
 function worldPerPixel(distance) {

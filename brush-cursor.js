@@ -14,11 +14,9 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// The ring is exactly as wide, in screen pixels, as the Brush size slider says (the paint dab uses the same number: ringRadiusPx in paint3d.js).
 function updateSize() {
-  const viewWidth = viewer?.clientWidth || 700;
-  const textureWidth = textureCanvas?.width || 2048;
-  const size = Number(brushSize?.value || 32);
-  const px = Math.max(8, Math.min(140, size * viewWidth / textureWidth));
+  const px = Math.max(4, Number(brushSize?.value || 32));
   ring.style.width = `${px}px`;
   ring.style.height = `${px}px`;
 }
@@ -37,5 +35,7 @@ function updatePosition(event) {
 document.addEventListener('pointermove', updatePosition, true);
 document.addEventListener('pointerleave', () => { ring.style.display = 'none'; }, true);
 brushSize?.addEventListener('input', updateSize);
+brushSize?.addEventListener('change', updateSize);
+document.addEventListener('pointerdown', updateSize, true);
 window.addEventListener('resize', updateSize);
 updateSize();
