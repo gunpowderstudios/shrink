@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.119
+- New **Racer** target card (Game mode): a one-click export for a browser racing game on phones. Base colour and metal/rough (ORM) go to 1024×1024, the normal map to 512×512, all as WebP. **High: 2048 base colour** is a tick box. Occlusion is packed into the metal/rough map; emissive and unused textures are dropped and listed with the reason.
+- **Merge into one texture set** (on by default): if the wheels or other parts have their own materials, they are re-packed into one atlas (UVs remapped, material factors baked, plain-colour parts become colour tiles) so the whole vehicle has one material and three textures. If it cannot (transparent materials, tiling UVs, textured part with no UVs) the panel says why and warns that the memory multiplies.
+- The panel shows the estimated GPU memory (width × height × 4 × 1.33 summed over all textures), before Optimise and after: green within about 12 MB, amber above, red FAIL at 46 MB or more. The triangle count is whatever Detail kept says.
+- New `racer-core.js` (no DOM, tested by `racer.test.mjs`) and `racer.js` (card panel + hook called from `optimizeModel`).
+
 ## v2.118
 - Game mode: the "Find the smallest that still looks the same" row is hidden (the slider, now 10% by default, and the target cards set the detail). The button stays for 3D print, where SHRINK IT uses it.
 

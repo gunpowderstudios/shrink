@@ -3,8 +3,8 @@ import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/control
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://esm.sh/three@0.180.0/examples/jsm/environments/RoomEnvironment.js';
 import { WebIO, Document } from '@gltf-transform/core';
-import { stripEmpty } from './remove-part-core.js?v=2.118';
-import { mergePart as mergePartCore } from './add-part-core.js?v=2.118';
+import { stripEmpty } from './remove-part-core.js?v=2.119';
+import { mergePart as mergePartCore } from './add-part-core.js?v=2.119';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt, mergeDocuments } from '@gltf-transform/functions';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
@@ -814,7 +814,10 @@ async function optimizeModel() {
       const wr = window.__shrinkWheels.apply(document);
       if (wr && !wr.found) setStatus(`No wheels separated: ${wr.reason}`);
     }
-    if (els.webpToggle.checked && !printMode) {
+    if (!printMode && window.__shrinkRacer?.active?.()) {        // Racer preset: per-map sizes, dropped maps, one texture set (racer.js)
+      setProgress(52, 'Preparing the textures for the Racer…');
+      await window.__shrinkRacer.process(document, text => setProgress(62, text));
+    } else if (els.webpToggle.checked && !printMode) {
       setProgress(52, 'Resizing and compressing textures…');
       await convertTexturesToWebP(document, Number(els.textureSize.value), Number(els.textureQuality.value) / 100, 52, 72);
     }
@@ -944,6 +947,7 @@ window.__shrinkApp = {
   get sourceFile() { return sourceFile; },
   readDoc: () => io.readBinary(sourceBytes),
   stripEmpty,
+  enableWebP: doc => doc.createExtension(EXTTextureWebP).setRequired(true),
   loadScene: loadSceneFromURL,
   readPart: bytes => io.readBinary(bytes),
   mergePart: (doc, partDoc, t, name, extras) => mergePartCore(doc, partDoc, t, name, mergeDocuments, extras),

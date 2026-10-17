@@ -24,7 +24,8 @@ const el = {
 const GAME_TARGETS = {
   web:  { label: 'web / mobile',   tris: 25000,  tex: 1024, quality: 80 },
   pc:   { label: 'PC / console',   tris: 100000, tex: 2048, quality: 85 },
-  hero: { label: 'close-up / hero', tris: 300000, tex: 4096, quality: 90 }
+  hero: { label: 'close-up / hero', tris: 300000, tex: 4096, quality: 90 },
+  racer: { label: 'Racer (phones)', tris: null, tex: 1024, quality: 85 }   // no triangle target: the Racer preset is about texture memory (racer.js)
 };
 
 const S = { tris: 0, target: 'pc', firstShow: true, autoRunning: false, measureTimer: 0, measureToken: 0, topoOrig: null, textures: null, busy: false, lastLive: null };
@@ -33,7 +34,7 @@ window.__shrinkLive = engine;
 
 /* ---------------- helpers ---------------- */
 const ratio = () => Math.max(0.01, Math.min(1, Number(el.geometry.value) / 100));
-// Game models open with Detail kept at 10% (v2.118); the target cards and the slider still change it.
+// Game models open with Detail kept at 10% (v2.119); the target cards and the slider still change it.
 const DEFAULT_GAME_KEEP = 0.10;
 const reduceOpts = () => ({ protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
 // Which slice of the surface must stay within the printer's detail? 95% lets the smallest, most detailed areas (faces, hands,
@@ -98,7 +99,7 @@ function updateLiveLine(trisOverride) {
 
 function updateChip(tris) {
   const b = GAME_TARGETS[S.target];
-  if (mode() !== 'game' || !b) { el.chip.hidden = true; return; }
+  if (mode() !== 'game' || !b || !b.tris) { el.chip.hidden = true; return; }
   el.chip.hidden = false;
   if (tris <= b.tris * 1.02) { el.chip.dataset.level = 'good'; el.chip.textContent = `✔ Within the ~${fmt(b.tris)} triangle guide for ${b.label}`; }
   else { el.chip.dataset.level = 'warn'; el.chip.textContent = `● ${fmt(tris - b.tris)} over the ~${fmt(b.tris)} guide for ${b.label} — a rule of thumb, not a hard limit`; }
@@ -200,8 +201,8 @@ function chooseTarget(key, { initial = false } = {}) {
   el.cards?.querySelectorAll('.target-card').forEach(b => b.classList.toggle('active', b.dataset.target === key));
   if (el.textureSize) { el.textureSize.value = String(t.tex); el.textureSize.dispatchEvent(new Event('change', { bubbles: true })); }
   if (el.textureQuality) { el.textureQuality.value = String(t.quality); el.textureQuality.dispatchEvent(new Event('input', { bubbles: true })); }
-  if (S.tris) setRatio(Math.min(1, t.tris / S.tris));
-  if (!initial) say(`Set up for ${t.label}: about ${fmt(t.tris)} triangles and ${t.tex}px textures. Adjust the slider if you want more or less detail.`);
+  if (S.tris && t.tris) setRatio(Math.min(1, t.tris / S.tris));
+  if (!initial) say(t.tris ? `Set up for ${t.label}: about ${fmt(t.tris)} triangles and ${t.tex}px textures. Adjust the slider if you want more or less detail.` : `Set up for ${t.label}: WebP textures sized for phones (see the memory figure below). The triangle count is whatever Detail kept says.`);
 }
 el.cards?.addEventListener('click', e => { const b = e.target.closest('.target-card'); if (b) chooseTarget(b.dataset.target); });
 [el.textureSize, el.webp, el.meshopt].forEach(x => x?.addEventListener('change', () => updateLiveLine()));
@@ -224,7 +225,7 @@ async function gameReport(tris) {
   const glb = glbBytesEstimate(tris, { meshopt: el.meshopt?.checked !== false, textureBytes: tx.file });
   let msg = ` File ≈ ${fmtBytes(glb)} (textures ≈ ${fmtBytes(tx.file)}, mesh ≈ ${fmtBytes(Math.max(0, glb - tx.file))}).`;
   const t = GAME_TARGETS[S.target];
-  if (t && tris > t.tris) msg += ` That is above your ${fmt(t.tris)} triangle target for ${t.label}; lower "Detail kept" if you need to hit it.`;
+  if (t && t.tris && tris > t.tris) msg += ` That is above your ${fmt(t.tris)} triangle target for ${t.label}; lower "Detail kept" if you need to hit it.`;
   if (tx.file > glb * 0.6) msg += ' Textures are most of the file — a smaller "Largest texture size" saves more than fewer triangles.';
   if (el.webp && !el.webp.checked) msg += ' WebP textures are off; turning them on shrinks the file.';
   if (el.meshopt && !el.meshopt.checked) msg += ' Meshopt is off; turning it on shrinks the mesh.';
