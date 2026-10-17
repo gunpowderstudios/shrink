@@ -161,6 +161,35 @@ export function detectWheels(P, adj = {}) {
   return { found: true, axle: alongZ ? 'x' : 'z', lengthAxis: alongZ ? 'z' : 'x', wheels, classify, frontSign, length: L, layout: spec.layout, info: { radius: wheels[0].radius, width: wheels[0].width / (wheels[0].wf || 1), alongZ } };
 }
 
+// The fitted circle can sit a little off the real hub (it is found from ring density), and a wheel that turns about an off-centre pivot wobbles in the game.
+// After the cut, fit a circle to the wheel's outer tread (Kasa least squares) and move the pivot there, and to the middle of the tyre's width. The geometry is
+// shifted back by the same amount, so nothing moves on screen. Skipped when the fit is not trustworthy (few points, not all the way round, or a big jump).
+function refinePivot(w, prims, axle) {
+  const pa = axle === 'z' ? [0, 1] : [2, 1], ax = axle === 'z' ? 2 : 0;
+  const pts = [];
+  for (const pr of prims) { const a = pr.getAttribute('POSITION').getArray(); for (let i = 0; i < a.length; i += 3) pts.push(a[i + pa[0]], a[i + pa[1]], a[i + ax]); }
+  const n = pts.length / 3; if (n < 60) return;
+  const d = new Float32Array(n); for (let i = 0; i < n; i++) d[i] = Math.hypot(pts[i * 3], pts[i * 3 + 1]);
+  const sorted = Float32Array.from(d).sort(), rmax = sorted[Math.floor(n * 0.98)];
+  const tread = []; for (let i = 0; i < n; i++) if (d[i] >= 0.85 * rmax && d[i] <= 1.15 * rmax) tread.push(i);
+  if (tread.length < 40) return;
+  const bins = new Set(); for (const i of tread) bins.add(Math.floor((Math.atan2(pts[i * 3 + 1], pts[i * 3]) + Math.PI) / (Math.PI / 6)));
+  if (bins.size < 8) return;   // a partial arc cannot place the centre
+  // Kasa: x^2 + y^2 + D x + E y + F = 0, centre (-D/2, -E/2); solved through the normal equations of the 3x3 system
+  let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sz = 0, sxz = 0, syz = 0, m = tread.length;
+  for (const i of tread) { const x = pts[i * 3], y = pts[i * 3 + 1], z = x * x + y * y; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; sz += z; sxz += x * z; syz += y * z; }
+  const A = [[sxx, sxy, sx], [sxy, syy, sy], [sx, sy, m]], B = [-sxz, -syz, -sz];
+  const det3 = M => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+  const D0 = det3(A); if (!isFinite(D0) || Math.abs(D0) < 1e-18) return;
+  const col = c => A.map((row, r) => row.map((v, q) => (q === c ? B[r] : v)));
+  const dx = -det3(col(0)) / D0 / 2, dy = -det3(col(1)) / D0 / 2;
+  let lo = Infinity, hi = -Infinity; for (const i of tread) { lo = Math.min(lo, pts[i * 3 + 2]); hi = Math.max(hi, pts[i * 3 + 2]); }
+  const dz = (lo + hi) / 2, delta = [0, 0, 0]; delta[pa[0]] = dx; delta[pa[1]] = dy; delta[ax] = dz;
+  if (Math.hypot(dx, dy) > 0.25 * rmax || Math.abs(dz) > 0.5 * w.radius) return;
+  for (const pr of prims) { const acc = pr.getAttribute('POSITION'), a = acc.getArray(); for (let i = 0; i < a.length; i += 3) { a[i] -= delta[0]; a[i + 1] -= delta[1]; a[i + 2] -= delta[2]; } acc.setArray(a); }
+  w.centre = [w.centre[0] + delta[0], w.centre[1] + delta[1], w.centre[2] + delta[2]];
+}
+
 /* ---------- glTF-Transform document surgery ---------- */
 function transformPoint(W, x, y, z) { return [W[0] * x + W[4] * y + W[8] * z + W[12], W[1] * x + W[5] * y + W[9] * z + W[13], W[2] * x + W[6] * y + W[10] * z + W[14]]; }
 function normalMatrix(W) {   // inverse transpose of the upper 3x3, row-major [a b c; d e f; g h i] as 9 numbers
@@ -288,8 +317,10 @@ export function splitWheels(doc, adj = {}) {
     }
   }
   const made = [];
+  const nudged = Object.keys(adj || {}).some(key => key !== 'layout' && (adj[key] && typeof adj[key] === 'object' ? Object.keys(adj[key]).length : Number(adj[key]) > 0 ? ['widthFront', 'widthRear', 'size', 'sizeFront', 'sizeRear'].includes(key) ? Number(adj[key]) !== 1 : true : Number(adj[key]) !== 0));
   det.wheels.forEach((w, k) => {
     if (!perWheel[k].length) return;
+    if (!nudged) refinePivot(w, perWheel[k], det.axle);
     const mesh = doc.createMesh(w.name); for (const pr of perWheel[k]) mesh.addPrimitive(pr);
     const nd = doc.createNode(w.name).setTranslation(w.centre).setMesh(mesh).setExtras({ wheel: true, axle: det.axle, radius: w.radius, width: w.width });
     scene.addChild(nd); made.push({ name: w.name, role: w.role, sz: w.sz, single: w.single, triangles: counts[k], centre: w.centre, width: w.width, radius: w.radius });

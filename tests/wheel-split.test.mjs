@@ -136,4 +136,22 @@ console.log('ok one axle');
  const m=doc.createMesh().addPrimitive(doc.createPrimitive().setAttribute('POSITION',doc.createAccessor().setType('VEC3').setArray(new Float32Array(P)).setBuffer(b)).setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint16Array(I)).setBuffer(b)));
  doc.createScene().addChild(doc.createNode().setMesh(m));
  const r=splitWheels(doc);assert.equal(r.found,false);console.log('ok not a car:',r.reason);}
+// v2.120: the pivot sits on the middle of the tyre (hub centre), so a wheel that spins or steers in the game does not wobble
+{
+  for (const alongZ of [false, true]) {
+    const {doc}=car(alongZ,null); const r=splitWheels(doc); assert.ok(r.found&&!r.partial);
+    const ax = r.axle==='z'?2:0, pl = [0,1,2].filter(k=>k!==ax);
+    for (const nd of doc.getRoot().listScenes()[0].listChildren()) {
+      if(!/^Wheel_/.test(nd.getName())) continue;
+      const mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];
+      for (const pr of nd.getMesh().listPrimitives()) { const a=pr.getAttribute('POSITION').getArray(); for(let i=0;i<a.length;i+=3)for(let k=0;k<3;k++){mn[k]=Math.min(mn[k],a[i+k]);mx[k]=Math.max(mx[k],a[i+k]);} }
+      for (const k of [...pl,ax]) assert.ok(Math.abs((mn[k]+mx[k])/2)<0.02,'pivot is centred on '+nd.getName()+' axis '+k+': '+((mn[k]+mx[k])/2));
+    }
+  }
+  // a hand-nudged wheel keeps the pivot where the person put it
+  const a=car(false,null).doc, base=splitWheels(car(false,null).doc), moved=splitWheels(a,{dyFront:0.5});
+  const yb=base.wheels.find(w=>w.name==='Wheel_FL').centre[1], ym=moved.wheels.find(w=>w.name==='Wheel_FL').centre[1];
+  assert.ok(Math.abs((ym-yb)-0.5*0.35)<0.01,'nudged pivot is exactly the nudge: '+(ym-yb));
+  console.log('ok pivot centred');
+}
 console.log('wheel-split tests passed');

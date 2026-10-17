@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.120
+- Wheel splitter: after the cut, each wheel's pivot is moved to the true centre of its tyre (a circle fitted to the outer tread, and the middle of the tyre's width), with the geometry shifted back by the same amount so nothing moves on screen. A wheel that spins or steers in the game no longer wobbles about an off-centre pivot. It is skipped when the fit is not trustworthy (partial arc, big jump) and when you have nudged the wheels by hand.
+
 ## v2.119
 - New **Racer** target card (Game mode): a one-click export for a browser racing game on phones. Base colour and metal/rough (ORM) go to 1024×1024, the normal map to 512×512, all as WebP. **High: 2048 base colour** is a tick box. Occlusion is packed into the metal/rough map; emissive and unused textures are dropped and listed with the reason.
 - **Merge into one texture set** (on by default): if the wheels or other parts have their own materials, they are re-packed into one atlas (UVs remapped, material factors baked, plain-colour parts become colour tiles) so the whole vehicle has one material and three textures. If it cannot (transparent materials, tiling UVs, textured part with no UVs) the panel says why and warns that the memory multiplies.

@@ -1,4 +1,4 @@
-// SHRINK 3D v2.119 — Remove / Weld back (Game mode). No imports and no DOM, so it runs in the page and in the tests.
+// SHRINK 3D v2.120 — Remove / Weld back (Game mode). No imports and no DOM, so it runs in the page and in the tests.
 //
 // The edit is a MASK over a baseline copy of the model: every triangle of the baseline is "alive" (in the car) or "cut". prepare() copies the baseline's triangles
 // into world space once; select() brushes a sphere of that space; applySelection() flips the brushed triangles (cut them, or weld them back); rewrite() then writes the
