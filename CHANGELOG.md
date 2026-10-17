@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.121
+- Exported file names always write **SHRINK** in capitals (GLB, STL, project and settings files), and a file that already ends in -SHRINK (re-opened output, in any case) is not tagged twice.
+
 ## v2.120
 - Wheel splitter: after the cut, each wheel's pivot is moved to the true centre of its tyre (a circle fitted to the outer tread, and the middle of the tyre's width), with the geometry shifted back by the same amount so nothing moves on screen. A wheel that spins or steers in the game no longer wobbles about an off-centre pivot. It is skipped when the fit is not trustworthy (partial arc, big jump) and when you have nudged the wheels by hand.
 

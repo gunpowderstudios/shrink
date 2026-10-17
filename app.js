@@ -3,8 +3,8 @@ import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/control
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://esm.sh/three@0.180.0/examples/jsm/environments/RoomEnvironment.js';
 import { WebIO, Document } from '@gltf-transform/core';
-import { stripEmpty } from './remove-part-core.js?v=2.120';
-import { mergePart as mergePartCore } from './add-part-core.js?v=2.120';
+import { stripEmpty } from './remove-part-core.js?v=2.121';
+import { mergePart as mergePartCore } from './add-part-core.js?v=2.121';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt, mergeDocuments } from '@gltf-transform/functions';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
@@ -915,12 +915,15 @@ async function canvasToBlob(canvas, type, quality) {
   return await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('Texture conversion failed.')), type, quality));
 }
 
-function baseName() { return (sourceFile?.name || 'model').replace(/\.[^.]+$/, ''); }
+// SHRINK is always written in capitals in a file name, and a file that already carries it (re-opened output) is not tagged twice
+const capShrink = n => String(n).replace(/([-_ ]|^)shrink(?=[-_ .]|$)/gi, '$1SHRINK');
+const dropShrinkTag = n => capShrink(n).replace(/[-_ ]SHRINK(?:[-_ ]project|[-_ ]settings)?$/, '');
+function baseName() { return dropShrinkTag((sourceFile?.name || 'model').replace(/\.[^.]+$/, '')) || 'model'; }
 
 function downloadBytes(bytes, filename) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([bytes], { type: 'model/gltf-binary' }));
-  a.download = filename;
+  a.download = capShrink(filename);
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -936,6 +939,7 @@ applyPreset('game');
 updateLabels();
 setPaintTool('brush');
 
+window.__shrinkCapShrink = capShrink;
 window.__shrinkApp = {
   THREE,
   get originalModel() { return originalModel; },

@@ -1,5 +1,5 @@
-// SHRINK 3D v2.120 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
-import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.120';
+// SHRINK 3D v2.121 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
+import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.121';
 
 const $ = id => document.getElementById(id);
 const A = () => window.__shrinkApp;

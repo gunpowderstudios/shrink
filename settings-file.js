@@ -1,4 +1,4 @@
-// SHRINK 3D v2.120 — save the whole tweaked model (a .glb with the settings inside) or just the settings (.json), and load either back.
+// SHRINK 3D v2.121 — save the whole tweaked model (a .glb with the settings inside) or just the settings (.json), and load either back.
 // It stores what is set, not the model: target card, detail %, texture options, protect options and every wheel slider.
 // Paint edits and "Look" (material) changes are pixels/maths on the model itself, so they are NOT in the file.
 // Loading just sets the controls and fires their normal events, so the Optimise button turns red ("Optimise again") by itself.
@@ -17,7 +17,7 @@ export function collect() {
   const values = {};
   for (const el of controls()) values[el.id] = el.type === 'checkbox' ? el.checked : el.value;
   return {
-    kind: KIND, version: FILE_VERSION, app: 'SHRINK 3D', release: window.__shrinkRelease || '2.120',
+    kind: KIND, version: FILE_VERSION, app: 'SHRINK 3D', release: window.__shrinkRelease || '2.121',
     saved: new Date().toISOString(), model: modelName(),
     target: document.querySelector('.control-panel .target-card.active')?.dataset.target || '',
     values,
@@ -86,7 +86,7 @@ function say(text, bad) { for (const id of ['settingsFileNote', 'settingsStartNo
 
 function download(obj, name, type) {
   const url = URL.createObjectURL(new Blob([type ? obj : JSON.stringify(obj, null, 2)], { type: type || 'application/json' }));
-  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  const a = document.createElement('a'); a.href = url; a.download = window.__shrinkCapShrink?.(name) || name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
@@ -141,7 +141,7 @@ function build() {
   anchor.after(row); row.after(note);
   $('settingsProject').addEventListener('click', saveProject);
   $('settingsSave').addEventListener('click', () => {
-    const d = collect(); const stem = (d.model || 'model').replace(/\.[^.]+$/, '');
+    const d = collect(); const stem = (window.__shrinkCapShrink?.(d.model || 'model') || 'model').replace(/\.[^.]+$/, '').replace(/[-_ ]SHRINK(?:-project|-settings)?$/i, '');
     download(d, `${stem}-SHRINK-settings.json`);
     say(`Saved ${stem}-SHRINK-settings.json` + (window.__shrinkPaint?.hasEdits?.() ? ' — your paint is not in this file; use Download GLB to keep the painted model.' : ''));
   });

@@ -1,4 +1,4 @@
-// SHRINK 3D v2.120 — Add part (Game mode). No imports and no DOM, so it runs in the page and in the tests.
+// SHRINK 3D v2.121 — Add part (Game mode). No imports and no DOM, so it runs in the page and in the tests.
 // Put another model (a separate wheel .glb, say) into the car's document under its own node, with the position, turn and size the person set in the viewer.
 
 // Copy `partDoc` into `doc` (partDoc is not changed). Everything of the part's scene (meshes, materials, textures, its own node transforms) goes under ONE new node
