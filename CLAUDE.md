@@ -427,3 +427,7 @@ A good Simple-mode run should:
 ## Stamp (v2.79)
 - `paint3d.js` owns the Stamp tool; `stamp-core.js` holds the pure maths (patch coordinates, bilinear sampling, edge fade) and is tested by `stamp.test.mjs`. The patch is captured by raycasting the screen and reading the active colour texture, and pasted by raycasting the destination: keep it a screen-space projection, do not turn it into a UV copy.
 - 3D painting (Paint, Clone, Stamp) edits the colour texture (`material.map`) and, since v2.82, the normal map too (the `flat` layer in `paint3d.js`: flatten for Paint/Stamp, copy for Clone). The normal map is edited on its own private canvas, handed to Apply through `collectDirtyLayers`, and undone per step via `shrink:paint-undo` events from `multi-undo.js`. Metallic/roughness pictures can still only be edited in the flat editor.
+
+## Add part (v2.112)
+- `add-part.js` (UI, TransformControls gizmo on `__shrinkViewer`) + `add-part-core.js` (`mergePart`, no DOM, tested by `add-part.test.mjs`). Commit goes through the source GLB like Remove/Weld: `readDoc` -> `mergePart` (uses `mergeDocuments` from `@gltf-transform/functions`; `Document.merge` is disabled in 4.x) -> prune -> write -> `replaceSource`. Undo uses the Remove undo stack (`__shrinkRemove.noteChange`).
+- Added parts go at the END of the main scene under one wrapper node, so Remove/Weld path keys stay valid. `mergePart` folds all accessors into one buffer (GLB allows only one). Added parts are not in the Remove/Weld baseline (they cannot be brushed).

@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.112
+- **Add part** (Game mode, viewer toolbar): pick another .glb (a separate wheel, say), place it with the move / rotate / scale gizmo, Size slider and 90° turn buttons, make Copies or a Mirror copy for the other side, then **Add to car**. The part is merged into the model under its own node (`add-part-core.js`, tested in Node), so Optimise, the download and Save project include it. "Undo last add" shares the Remove/Weld undo stack.
+
 ## v2.111 — Weld tool (bring cut-out parts back)
 
 - New **Weld** button beside Remove. In Weld mode every cut-out triangle shows as a blue ghost; brush over it (green) and press **Weld back selected**. **Select all cut** brings everything back.

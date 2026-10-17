@@ -1,8 +1,8 @@
-// SHRINK 3D v2.111 — Remove part (Game mode). A "Remove" tool in the viewer toolbar: paint the part you do not want (a wing mirror, an aerial) red with a brush,
+// SHRINK 3D v2.112 — Remove part (Game mode). A "Remove" tool in the viewer toolbar: paint the part you do not want (a wing mirror, an aerial) red with a brush,
 // press "Remove selected", and those triangles are cut out of the model. The cut goes into the source GLB (like applying a texture edit), so Optimise, the wheels and
 // the download all use the trimmed model. Up to five removals can be undone. The picking maths and the document edit are in remove-part-core.js (tested in Node).
 import { ensureBVH, raycasterFor } from './bvh-support.js?v=2.18';
-import { prepare, select, selectAll, clearSelection, selectedCorners, deadCorners, applySelection, aliveTotal, snapshotMasks, restoreMasks, rewrite } from './remove-part-core.js?v=2.111';
+import { prepare, select, selectAll, clearSelection, selectedCorners, deadCorners, applySelection, aliveTotal, snapshotMasks, restoreMasks, rewrite } from './remove-part-core.js?v=2.112';
 
 const $ = id => document.getElementById(id);
 const A = () => window.__shrinkApp, V = () => window.__shrinkViewer;
@@ -98,6 +98,7 @@ function setModeUI() {
 async function enter(mode = 'remove') {
   const app = A(); if (!app?.sourceBytes) { say('Open a model first.', true); return; }
   if (st.busy) return;
+  window.__shrinkAddPart?.exit?.();
   if (st.on) { if (st.data) clearSelection(st.data); st.mode = mode; clearOverlay(); if (weld()) rebuildGhost(); setModeUI(); refresh(); say(mode === 'weld' ? 'Weld: the parts you cut out show in blue. Brush over them, then press “Weld back selected”.' : 'Remove: brush over the part you want gone, then press “Remove selected”.'); return; }
   st.busy = true;
   try {
@@ -193,13 +194,13 @@ async function doGo() {
 }
 async function doUndo() {
   if (!st.undo.length || st.busy) return; st.busy = true; counts();
-  try { const u = st.undo.pop(); await swapIn(u.bytes, 'Undone.'); restoreMasks(st.data, u.masks); if (weld()) rebuildGhost(); refresh(); }
+  try { const u = st.undo.pop(); await swapIn(u.bytes, 'Undone.'); if (st.data && u.masks) restoreMasks(st.data, u.masks); if (weld()) rebuildGhost(); refresh(); }
   catch (err) { console.error(err); say(`Could not undo: ${err.message}`, true); }
   finally { st.busy = false; counts(); }
 }
 
 window.addEventListener('shrink:paint-mode', e => { if (st.on && !st.busy && e.detail?.mode !== 'navigate') exit(false); });
 window.addEventListener('shrink:model-opened', () => { st.undo = []; st.data = null; if (st.on) exit(false); if ($('rmCount')) counts(); });
-window.__shrinkRemove = { get active() { return st.on; }, get mode() { return st.mode; }, enter, exit, get selected() { return st.data?.selected || 0; }, get cut() { return st.data?.dead || 0; } };
+window.__shrinkRemove = { noteChange(prevBytes) { st.undo.push({ bytes: prevBytes, masks: st.data ? snapshotMasks(st.data) : null }); if (st.undo.length > 5) st.undo.shift(); counts(); }, undo: doUndo, get active() { return st.on; }, get mode() { return st.mode; }, enter, exit, get selected() { return st.data?.selected || 0; }, get cut() { return st.data?.dead || 0; } };
 
 if (!buildUI()) { const t = setInterval(() => { if (buildUI()) clearInterval(t); }, 300); setTimeout(() => clearInterval(t), 20000); }
