@@ -1,4 +1,4 @@
-// SHRINK 3D v2.109 — save the left-panel settings to a small JSON file and load them back.
+// SHRINK 3D v2.110 — save the whole tweaked model (a .glb with the settings inside) or just the settings (.json), and load either back.
 // It stores what is set, not the model: target card, detail %, texture options, protect options and every wheel slider.
 // Paint edits and "Look" (material) changes are pixels/maths on the model itself, so they are NOT in the file.
 // Loading just sets the controls and fires their normal events, so the Optimise button turns red ("Optimise again") by itself.
@@ -17,7 +17,7 @@ export function collect() {
   const values = {};
   for (const el of controls()) values[el.id] = el.type === 'checkbox' ? el.checked : el.value;
   return {
-    kind: KIND, version: FILE_VERSION, app: 'SHRINK 3D', release: window.__shrinkRelease || '2.109',
+    kind: KIND, version: FILE_VERSION, app: 'SHRINK 3D', release: window.__shrinkRelease || '2.110',
     saved: new Date().toISOString(), model: modelName(),
     target: document.querySelector('.control-panel .target-card.active')?.dataset.target || '',
     values,
@@ -44,10 +44,47 @@ export function apply(data) {
   return { applied, skipped };
 }
 
+
+// ---- project file: the model itself (with paint, removed parts and Look baked in) as a normal .glb, with the settings stored in its glTF extras ----
+// It opens in any viewer as the tweaked vehicle; SHRINK reads the settings back when the file is opened, so the wheel adjustments and every control return too.
+export function projectFromBytes(bytes) {
+  try {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (bytes.byteLength < 20 || dv.getUint32(0, true) !== 0x46546C67 || dv.getUint32(16, true) !== 0x4E4F534A) return null;   // 'glTF', then a JSON chunk
+    const len = dv.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + len)));
+    const p = json?.extras?.shrinkProject;
+    return p && p.kind === KIND ? p : null;
+  } catch { return null; }
+}
+async function applyPaintFirst() {
+  if (!window.__shrinkPaint?.hasEdits?.()) return false;
+  say('Saving your paint into the model first…');
+  await new Promise(res => { const done = () => { window.removeEventListener('shrink:texture-applied', done); res(); }; window.addEventListener('shrink:texture-applied', done); setTimeout(done, 30000); $('applyTextureBtn')?.click(); });
+  window.__shrinkPaint?.setMode?.('navigate');      // applying paint switches Paint on; go back to rotating
+  return true;
+}
+async function saveProject() {
+  const app = window.__shrinkApp; if (!app?.sourceBytes) { say('Open a model first.', true); return; }
+  const btn = $('settingsProject'); if (btn) btn.disabled = true;
+  try {
+    await applyPaintFirst();
+    say('Building the project file…');
+    const doc = await app.readDoc(), look = window.__shrinkMaterial;
+    if (look?.changed) { look.applyToDocument(doc); await look.applyColourToDocument?.(doc); }
+    const d = collect(), root = doc.getRoot();
+    root.setExtras({ ...(root.getExtras() || {}), shrinkProject: d });
+    const bytes = await app.writeDoc(doc), stem = (d.model || 'model').replace(/\.[^.]+$/, '').replace(/-SHRINK-project$/, '');
+    download(bytes, `${stem}-SHRINK-project.glb`, 'model/gltf-binary');
+    say(`Saved ${stem}-SHRINK-project.glb — the model with your paint, removed parts and wheel adjustments. Open this file in SHRINK to carry on.`);
+  } catch (err) { console.error(err); say(`Could not save the project: ${err.message}`, true); }
+  finally { if (btn) btn.disabled = false; }
+}
+
 function say(text, bad) { for (const id of ['settingsFileNote', 'settingsStartNote']) { const n = $(id); if (n) { n.textContent = text; n.classList.toggle('stale', !!bad); } } }
 
-function download(obj, name) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+function download(obj, name, type) {
+  const url = URL.createObjectURL(new Blob([type ? obj : JSON.stringify(obj, null, 2)], { type: type || 'application/json' }));
   const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
@@ -70,9 +107,11 @@ async function takeFile(f) {
   } catch (err) { say(err instanceof SyntaxError ? 'That file is not valid JSON.' : err.message, true); }
 }
 window.addEventListener('shrink:model-opened', () => {
+  let fromFile = false;
+  if (!pending) { const p = projectFromBytes(window.__shrinkApp?.sourceBytes || new Uint8Array(0)); if (p) { pending = p; fromFile = true; } }
   if (!pending) return;
   const data = pending; pending = null;
-  const go = () => { try { const r = apply(data); say(`Settings applied (${r.applied} controls). Press Optimise to build.`, false); } catch (err) { say(err.message, true); } };
+  const go = () => { try { const r = apply(data); say(fromFile ? `Project opened: your settings and wheel adjustments are back (${r.applied} controls). Press Optimise to build.` : `Settings applied (${r.applied} controls). Press Optimise to build.`, false); } catch (err) { say(err.message, true); } };
   let done = false; const once = () => { if (done) return; done = true; window.removeEventListener('shrink:live-ready', onReady); setTimeout(go, 200); };
   const onReady = () => once();
   window.addEventListener('shrink:live-ready', onReady); setTimeout(once, 20000);
@@ -82,7 +121,7 @@ function buildStart() {
   if ($('settingsStartRow')) return true;
   const drop = $('dropZone'); if (!drop) return false;
   const row = document.createElement('div'); row.id = 'settingsStartRow'; row.className = 'hint game-only settings-start';
-  row.innerHTML = 'Have a settings file from before? <button id="settingsStartLoad" class="button ghost small" type="button">Load settings</button> <span id="settingsStartNote"></span>';
+  row.innerHTML = 'Have a settings file from before? (A saved project .glb needs no loading: just open it as your model.) <button id="settingsStartLoad" class="button ghost small" type="button">Load settings</button> <span id="settingsStartNote"></span>';
   drop.after(row);
   const sync = () => { row.hidden = drop.classList.contains('hidden'); };
   sync(); new MutationObserver(sync).observe(drop, { attributes: true, attributeFilter: ['class'] });
@@ -94,11 +133,12 @@ function build() {
   if ($('settingsFileRow')) return true;
   const anchor = $('flowNote') || $('stepSave'); if (!anchor) return false;
   const row = document.createElement('div'); row.id = 'settingsFileRow'; row.className = 'settings-file-row game-only';
-  row.innerHTML = '<button id="settingsSave" class="button ghost small" type="button" title="Save these settings (detail, textures, wheel adjustments) to a .json file">Save settings</button>' +
-    '<button id="settingsLoad" class="button ghost small" type="button" title="Load a settings file saved earlier">Load settings</button>' +
-    '';
+  row.innerHTML = '<button id="settingsProject" class="button ghost small" type="button" title="Save the whole tweaked model as one .glb: your paint, removed parts, look and wheel adjustments, with every setting stored inside. Open it in SHRINK later to carry on.">Save project (GLB)</button>' +
+    '<button id="settingsSave" class="button ghost small" type="button" title="Save only the settings (detail, textures, wheel adjustments) to a small .json file">Settings only</button>' +
+    '<button id="settingsLoad" class="button ghost small" type="button" title="Load a settings .json saved earlier (a saved project .glb is simply opened as the model)">Load settings</button>';
   const note = document.createElement('div'); note.id = 'settingsFileNote'; note.className = 'hint flow-note';
   anchor.after(row); row.after(note);
+  $('settingsProject').addEventListener('click', saveProject);
   $('settingsSave').addEventListener('click', () => {
     const d = collect(); const stem = (d.model || 'model').replace(/\.[^.]+$/, '');
     download(d, `${stem}-SHRINK-settings.json`);
@@ -113,7 +153,7 @@ function ensureInput() {
   const i = document.createElement('input'); i.id = 'settingsLoadInput'; i.type = 'file'; i.accept = '.json,application/json'; i.hidden = true; document.body.appendChild(i);
   i.addEventListener('change', e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) takeFile(f); });
 }
-window.__shrinkSettings = { collect, apply, takeFile };
+window.__shrinkSettings = { collect, apply, takeFile, saveProject, projectFromBytes };
 ensureInput(); buildStart();
 if (!$('settingsStartRow')) { const t0 = setInterval(() => { if (buildStart()) clearInterval(t0); }, 300); setTimeout(() => clearInterval(t0), 15000); }
 if (!build()) { const t = setInterval(() => { if (build()) clearInterval(t); }, 300); setTimeout(() => clearInterval(t), 15000); }

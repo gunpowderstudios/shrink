@@ -830,6 +830,7 @@ async function optimizeModel() {
     }
 
     setProgress(94, 'Writing optimized GLB…');
+    { const ex = document.getRoot().getExtras(); if (ex && ex.shrinkProject) { const { shrinkProject, ...rest } = ex; document.getRoot().setExtras(rest); } }   // the saved project's settings are not part of the game file
     optimizedBytes = await io.writeBinary(document);
 
     setProgress(97, 'Loading optimized preview…');

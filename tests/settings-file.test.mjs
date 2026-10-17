@@ -58,4 +58,29 @@ await new Promise(r => setTimeout(r, 400));
 ok($('geometry').value === '41' && $('wheelFront').value === '15', 'applied after the model opened');
 await S.takeFile({ text: async () => '{"hello":1}' });
 ok(/not a SHRINK settings file/.test($('settingsStartNote').textContent), 'wrong JSON file reported on the start screen');
+
+// ---- project file: the model as a .glb with the settings stored in its extras ----
+{
+  const { Document, NodeIO } = await import('@gltf-transform/core'); const io = new NodeIO();
+  const doc = new Document(); doc.createBuffer(); doc.createScene('s');
+  const bytes = new Uint8Array(await io.writeBinary(doc));
+  ok(S.projectFromBytes(bytes) === null, 'a plain GLB has no project settings');
+  let blob = null; const realCreate = URL.createObjectURL; URL.createObjectURL = b => { blob = b; return 'blob:test'; };
+  window.__shrinkApp = { sourceFile: { name: 'car.glb' }, sourceBytes: bytes, readDoc: () => io.readBinary(bytes), writeDoc: d => io.writeBinary(d) };
+  $('geometry').value = '55'; $('wheelFront').value = '33'; $('wheelLayout').value = '3';
+  await S.saveProject();
+  URL.createObjectURL = realCreate;
+  ok(!!blob, 'Save project produced a file');
+  const out = new Uint8Array(await blob.arrayBuffer());
+  const p = S.projectFromBytes(out);
+  ok(p && p.kind === 'shrink-settings' && p.values.geometry === '55' && p.values.wheelFront === '33' && p.values.wheelLayout === '3', 'the settings are stored inside the GLB');
+  ok((await io.readBinary(out)).getRoot().listScenes().length === 1, 'and it is still a normal GLB');
+  // opening that GLB brings the settings back
+  $('geometry').value = '70'; $('wheelFront').value = '0'; $('wheelLayout').value = '4';
+  window.__shrinkApp = { sourceFile: { name: 'car-SHRINK-project.glb' }, sourceBytes: out };
+  window.dispatchEvent(new window.Event('shrink:model-opened')); window.dispatchEvent(new window.Event('shrink:live-ready'));
+  await new Promise(r => setTimeout(r, 400));
+  ok($('geometry').value === '55' && $('wheelFront').value === '33' && $('wheelLayout').value === '3', 'opening the project restores geometry, wheel slider and layout');
+  ok(/Project opened/.test($('settingsFileNote').textContent), 'note says the project was opened');
+}
 console.log(bad ? `\n${bad} FAILED` : '\nall passed'); process.exit(bad ? 1 : 0);

@@ -1,5 +1,5 @@
 // SHRINK 3D v2.90 — "Separate the wheels" panel (Game mode). The cutting is in wheel-split-core.js; this is the switch and the message. The live preview keeps showing the reduced model; the split exists in the saved GLB only.
-import { splitWheels } from './wheel-split-core.js?v=2.109';
+import { splitWheels } from './wheel-split-core.js?v=2.110';
 
 const $ = id => document.getElementById(id);
 function fresh(layout) { return { layout: layout || '4', shiftFront: 0, shiftRear: 0, trackFront: 0, trackRear: 0, front: 0, rear: 0, dyFront: 0, dyRear: 0, dyW: { Wheel_FL: 0, Wheel_FR: 0, Wheel_RL: 0, Wheel_RR: 0, Wheel_F: 0, Wheel_L: 0, Wheel_R: 0 }, sizeFront: 1, sizeRear: 1, widthFront: 1, widthRear: 1 }; }
@@ -71,7 +71,7 @@ function inject() {
     <label class="check"><input id="wheelSplit" type="checkbox" checked> Separate the wheels</label>
     <div class="control-block compact"><label for="wheelLayout">Wheel layout</label><select id="wheelLayout"><option value="4">4 wheels (two axles)</option><option value="3">3 wheels (one at the front, two at the back)</option><option value="2">2 wheels (one axle, e.g. a caravan)</option><option value="auto">Auto (try 4, then 3)</option></select></div>
     <div class="hint">Cuts the wheels out as their own parts (Wheel_FL/FR/RL/RR, Wheel_F + Wheel_RL/RR on a three-wheeler, or Wheel_L + Wheel_R on a one-axle caravan: use the Front sliders), each pivoting on its own centre, so a game can spin and steer them. The car must sit on its wheels. The preview looks the same; the wheels are separate in the saved file.</div>
-    <details id="wheelAdjust" class="fold tiny"><summary>Adjust wheels (only if the markers look wrong)</summary><div class="fold-inner">
+    <details id="wheelAdjust" class="fold tiny" open><summary>Adjust wheels (only if the markers look wrong)</summary><div class="fold-inner">
       <div class="wheel-group"><b>Front wheels</b></div>
       <div class="range-heading"><label for="wheelSizeFront">Front wheel size</label><output id="wheelSizeFrontV">100%</output></div><input id="wheelSizeFront" type="range" min="50" max="150" step="1" value="100">
       <div class="range-heading"><label for="wheelFront">Front forward / back</label><output id="wheelFrontV">0</output></div><input id="wheelFront" type="range" min="-100" max="100" step="1" value="0">

@@ -2,6 +2,13 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.110 — Save project (GLB), wheel adjustments open by default
+
+- **Save project (GLB)** (settings-file.js `saveProject`): applies pending paint into the model, bakes the Look change, and writes the source GLB (which already has any Remove-brush cuts) with the settings stored in the glTF root `extras.shrinkProject` (the same object as the settings .json). It is a normal GLB that opens anywhere. The wheel split is *not* baked: it stays a setting so the wheels remain adjustable.
+- Opening a project GLB as the model restores every control and wheel slider (`projectFromBytes` reads only the file's JSON chunk, then the existing pending-apply path waits for `shrink:live-ready`; allow a few seconds). Optimise strips `shrinkProject` from the game file it builds.
+- The old **Save settings** is now **Settings only** (.json). Adjust wheels is `open` by default.
+- Tests: settings-file.test.mjs (save, read back, reopen). Browser-checked on the Dodge: remove a part, move a wheel slider, save, reopen in a fresh page.
+
 ## v2.109 — Remove brush (Game mode)
 
 - New **Remove** button in the viewer toolbar (`remove-part.js`, loaded by `ui-mode.js`). Brush over triangles (they turn red, Alt-drag or Unselect un-picks, "Only what I can see" limits it to faces pointing at you), then **Remove selected** cuts them out of the source GLB. Unused vertices are dropped; a primitive that loses every triangle is removed. **Undo remove** restores up to the last 5 cuts.

@@ -415,6 +415,7 @@ A good Simple-mode run should:
 
 ## Settings file (v2.99)
 - `settings-file.js` saves/loads the `.control-panel` inputs by element id (so new controls and wheel sliders are included automatically; mirrors and painting tools are in its `SKIP`). Loading only sets values and fires `input`/`change`; it never builds. Target card is clicked first, `geometry` applied last. Paint edits and Look are deliberately not stored. Print-mode state (FUSE IT etc.) is not covered.
+- (v2.110) **Save project (GLB)** writes the source GLB (paint applied, Look baked, Remove cuts already in it) with the same settings object in glTF `extras.shrinkProject`. Opening such a file applies it via `projectFromBytes` + the pending path in `settings-file.js`. The wheel split is never baked into the project; `optimizeModel` strips `shrinkProject` from the game GLB.
 
 ## Paint tool rules (v2.100)
 - `abortStroke()` in `paint3d.js` ends whatever is running (stroke, spray timer, stamp box); `setMode` and Esc call it. Window-level pointerup/cancel/move/blur handlers exist so a lost mouse-up can never leave the brush painting. Do not gate Esc on `state.painting` again.
