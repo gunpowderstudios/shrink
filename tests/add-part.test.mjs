@@ -24,4 +24,6 @@ const w2 = mergePart(car, wheel, { translation: [-10, 2, 0], scale: [-2, 2, 2] }
 const keys = prepare(car).prims.map(p => p.pk); assert.equal(keys[0], '0:0', 'car primitive keeps its key'); assert.equal(keys.length, before + 2);
 assert.equal(car.getRoot().listBuffers().length, 1, 'one buffer, so the GLB can be written');
 assert.ok(car.getRoot().listAccessors().every(a => a.getBuffer() === car.getRoot().listBuffers()[0]));
+const w3 = mergePart(car, wheel, { translation: [0, 0, 0] }, 'Part_wheel_3', mergeDocuments, { shrinkPart: 'k1' });
+assert.equal(w3.getExtras().shrinkPart, 'k1', 'the wrapper remembers which part file it came from');
 console.log('add-part tests passed');
