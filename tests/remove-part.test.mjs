@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { Document } from '@gltf-transform/core';
-import { prepare, select, clearSelection, selectedCorners, removeSelected } from '../remove-part-core.js';
+import { prepare, select, selectAll, clearSelection, selectedCorners, deadCorners, applySelection, aliveTotal, snapshotMasks, restoreMasks, rewrite, stripEmpty } from '../remove-part-core.js';
 
 // a body (indexed box-ish strip) and a "mirror" (non-indexed triangles) sitting out at x=5, on a node moved by +10 in x
 function model() {
@@ -34,19 +34,35 @@ function model() {
   select(d, [15, 0.8, 0.3], 0.5);                           // the mirror
   select(d, [0.2, 0.3, 0.3], 0.15);                         // a few body triangles
   const before = d.selected; assert.ok(before > 5);
-  const r = removeSelected(doc, d);
-  assert.equal(r.removed, before); assert.equal(r.remaining, 25 - before);
-  assert.equal(mirror.isDisposed(), true, 'mirror primitive gone when all its triangles go');
-  assert.equal(doc.getRoot().listMeshes().length, 1, 'empty mesh dropped');
+  assert.equal(applySelection(d, 'remove'), before); assert.equal(aliveTotal(d), 25 - before); assert.equal(d.selected, 0);
+  assert.equal(rewrite(doc, d), 2, 'both touched primitives rebuilt');
+  const mp = mirror.getExtras(); assert.equal(mp.shrinkEmpty, true, 'emptied primitive kept as a flagged placeholder');
   const idx = body.getIndices().getArray(), nv = body.getAttribute('POSITION').getCount();
   assert.equal(idx.length / 3, 20 - (before - 5), 'body triangles left');
   assert.equal(nv, idx.length, 'unused vertices dropped (each triangle owned 3)');
   assert.ok(Math.max(...idx) < nv, 'indices valid');
+  assert.equal(stripEmpty(doc), 1, 'placeholder stripped for export'); assert.equal(doc.getRoot().listMeshes().length, 1, 'empty mesh dropped');
   console.log('ok remove'); }
+
+// weld back: the cut part can be brought back, from a baseline that never changes
+{ const { doc, body, mirror } = model(); const d = prepare(doc);
+  select(d, [15, 0.8, 0.3], 0.5); const snap0 = snapshotMasks(d); applySelection(d, 'remove'); rewrite(doc, d);
+  assert.equal(d.dead, 5); assert.equal(deadCorners(d).length, 5 * 9, 'ghost shows the cut triangles');
+  assert.equal(select(d, [15, 0.8, 0.3], 0.5, { mode: 'remove' }), 0, 'remove mode cannot pick what is already cut');
+  assert.equal(select(d, [0, 0, 0], 100, { mode: 'weld' }), 5, 'weld mode picks only cut triangles');
+  assert.equal(applySelection(d, 'weld'), 5); assert.equal(d.dead, 0); rewrite(doc, d);
+  assert.equal(mirror.getExtras().shrinkEmpty, undefined, 'placeholder flag cleared');
+  assert.equal(mirror.getIndices().getCount(), 15, 'mirror back with its 5 triangles'); assert.equal(mirror.getAttribute('TEXCOORD_0').getCount(), 15, 'uv data came back too');
+  assert.equal(stripEmpty(doc), 0, 'nothing to strip once welded back');
+  // partial weld + selectAll + undo of masks
+  select(d, [15, 0.8, 0.3], 0.5); applySelection(d, 'remove'); const snap = snapshotMasks(d); rewrite(doc, d);
+  assert.equal(selectAll(d, 'weld'), 5); clearSelection(d); restoreMasks(d, snap0); assert.equal(d.dead, 0, 'masks restored from a snapshot');
+  restoreMasks(d, snap); assert.equal(d.dead, 5);
+  console.log('ok weld back'); }
 
 { const { doc, mirror } = model(); const d = prepare(doc);
   const p = d.prims.find(x => x.node.getName() === 'mirror'); p.sel[0] = 1; p.sel[3] = 1; d.selected = 2;
-  removeSelected(doc, d);
+  applySelection(d, 'remove'); rewrite(doc, d);
   assert.equal(mirror.getIndices().getCount(), 9, 'non-indexed primitive becomes indexed with 3 triangles');
   assert.equal(mirror.getAttribute('POSITION').getCount(), 9); assert.equal(mirror.getAttribute('TEXCOORD_0').getCount(), 9, 'other attributes follow');
   console.log('ok non-indexed'); }

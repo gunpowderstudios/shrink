@@ -1,13 +1,13 @@
-// SHRINK 3D v2.110 — Remove part (Game mode). A "Remove" tool in the viewer toolbar: paint the part you do not want (a wing mirror, an aerial) red with a brush,
+// SHRINK 3D v2.111 — Remove part (Game mode). A "Remove" tool in the viewer toolbar: paint the part you do not want (a wing mirror, an aerial) red with a brush,
 // press "Remove selected", and those triangles are cut out of the model. The cut goes into the source GLB (like applying a texture edit), so Optimise, the wheels and
 // the download all use the trimmed model. Up to five removals can be undone. The picking maths and the document edit are in remove-part-core.js (tested in Node).
 import { ensureBVH, raycasterFor } from './bvh-support.js?v=2.18';
-import { prepare, select, clearSelection, selectedCorners, removeSelected } from './remove-part-core.js?v=2.110';
+import { prepare, select, selectAll, clearSelection, selectedCorners, deadCorners, applySelection, aliveTotal, snapshotMasks, restoreMasks, rewrite } from './remove-part-core.js?v=2.111';
 
 const $ = id => document.getElementById(id);
 const A = () => window.__shrinkApp, V = () => window.__shrinkViewer;
 const viewer = $('viewer'), raycaster = raycasterFor();
-const st = { on: false, busy: false, data: null, doc: null, bytes: null, size: 40, front: false, erase: false, down: false, last: null, overlay: null, undo: [], timer: null };
+const st = { on: false, mode: 'remove', busy: false, data: null, ghost: null, size: 40, front: false, erase: false, down: false, last: null, overlay: null, undo: [], timer: null };
 const say = (t, bad) => { const s = $('status'); if (s) { s.textContent = t; s.classList.toggle('error', !!bad); } };
 
 function buildUI() {
@@ -16,12 +16,16 @@ function buildUI() {
   const btn = document.createElement('button'); btn.id = 'removeModelBtn'; btn.type = 'button'; btn.className = 'button ghost small model-paint-button game-only'; btn.textContent = 'Remove';
   btn.title = 'Brush over a part of the model (a wing mirror, an aerial) and cut it out';
   controls.insertBefore(btn, $('undo3DBtn') || null);
+  const wbtn = document.createElement('button'); wbtn.id = 'weldModelBtn'; wbtn.type = 'button'; wbtn.className = 'button ghost small model-paint-button game-only'; wbtn.textContent = 'Weld';
+  wbtn.title = 'Brush over parts you cut out to weld them back in';
+  controls.insertBefore(wbtn, $('undo3DBtn') || null);
   const bar = document.createElement('div'); bar.id = 'removeBar'; bar.className = 'tool-options game-only'; bar.hidden = true;
   bar.innerHTML = `<label>Brush size <input id="rmSize" type="range" min="8" max="200" step="1" value="40" aria-label="Brush size"><output id="rmSizeV">40</output></label>
     <label title="Only pick faces that point at you. Leave it off to pick the part right through (both sides of a thin mirror)."><input id="rmFront" type="checkbox"> Only what I can see</label>
     <label title="Brush away the red instead (or hold Alt while you drag)"><input id="rmErase" type="checkbox"> Unselect</label>
     <span id="rmCount" class="rm-count">Nothing selected</span>
     <button id="rmClear" class="button ghost small" type="button" disabled>Clear</button>
+    <button id="rmAll" class="button ghost small" type="button" hidden>Select all cut</button>
     <button id="rmGo" class="button small rm-go" type="button" disabled>Remove selected</button>
     <button id="rmUndo" class="button ghost small" type="button" disabled>Undo remove</button>
     <button id="rmDone" class="button ghost small" type="button" style="margin-left:auto" title="Stop and go back to rotating the model (Esc)">Done · Esc</button>`;
@@ -32,49 +36,70 @@ function buildUI() {
     .viewer.direct-remove canvas{cursor:none!important;touch-action:none}
     .viewer.direct-remove.modifier-rotate canvas{cursor:grab!important}
     .rm-count{font-size:12px;color:#ffb3b3;font-weight:700}
-    .rm-go:not(:disabled){background:#e23d3d;color:#fff;border-color:#e23d3d}`;
+    .rm-go:not(:disabled){background:#e23d3d;color:#fff;border-color:#e23d3d}
+    .rm-go.rm-weld:not(:disabled){background:#1f9d55;border-color:#1f9d55}`;
   document.head.appendChild(css);
-  btn.addEventListener('click', () => (st.on ? exit() : enter()));
+  btn.addEventListener('click', () => (st.on && st.mode === 'remove' ? exit() : enter('remove')));
+  wbtn.addEventListener('click', () => (st.on && st.mode === 'weld' ? exit() : enter('weld')));
+  $('rmAll').addEventListener('click', () => { if (st.data) { selectAll(st.data, st.mode); refresh(); } });
   $('rmDone').addEventListener('click', () => exit());
   $('rmSize').addEventListener('input', e => { st.size = Number(e.target.value); $('rmSizeV').textContent = String(st.size); sizeRing(); });
   $('rmFront').addEventListener('change', e => { st.front = e.target.checked; });
   $('rmErase').addEventListener('change', e => { st.erase = e.target.checked; });
   $('rmClear').addEventListener('click', () => { if (st.data) { clearSelection(st.data); refresh(); } });
-  $('rmGo').addEventListener('click', doRemove);
+  $('rmGo').addEventListener('click', doGo);
   $('rmUndo').addEventListener('click', doUndo);
   return true;
 }
 
 function sizeRing() { const r = $('rmRing'); if (r) { r.style.width = r.style.height = st.size + 'px'; } }
+const weld = () => st.mode === 'weld';
 function counts() {
-  const n = st.data?.selected || 0;
-  $('rmCount').textContent = n ? `${n.toLocaleString()} of ${st.data.total.toLocaleString()} triangles selected` : 'Nothing selected';
+  const n = st.data?.selected || 0, dead = st.data ? st.data.dead : 0;
+  $('rmCount').textContent = n ? `${n.toLocaleString()} triangles selected` : weld() ? (dead ? `${dead.toLocaleString()} triangles are cut out (blue)` : 'Nothing has been cut out yet') : 'Nothing selected';
   $('rmClear').disabled = !n; $('rmGo').disabled = !n || st.busy; $('rmUndo').disabled = !st.undo.length || st.busy;
+  $('rmAll').disabled = weld() && !dead; $('rmAll').hidden = !weld();
+  $('rmGo').textContent = weld() ? 'Weld back selected' : 'Remove selected'; $('rmGo').classList.toggle('rm-weld', weld());
+  $('rmFront').closest('label').hidden = weld();
 }
 
-function clearOverlay() {
-  if (!st.overlay) return;
-  V()?.scene.remove(st.overlay); st.overlay.geometry.dispose(); st.overlay.material.dispose(); st.overlay = null;
+function dropMesh(key) { const m = st[key]; if (!m) return; V()?.scene.remove(m); m.geometry.dispose(); m.material.dispose(); st[key] = null; }
+function clearOverlay() { dropMesh('overlay'); dropMesh('ghost'); }
+function mkMesh(corners, color, opacity, raycastable) {
+  const T = A()?.THREE; if (!T || !corners?.length) return null;
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(corners, 3));
+  const m = new T.Mesh(g, new T.MeshBasicMaterial({ color, transparent: true, opacity, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, depthWrite: false }));
+  m.frustumCulled = false; if (!raycastable) m.raycast = () => {}; m.renderOrder = 10; V().scene.add(m); return m;
 }
 function rebuildOverlay() {
-  st.timer = null; clearOverlay();
-  const T = A()?.THREE, corners = st.data ? selectedCorners(st.data) : null;
-  if (!T || !corners?.length) return;
-  const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(corners, 3));
-  const m = new T.Mesh(g, new T.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.7, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
-  m.frustumCulled = false; m.raycast = () => {}; m.renderOrder = 10; V().scene.add(m); st.overlay = m;
+  st.timer = null; dropMesh('overlay');
+  if (st.data) st.overlay = mkMesh(selectedCorners(st.data), weld() ? 0x35e07a : 0xff2a2a, 0.75, false);
+}
+function rebuildGhost() {                       // while welding: every cut-out triangle, in blue
+  dropMesh('ghost');
+  if (st.data && weld()) st.ghost = mkMesh(deadCorners(st.data), 0x3aa0ff, 0.45, true);
 }
 function refresh(soon) { counts(); if (soon) { if (!st.timer) st.timer = setTimeout(rebuildOverlay, 60); } else { clearTimeout(st.timer); rebuildOverlay(); } }
 
+// The baseline copy of the model that cuts are masks over. Made once per opened model (before the first cut) and kept for the session.
 async function load() {
   clearOverlay();
   await ensureBVH(A().originalModel, say);
-  st.bytes = A().sourceBytes; st.doc = await A().readDoc(); st.data = prepare(st.doc); counts();
+  if (!st.data) { const doc = await A().readDoc(); st.data = prepare(doc); st.undo = []; }
+  counts();
 }
 
-async function enter() {
+const HELP = { remove: 'REMOVE · drag to paint the part red · Alt-drag unselects · Cmd/Ctrl to rotate · Esc when done', weld: 'WELD · cut-out parts show blue · drag over them to paint them green · Cmd/Ctrl to rotate · Esc when done' };
+function setModeUI() {
+  $('removeModelBtn').classList.toggle('active', st.on && st.mode === 'remove'); $('weldModelBtn').classList.toggle('active', st.on && st.mode === 'weld');
+  const help = document.querySelector('.viewer-help'); if (help && st.on) help.textContent = HELP[st.mode];
+  $('rmRing').style.borderColor = weld() ? '#35e07a' : '#ff5a5a';
+}
+async function enter(mode = 'remove') {
   const app = A(); if (!app?.sourceBytes) { say('Open a model first.', true); return; }
-  if (st.busy) return; st.busy = true;
+  if (st.busy) return;
+  if (st.on) { if (st.data) clearSelection(st.data); st.mode = mode; clearOverlay(); if (weld()) rebuildGhost(); setModeUI(); refresh(); say(mode === 'weld' ? 'Weld: the parts you cut out show in blue. Brush over them, then press “Weld back selected”.' : 'Remove: brush over the part you want gone, then press “Remove selected”.'); return; }
+  st.busy = true;
   try {
     if (window.__shrinkPaint?.hasEdits?.()) {          // keep painted-on colour: write it into the model first, then cut
       say('Saving your paint into the model first…');
@@ -82,13 +107,12 @@ async function enter() {
     }
     window.__shrinkPaint?.setMode?.('navigate');
     app.show('original');
-    say('Preparing the model for the Remove brush…');
+    say('Preparing the model…');
     await load();
-    st.on = true; st.last = null;
-    viewer.classList.add('direct-remove'); $('removeModelBtn').classList.add('active'); $('removeBar').hidden = false; sizeRing();
-    const help = document.querySelector('.viewer-help'); if (help) help.textContent = 'REMOVE · drag to paint the part red · Alt-drag unselects · Cmd/Ctrl to rotate · Esc when done';
-    say('Remove: brush over the part you want gone (it turns red), then press “Remove selected”. Nothing is cut until you do.');
-  } catch (err) { console.error(err); say(`Could not start the Remove brush: ${err.message}`, true); }
+    st.mode = mode; st.on = true; st.last = null;
+    viewer.classList.add('direct-remove'); $('removeBar').hidden = false; sizeRing(); if (weld()) rebuildGhost(); setModeUI();
+    say(mode === 'weld' ? 'Weld: the parts you cut out show in blue. Brush over them, then press “Weld back selected”.' : 'Remove: brush over the part you want gone (it turns red), then press “Remove selected”. Nothing is cut until you do.');
+  } catch (err) { console.error(err); say(`Could not start the tool: ${err.message}`, true); }
   finally { st.busy = false; counts(); }
 }
 
@@ -96,7 +120,7 @@ function exit(restoreHelp = true) {
   if (!st.on) return;
   st.on = false; st.down = false; st.last = null;
   clearTimeout(st.timer); clearOverlay(); if (st.data) clearSelection(st.data);
-  viewer.classList.remove('direct-remove', 'modifier-rotate'); $('removeModelBtn')?.classList.remove('active'); if ($('removeBar')) $('removeBar').hidden = true; if ($('rmRing')) $('rmRing').style.display = 'none';
+  viewer.classList.remove('direct-remove', 'modifier-rotate'); $('removeModelBtn')?.classList.remove('active'); $('weldModelBtn')?.classList.remove('active'); if ($('removeBar')) $('removeBar').hidden = true; if ($('rmRing')) $('rmRing').style.display = 'none';
   if (window.__shrinkViewer?.controls?.mouseButtons) window.__shrinkViewer.controls.mouseButtons.LEFT = 0;
   if (restoreHelp) window.__shrinkPaint?.setMode?.('navigate');
 }
@@ -106,13 +130,16 @@ function pick(clientX, clientY) {
   const v = V(), root = A()?.originalModel; if (!v || !root) return null;
   const rect = v.renderer.domElement.getBoundingClientRect(); if (!rect.width || !rect.height) return null;
   raycaster.setFromCamera({ x: ((clientX - rect.left) / rect.width) * 2 - 1, y: -((clientY - rect.top) / rect.height) * 2 + 1 }, v.camera);
-  const h = raycaster.intersectObject(root, true).find(x => x.object.isMesh); if (!h) return null;
+  let h;
+  if (weld()) { h = raycaster.intersectObjects(st.ghost ? [st.ghost, root] : [root], true).find(x => x.object.isMesh); if (!h || h.object !== st.ghost) return null; }   // only a ghost that nothing is in front of
+  else h = raycaster.intersectObject(root, true).find(x => x.object.isMesh);
+  if (!h) return null;
   const cam = v.camera, wpp = cam.isPerspectiveCamera ? 2 * h.distance * Math.tan((cam.fov * Math.PI / 360)) / rect.height : (cam.top - cam.bottom) / cam.zoom / rect.height;
   return { point: h.point, wpp, eye: [cam.position.x, cam.position.y, cam.position.z] };
 }
 function dab(x, y, alt) {
   const h = pick(x, y); if (!h || !st.data) return;
-  const n = select(st.data, [h.point.x, h.point.y, h.point.z], st.size / 2 * h.wpp, { erase: st.erase || alt, eye: st.front ? h.eye : null });
+  const n = select(st.data, [h.point.x, h.point.y, h.point.z], st.size / 2 * h.wpp, { mode: st.mode, erase: st.erase || alt, eye: st.front && !weld() ? h.eye : null });
   if (n) refresh(true);
 }
 function stroke(e) {
@@ -143,34 +170,36 @@ window.addEventListener('keydown', e => {
 }, true);
 window.addEventListener('keyup', e => { if (st.on && (e.key === 'Meta' || e.key === 'Control')) { viewer.classList.remove('modifier-rotate'); orbitLeft(false); } }, true);
 
-// ---- removing and undoing ----
+// ---- cutting, welding back and undoing ----
 async function swapIn(bytes, message) {
   await A().replaceSource(bytes);              // reloads the preview; the paint tool answers its texture-applied event by switching Paint on, so put it back
   window.__shrinkPaint?.setMode?.('navigate'); A().show('original');
-  await load(); refresh(); say(message);
+  await ensureBVH(A().originalModel, say);
+  if (weld()) rebuildGhost(); refresh(); say(message);
 }
-async function doRemove() {
+async function doGo() {
   if (!st.data?.selected || st.busy) return; st.busy = true; counts();
+  const mode = st.mode;
   try {
-    if (A().sourceBytes !== st.bytes) throw new Error('The model changed since you started brushing. Brush again.');
-    say('Cutting the selection out…');
-    const r = removeSelected(st.doc, st.data);
-    await A().pruneDoc(st.doc);
-    const bytes = await A().writeDoc(st.doc), prev = st.bytes;
-    st.undo.push(prev); if (st.undo.length > 5) st.undo.shift();
-    await swapIn(bytes, `Removed ${r.removed.toLocaleString()} triangles (${r.remaining.toLocaleString()} left). Press Optimise to build the file. Undo remove puts them back.`);
-  } catch (err) { console.error(err); say(`Could not remove that: ${err.message}`, true); try { await load(); } catch {} refresh(); }
+    say(mode === 'weld' ? 'Welding the parts back…' : 'Cutting the selection out…');
+    const prevBytes = A().sourceBytes, prevMasks = snapshotMasks(st.data);
+    const n = applySelection(st.data, mode);
+    const doc = await A().readDoc(); rewrite(doc, st.data); await A().pruneDoc(doc);
+    const bytes = await A().writeDoc(doc);
+    st.undo.push({ bytes: prevBytes, masks: prevMasks }); if (st.undo.length > 5) st.undo.shift();
+    await swapIn(bytes, mode === 'weld' ? `Welded ${n.toLocaleString()} triangles back in. Press Optimise to build the file.` : `Removed ${n.toLocaleString()} triangles (${aliveTotal(st.data).toLocaleString()} left). Weld puts them back, or Undo remove.`);
+  } catch (err) { console.error(err); say(`Could not do that: ${err.message}`, true); refresh(); }
   finally { st.busy = false; counts(); }
 }
 async function doUndo() {
   if (!st.undo.length || st.busy) return; st.busy = true; counts();
-  try { await swapIn(st.undo.pop(), 'Put the last removed part back.'); }
+  try { const u = st.undo.pop(); await swapIn(u.bytes, 'Undone.'); restoreMasks(st.data, u.masks); if (weld()) rebuildGhost(); refresh(); }
   catch (err) { console.error(err); say(`Could not undo: ${err.message}`, true); }
   finally { st.busy = false; counts(); }
 }
 
 window.addEventListener('shrink:paint-mode', e => { if (st.on && !st.busy && e.detail?.mode !== 'navigate') exit(false); });
-window.addEventListener('shrink:model-opened', () => { st.undo = []; st.data = null; st.doc = null; st.bytes = null; if (st.on) exit(false); if ($('rmCount')) counts(); });
-window.__shrinkRemove = { get active() { return st.on; }, enter, exit, get selected() { return st.data?.selected || 0; } };
+window.addEventListener('shrink:model-opened', () => { st.undo = []; st.data = null; if (st.on) exit(false); if ($('rmCount')) counts(); });
+window.__shrinkRemove = { get active() { return st.on; }, get mode() { return st.mode; }, enter, exit, get selected() { return st.data?.selected || 0; }, get cut() { return st.data?.dead || 0; } };
 
 if (!buildUI()) { const t = setInterval(() => { if (buildUI()) clearInterval(t); }, 300); setTimeout(() => clearInterval(t), 20000); }

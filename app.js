@@ -3,6 +3,7 @@ import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/control
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://esm.sh/three@0.180.0/examples/jsm/environments/RoomEnvironment.js';
 import { WebIO, Document } from '@gltf-transform/core';
+import { stripEmpty } from './remove-part-core.js?v=2.111';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt } from '@gltf-transform/functions';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
@@ -671,8 +672,8 @@ async function downloadEdited() {
   let bytes = sourceBytes;
   const look = window.__shrinkMaterial;
   const wheels = window.__shrinkWheels?.enabled && window.__shrinkUI?.getMode?.() !== 'print';
-  if (look?.changed || wheels) {          // Material look changed or wheels to separate: write it into the edited GLB too
-    try { const doc = await io.readBinary(sourceBytes); if (look?.changed) { look.applyToDocument(doc); await look.applyColourToDocument?.(doc); } if (wheels) window.__shrinkWheels.apply(doc); await doc.transform(prune()); bytes = await io.writeBinary(doc); }
+  if (look?.changed || wheels || window.__shrinkRemove?.cut) {          // Material look changed, wheels to separate, or parts cut out: write it into the edited GLB too
+    try { const doc = await io.readBinary(sourceBytes); stripEmpty(doc); if (look?.changed) { look.applyToDocument(doc); await look.applyColourToDocument?.(doc); } if (wheels) window.__shrinkWheels.apply(doc); await doc.transform(prune()); bytes = await io.writeBinary(doc); }
     catch (err) { console.error(err); setStatus(`Saved without the Material look change: ${err.message}`, true); }
   }
   downloadBytes(bytes, `${baseName()}-edited.glb`);
@@ -786,6 +787,7 @@ async function optimizeModel() {
     await MeshoptDecoder.ready;
     await MeshoptEncoder.ready;
     const document = await io.readBinary(sourceBytes);
+    stripEmpty(document);      // parts cut out with the Remove brush leave a collapsed placeholder triangle; the saved file does not need it
     window.__shrinkMaterial?.applyToDocument?.(document);      // Material look: the saved GLB gets the same metallic setting as the preview
     await window.__shrinkMaterial?.applyColourToDocument?.(document);   // colour correction repaints the base-colour picture (before it is resized)
     const keepRatio = Number(els.geometry.value) / 100;
@@ -940,6 +942,7 @@ window.__shrinkApp = {
   get sourceKind() { return sourceKind; },
   get sourceFile() { return sourceFile; },
   readDoc: () => io.readBinary(sourceBytes),
+  stripEmpty,
   writeDoc: doc => io.writeBinary(doc),
   pruneDoc: doc => doc.transform(prune()),
   replaceSource,

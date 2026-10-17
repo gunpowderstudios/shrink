@@ -1,4 +1,4 @@
-// SHRINK 3D v2.110 — save the whole tweaked model (a .glb with the settings inside) or just the settings (.json), and load either back.
+// SHRINK 3D v2.111 — save the whole tweaked model (a .glb with the settings inside) or just the settings (.json), and load either back.
 // It stores what is set, not the model: target card, detail %, texture options, protect options and every wheel slider.
 // Paint edits and "Look" (material) changes are pixels/maths on the model itself, so they are NOT in the file.
 // Loading just sets the controls and fires their normal events, so the Optimise button turns red ("Optimise again") by itself.
@@ -17,7 +17,7 @@ export function collect() {
   const values = {};
   for (const el of controls()) values[el.id] = el.type === 'checkbox' ? el.checked : el.value;
   return {
-    kind: KIND, version: FILE_VERSION, app: 'SHRINK 3D', release: window.__shrinkRelease || '2.110',
+    kind: KIND, version: FILE_VERSION, app: 'SHRINK 3D', release: window.__shrinkRelease || '2.111',
     saved: new Date().toISOString(), model: modelName(),
     target: document.querySelector('.control-panel .target-card.active')?.dataset.target || '',
     values,
@@ -71,6 +71,7 @@ async function saveProject() {
     await applyPaintFirst();
     say('Building the project file…');
     const doc = await app.readDoc(), look = window.__shrinkMaterial;
+    app.stripEmpty?.(doc);
     if (look?.changed) { look.applyToDocument(doc); await look.applyColourToDocument?.(doc); }
     const d = collect(), root = doc.getRoot();
     root.setExtras({ ...(root.getExtras() || {}), shrinkProject: d });

@@ -2,6 +2,14 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.111 — Weld tool (bring cut-out parts back)
+
+- New **Weld** button beside Remove. In Weld mode every cut-out triangle shows as a blue ghost; brush over it (green) and press **Weld back selected**. **Select all cut** brings everything back.
+- The edit is now a **mask over a baseline copy** of the model (`remove-part-core.js`: `prepare`, `select`, `applySelection`, `rewrite`). The baseline is read once per opened model and never changed, so cut parts can always be restored exactly (a cut + weld returns the original triangle count). `rewrite()` rebuilds touched primitives of the current document from the baseline's vertex data, matched by path key (mesh-node ordinal : primitive index).
+- A primitive that loses every triangle stays as one collapsed triangle flagged `extras.shrinkEmpty`, so its path stays valid; `stripEmpty()` removes those from documents that are exported (Optimise, Save project, edited download).
+- Undo remove now restores the masks too. The baseline lives for the session only: after reopening a saved project the earlier cuts are baked in.
+- Test: remove-part.test.mjs (weld back, placeholder flag, masks). Browser-checked on the Dodge: cut 141, weld back 141 = original 9,944 triangles, undo, Optimise.
+
 ## v2.110 — Save project (GLB), wheel adjustments open by default
 
 - **Save project (GLB)** (settings-file.js `saveProject`): applies pending paint into the model, bakes the Look change, and writes the source GLB (which already has any Remove-brush cuts) with the settings stored in the glTF root `extras.shrinkProject` (the same object as the settings .json). It is a normal GLB that opens anywhere. The wheel split is *not* baked: it stays a setting so the wheels remain adjustable.
