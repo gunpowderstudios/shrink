@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.117
+- Game models now open with **Detail kept 10%** (was set from the target card, about 100k triangles). The target cards and the slider still change it. The simplifier still stops early where the surface would visibly change (error limit 0.05), so a model with many UV seams may end above 10%.
+
 ## v2.116
 - Wheel splitter: wheels that are identical copies (the four wheels from Add part, merged into one shared mesh by Optimise's dedup) are now each given their own mesh before cutting, so all four separate (before: only one, "Only 1 wheel(s) separated"). A part that gave all its triangles to a wheel is removed with its empty nodes, so no empty wheel_1..4 nodes are left behind.
 
