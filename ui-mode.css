@@ -152,3 +152,6 @@
 .app-mode-game #resultCard .stat { min-width: 0; }
 .app-mode-game #resultCard .kept-line { margin: 6px 0 0; overflow-wrap: anywhere; padding: 4px 7px; font-size: 11px; line-height: 1.35; }
 .app-mode-game #resultCard .stat { padding: 2px 8px; border-radius: 8px; }
+
+/* v2.118: in Game mode the slider and the target cards set the detail; "Find the smallest" is for 3D print (SHRINK IT clicks it), so its row is hidden there */
+.app-mode-game .detail-row:has(#autoBtn) { display: none; }

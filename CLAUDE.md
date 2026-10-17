@@ -269,7 +269,7 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 
 ## Game viewer layout
 - The navigation hint (**Drag to rotate · Scroll to zoom · Right-drag to pan**) belongs inside the 3D viewer canvas.
-- (v2.80) The big red **Find the smallest…** button under the viewer was removed on purpose; the button in the left panel is the only one. Do not bring it back.
+- (v2.80) The big red **Find the smallest…** button under the viewer was removed on purpose; the button in the left panel was the only one. (v2.118) That left-panel button (`#autoBtn`) is now hidden in Game mode too (CSS `:has`); it stays in the DOM because print mode's SHRINK IT clicks it (`print-v2-ui.js` `shrinkModel`). Do not remove the element.
 - (v2.83) The Game viewer height rule lives in `ui-mode.css` (an older `!important` rule there beat the one in `style.css`). The user explicitly asked for the drag handle along the viewer's bottom edge (`viewer-auto-button.js`), so it is allowed; it keeps no saved state. Change a style sheet, bump its `?v=` in `index.html`.
 - (v2.80) In Game mode on desktop the viewer panel is `calc(100vh - 36px)` tall and sticky. Brush size / Opacity / Stamp options live in the `.tool-options` strip under the viewer toolbar (built in `paint3d.js`), not floating over the model.
 

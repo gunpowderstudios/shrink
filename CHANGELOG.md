@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.118
+- Game mode: the "Find the smallest that still looks the same" row is hidden (the slider, now 10% by default, and the target cards set the detail). The button stays for 3D print, where SHRINK IT uses it.
+
 ## v2.117
 - Game models now open with **Detail kept 10%** (was set from the target card, about 100k triangles). The target cards and the slider still change it. The simplifier still stops early where the surface would visibly change (error limit 0.05), so a model with many UV seams may end above 10%.
 
