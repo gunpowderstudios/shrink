@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.115
+- Add part: a **Name** box names the selected part's node in the file. The first part is `Wheel_FL`; Mirror copy gives the opposite side (`Wheel_FR`, `Wheel_RR` <-> `Wheel_RL`), Copy the next free of FL/FR/RL/RR; two parts cannot share a name. Names survive Edit added parts.
+- The wheel splitter now leaves a model alone that already has root nodes named `Wheel_FL/FR/RL/RR/F/L/R`, so no name appears twice.
+- Cancel in an Edit added parts session puts the parts back (it undoes the pick-up).
+
 ## v2.114
 - Add part: **Edit added parts** picks the parts added earlier in this session back up as movable ghosts (move, rotate, size, Copy, Mirror copy), then **Add to car** puts them back. New **Flip** button turns the selected part 180 degrees about the upright axis in place. The merged wrapper node carries `extras.shrinkPart` (key of the part file); the part files are kept in memory for the session only, so parts from a reopened project are part of the model and cannot be picked up.
 
