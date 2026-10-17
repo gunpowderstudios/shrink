@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.116
+- Wheel splitter: wheels that are identical copies (the four wheels from Add part, merged into one shared mesh by Optimise's dedup) are now each given their own mesh before cutting, so all four separate (before: only one, "Only 1 wheel(s) separated"). A part that gave all its triangles to a wheel is removed with its empty nodes, so no empty wheel_1..4 nodes are left behind.
+
 ## v2.115
 - Add part: a **Name** box names the selected part's node in the file. The first part is `Wheel_FL`; Mirror copy gives the opposite side (`Wheel_FR`, `Wheel_RR` <-> `Wheel_RL`), Copy the next free of FL/FR/RL/RR; two parts cannot share a name. Names survive Edit added parts.
 - The wheel splitter now leaves a model alone that already has root nodes named `Wheel_FL/FR/RL/RR/F/L/R`, so no name appears twice.

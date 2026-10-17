@@ -26,4 +26,8 @@ assert.equal(car.getRoot().listBuffers().length, 1, 'one buffer, so the GLB can 
 assert.ok(car.getRoot().listAccessors().every(a => a.getBuffer() === car.getRoot().listBuffers()[0]));
 const w3 = mergePart(car, wheel, { translation: [0, 0, 0] }, 'Part_wheel_3', mergeDocuments, { shrinkPart: 'k1' });
 assert.equal(w3.getExtras().shrinkPart, 'k1', 'the wrapper remembers which part file it came from');
+// dedup() merges identical wheels into one shared mesh; the wheel splitter needs its own copy per node
+import { unshareMeshes } from '../wheel-split-core.js';
+{ const sh = car; const m0 = sh.getRoot().listMeshes()[0]; const n2 = sh.createNode('shared2').setMesh(m0); sh.getRoot().listScenes()[0].addChild(n2);
+  unshareMeshes(sh); assert.notEqual(n2.getMesh(), m0); assert.notEqual(n2.getMesh().listPrimitives()[0], m0.listPrimitives()[0], 'primitives are separate objects too'); }
 console.log('add-part tests passed');

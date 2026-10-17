@@ -187,7 +187,16 @@ export function collectWorldPositions(doc) {
 
 // Cut the wheels out of the document: new nodes Wheel_xx at the scene root, each wheel's triangles moved out of the body primitives.
 // Returns { found, reason?, wheels: [{name, triangles, centre}], bodyTriangles }.
+// A mesh used by several nodes (dedup() merges identical wheels into one shared mesh) cannot be cut per use: give every extra node its own copy first.
+export function unshareMeshes(doc) {
+  const seen = new Set();
+  for (const node of doc.getRoot().listNodes()) {
+    const m = node.getMesh(); if (!m) continue;
+    if (seen.has(m)) { const c = doc.createMesh(m.getName()).setExtras(m.getExtras()); for (const pr of m.listPrimitives()) c.addPrimitive(pr.clone()); node.setMesh(c); } else seen.add(m);
+  }
+}
 export function splitWheels(doc, adj = {}) {
+  unshareMeshes(doc);
   const { P, parts } = collectWorldPositions(doc);
   const det = detectWheels(P, adj);
   if (!det.found) return { found: false, reason: det.reason };
@@ -195,7 +204,7 @@ export function splitWheels(doc, adj = {}) {
   if (!scene) return { found: false, reason: 'The file has no scene.' };
   const perWheel = det.wheels.map(() => []), counts = det.wheels.map(() => 0);
   let bodyTriangles = 0; const v = [0, 0, 0];
-  const seenMesh = new Map();
+  const seenMesh = new Map(), emptied = [];
   for (const p of parts) {
     const { node, prim, pos, W } = p;
     if (prim.getMode() !== 4 || prim.listTargets().length) continue;                 // plain triangle lists only
@@ -267,8 +276,16 @@ export function splitWheels(doc, adj = {}) {
     if (groups.slice(1).some(g => g.length)) {   // some triangles left: swap the body primitive's data for the body-only subset
       const built = mk(subset(groups[0].length ? groups[0] : [0, 0, 0], null), 'body');
       for (const sem of semantics) prim.setAttribute(sem, built.attrs[sem]);
-      prim.setIndices(built.idx); bodyTriangles += groups[0].length / 3;
+      prim.setIndices(built.idx); bodyTriangles += groups[0].length / 3; if (!groups[0].length) emptied.push({ prim, node });
     } else bodyTriangles += nTri;
+  }
+  // a primitive that gave all its triangles to a wheel (an added wheel part, say) is removed, and the nodes it leaves empty with it
+  for (const { prim, node } of emptied) {
+    const mesh = node.getMesh(); prim.dispose();
+    if (mesh && !mesh.listPrimitives().length) {
+      node.setMesh(null); mesh.dispose();
+      let n = node; while (n && !n.getMesh() && !n.listChildren().length && !Object.keys(n.getExtras() || {}).filter(k => k !== 'shrinkPart').length) { const par = n.getParentNode(); n.dispose(); n = par; }
+    }
   }
   const made = [];
   det.wheels.forEach((w, k) => {
