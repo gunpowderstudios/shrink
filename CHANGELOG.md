@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.123
+- Stamp ghost really hides now. The dashed ghost is a canvas inside the viewer, and the viewer's `canvas { display:block }` rule overrode its `hidden` attribute, so it was never hidden at all once it had been shown (this was the real cause of the ghosting after Esc or a paste). Added `.stamp-ghost[hidden]{display:none!important}`.
+
 ## v2.122
 - Stamp: **Esc now cancels the stamp completely** (the copied patch is forgotten, so it does not come back the next time Stamp is switched on). The dashed ghost can no longer appear after you have left Stamp: a slow copy or paste on a big model used to finish after Esc and show it again. A paste still keeps the patch for pasting again.
 

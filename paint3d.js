@@ -948,6 +948,7 @@ stampStyle.textContent = `.tool-options{display:flex;flex-wrap:wrap;gap:6px 18px
 .stamp-group{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
 .stamp-hint{flex-basis:100%;opacity:.75;font-size:12px}
 .stamp-rect{position:absolute;z-index:28;border:2px dashed #ff4e55;background:rgba(255,78,85,.12);pointer-events:none}
+.stamp-ghost[hidden],.stamp-rect[hidden]{display:none!important}
 .stamp-ghost{position:absolute;z-index:27;pointer-events:none;opacity:.6;outline:2px dashed #fff;transform-origin:50% 50%;image-rendering:auto}`;
 document.head.appendChild(stampStyle);
 const $s = id => stampBar.querySelector('#' + id);

@@ -422,7 +422,7 @@ A good Simple-mode run should:
 ## Paint tool rules (v2.100)
 - `abortStroke()` in `paint3d.js` ends whatever is running (stroke, spray timer, stamp box); `setMode` and Esc call it. Window-level pointerup/cancel/move/blur handlers exist so a lost mouse-up can never leave the brush painting. Do not gate Esc on `state.painting` again.
 - Undo/Redo live in `multi-undo.js` (hooked on the full-texture `getImageData` that `paint3d.js` does before each stroke). **Reading the texture canvas with `getImageData(0,0,w,h)` while a paint tool is on counts as a stroke** (tests: use `toDataURL`). Each stroke has a `serial`; the bumps layer swaps its saved region on `shrink:paint-undo` / `shrink:paint-redo` (`swapRegion`).
-- Stamp: one paste finishes the stamp (`setMode('navigate')`, patch kept); Shift-click keeps it on. The ghost is hidden unless aiming. (v2.122) Esc in Stamp mode also drops the patch; every ghost unhide goes through `showGhost()`, which refuses unless `state.mode === 'stamp'` (copy/paste are async and can finish after Esc).
+- Stamp: one paste finishes the stamp (`setMode('navigate')`, patch kept); Shift-click keeps it on. The ghost is hidden unless aiming. (v2.122) Esc in Stamp mode also drops the patch; every ghost unhide goes through `showGhost()`, which refuses unless `state.mode === 'stamp'` (copy/paste are async and can finish after Esc). (v2.123) The ghost is a `<canvas>` inside `.viewer`, and `.viewer canvas{display:block}` beats the `hidden` attribute: it needs its own `[hidden]{display:none!important}` rule. Test visibility with `getComputedStyle(...).display`, not the `hidden` property.
 - Recent colours are kept in `localStorage['shrink-paint-colours']` (per browser, try/catch).
 
 ## Stamp (v2.79)
