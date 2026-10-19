@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.122
+- Stamp: **Esc now cancels the stamp completely** (the copied patch is forgotten, so it does not come back the next time Stamp is switched on). The dashed ghost can no longer appear after you have left Stamp: a slow copy or paste on a big model used to finish after Esc and show it again. A paste still keeps the patch for pasting again.
+
 ## v2.121
 - Exported file names always write **SHRINK** in capitals (GLB, STL, project and settings files), and a file that already ends in -SHRINK (re-opened output, in any case) is not tagged twice.
 

@@ -1,4 +1,4 @@
-// SHRINK 3D v2.121 — Add part (Game mode). "Add part…" in the viewer toolbar: pick another .glb (a separate wheel, say), place it on the car with the move / turn / size
+// SHRINK 3D v2.122 — Add part (Game mode). "Add part…" in the viewer toolbar: pick another .glb (a separate wheel, say), place it on the car with the move / turn / size
 // gizmo, make copies (a mirrored copy for the other side), then "Add to car" merges it into the model under its own node. The merge goes through the source GLB
 // (like the Remove brush), so Optimise and the download use it. The placement maths is in the page; the merge itself is add-part-core.js (tested in Node).
 import { TransformControls } from 'https://esm.sh/three@0.180.0/examples/jsm/controls/TransformControls.js';

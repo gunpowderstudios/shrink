@@ -160,7 +160,9 @@ cloneModelBtn.addEventListener('click', () => toggleMode('clone'));
 sampleModelBtn.addEventListener('click', () => toggleMode('sample'));
 stampModelBtn.addEventListener('click', () => toggleMode('stamp'));
 window.addEventListener('keydown', e => {
-  if (e.key !== 'Escape' || state.mode === 'navigate') return;
+  if (e.key !== 'Escape') return;
+  if (state.mode === 'navigate') { stampGhost.hidden = true; return; }   // a ghost left behind by a late copy/paste goes too
+  if (state.mode === 'stamp') { stamp.patch = null; stamp.sel = null; stampRect.hidden = true; }   // Esc cancels the stamp: the copied patch is forgotten, so it does not come back next time
   setMode('navigate');          // also ends a stroke that is still running (a lost mouse-up used to leave the brush painting)
 });
 navigateModelBtn.addEventListener('click', () => setMode('navigate'));
@@ -969,6 +971,11 @@ $s('stampRot').addEventListener('input', () => { stamp.rot = Number($s('stampRot
 $s('stampFlip').addEventListener('click', () => { stamp.flip = !stamp.flip; $s('stampFlip').classList.toggle('active', stamp.flip); updateStampUI(); });
 $s('stampNew').addEventListener('click', () => { stamp.patch = null; stampGhost.hidden = true; updateStampUI(); say('Drag a box around what you want to copy.'); });
 
+// The ghost only ever shows while Stamp is on. Slow copies/pastes finish after the person has already left Stamp (Esc, another tool), so every unhide goes through here.
+function showGhost(pos) {
+  if (state.mode !== 'stamp' || !stamp.patch) { stampGhost.hidden = true; return; }
+  layoutGhost(pos); stampGhost.hidden = false;
+}
 function layoutGhost(pos) {
   if (!stamp.patch || !pos || !viewer) return;
   const { pw, ph, s } = stamp.patch, sc = stamp.lastSc * stamp.scale, w = pw * s * sc, h = ph * s * sc;
@@ -1002,8 +1009,7 @@ function stampMove(evt) {
   stamp.lastPos = { x: evt.clientX, y: evt.clientY };
   const hit = rayAt(evt.clientX, evt.clientY);
   if (hit) stamp.lastSc = stamp.patch.wpp0 / worldPerPixel(hit.distance);     // same real-world size as the original
-  layoutGhost(stamp.lastPos);
-  stampGhost.hidden = false;
+  showGhost(stamp.lastPos);
 }
 
 function stampUp(evt) {
@@ -1046,8 +1052,8 @@ async function captureStamp(x0, y0, w, h) {
     stampGhost.width = pw; stampGhost.height = ph;
     stampGhost.getContext('2d').putImageData(new ImageData(data, pw, ph), 0, 0);
     stamp.lastSc = 1; stamp.lastPos = { x: x0 + w / 2, y: y0 + h / 2 };
-    updateStampUI(); stampGhost.hidden = false; layoutGhost(stamp.lastPos);
-    say('Copied. Turn the car to where it should go, aim, and click to paste. Use Size, Rotate and Flip first if needed. Undo works as usual.');
+    updateStampUI(); showGhost(stamp.lastPos);
+    say(state.mode === 'stamp' ? 'Copied. Turn the car to where it should go, aim, and click to paste. Use Size, Rotate and Flip first if needed. Undo works as usual.' : 'Copied, but Stamp was switched off meanwhile. Press Stamp to paste it.');
   } catch (err) { console.error(err); say(`Could not copy: ${err.message}`, true); }
   finally { stamp.busy = false; }
 }
