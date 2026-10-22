@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.125
+- A yellow warning triangle now appears above the tools as soon as a model is too detailed to fuse or fix safely (over 1,000,000 triangles), with the triangle count and what to do: press SHRINK IT first, then FIX IT or FUSE IT. It clears itself once the model has been shrunk.
+
 ## v2.124
 - FUSE IT no longer freezes the page on a huge model. The solid work runs on the page's main thread, so a model of several million triangles (a 226 MB STL) gave Chrome's "Page Unresponsive" box. Above 1,000,000 triangles FUSE IT now stops straight away and says to press SHRINK IT first (shrink, then fuse is the order that works).
 

@@ -409,3 +409,9 @@
 .v2-peg-row b{font-weight:700;white-space:nowrap}
 .v2-peg-row span{color:#b9c6d4;line-height:1.35}
 .v2-peg-row.bad span{color:#ff9aab}
+
+.v2-size-warn{display:flex;gap:12px;align-items:flex-start;margin:0 0 12px;padding:12px 14px;border:1px solid rgba(255,196,60,.55);border-radius:12px;background:rgba(255,176,32,.12);color:#ffd98a;font-size:13px;line-height:1.45}
+.v2-size-warn[hidden]{display:none!important}
+.v2-size-warn-icon{font-size:26px;line-height:1;color:#ffc43c;flex:none}
+.v2-size-warn strong{display:block;color:#ffe3a6}
+.v2-size-warn span{display:block}

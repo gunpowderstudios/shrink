@@ -162,7 +162,20 @@
   let healthRun = 0;
   let rebasing = null;                          // a re-base of the live reducer that is in flight (the slider waits for it)
   let lastHealth = null;                         // { model, h }: the newest health result and the model it belongs to
+  // A yellow triangle above the tools while the working model is too detailed to fuse or fix without freezing the tab.
+  function updateSizeWarning() {
+    const anchor = $('v2FuseCard'); if (!anchor) return;
+    let el = $('v2SizeWarn');
+    if (!el) { el = document.createElement('div'); el.id = 'v2SizeWarn'; el.className = 'v2-size-warn'; el.hidden = true; el.setAttribute('role', 'status'); anchor.before(el); }
+    const model = sourceModel(), tris = model ? modelTriangles(model) : 0, limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
+    const big = tris > limit;
+    if (big) el.innerHTML = `<span class="v2-size-warn-icon" aria-hidden="true">⚠</span><div><strong>This model is very detailed (${tris.toLocaleString()} triangles)</strong><span>Press <b>SHRINK IT</b> first, then <b>FIX IT</b> or <b>FUSE IT</b>. Fusing or fixing this many triangles can freeze the page.</span></div>`;
+    if (el.hidden === big) el.hidden = !big;
+  }
+  window.__shrinkRefreshSizeWarning = updateSizeWarning;
+
   async function updateHealthCard() {
+    updateSizeWarning();
     const card = ensureHealthCard();
     const model = healthModel();
     if (!card || !model) return;
