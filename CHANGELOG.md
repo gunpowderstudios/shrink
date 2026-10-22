@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.135
+- The top-right button is now labelled **SHRINK AND FIX MY MODEL** (it still also fuses and centres where it can).
+
 ## v2.134
 - The 3D Print multitool's SHRINK / FIX / FUSE cards are now tucked into a collapsed **Advanced** drawer in the left column (SHRINK MY MODEL! does them all in one click). Click it to use them one at a time. Download stays visible below it.
 

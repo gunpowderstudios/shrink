@@ -413,7 +413,7 @@
   }
 
 
-  // ---- SHRINK MY MODEL! (top right): shrink, fix, fuse and centre in one go, each step only if it can ----
+  // ---- SHRINK AND FIX MY MODEL (top right): shrink, fix, fuse and centre in one go, each step only if it can ----
   function centreOnBed() {
     const model = sourceModel(), THREE = app()?.THREE;
     if (!model || !THREE) return { ok: false, text: 'nothing to centre' };
@@ -517,7 +517,7 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">SHRINK MY MODEL!</button><div id="v2MagicNote" class="v2-magic-note" role="status" hidden></div>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">SHRINK AND FIX MY MODEL</button><div id="v2MagicNote" class="v2-magic-note" role="status" hidden></div>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
     $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
@@ -685,7 +685,7 @@
           </section>
 
           <details id="v2AdvTools" class="v2-adv-tools">
-            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse one at a time</strong><small>SHRINK MY MODEL! (top right) does all of these for you. Open this to use them separately.</small></summary>
+            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse one at a time</strong><small>SHRINK AND FIX MY MODEL (top right) does all of these for you. Open this to use them separately.</small></summary>
           <div class="v2-action-grid">
             <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
               <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
