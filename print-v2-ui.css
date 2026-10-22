@@ -415,3 +415,11 @@
 .v2-size-warn-icon{font-size:26px;line-height:1;color:#ffc43c;flex:none}
 .v2-size-warn strong{display:block;color:#ffe3a6}
 .v2-size-warn span{display:block}
+
+.v2-fix-progress{margin:10px 0 8px}.v2-fix-progress[hidden]{display:none!important}
+.v2-fix-bar{position:relative;height:7px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+.v2-fix-bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#ff4f57,#ff8a5c);transition:width .25s ease}
+.v2-fix-progress[data-busy="1"] .v2-fix-bar::after{content:"";position:absolute;top:0;left:0;height:100%;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);animation:v2fixslide 1s linear infinite}
+.v2-fix-progress[data-state="bad"] .v2-fix-bar i{background:#ffb020}
+@keyframes v2fixslide{from{transform:translateX(-100%)}to{transform:translateX(260%)}}
+.v2-fix-progress small{display:block;margin-top:5px;color:#cbd5e1;font-size:11px}

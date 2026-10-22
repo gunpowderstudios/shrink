@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.127
+- FIX IT (the Model Health box on the right) now shows a small progress bar with what it is doing: getting ready, repairing, putting the result on screen, checking. The repair is one blocking step, so the bar is staged and has a sliding stripe that keeps moving while it works.
+
 ## v2.126
 - 3D Print downloads are now simply `<original name>-SHRINK` (e.g. `dwarf-SHRINK.stl`): the height, FIX, FUSE, REBUILD and reduction tags are gone. A split still names its parts `-PART1of2` and the zip `-SPLIT2` so they stay distinguishable.
 

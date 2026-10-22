@@ -129,6 +129,7 @@
       </div>
       <div id="v2HealthRows" class="v2-health-rows"><div class="v2-health-checking">Running mesh checks…</div></div>
       <div id="v2HealthChanges" class="v2-health-changes"><small>CHANGES</small><div class="v2-change-none">None yet</div></div>
+      <div id="v2FixProgress" class="v2-fix-progress" hidden><div class="v2-fix-bar"><i id="v2FixFill"></i></div><small id="v2FixLabel"></small></div>
       <button id="v2HealthFixBtn" class="v2-health-fix" type="button">FIX IT</button>
     `;
     card.querySelector('#v2HealthFixBtn')?.addEventListener('click', fixHealthModel);
@@ -200,6 +201,15 @@
     }
   }
 
+  // Little progress bar in the health card while FIX IT works. The repair itself is one blocking step, so the bar is staged (it is painted before each step)
+  // and carries a sliding stripe (a CSS transform animation keeps moving while the page is busy).
+  const paintNow = () => new Promise(res => requestAnimationFrame(() => setTimeout(res, 0)));
+  async function fixStep(pct, text) {
+    const box = $('v2FixProgress'); if (!box) return;
+    box.hidden = false; box.dataset.busy = pct < 100 ? '1' : '';
+    $('v2FixFill').style.width = `${pct}%`; $('v2FixLabel').textContent = text || '';
+    await paintNow();
+  }
   async function fixHealthModel() {
     const btn = $('v2HealthFixBtn');
     const model = healthModel();
@@ -208,20 +218,28 @@
     btn.disabled = true;
     btn.textContent = 'FIXING…';
     try {
+      await fixStep(8, 'Getting ready…');
       for (let i = 0; i < 50 && !window.__shrinkFuse?.repairModel; i++) await wait(100);
       if (!window.__shrinkFuse?.repairModel) throw new Error('The repair engine is still loading.');
+      await fixStep(30, 'Repairing the mesh…');
       const { root } = window.__shrinkFuse.repairModel(model);
+      await fixStep(75, 'Putting the fixed model on screen…');
       installWorkingResult(root, 'repair');
       btn.textContent = 'FIXED';
+      await fixStep(90, 'Checking the result…');
       await wait(80);
       await updateHealthCard();
+      await fixStep(100, 'Done');
+      setTimeout(() => { if ($('v2FixProgress') && !btn.disabled) $('v2FixProgress').hidden = true; }, 1500);
       const card = $('v2HealthCard');
       if (card && $('v2HealthScore')?.textContent === '100') btn.hidden = true;
     } catch (err) {
       console.error('[SHRINK 3D v2.55] Health repair failed', err);
       btn.textContent = 'COULD NOT FIX';
+      await fixStep(100, 'Could not fix this model');
+      $('v2FixProgress') && ($('v2FixProgress').dataset.state = 'bad');
       window.__shrinkPrintSafety?.showDiagnostic?.('Fuse', err?.message || String(err));
-      setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; }, 1800);
+      setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; const b = $('v2FixProgress'); if (b) { b.hidden = true; delete b.dataset.state; } }, 2500);
     } finally {
       btn.disabled = false;
       if (!btn.hidden && btn.textContent === 'FIXING…') btn.textContent = old;
