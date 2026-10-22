@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.128
+- Game export: new tick box **Centre on origin & sit on ground** (on by default). The saved GLB's model is moved so its bounding box is centred left/right and front/back on the origin and its lowest point is exactly on y = 0, wheels included. Only the translation of the top-level nodes changes (no rotation, scaling or geometry changes). `ground-core.js`, tested by `ground.test.mjs`. 3D Print downloads are not changed.
+
 ## v2.127
 - FIX IT (the Model Health box on the right) now shows a small progress bar with what it is doing: getting ready, repairing, putting the result on screen, checking. The repair is one blocking step, so the bar is staged and has a sliding stripe that keeps moving while it works.
 

@@ -35,8 +35,8 @@
   <meta name="twitter:image" content="https://gunpowderstudios.github.io/shrink/src/app-icon.png" />
   <meta name="twitter:image:alt" content="SHRINK 3D model optimizer app icon" />
 
-  <link rel="stylesheet" href="./style.css?v=2.127" />
-  <link rel="stylesheet" href="./ui-mode.css?v=2.127" />
+  <link rel="stylesheet" href="./style.css?v=2.128" />
+  <link rel="stylesheet" href="./ui-mode.css?v=2.128" />
 
   <script type="application/ld+json">
   {
@@ -85,7 +85,7 @@
   <main class="app-shell">
     <header class="topbar">
       <div class="brand-line">
-        <div class="title-row"><h1>SHRINK 3D</h1><span class="version-badge">v2.127</span></div>
+        <div class="title-row"><h1>SHRINK 3D</h1><span class="version-badge">v2.128</span></div>
         <p class="subtitle">Reduce your models, keep the detail</p>
       </div>
       <div class="privacy-pill">Runs locally in your browser</div>
@@ -157,7 +157,7 @@
           <details id="advancedDetails" class="fold game-only"><summary>File settings</summary><div class="fold-inner">
             <div class="control-block"><label for="textureSize">Largest texture size</label><select id="textureSize"><option value="4096">4096 px</option><option value="2048">2048 px</option><option value="1024" selected>1024 px</option><option value="512">512 px</option><option value="256">256 px</option></select></div>
             <div class="control-block"><div class="range-heading"><label for="textureQuality">Texture quality</label><output id="textureQualityValue">82%</output></div><input id="textureQuality" type="range" min="45" max="95" step="1" value="82" /></div>
-            <div class="toggles"><label class="toggle-row"><span>Smaller textures (WebP)</span><input id="webpToggle" type="checkbox" checked /></label><label class="toggle-row"><span>Shrink mesh data</span><input id="quantizeToggle" type="checkbox" checked /></label><label class="toggle-row"><span>Compress mesh (Meshopt)</span><input id="meshoptToggle" type="checkbox" checked /></label></div>
+            <div class="toggles"><label class="toggle-row"><span>Smaller textures (WebP)</span><input id="webpToggle" type="checkbox" checked /></label><label class="toggle-row"><span>Shrink mesh data</span><input id="quantizeToggle" type="checkbox" checked /></label><label class="toggle-row"><span>Compress mesh (Meshopt)</span><input id="meshoptToggle" type="checkbox" checked /></label><label class="toggle-row" title="Moves the model so it is centred on the origin (left/right and front/back) with its lowest point on the ground (y = 0), ready to import. Wheels move with it."><span>Centre on origin &amp; sit on ground</span><input id="groundToggle" type="checkbox" checked /></label></div>
             <div class="hint">Games read WebP + Meshopt fine in most engines. Turn these off if your engine can't load them.</div>
           </div></details>
           <section id="printPanel" class="print-only print-panel hidden"><div class="protect-box"><div class="protect-head"><button id="protectBtn" class="button ghost small" type="button">🖌 Protect detail</button><button id="protectClearBtn" class="button ghost small" type="button" disabled>Clear</button></div><div id="protectInfo" class="hint">Paint over faces, hands and fine ornament you want to keep sharp. Everything else is reduced first.</div><div class="range-heading"><label for="protectRadius">Brush size</label><output id="protectRadiusValue">3.0 mm</output></div><input id="protectRadius" type="range" min="0.5" max="20" step="0.5" value="3" /><details class="fold tiny"><summary>Advanced</summary><div class="fold-inner"><div class="range-heading"><label for="protectKeep">Protected detail kept</label><output id="protectKeepValue">100%</output></div><input id="protectKeep" type="range" min="20" max="100" step="5" value="100" /></div></details></div></section>
@@ -180,13 +180,13 @@
     <footer class="site-footer">SHRINK 3D 2026 &copy; <a href="https://www.gunpowderstudios.co.uk" target="_blank" rel="noopener">Gunpowder Studios</a></footer>
   </main>
 
-  <script type="module" src="./paint3d.js?v=2.127"></script>
-  <script type="module" src="./app.js?v=2.127"></script>
+  <script type="module" src="./paint3d.js?v=2.128"></script>
+  <script type="module" src="./app.js?v=2.128"></script>
   <script type="module" src="./paint-input-fix.js?v=2.18"></script>
-  <script type="module" src="./brush-cursor.js?v=2.127"></script>
+  <script type="module" src="./brush-cursor.js?v=2.128"></script>
   <script type="module" src="./print-tools.js?v=2.58"></script>
-  <script type="module" src="./ui-mode.js?v=2.127"></script>
-  <script type="module" src="./viewer-auto-button.js?v=2.127"></script>
-  <script type="module" src="./live-ui.js?v=2.127"></script>
+  <script type="module" src="./ui-mode.js?v=2.128"></script>
+  <script type="module" src="./viewer-auto-button.js?v=2.128"></script>
+  <script type="module" src="./live-ui.js?v=2.128"></script>
 </body>
 </html>

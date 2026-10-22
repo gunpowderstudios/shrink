@@ -3,10 +3,11 @@ import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/control
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://esm.sh/three@0.180.0/examples/jsm/environments/RoomEnvironment.js';
 import { WebIO, Document } from '@gltf-transform/core';
-import { stripEmpty } from './remove-part-core.js?v=2.127';
-import { mergePart as mergePartCore } from './add-part-core.js?v=2.127';
+import { stripEmpty } from './remove-part-core.js?v=2.128';
+import { mergePart as mergePartCore } from './add-part-core.js?v=2.128';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
-import { dedup, prune, weld, simplify, quantize, meshopt, mergeDocuments } from '@gltf-transform/functions';
+import { dedup, prune, weld, simplify, quantize, meshopt, mergeDocuments, getBounds } from '@gltf-transform/functions';
+import { centreOnGround } from './ground-core.js?v=2.128';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import { simplifyWithProtection, smoothNormals } from './mesh-tools.js?v=2.18';
 
@@ -813,6 +814,10 @@ async function optimizeModel() {
       setProgress(48, 'Separating the wheels…');
       const wr = window.__shrinkWheels.apply(document);
       if (wr && !wr.found) setStatus(`No wheels separated: ${wr.reason}`);
+    }
+    if (!printMode && $('groundToggle')?.checked) {        // origin in the middle, lowest point on the ground (after the wheels are cut so they move with the car)
+      const g = centreOnGround(document, getBounds);
+      if (g.moved) setProgress(50, 'Centring the model on the origin…');
     }
     if (!printMode && window.__shrinkRacer?.active?.()) {        // Racer preset: per-map sizes, dropped maps, one texture set (racer.js)
       setProgress(52, 'Preparing the textures for the Racer…');
