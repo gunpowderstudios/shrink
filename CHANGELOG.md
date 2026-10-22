@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.130
+- New friendly **SHRINK MY MODEL!** button top right (3D Print mode, once a model is loaded). One click runs SHRINK IT, then FIX IT (skipped if the model is already clean), then FUSE IT, then centres the model on the origin with its base flat on the bed, each step only if it can. A small report under the button says what each step did (click it to dismiss); a step that cannot be done is flagged and the rest carry on. Download is still your decision.
+
 ## v2.129
 - 3D Print tools are now in the order people actually use them: **1 SHRINK IT, 2 FIX IT, 3 FUSE IT, 4 Download**. FIX IT is a new large button/card between Shrink and Fuse (same repair and progress bar as the small FIX IT in the Model Health box, which still works). The yellow "very detailed" warning sits above the first card.
 

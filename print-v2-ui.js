@@ -431,6 +431,68 @@
     }
   }
 
+
+  // ---- SHRINK MY MODEL! (top right): shrink, fix, fuse and centre in one go, each step only if it can ----
+  function centreOnBed() {
+    const model = sourceModel(), THREE = app()?.THREE;
+    if (!model || !THREE) return { ok: false, text: 'nothing to centre' };
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model);
+    if (box.isEmpty()) return { ok: false, text: 'nothing to centre' };
+    const c = box.getCenter(new THREE.Vector3()), d = new THREE.Vector3(-c.x, -box.min.y, -c.z);
+    if (d.length() < 1e-6) return { ok: true, text: 'already centred and flat on the bed' };
+    model.position.add(d); model.updateMatrixWorld(true);
+    return { ok: true, text: 'centred, with its base flat on the bed' };
+  }
+  async function shrinkMyModel() {
+    const btn = $('v2MagicBtn'), note = $('v2MagicNote');
+    if (!btn || btn.disabled || !sourceModel()) return;
+    btn.disabled = true; btn.dataset.busy = '1'; const label = btn.textContent;
+    const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : ''); };
+    const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
+    try {
+      const startTris = modelTriangles(sourceModel());
+      // 1. SHRINK
+      btn.textContent = '1/4 Shrinking…'; show('Shrinking…'); await paintNow();
+      try { await shrinkModel(); const now = modelTriangles(sourceModel()); done('ok', '✓', `Shrunk: ${startTris.toLocaleString()} → ${now.toLocaleString()} triangles`); }
+      catch (err) { done('warn', '⚠', `Could not shrink (${err.message || err})`); }
+      // 2. FIX (only if the health check says something is wrong)
+      btn.textContent = '2/4 Fixing…'; show('Checking and fixing…'); await updateHealthCard(); await paintNow();
+      if ($('v2HealthScore')?.textContent === '100') done('ok', '✓', 'Already clean: nothing to fix');
+      else {
+        await fixHealthModel(); await wait(60);
+        const sc = Number($('v2HealthScore')?.textContent);
+        done(sc === 100 ? 'ok' : 'warn', sc === 100 ? '✓' : '⚠', sc === 100 ? 'Fixed: the model is watertight' : `Fixed what could be fixed (health ${Number.isFinite(sc) ? sc + '/100' : 'unknown'})`);
+      }
+      // 3. FUSE
+      btn.textContent = '3/4 Fusing…'; show('Fusing…'); await paintNow();
+      const fc = $('v2FuseCard'); if (fc) fc.dataset.state = '';
+      await fuseCheck(); await wait(60);
+      const fs = fc?.dataset.state;
+      done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
+      // 4. CENTRE
+      btn.textContent = '4/4 Centring…'; show('Centring…'); await paintNow();
+      const cr = centreOnBed(); done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
+      rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
+      markStep?.(4, 'active');
+    } catch (err) {
+      console.error('[SHRINK 3D] SHRINK MY MODEL failed', err);
+      done('warn', '⚠', `Stopped: ${err.message || err}`);
+    } finally {
+      delete btn.dataset.busy; btn.disabled = false; btn.textContent = label;
+    }
+  }
+
+  function ensureMagicButton() {
+    if ($('v2MagicBtn')) return;
+    const top = document.querySelector('.topbar'); if (!top) return;
+    const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">SHRINK MY MODEL!</button><div id="v2MagicNote" class="v2-magic-note" role="status" hidden></div>';
+    const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
+    $('v2MagicBtn').addEventListener('click', shrinkMyModel);
+    $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
+  }
+
   let activePegCut = 0;
 
   // ---- peg report: plain words + colour for every peg, so a peg sticking out of the model is obvious ----
@@ -779,6 +841,8 @@
   }
 
   function onMode() {
+    ensureMagicButton();
+    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel(); }
     const print = document.body.classList.contains('app-mode-print');
     if (print) activate(); else deactivate();
   }

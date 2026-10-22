@@ -425,3 +425,13 @@
 .v2-fix-progress small{display:block;margin-top:5px;color:#cbd5e1;font-size:11px}
 
 .v2-red{background:linear-gradient(180deg,#ef4b53,#b9272f)}.v2-fix-card{border-color:#7a2e34}
+
+.v2-magic-wrap{position:relative;margin-left:auto;flex:0 0 auto}.v2-magic-wrap+.privacy-pill{margin-left:0}
+.app-mode-game .v2-magic-wrap{display:none!important}
+.v2-magic{padding:11px 20px;border:0;border-radius:999px;background:linear-gradient(180deg,#27c27d,#169a60);color:#fff;font-size:15px;font-weight:900;letter-spacing:.2px;cursor:pointer;box-shadow:0 6px 18px rgba(24,169,110,.35);transition:transform .13s ease,filter .13s ease}
+.v2-magic:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}.v2-magic:disabled{opacity:.7;cursor:wait}
+.v2-magic-note{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:300px;max-width:380px;padding:12px 14px;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:#10161f;box-shadow:0 12px 30px rgba(0,0,0,.5);font-size:13px;line-height:1.4;cursor:pointer}
+.v2-magic-note[hidden]{display:none!important}
+.v2-magic-note div{display:flex;gap:9px;padding:3px 0;color:#dbe4ee}.v2-magic-note i{font-style:normal;width:16px;flex:none;text-align:center}
+.v2-magic-note .ok i{color:#46d796}.v2-magic-note .warn i{color:#ffc43c}.v2-magic-note .warn{color:#ffe3a6}.v2-magic-note .busy{color:#9fb4d0}.v2-magic-note .end{margin-top:4px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1);font-weight:800;color:#fff}
+@media(max-width:700px){.v2-magic-wrap{margin-left:0;width:100%}.v2-magic{width:100%}}
