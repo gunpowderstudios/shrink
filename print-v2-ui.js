@@ -421,7 +421,7 @@
   function levelModel() {
     const THREE = app()?.THREE, model = sourceModel();
     if (!THREE || !model) return { ok: false, text: 'nothing to level' };
-    model.updateMatrixWorld(true);
+    model.updateWorldMatrix(true, true);
     const tris = []; let total = 0;
     model.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) total += o.geometry.index ? o.geometry.index.count / 3 : o.geometry.attributes.position.count / 3; });
     const stride = Math.max(1, Math.ceil(total / 40000));
@@ -497,7 +497,7 @@
       if (tiltDeg > 0.3) { rotateAboutCentre(model, q, THREE); turned = true; }
     }
     // square to the grid: long side along X
-    model.updateMatrixWorld(true);
+    model.updateWorldMatrix(true, true);
     const pts = []; model.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; const pos = o.geometry.attributes.position, st = Math.max(1, Math.ceil(pos.count / 30000)), v = new THREE.Vector3(); for (let i = 0; i < pos.count; i += st) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); pts.push(v.x, v.z); } });
     let mxx = 0, mzz = 0, mxz = 0, ax = 0, az = 0; const np = pts.length / 2;
     for (let i = 0; i < np; i++) { ax += pts[i * 2]; az += pts[i * 2 + 1]; } ax /= np; az /= np;
@@ -511,23 +511,35 @@
     const bits = []; if (turned) bits.push(`tilted ${tiltDeg.toFixed(0)}° to sit flat`); if (yawDeg) bits.push(`turned ${Math.abs(yawDeg).toFixed(0)}° to line up with the grid`);
     return { ok: true, text: bits.length ? bits.join(' and ') : 'already sitting flat and square', changed: bits.length > 0, tiltDeg, yawDeg };
   }
-  function rotateAboutCentre(model, q, THREE) {
-    model.updateMatrixWorld(true);
-    const c = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
-    model.quaternion.premultiply(q);
-    model.position.sub(c).applyQuaternion(q).add(c);
-    model.updateMatrixWorld(true);
+  // World-space helpers: the working model may sit inside a parent with its own scale/rotation, so never add world offsets to .position directly
+  function moveWorld(model, dWorld, THREE) {
+    model.updateWorldMatrix(true, false);
+    const pw = model.getWorldPosition(new THREE.Vector3()), target = pw.clone().add(dWorld);
+    if (model.parent) { model.parent.updateWorldMatrix(true, false); model.position.copy(model.parent.worldToLocal(target)); } else model.position.copy(target);
+    model.updateWorldMatrix(true, true);
+  }
+  function rotateAboutCentre(model, qWorld, THREE) {
+    model.updateWorldMatrix(true, true);
+    const c = new THREE.Box3().setFromObject(model, true).getCenter(new THREE.Vector3());
+    const pw = model.getWorldPosition(new THREE.Vector3()), newPw = pw.sub(c).applyQuaternion(qWorld).add(c);
+    if (model.parent) {
+      model.parent.updateWorldMatrix(true, false);
+      const pq = model.parent.getWorldQuaternion(new THREE.Quaternion());
+      model.quaternion.premultiply(pq).premultiply(qWorld).premultiply(pq.clone().invert());
+      model.position.copy(model.parent.worldToLocal(newPw));
+    } else { model.quaternion.premultiply(qWorld); model.position.copy(newPw); }
+    model.updateWorldMatrix(true, true);
   }
   window.__shrinkLevel = () => levelModel();
   function centreOnBed() {
     const model = sourceModel(), THREE = app()?.THREE;
     if (!model || !THREE) return { ok: false, text: 'nothing to centre' };
-    model.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(model);
+    model.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(model, true);
     if (box.isEmpty()) return { ok: false, text: 'nothing to centre' };
     const c = box.getCenter(new THREE.Vector3()), d = new THREE.Vector3(-c.x, -box.min.y, -c.z);
     if (d.length() < 1e-6) return { ok: true, text: 'already centred and flat on the bed' };
-    model.position.add(d); model.updateMatrixWorld(true);
+    moveWorld(model, d, THREE);
     // keep the view on the model: move the camera and orbit target by the same shift
     const v = window.__shrinkViewer;
     if (v?.camera && v?.controls) {
@@ -551,8 +563,8 @@
     const THREE = app()?.THREE, v = window.__shrinkViewer, model = sourceModel();
     if (!THREE || !v || !model) return;
     removeBedGuide();
-    model.updateMatrixWorld(true);
-    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    model.updateWorldMatrix(true, true);
+    const size = new THREE.Box3().setFromObject(model, true).getSize(new THREE.Vector3());
     const span = Math.max(size.x, size.z, size.y * 0.8, 1e-6);
     const pow = Math.pow(10, Math.floor(Math.log10(span / 8)));
     const cell = [1, 2, 5, 10].map(m => m * pow).find(c => span * 1.7 / c <= 24) || 10 * pow;
@@ -579,6 +591,7 @@
     v.scene.children.forEach(o => { if (o.isGridHelper && o.parent === v.scene) { o.userData._shrinkHidden = true; o.visible = false; } });
   }
   window.__shrinkBedGuide = { show: showBedGuide, remove: removeBedGuide };
+  window.__shrinkCentre = () => centreOnBed();
   async function shrinkMyModel() {
     const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;

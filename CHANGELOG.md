@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.137
+- Fix: SHRINK AND FIX MY MODEL could report "flat on the bed" while the model hovered above the grid. Levelling and centring now work in world space (the model can sit inside a parent with its own scale or rotation), refresh the parent matrices first, and measure the model's true extents from its vertices instead of a cached bounding box. Checked with a model inside a scaled and rotated parent: base exactly at y=0, centred.
+
 ## v2.136
 - **SHRINK AND FIX MY MODEL** now lays the model flat as well as centring it. Step 4 finds the flattest, most stable face within 50° of "down" (so a standing figure is never tipped onto its back, but a tilted wall section or a model that arrived at an angle is turned to sit flat on the bed), then turns it about the vertical so its long side runs along X, square to the grid, then centres it and drops it on the bed. The report says how far it tilted and turned. Rounder models are not turned; ones already flat are left alone. Wheeled models (several small contact patches) can end up a degree or two off.
 
