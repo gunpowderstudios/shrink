@@ -450,6 +450,49 @@
     model.visible = true;
     return { ok: true, text: 'centred, with its base flat on the bed' };
   }
+
+  // ---- matrix-style print bed + X/Y/Z arrows, shown once the model is centred ----
+  function removeBedGuide() {
+    const v = window.__shrinkViewer; if (!v) return;
+    const g = v.scene.getObjectByName('shrinkBedGuide');
+    if (g) {
+      v.scene.remove(g);
+      g.traverse(o => { o.geometry?.dispose?.(); if (o.material) { o.material.map?.dispose?.(); o.material.dispose?.(); } });
+    }
+    v.scene.children.forEach(o => { if (o.isGridHelper && o.userData._shrinkHidden) { o.visible = true; delete o.userData._shrinkHidden; } });
+  }
+  function showBedGuide() {
+    const THREE = app()?.THREE, v = window.__shrinkViewer, model = sourceModel();
+    if (!THREE || !v || !model) return;
+    removeBedGuide();
+    model.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    const span = Math.max(size.x, size.z, size.y * 0.8, 1e-6);
+    const pow = Math.pow(10, Math.floor(Math.log10(span / 8)));
+    const cell = [1, 2, 5, 10].map(m => m * pow).find(c => span * 1.7 / c <= 24) || 10 * pow;
+    const half = Math.max(4, Math.ceil(span * 0.85 / cell)) * cell, n = Math.round(half * 2 / cell);
+    const g = new THREE.Group(); g.name = 'shrinkBedGuide';
+    const grid = new THREE.GridHelper(half * 2, n, 0x39ff7a, 0x14994a);
+    grid.material.transparent = true; grid.material.opacity = 0.55; grid.material.depthWrite = false;
+    grid.position.y = -span * 0.0005; g.add(grid);
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(half * 2, half * 2), new THREE.MeshBasicMaterial({ color: 0x021a0c, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+    plane.rotation.x = -Math.PI / 2; plane.position.y = -span * 0.001; g.add(plane);
+    const len = span * 0.7, head = len * 0.16;
+    const label = (txt, col, pos) => {
+      const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+      x.font = 'bold 44px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = col; x.fillText(txt, 32, 34);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+      sp.scale.setScalar(len * 0.16); sp.position.copy(pos); sp.renderOrder = 10; g.add(sp);
+    };
+    [['X', 0xff4d4d, '#ff6b6b', new THREE.Vector3(1, 0, 0)], ['Y', 0x4dff7a, '#7dff9d', new THREE.Vector3(0, 1, 0)], ['Z', 0x4d9bff, '#7db4ff', new THREE.Vector3(0, 0, 1)]].forEach(([t, hex, css, dir]) => {
+      const a = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), len, hex, head, head * 0.55);
+      a.line.material.depthTest = false; a.cone.material.depthTest = false; a.renderOrder = 9; a.line.renderOrder = 9; a.cone.renderOrder = 9; g.add(a);
+      label(t, css, dir.clone().multiplyScalar(len + head * 1.1));
+    });
+    v.scene.add(g);
+    v.scene.children.forEach(o => { if (o.isGridHelper && o.parent === v.scene) { o.userData._shrinkHidden = true; o.visible = false; } });
+  }
+  window.__shrinkBedGuide = { show: showBedGuide, remove: removeBedGuide };
   async function shrinkMyModel() {
     const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
@@ -478,7 +521,7 @@
       done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
       // 4. CENTRE
       btn.textContent = '4/4 Centring…'; show('Centring…'); await paintNow();
-      const cr = centreOnBed(); done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
+      const cr = centreOnBed(); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
       markStep?.(4, 'active');
     } catch (err) {
@@ -819,7 +862,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', () => { setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', () => { removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
@@ -850,6 +893,7 @@
     ensureMagicButton();
     { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel(); }
     const print = document.body.classList.contains('app-mode-print');
+    if (!print) removeBedGuide();
     if (print) activate(); else deactivate();
   }
 

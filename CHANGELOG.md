@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.132
+- **SHRINK MY MODEL!** now shows a matrix-style green gridded print bed under the centred model, with red X, green Y and blue Z arrows from the origin (like a 3D program). The grid cell size scales with the model. It is a viewer-only guide: it is never exported, and it disappears when a new model is opened or you switch to Game mode.
+
 ## v2.131
 - Fix: after **SHRINK MY MODEL!** the model could vanish from the viewer. Centring moved the model to the origin but left the camera looking at the old spot. The camera and orbit target now move by the same amount, so the model stays in view.
 
