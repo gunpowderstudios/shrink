@@ -142,7 +142,7 @@
   let lastHealth = null;                         // { model, h }: the newest health result and the model it belongs to
   // A yellow triangle above the tools while the working model is too detailed to fuse or fix without freezing the tab.
   function updateSizeWarning() {
-    const anchor = $('v2FuseCard'); if (!anchor) return;
+    const anchor = $('v2ShrinkCard'); if (!anchor) return;
     let el = $('v2SizeWarn');
     if (!el) { el = document.createElement('div'); el.id = 'v2SizeWarn'; el.className = 'v2-size-warn'; el.hidden = true; el.setAttribute('role', 'status'); anchor.before(el); }
     const model = sourceModel(), tris = model ? modelTriangles(model) : 0, limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
@@ -208,6 +208,7 @@
     const box = $('v2FixProgress'); if (!box) return;
     box.hidden = false; box.dataset.busy = pct < 100 ? '1' : '';
     $('v2FixFill').style.width = `${pct}%`; $('v2FixLabel').textContent = text || '';
+    progress($('v2FixCard'), pct, text);
     await paintNow();
   }
   async function fixHealthModel() {
@@ -217,6 +218,8 @@
     const old = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'FIXING…';
+    const big = $('v2FixBigBtn'); if (big) { big.disabled = true; big.textContent = 'FIXING…'; }
+    const bigResult = html => { const r = $('v2FixResult'); if (r) r.innerHTML = html; };
     try {
       await fixStep(8, 'Getting ready…');
       for (let i = 0; i < 50 && !window.__shrinkFuse?.repairModel; i++) await wait(100);
@@ -230,6 +233,7 @@
       await wait(80);
       await updateHealthCard();
       await fixStep(100, 'Done');
+      { const sc = Number($('v2HealthScore')?.textContent); bigResult(sc === 100 ? '<strong>✓ Fixed</strong><span>The model is watertight and clean now.</span>' : `<strong>✓ Fixed what could be fixed</strong><span>Model health is ${Number.isFinite(sc) ? sc + '/100' : 'updated'}. See the Model Health box for what is left.</span>`); }
       setTimeout(() => { if ($('v2FixProgress') && !btn.disabled) $('v2FixProgress').hidden = true; }, 1500);
       const card = $('v2HealthCard');
       if (card && $('v2HealthScore')?.textContent === '100') btn.hidden = true;
@@ -237,12 +241,14 @@
       console.error('[SHRINK 3D v2.55] Health repair failed', err);
       btn.textContent = 'COULD NOT FIX';
       await fixStep(100, 'Could not fix this model');
+      bigResult(`<strong>Could not fix this model</strong><span>${err?.message || err}</span>`);
       $('v2FixProgress') && ($('v2FixProgress').dataset.state = 'bad');
       window.__shrinkPrintSafety?.showDiagnostic?.('Fuse', err?.message || String(err));
       setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; const b = $('v2FixProgress'); if (b) { b.hidden = true; delete b.dataset.state; } }, 2500);
     } finally {
       btn.disabled = false;
       if (!btn.hidden && btn.textContent === 'FIXING…') btn.textContent = old;
+      if (big) { big.disabled = false; big.textContent = 'FIX IT'; }
     }
   }
 
@@ -589,18 +595,10 @@
           <div class="v2-tool-intro">
             <span>3D PRINT MULTITOOL</span>
             <strong>USE ANY TOOL YOU NEED</strong>
-            <small>Fuse it, shrink it, download it — use one, two or all three.</small>
+            <small>Shrink it, fix it, fuse it, download it — use one, two or all of them.</small>
           </div>
 
           <div class="v2-action-grid">
-            <section id="v2FuseCard" class="v2-card v2-action-card v2-fuse-card">
-              <div class="v2-card-head"><div><h2>Fuse it</h2><p>Repair mesh problems and join parts that genuinely touch or overlap.</p></div></div>
-              <button id="v2FuseBtn" class="v2-mega v2-purple" type="button">FUSE IT</button>
-              <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
-              <div id="v2FuseResult" class="v2-result">SHRINK repairs the mesh and joins touching parts. Separate watertight parts are fine and will be left intact.</div>
-              <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles and joins touching/overlapping parts. Multiple closed components are valid; SHRINK only reports a repair problem when the mesh itself is open or non-manifold.</p></div></details>
-            </section>
-
             <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
               <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
               <div class="v2-protect">
@@ -617,6 +615,21 @@
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
               <div id="v2ShrinkResult" class="v2-result">SHRINK compares the reduced model with the original and stops before the difference should be visible.</div>
               <details class="v2-advanced"><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<div class="v2-detail-control"><input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"><div class="v2-detail-number"><input id="v2DetailNumber" type="number" min="1" max="100" step="0.1" value="70" inputmode="decimal" aria-label="Detail kept percentage"><span>%</span></div></div></label><p>Drag the slider or type the percentage you want to keep.</p></div></details>
+            </section>
+
+            <section id="v2FixCard" class="v2-card v2-action-card v2-fix-card">
+              <div class="v2-card-head"><div><h2>Fix it</h2><p>Mend holes, flipped faces and loose edges. Nothing is joined or removed.</p></div></div>
+              <button id="v2FixBigBtn" class="v2-mega v2-red" type="button">FIX IT</button>
+              <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
+              <div id="v2FixResult" class="v2-result">Check the Model Health box on the right first. FIX IT repairs what it can.</div>
+            </section>
+
+            <section id="v2FuseCard" class="v2-card v2-action-card v2-fuse-card">
+              <div class="v2-card-head"><div><h2>Fuse it</h2><p>Repair mesh problems and join parts that genuinely touch or overlap.</p></div></div>
+              <button id="v2FuseBtn" class="v2-mega v2-purple" type="button">FUSE IT</button>
+              <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
+              <div id="v2FuseResult" class="v2-result">SHRINK repairs the mesh and joins touching parts. Separate watertight parts are fine and will be left intact.</div>
+              <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles and joins touching/overlapping parts. Multiple closed components are valid; SHRINK only reports a repair problem when the mesh itself is open or non-manifold.</p></div></details>
             </section>
 
             <section class="v2-card v2-action-card v2-download-card">
@@ -646,6 +659,7 @@
     $('v2HeightRange').addEventListener('input', () => { $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });
     $('v2FuseBtn').addEventListener('click', fuseCheck);
+    $('v2FixBigBtn').addEventListener('click', fixHealthModel);
     $('v2ProtectBtn').addEventListener('click', () => {
       const native = $('protectBtn');
       native?.click();

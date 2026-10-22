@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.129
+- 3D Print tools are now in the order people actually use them: **1 SHRINK IT, 2 FIX IT, 3 FUSE IT, 4 Download**. FIX IT is a new large button/card between Shrink and Fuse (same repair and progress bar as the small FIX IT in the Model Health box, which still works). The yellow "very detailed" warning sits above the first card.
+
 ## v2.128
 - Game export: new tick box **Centre on origin & sit on ground** (on by default). The saved GLB's model is moved so its bounding box is centred left/right and front/back on the origin and its lowest point is exactly on y = 0, wheels included. Only the translation of the top-level nodes changes (no rotation, scaling or geometry changes). `ground-core.js`, tested by `ground.test.mjs`. 3D Print downloads are not changed.
 

@@ -423,3 +423,5 @@
 .v2-fix-progress[data-state="bad"] .v2-fix-bar i{background:#ffb020}
 @keyframes v2fixslide{from{transform:translateX(-100%)}to{transform:translateX(260%)}}
 .v2-fix-progress small{display:block;margin-top:5px;color:#cbd5e1;font-size:11px}
+
+.v2-red{background:linear-gradient(180deg,#ef4b53,#b9272f)}.v2-fix-card{border-color:#7a2e34}
