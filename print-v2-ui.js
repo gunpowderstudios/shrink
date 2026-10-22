@@ -414,6 +414,111 @@
 
 
   // ---- SHRINK AND FIX MY MODEL (top right): shrink, fix, fuse and centre in one go, each step only if it can ----
+
+  // ---- lay the model flat and square to the grid (before centring) ----
+  // Finds the flattest, most stable face within 50 degrees of "down", turns the model so that face sits on the bed, then
+  // turns it about the vertical so its long side runs along X. Never flips a model more than 50 degrees (a standing figure stays standing).
+  function levelModel() {
+    const THREE = app()?.THREE, model = sourceModel();
+    if (!THREE || !model) return { ok: false, text: 'nothing to level' };
+    model.updateMatrixWorld(true);
+    const tris = []; let total = 0;
+    model.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) total += o.geometry.index ? o.geometry.index.count / 3 : o.geometry.attributes.position.count / 3; });
+    const stride = Math.max(1, Math.ceil(total / 40000));
+    let k = 0; const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    model.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count / 3 : pos.count / 3, m = o.matrixWorld;
+      for (let t = 0; t < n; t++, k++) {
+        if (k % stride) continue;
+        const i0 = idx ? idx.getX(t * 3) : t * 3, i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+        a.fromBufferAttribute(pos, i0).applyMatrix4(m); b.fromBufferAttribute(pos, i1).applyMatrix4(m); c.fromBufferAttribute(pos, i2).applyMatrix4(m);
+        tris.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      }
+    });
+    const T = tris.length / 9; if (T < 4) return { ok: false, text: 'nothing to level' };
+    const P = Float32Array.from(tris), N = new Float32Array(T * 3), A = new Float32Array(T);
+    let lo = [1e30, 1e30, 1e30], hi = [-1e30, -1e30, -1e30];
+    for (let t = 0; t < T; t++) {
+      const o = t * 9, ux = P[o + 3] - P[o], uy = P[o + 4] - P[o + 1], uz = P[o + 5] - P[o + 2], vx = P[o + 6] - P[o], vy = P[o + 7] - P[o + 1], vz = P[o + 8] - P[o + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1;
+      N[t * 3] = nx / l; N[t * 3 + 1] = ny / l; N[t * 3 + 2] = nz / l; A[t] = l / 2;
+      for (let q = 0; q < 3; q++) for (let e = 0; e < 3; e++) { const v = P[o + q * 3 + e]; if (v < lo[e]) lo[e] = v; if (v > hi[e]) hi[e] = v; }
+    }
+    const diag = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1, EPS = 0.012;
+    const score = (d, epsF = EPS) => {
+      const eps = diag * epsF;   // d = unit "down" direction
+      let mx = -1e30, mn = 1e30;
+      for (let t = 0; t < T; t++) for (let q = 0; q < 3; q++) { const o = t * 9 + q * 3, h = P[o] * d[0] + P[o + 1] * d[1] + P[o + 2] * d[2]; if (h > mx) mx = h; if (h < mn) mn = h; }
+      let contact = 0, proj = 0, nsum = [0, 0, 0];
+      for (let t = 0; t < T; t++) {
+        const o = t * 9, h0 = P[o] * d[0] + P[o + 1] * d[1] + P[o + 2] * d[2], h1 = P[o + 3] * d[0] + P[o + 4] * d[1] + P[o + 5] * d[2], h2 = P[o + 6] * d[0] + P[o + 7] * d[1] + P[o + 8] * d[2];
+        const dn = N[t * 3] * d[0] + N[t * 3 + 1] * d[1] + N[t * 3 + 2] * d[2];
+        proj += A[t] * Math.abs(dn) * 0.5;
+        if (mx - h0 < eps && mx - h1 < eps && mx - h2 < eps && Math.abs(dn) > 0.8) { const sg = dn < 0 ? -1 : 1; contact += A[t]; nsum[0] += sg * N[t * 3] * A[t]; nsum[1] += sg * N[t * 3 + 1] * A[t]; nsum[2] += sg * N[t * 3 + 2] * A[t]; }
+      }
+      const height = Math.max(mx - mn, diag * 1e-3);
+      return { s: (contact + 0.05 * proj) / height, contact, nsum };
+    };
+    const cur = [0, -1, 0], base = score(cur);
+    let best = { s: base.s, d: cur, nsum: base.nsum, contact: base.contact };
+    // coarse pass over directions within 50 deg of straight down (wide contact band), then hill-climb the best few with a narrowing band
+    const cone = Math.cos(50 * Math.PI / 180), NS = 360, ga = Math.PI * (3 - Math.sqrt(5)), coarse = [];
+    for (let i = 0; i < NS; i++) {
+      const y = 1 - (i + 0.5) / NS * 2, r = Math.sqrt(1 - y * y), d = [Math.cos(i * ga) * r, y, Math.sin(i * ga) * r];
+      if (-d[1] < cone) continue;
+      coarse.push({ d, s: score(d, 0.1).s });
+    }
+    coarse.sort((x, y) => y.s - x.s);
+    const unit = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    const inCone = d => -d[1] >= cone;
+    for (const c0 of coarse.slice(0, 6)) {
+      let d = c0.d, rad = 9 * Math.PI / 180, ef = 0.05, cs = score(d, ef).s;
+      for (let round = 0; round < 8; round++) {
+        const w = Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+        const u = unit([d[1] * w[2] - d[2] * w[1], d[2] * w[0] - d[0] * w[2], d[0] * w[1] - d[1] * w[0]]);
+        const v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]];
+        let bd = d, bs = cs;
+        for (const rr of [0.5, 1]) for (let k2 = 0; k2 < 8; k2++) {
+          const an = k2 * Math.PI / 4, off = rad * rr, cd = unit([d[0] + Math.tan(off) * (Math.cos(an) * u[0] + Math.sin(an) * v[0]), d[1] + Math.tan(off) * (Math.cos(an) * u[1] + Math.sin(an) * v[1]), d[2] + Math.tan(off) * (Math.cos(an) * u[2] + Math.sin(an) * v[2])]);
+          if (!inCone(cd)) continue;
+          const sc = score(cd, ef).s; if (sc > bs) { bs = sc; bd = cd; }
+        }
+        d = bd; rad *= 0.6; ef = Math.max(EPS, ef * 0.7); cs = score(d, ef).s;
+      }
+      const fin = score(d);
+      if (fin.s > best.s) best = { s: fin.s, d, nsum: fin.nsum, contact: fin.contact };
+    }
+    let tiltDeg = 0, turned = false;
+    if (best.d !== cur && best.s > base.s * 1.25) {
+      let d = new THREE.Vector3(...best.nsum); if (d.lengthSq() < 1e-12) d = new THREE.Vector3(...best.d); d.normalize();   // exact plane of the contact faces
+      const q = new THREE.Quaternion().setFromUnitVectors(d, new THREE.Vector3(0, -1, 0));
+      tiltDeg = Math.acos(Math.min(1, Math.max(-1, d.y * -1))) * 180 / Math.PI;
+      if (tiltDeg > 0.3) { rotateAboutCentre(model, q, THREE); turned = true; }
+    }
+    // square to the grid: long side along X
+    model.updateMatrixWorld(true);
+    const pts = []; model.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; const pos = o.geometry.attributes.position, st = Math.max(1, Math.ceil(pos.count / 30000)), v = new THREE.Vector3(); for (let i = 0; i < pos.count; i += st) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); pts.push(v.x, v.z); } });
+    let mxx = 0, mzz = 0, mxz = 0, ax = 0, az = 0; const np = pts.length / 2;
+    for (let i = 0; i < np; i++) { ax += pts[i * 2]; az += pts[i * 2 + 1]; } ax /= np; az /= np;
+    for (let i = 0; i < np; i++) { const x = pts[i * 2] - ax, z = pts[i * 2 + 1] - az; mxx += x * x; mzz += z * z; mxz += x * z; }
+    const tr = mxx + mzz, det = Math.sqrt(Math.max(0, (mxx - mzz) ** 2 / 4 + mxz * mxz)), l1 = tr / 2 + det, l2 = tr / 2 - det;
+    let yawDeg = 0;
+    if (l2 <= 0 || l1 / l2 > 1.15) {
+      const th = 0.5 * Math.atan2(2 * mxz, mxx - mzz); yawDeg = th * 180 / Math.PI;
+      if (Math.abs(yawDeg) > 1) rotateAboutCentre(model, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), th), THREE); else yawDeg = 0;
+    }
+    const bits = []; if (turned) bits.push(`tilted ${tiltDeg.toFixed(0)}° to sit flat`); if (yawDeg) bits.push(`turned ${Math.abs(yawDeg).toFixed(0)}° to line up with the grid`);
+    return { ok: true, text: bits.length ? bits.join(' and ') : 'already sitting flat and square', changed: bits.length > 0, tiltDeg, yawDeg };
+  }
+  function rotateAboutCentre(model, q, THREE) {
+    model.updateMatrixWorld(true);
+    const c = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+    model.quaternion.premultiply(q);
+    model.position.sub(c).applyQuaternion(q).add(c);
+    model.updateMatrixWorld(true);
+  }
+  window.__shrinkLevel = () => levelModel();
   function centreOnBed() {
     const model = sourceModel(), THREE = app()?.THREE;
     if (!model || !THREE) return { ok: false, text: 'nothing to centre' };
@@ -501,7 +606,9 @@
       const fs = fc?.dataset.state;
       done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
       // 4. CENTRE
-      btn.textContent = '4/4 Centring…'; show('Centring…'); await paintNow();
+      btn.textContent = '4/4 Levelling…'; show('Levelling and centring…'); await paintNow();
+      let lv = null; try { lv = levelModel(); } catch (e) { console.warn('level', e); }
+      if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);
       const cr = centreOnBed(); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
       markStep?.(4, 'active');

@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.136
+- **SHRINK AND FIX MY MODEL** now lays the model flat as well as centring it. Step 4 finds the flattest, most stable face within 50° of "down" (so a standing figure is never tipped onto its back, but a tilted wall section or a model that arrived at an angle is turned to sit flat on the bed), then turns it about the vertical so its long side runs along X, square to the grid, then centres it and drops it on the bed. The report says how far it tilted and turned. Rounder models are not turned; ones already flat are left alone. Wheeled models (several small contact patches) can end up a degree or two off.
+
 ## v2.135
 - The top-right button is now labelled **SHRINK AND FIX MY MODEL** (it still also fuses and centres where it can).
 
