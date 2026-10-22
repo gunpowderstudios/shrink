@@ -130,9 +130,7 @@
       <div id="v2HealthRows" class="v2-health-rows"><div class="v2-health-checking">Running mesh checks…</div></div>
       <div id="v2HealthChanges" class="v2-health-changes"><small>CHANGES</small><div class="v2-change-none">None yet</div></div>
       <div id="v2FixProgress" class="v2-fix-progress" hidden><div class="v2-fix-bar"><i id="v2FixFill"></i></div><small id="v2FixLabel"></small></div>
-      <button id="v2HealthFixBtn" class="v2-health-fix" type="button">FIX IT</button>
     `;
-    card.querySelector('#v2HealthFixBtn')?.addEventListener('click', fixHealthModel);
     viewer.appendChild(card);
     return card;
   }
@@ -183,15 +181,6 @@
         healthRow('Non-manifold', new Intl.NumberFormat().format(h.pinchedEdges), manifold) +
         healthRow('Flipped faces', new Intl.NumberFormat().format(h.flippedEdges), oriented) +
         healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens);
-      const fixBtn = $('v2HealthFixBtn');
-      if (fixBtn) {
-        const healthyNow = rating.score === 100;
-        fixBtn.hidden = healthyNow;
-        if (!healthyNow) {
-          fixBtn.textContent = 'FIX IT';
-          fixBtn.disabled = false;
-        }
-      }
     } catch (err) {
       card.className = 'v2-health-card bad';
       $('v2HealthLabel').textContent = 'Check failed';
@@ -212,13 +201,10 @@
     await paintNow();
   }
   async function fixHealthModel() {
-    const btn = $('v2HealthFixBtn');
+    const big = $('v2FixBigBtn');
     const model = healthModel();
-    if (!btn || !model || btn.disabled) return;
-    const old = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'FIXING…';
-    const big = $('v2FixBigBtn'); if (big) { big.disabled = true; big.textContent = 'FIXING…'; }
+    if (!big || !model || big.disabled) return;
+    big.disabled = true; big.textContent = 'FIXING…';
     const bigResult = html => { const r = $('v2FixResult'); if (r) r.innerHTML = html; };
     try {
       await fixStep(8, 'Getting ready…');
@@ -228,27 +214,22 @@
       const { root } = window.__shrinkFuse.repairModel(model);
       await fixStep(75, 'Putting the fixed model on screen…');
       installWorkingResult(root, 'repair');
-      btn.textContent = 'FIXED';
+      // (the big FIX IT button resets itself in finally)
       await fixStep(90, 'Checking the result…');
       await wait(80);
       await updateHealthCard();
       await fixStep(100, 'Done');
       { const sc = Number($('v2HealthScore')?.textContent); bigResult(sc === 100 ? '<strong>✓ Fixed</strong><span>The model is watertight and clean now.</span>' : `<strong>✓ Fixed what could be fixed</strong><span>Model health is ${Number.isFinite(sc) ? sc + '/100' : 'updated'}. See the Model Health box for what is left.</span>`); }
-      setTimeout(() => { if ($('v2FixProgress') && !btn.disabled) $('v2FixProgress').hidden = true; }, 1500);
-      const card = $('v2HealthCard');
-      if (card && $('v2HealthScore')?.textContent === '100') btn.hidden = true;
+      setTimeout(() => { if ($('v2FixProgress') && !big.disabled) $('v2FixProgress').hidden = true; }, 1500);
     } catch (err) {
       console.error('[SHRINK 3D v2.55] Health repair failed', err);
-      btn.textContent = 'COULD NOT FIX';
       await fixStep(100, 'Could not fix this model');
       bigResult(`<strong>Could not fix this model</strong><span>${err?.message || err}</span>`);
       $('v2FixProgress') && ($('v2FixProgress').dataset.state = 'bad');
       window.__shrinkPrintSafety?.showDiagnostic?.('Fuse', err?.message || String(err));
-      setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; const b = $('v2FixProgress'); if (b) { b.hidden = true; delete b.dataset.state; } }, 2500);
+      setTimeout(() => { const b = $('v2FixProgress'); if (b) { b.hidden = true; delete b.dataset.state; } }, 2500);
     } finally {
-      btn.disabled = false;
-      if (!btn.hidden && btn.textContent === 'FIXING…') btn.textContent = old;
-      if (big) { big.disabled = false; big.textContent = 'FIX IT'; }
+      big.disabled = false; big.textContent = 'FIX IT';
     }
   }
 
@@ -431,6 +412,237 @@
     }
   }
 
+
+  // ---- SHRINK AND FIX MY MODEL (top right): shrink, fix, fuse and centre in one go, each step only if it can ----
+
+  // ---- lay the model flat and square to the grid (before centring) ----
+  // Finds the flattest, most stable face within 50 degrees of "down", turns the model so that face sits on the bed, then
+  // turns it about the vertical so its long side runs along X. Never flips a model more than 50 degrees (a standing figure stays standing).
+  function levelModel() {
+    const THREE = app()?.THREE, model = sourceModel();
+    if (!THREE || !model) return { ok: false, text: 'nothing to level' };
+    model.updateWorldMatrix(true, true);
+    const tris = []; let total = 0;
+    model.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) total += o.geometry.index ? o.geometry.index.count / 3 : o.geometry.attributes.position.count / 3; });
+    const stride = Math.max(1, Math.ceil(total / 40000));
+    let k = 0; const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    model.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count / 3 : pos.count / 3, m = o.matrixWorld;
+      for (let t = 0; t < n; t++, k++) {
+        if (k % stride) continue;
+        const i0 = idx ? idx.getX(t * 3) : t * 3, i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+        a.fromBufferAttribute(pos, i0).applyMatrix4(m); b.fromBufferAttribute(pos, i1).applyMatrix4(m); c.fromBufferAttribute(pos, i2).applyMatrix4(m);
+        tris.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      }
+    });
+    const T = tris.length / 9; if (T < 4) return { ok: false, text: 'nothing to level' };
+    const P = Float32Array.from(tris), N = new Float32Array(T * 3), A = new Float32Array(T);
+    let lo = [1e30, 1e30, 1e30], hi = [-1e30, -1e30, -1e30];
+    for (let t = 0; t < T; t++) {
+      const o = t * 9, ux = P[o + 3] - P[o], uy = P[o + 4] - P[o + 1], uz = P[o + 5] - P[o + 2], vx = P[o + 6] - P[o], vy = P[o + 7] - P[o + 1], vz = P[o + 8] - P[o + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1;
+      N[t * 3] = nx / l; N[t * 3 + 1] = ny / l; N[t * 3 + 2] = nz / l; A[t] = l / 2;
+      for (let q = 0; q < 3; q++) for (let e = 0; e < 3; e++) { const v = P[o + q * 3 + e]; if (v < lo[e]) lo[e] = v; if (v > hi[e]) hi[e] = v; }
+    }
+    const diag = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1, EPS = 0.012;
+    const score = (d, epsF = EPS) => {
+      const eps = diag * epsF;   // d = unit "down" direction
+      let mx = -1e30, mn = 1e30;
+      for (let t = 0; t < T; t++) for (let q = 0; q < 3; q++) { const o = t * 9 + q * 3, h = P[o] * d[0] + P[o + 1] * d[1] + P[o + 2] * d[2]; if (h > mx) mx = h; if (h < mn) mn = h; }
+      let contact = 0, proj = 0, nsum = [0, 0, 0];
+      for (let t = 0; t < T; t++) {
+        const o = t * 9, h0 = P[o] * d[0] + P[o + 1] * d[1] + P[o + 2] * d[2], h1 = P[o + 3] * d[0] + P[o + 4] * d[1] + P[o + 5] * d[2], h2 = P[o + 6] * d[0] + P[o + 7] * d[1] + P[o + 8] * d[2];
+        const dn = N[t * 3] * d[0] + N[t * 3 + 1] * d[1] + N[t * 3 + 2] * d[2];
+        proj += A[t] * Math.abs(dn) * 0.5;
+        if (mx - h0 < eps && mx - h1 < eps && mx - h2 < eps && Math.abs(dn) > 0.8) { const sg = dn < 0 ? -1 : 1; contact += A[t]; nsum[0] += sg * N[t * 3] * A[t]; nsum[1] += sg * N[t * 3 + 1] * A[t]; nsum[2] += sg * N[t * 3 + 2] * A[t]; }
+      }
+      const height = Math.max(mx - mn, diag * 1e-3);
+      return { s: (contact + 0.05 * proj) / height, contact, nsum };
+    };
+    const cur = [0, -1, 0], base = score(cur);
+    let best = { s: base.s, d: cur, nsum: base.nsum, contact: base.contact };
+    // coarse pass over directions within 50 deg of straight down (wide contact band), then hill-climb the best few with a narrowing band
+    const cone = Math.cos(50 * Math.PI / 180), NS = 360, ga = Math.PI * (3 - Math.sqrt(5)), coarse = [];
+    for (let i = 0; i < NS; i++) {
+      const y = 1 - (i + 0.5) / NS * 2, r = Math.sqrt(1 - y * y), d = [Math.cos(i * ga) * r, y, Math.sin(i * ga) * r];
+      if (-d[1] < cone) continue;
+      coarse.push({ d, s: score(d, 0.1).s });
+    }
+    coarse.sort((x, y) => y.s - x.s);
+    const unit = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    const inCone = d => -d[1] >= cone;
+    for (const c0 of coarse.slice(0, 6)) {
+      let d = c0.d, rad = 9 * Math.PI / 180, ef = 0.05, cs = score(d, ef).s;
+      for (let round = 0; round < 8; round++) {
+        const w = Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+        const u = unit([d[1] * w[2] - d[2] * w[1], d[2] * w[0] - d[0] * w[2], d[0] * w[1] - d[1] * w[0]]);
+        const v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]];
+        let bd = d, bs = cs;
+        for (const rr of [0.5, 1]) for (let k2 = 0; k2 < 8; k2++) {
+          const an = k2 * Math.PI / 4, off = rad * rr, cd = unit([d[0] + Math.tan(off) * (Math.cos(an) * u[0] + Math.sin(an) * v[0]), d[1] + Math.tan(off) * (Math.cos(an) * u[1] + Math.sin(an) * v[1]), d[2] + Math.tan(off) * (Math.cos(an) * u[2] + Math.sin(an) * v[2])]);
+          if (!inCone(cd)) continue;
+          const sc = score(cd, ef).s; if (sc > bs) { bs = sc; bd = cd; }
+        }
+        d = bd; rad *= 0.6; ef = Math.max(EPS, ef * 0.7); cs = score(d, ef).s;
+      }
+      const fin = score(d);
+      if (fin.s > best.s) best = { s: fin.s, d, nsum: fin.nsum, contact: fin.contact };
+    }
+    let tiltDeg = 0, turned = false;
+    if (best.d !== cur && best.s > base.s * 1.25) {
+      let d = new THREE.Vector3(...best.nsum); if (d.lengthSq() < 1e-12) d = new THREE.Vector3(...best.d); d.normalize();   // exact plane of the contact faces
+      const q = new THREE.Quaternion().setFromUnitVectors(d, new THREE.Vector3(0, -1, 0));
+      tiltDeg = Math.acos(Math.min(1, Math.max(-1, d.y * -1))) * 180 / Math.PI;
+      if (tiltDeg > 0.3) { rotateAboutCentre(model, q, THREE); turned = true; }
+    }
+    // square to the grid: long side along X
+    model.updateWorldMatrix(true, true);
+    const pts = []; model.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; const pos = o.geometry.attributes.position, st = Math.max(1, Math.ceil(pos.count / 30000)), v = new THREE.Vector3(); for (let i = 0; i < pos.count; i += st) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); pts.push(v.x, v.z); } });
+    let mxx = 0, mzz = 0, mxz = 0, ax = 0, az = 0; const np = pts.length / 2;
+    for (let i = 0; i < np; i++) { ax += pts[i * 2]; az += pts[i * 2 + 1]; } ax /= np; az /= np;
+    for (let i = 0; i < np; i++) { const x = pts[i * 2] - ax, z = pts[i * 2 + 1] - az; mxx += x * x; mzz += z * z; mxz += x * z; }
+    const tr = mxx + mzz, det = Math.sqrt(Math.max(0, (mxx - mzz) ** 2 / 4 + mxz * mxz)), l1 = tr / 2 + det, l2 = tr / 2 - det;
+    let yawDeg = 0;
+    if (l2 <= 0 || l1 / l2 > 1.15) {
+      const th = 0.5 * Math.atan2(2 * mxz, mxx - mzz); yawDeg = th * 180 / Math.PI;
+      if (Math.abs(yawDeg) > 1) rotateAboutCentre(model, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), th), THREE); else yawDeg = 0;
+    }
+    const bits = []; if (turned) bits.push(`tilted ${tiltDeg.toFixed(0)}° to sit flat`); if (yawDeg) bits.push(`turned ${Math.abs(yawDeg).toFixed(0)}° to line up with the grid`);
+    return { ok: true, text: bits.length ? bits.join(' and ') : 'already sitting flat and square', changed: bits.length > 0, tiltDeg, yawDeg };
+  }
+  // World-space helpers: the working model may sit inside a parent with its own scale/rotation, so never add world offsets to .position directly
+  function moveWorld(model, dWorld, THREE) {
+    model.updateWorldMatrix(true, false);
+    const pw = model.getWorldPosition(new THREE.Vector3()), target = pw.clone().add(dWorld);
+    if (model.parent) { model.parent.updateWorldMatrix(true, false); model.position.copy(model.parent.worldToLocal(target)); } else model.position.copy(target);
+    model.updateWorldMatrix(true, true);
+  }
+  function rotateAboutCentre(model, qWorld, THREE) {
+    model.updateWorldMatrix(true, true);
+    const c = new THREE.Box3().setFromObject(model, true).getCenter(new THREE.Vector3());
+    const pw = model.getWorldPosition(new THREE.Vector3()), newPw = pw.sub(c).applyQuaternion(qWorld).add(c);
+    if (model.parent) {
+      model.parent.updateWorldMatrix(true, false);
+      const pq = model.parent.getWorldQuaternion(new THREE.Quaternion());
+      model.quaternion.premultiply(pq).premultiply(qWorld).premultiply(pq.clone().invert());
+      model.position.copy(model.parent.worldToLocal(newPw));
+    } else { model.quaternion.premultiply(qWorld); model.position.copy(newPw); }
+    model.updateWorldMatrix(true, true);
+  }
+  window.__shrinkLevel = () => levelModel();
+  function centreOnBed() {
+    const model = sourceModel(), THREE = app()?.THREE;
+    if (!model || !THREE) return { ok: false, text: 'nothing to centre' };
+    model.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(model, true);
+    if (box.isEmpty()) return { ok: false, text: 'nothing to centre' };
+    const c = box.getCenter(new THREE.Vector3()), d = new THREE.Vector3(-c.x, -box.min.y, -c.z);
+    if (d.length() < 1e-6) return { ok: true, text: 'already centred and flat on the bed' };
+    moveWorld(model, d, THREE);
+    // keep the view on the model: move the camera and orbit target by the same shift
+    const v = window.__shrinkViewer;
+    if (v?.camera && v?.controls) {
+      v.camera.position.add(d); v.controls.target.add(d); v.camera.updateMatrixWorld(true); v.controls.update?.();
+    }
+    model.visible = true;
+    return { ok: true, text: 'centred, with its base flat on the bed' };
+  }
+
+  // ---- matrix-style print bed + X/Y/Z arrows, shown once the model is centred ----
+  function removeBedGuide() {
+    const v = window.__shrinkViewer; if (!v) return;
+    const g = v.scene.getObjectByName('shrinkBedGuide');
+    if (g) {
+      v.scene.remove(g);
+      g.traverse(o => { o.geometry?.dispose?.(); if (o.material) { o.material.map?.dispose?.(); o.material.dispose?.(); } });
+    }
+    v.scene.children.forEach(o => { if (o.isGridHelper && o.userData._shrinkHidden) { o.visible = true; delete o.userData._shrinkHidden; } });
+  }
+  function showBedGuide() {
+    const THREE = app()?.THREE, v = window.__shrinkViewer, model = sourceModel();
+    if (!THREE || !v || !model) return;
+    removeBedGuide();
+    model.updateWorldMatrix(true, true);
+    const size = new THREE.Box3().setFromObject(model, true).getSize(new THREE.Vector3());
+    const span = Math.max(size.x, size.z, size.y * 0.8, 1e-6);
+    const pow = Math.pow(10, Math.floor(Math.log10(span / 8)));
+    const cell = [1, 2, 5, 10].map(m => m * pow).find(c => span * 1.7 / c <= 24) || 10 * pow;
+    const half = Math.max(4, Math.ceil(span * 0.85 / cell)) * cell, n = Math.round(half * 2 / cell);
+    const g = new THREE.Group(); g.name = 'shrinkBedGuide';
+    const grid = new THREE.GridHelper(half * 2, n, 0x39ff7a, 0x14994a);
+    grid.material.transparent = true; grid.material.opacity = 0.55; grid.material.depthWrite = false;
+    grid.position.y = -span * 0.0005; g.add(grid);
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(half * 2, half * 2), new THREE.MeshBasicMaterial({ color: 0x021a0c, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+    plane.rotation.x = -Math.PI / 2; plane.position.y = -span * 0.001; g.add(plane);
+    const len = span * 0.7, head = len * 0.16;
+    const label = (txt, col, pos) => {
+      const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+      x.font = 'bold 44px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = col; x.fillText(txt, 32, 34);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+      sp.scale.setScalar(len * 0.16); sp.position.copy(pos); sp.renderOrder = 10; g.add(sp);
+    };
+    [['X', 0xff4d4d, '#ff6b6b', new THREE.Vector3(1, 0, 0)], ['Y', 0x4dff7a, '#7dff9d', new THREE.Vector3(0, 1, 0)], ['Z', 0x4d9bff, '#7db4ff', new THREE.Vector3(0, 0, 1)]].forEach(([t, hex, css, dir]) => {
+      const a = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), len, hex, head, head * 0.55);
+      a.line.material.depthTest = false; a.cone.material.depthTest = false; a.renderOrder = 9; a.line.renderOrder = 9; a.cone.renderOrder = 9; g.add(a);
+      label(t, css, dir.clone().multiplyScalar(len + head * 1.1));
+    });
+    v.scene.add(g);
+    v.scene.children.forEach(o => { if (o.isGridHelper && o.parent === v.scene) { o.userData._shrinkHidden = true; o.visible = false; } });
+  }
+  window.__shrinkBedGuide = { show: showBedGuide, remove: removeBedGuide };
+  window.__shrinkCentre = () => centreOnBed();
+  async function shrinkMyModel() {
+    const btn = $('v2MagicBtn'), note = $('v2MagicNote');
+    if (!btn || btn.disabled || !sourceModel()) return;
+    btn.disabled = true; btn.dataset.busy = '1'; const label = btn.textContent;
+    const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : ''); };
+    const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
+    try {
+      const startTris = modelTriangles(sourceModel());
+      // 1. SHRINK
+      btn.textContent = '1/4 Shrinking…'; show('Shrinking…'); await paintNow();
+      try { await shrinkModel(); const now = modelTriangles(sourceModel()); done('ok', '✓', `Shrunk: ${startTris.toLocaleString()} → ${now.toLocaleString()} triangles`); }
+      catch (err) { done('warn', '⚠', `Could not shrink (${err.message || err})`); }
+      // 2. FIX (only if the health check says something is wrong)
+      btn.textContent = '2/4 Fixing…'; show('Checking and fixing…'); await updateHealthCard(); await paintNow();
+      if ($('v2HealthScore')?.textContent === '100') done('ok', '✓', 'Already clean: nothing to fix');
+      else {
+        await fixHealthModel(); await wait(60);
+        const sc = Number($('v2HealthScore')?.textContent);
+        done(sc === 100 ? 'ok' : 'warn', sc === 100 ? '✓' : '⚠', sc === 100 ? 'Fixed: the model is watertight' : `Fixed what could be fixed (health ${Number.isFinite(sc) ? sc + '/100' : 'unknown'})`);
+      }
+      // 3. FUSE
+      btn.textContent = '3/4 Fusing…'; show('Fusing…'); await paintNow();
+      const fc = $('v2FuseCard'); if (fc) fc.dataset.state = '';
+      await fuseCheck(); await wait(60);
+      const fs = fc?.dataset.state;
+      done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
+      // 4. CENTRE
+      btn.textContent = '4/4 Levelling…'; show('Levelling and centring…'); await paintNow();
+      let lv = null; try { lv = levelModel(); } catch (e) { console.warn('level', e); }
+      if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);
+      const cr = centreOnBed(); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
+      rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
+      markStep?.(4, 'active');
+    } catch (err) {
+      console.error('[SHRINK 3D] SHRINK MY MODEL failed', err);
+      done('warn', '⚠', `Stopped: ${err.message || err}`);
+    } finally {
+      delete btn.dataset.busy; btn.disabled = false; btn.textContent = label;
+    }
+  }
+
+  function ensureMagicButton() {
+    if ($('v2MagicBtn')) return;
+    const top = document.querySelector('.topbar'); if (!top) return;
+    const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">SHRINK AND FIX MY MODEL</button><div id="v2MagicNote" class="v2-magic-note" role="status" hidden></div>';
+    const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
+    $('v2MagicBtn').addEventListener('click', shrinkMyModel);
+    $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
+  }
+
   let activePegCut = 0;
 
   // ---- peg report: plain words + colour for every peg, so a peg sticking out of the model is obvious ----
@@ -592,12 +804,8 @@
             <details class="v2-advanced"><summary>Advanced printer settings</summary><div class="v2-advanced-body"><label id="v2CustomPrinter" hidden>Smallest detail to keep (mm)<input id="v2PrinterDetail" type="number" min="0.005" step="0.005" value="0.05"></label><p>Technical users can set the printer's smallest visible detail here. SHRINK uses this when judging whether a change will be visible.</p></div></details>
           </section>
 
-          <div class="v2-tool-intro">
-            <span>3D PRINT MULTITOOL</span>
-            <strong>USE ANY TOOL YOU NEED</strong>
-            <small>Shrink it, fix it, fuse it, download it — use one, two or all of them.</small>
-          </div>
-
+          <details id="v2AdvTools" class="v2-adv-tools">
+            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse one at a time</strong><small>SHRINK AND FIX MY MODEL (top right) does all of these for you. Open this to use them separately.</small></summary>
           <div class="v2-action-grid">
             <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
               <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
@@ -632,6 +840,10 @@
               <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles and joins touching/overlapping parts. Multiple closed components are valid; SHRINK only reports a repair problem when the mesh itself is open or non-manifold.</p></div></details>
             </section>
 
+          </div>
+          </details>
+
+          <div class="v2-action-grid v2-download-grid">
             <section class="v2-card v2-action-card v2-download-card">
               <div class="v2-card-head"><div><h2>Download</h2><p>Save one STL, or split it into printable sections with pegs.</p></div></div>
               <div class="v2-download-options"><label>Split into<select id="v2SplitMode"><option value="off">One STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">Auto by maximum height</option></select></label><label>Joint<select id="v2Joint"><option value="pegs">Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label></div>
@@ -751,7 +963,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', () => { setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', () => { removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
@@ -779,7 +991,10 @@
   }
 
   function onMode() {
+    ensureMagicButton();
+    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel(); }
     const print = document.body.classList.contains('app-mode-print');
+    if (!print) removeBedGuide();
     if (print) activate(); else deactivate();
   }
 

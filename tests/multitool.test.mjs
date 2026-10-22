@@ -327,7 +327,7 @@ await block(25, async () => {
   page.$('v2ShrinkBtn').click();
   await waitFor(() => /✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000);
   await wait(300);
-  ok(!/Tidied/.test(page.$('v2ShrinkResult').textContent) && !(await healthOf(window.__shrinkLive.root)).clean && page.$('v2HealthFixBtn').hidden === false, 'K4 nothing was repaired behind the person\'s back; FIX IT is still offered');
+  ok(!/Tidied/.test(page.$('v2ShrinkResult').textContent) && !(await healthOf(window.__shrinkLive.root)).clean, 'K4 nothing was repaired behind the person\'s back');
 });
 
 /* ============ L. a model whose display geometry has crease-split vertices behaves exactly like any other ============ */

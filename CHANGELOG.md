@@ -2,6 +2,30 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.137
+- Fix: SHRINK AND FIX MY MODEL could report "flat on the bed" while the model hovered above the grid. Levelling and centring now work in world space (the model can sit inside a parent with its own scale or rotation), refresh the parent matrices first, and measure the model's true extents from its vertices instead of a cached bounding box. Checked with a model inside a scaled and rotated parent: base exactly at y=0, centred.
+
+## v2.136
+- **SHRINK AND FIX MY MODEL** now lays the model flat as well as centring it. Step 4 finds the flattest, most stable face within 50° of "down" (so a standing figure is never tipped onto its back, but a tilted wall section or a model that arrived at an angle is turned to sit flat on the bed), then turns it about the vertical so its long side runs along X, square to the grid, then centres it and drops it on the bed. The report says how far it tilted and turned. Rounder models are not turned; ones already flat are left alone. Wheeled models (several small contact patches) can end up a degree or two off.
+
+## v2.135
+- The top-right button is now labelled **SHRINK AND FIX MY MODEL** (it still also fuses and centres where it can).
+
+## v2.134
+- The 3D Print multitool's SHRINK / FIX / FUSE cards are now tucked into a collapsed **Advanced** drawer in the left column (SHRINK MY MODEL! does them all in one click). Click it to use them one at a time. Download stays visible below it.
+
+## v2.133
+- The little Model Health box on the right is now a report only: its FIX IT button is gone (the big FIX IT button in the left column does the job). Its progress bar stays.
+
+## v2.132
+- **SHRINK MY MODEL!** now shows a matrix-style green gridded print bed under the centred model, with red X, green Y and blue Z arrows from the origin (like a 3D program). The grid cell size scales with the model. It is a viewer-only guide: it is never exported, and it disappears when a new model is opened or you switch to Game mode.
+
+## v2.131
+- Fix: after **SHRINK MY MODEL!** the model could vanish from the viewer. Centring moved the model to the origin but left the camera looking at the old spot. The camera and orbit target now move by the same amount, so the model stays in view.
+
+## v2.130
+- New friendly **SHRINK MY MODEL!** button top right (3D Print mode, once a model is loaded). One click runs SHRINK IT, then FIX IT (skipped if the model is already clean), then FUSE IT, then centres the model on the origin with its base flat on the bed, each step only if it can. A small report under the button says what each step did (click it to dismiss); a step that cannot be done is flagged and the rest carry on. Download is still your decision.
+
 ## v2.129
 - 3D Print tools are now in the order people actually use them: **1 SHRINK IT, 2 FIX IT, 3 FUSE IT, 4 Download**. FIX IT is a new large button/card between Shrink and Fuse (same repair and progress bar as the small FIX IT in the Model Health box, which still works). The yellow "very detailed" warning sits above the first card.
 
