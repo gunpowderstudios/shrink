@@ -1,4 +1,4 @@
-// SHRINK 3D v2.132 — "Racer" export preset, the document side. No imports and no DOM: the page (racer.js) and the tests (racer.test.mjs) both use it.
+// SHRINK 3D v2.133 — "Racer" export preset, the document side. No imports and no DOM: the page (racer.js) and the tests (racer.test.mjs) both use it.
 //
 // The Racer preset prepares a vehicle GLB for a browser racing game on phones. Memory comes from the UNPACKED texture size, not the file size, so:
 //   base colour and the metal/rough (ORM) map -> 1024 (base colour 2048 with the "High" option), normal map -> 512, all WebP;

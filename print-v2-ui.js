@@ -130,9 +130,7 @@
       <div id="v2HealthRows" class="v2-health-rows"><div class="v2-health-checking">Running mesh checks…</div></div>
       <div id="v2HealthChanges" class="v2-health-changes"><small>CHANGES</small><div class="v2-change-none">None yet</div></div>
       <div id="v2FixProgress" class="v2-fix-progress" hidden><div class="v2-fix-bar"><i id="v2FixFill"></i></div><small id="v2FixLabel"></small></div>
-      <button id="v2HealthFixBtn" class="v2-health-fix" type="button">FIX IT</button>
     `;
-    card.querySelector('#v2HealthFixBtn')?.addEventListener('click', fixHealthModel);
     viewer.appendChild(card);
     return card;
   }
@@ -183,15 +181,6 @@
         healthRow('Non-manifold', new Intl.NumberFormat().format(h.pinchedEdges), manifold) +
         healthRow('Flipped faces', new Intl.NumberFormat().format(h.flippedEdges), oriented) +
         healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens);
-      const fixBtn = $('v2HealthFixBtn');
-      if (fixBtn) {
-        const healthyNow = rating.score === 100;
-        fixBtn.hidden = healthyNow;
-        if (!healthyNow) {
-          fixBtn.textContent = 'FIX IT';
-          fixBtn.disabled = false;
-        }
-      }
     } catch (err) {
       card.className = 'v2-health-card bad';
       $('v2HealthLabel').textContent = 'Check failed';
@@ -212,13 +201,10 @@
     await paintNow();
   }
   async function fixHealthModel() {
-    const btn = $('v2HealthFixBtn');
+    const big = $('v2FixBigBtn');
     const model = healthModel();
-    if (!btn || !model || btn.disabled) return;
-    const old = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'FIXING…';
-    const big = $('v2FixBigBtn'); if (big) { big.disabled = true; big.textContent = 'FIXING…'; }
+    if (!big || !model || big.disabled) return;
+    big.disabled = true; big.textContent = 'FIXING…';
     const bigResult = html => { const r = $('v2FixResult'); if (r) r.innerHTML = html; };
     try {
       await fixStep(8, 'Getting ready…');
@@ -228,27 +214,22 @@
       const { root } = window.__shrinkFuse.repairModel(model);
       await fixStep(75, 'Putting the fixed model on screen…');
       installWorkingResult(root, 'repair');
-      btn.textContent = 'FIXED';
+      // (the big FIX IT button resets itself in finally)
       await fixStep(90, 'Checking the result…');
       await wait(80);
       await updateHealthCard();
       await fixStep(100, 'Done');
       { const sc = Number($('v2HealthScore')?.textContent); bigResult(sc === 100 ? '<strong>✓ Fixed</strong><span>The model is watertight and clean now.</span>' : `<strong>✓ Fixed what could be fixed</strong><span>Model health is ${Number.isFinite(sc) ? sc + '/100' : 'updated'}. See the Model Health box for what is left.</span>`); }
-      setTimeout(() => { if ($('v2FixProgress') && !btn.disabled) $('v2FixProgress').hidden = true; }, 1500);
-      const card = $('v2HealthCard');
-      if (card && $('v2HealthScore')?.textContent === '100') btn.hidden = true;
+      setTimeout(() => { if ($('v2FixProgress') && !big.disabled) $('v2FixProgress').hidden = true; }, 1500);
     } catch (err) {
       console.error('[SHRINK 3D v2.55] Health repair failed', err);
-      btn.textContent = 'COULD NOT FIX';
       await fixStep(100, 'Could not fix this model');
       bigResult(`<strong>Could not fix this model</strong><span>${err?.message || err}</span>`);
       $('v2FixProgress') && ($('v2FixProgress').dataset.state = 'bad');
       window.__shrinkPrintSafety?.showDiagnostic?.('Fuse', err?.message || String(err));
-      setTimeout(() => { if (btn) btn.textContent = 'FIX IT'; const b = $('v2FixProgress'); if (b) { b.hidden = true; delete b.dataset.state; } }, 2500);
+      setTimeout(() => { const b = $('v2FixProgress'); if (b) { b.hidden = true; delete b.dataset.state; } }, 2500);
     } finally {
-      btn.disabled = false;
-      if (!btn.hidden && btn.textContent === 'FIXING…') btn.textContent = old;
-      if (big) { big.disabled = false; big.textContent = 'FIX IT'; }
+      big.disabled = false; big.textContent = 'FIX IT';
     }
   }
 

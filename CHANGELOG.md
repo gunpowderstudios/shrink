@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.133
+- The little Model Health box on the right is now a report only: its FIX IT button is gone (the big FIX IT button in the left column does the job). Its progress bar stays.
+
 ## v2.132
 - **SHRINK MY MODEL!** now shows a matrix-style green gridded print bed under the centred model, with red X, green Y and blue Z arrows from the origin (like a 3D program). The grid cell size scales with the model. It is a viewer-only guide: it is never exported, and it disappears when a new model is opened or you switch to Game mode.
 
