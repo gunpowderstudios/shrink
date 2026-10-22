@@ -1,4 +1,4 @@
-// SHRINK 3D v2.133 — "Centre on origin, sit on the ground" for a GLB (no DOM; tested by ground.test.mjs).
+// SHRINK 3D v2.134 — "Centre on origin, sit on the ground" for a GLB (no DOM; tested by ground.test.mjs).
 // Moves the whole model (every scene root node, wheels included) so its bounding box is centred left/right and front/back on the origin and its
 // lowest point is exactly on y = 0. Only the translation of the scene's top-level nodes changes: meshes, rotations, scales and materials are untouched.
 // getBounds comes from @gltf-transform/core or /functions (passed in so this file has no imports).

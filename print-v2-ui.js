@@ -684,12 +684,8 @@
             <details class="v2-advanced"><summary>Advanced printer settings</summary><div class="v2-advanced-body"><label id="v2CustomPrinter" hidden>Smallest detail to keep (mm)<input id="v2PrinterDetail" type="number" min="0.005" step="0.005" value="0.05"></label><p>Technical users can set the printer's smallest visible detail here. SHRINK uses this when judging whether a change will be visible.</p></div></details>
           </section>
 
-          <div class="v2-tool-intro">
-            <span>3D PRINT MULTITOOL</span>
-            <strong>USE ANY TOOL YOU NEED</strong>
-            <small>Shrink it, fix it, fuse it, download it — use one, two or all of them.</small>
-          </div>
-
+          <details id="v2AdvTools" class="v2-adv-tools">
+            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse one at a time</strong><small>SHRINK MY MODEL! (top right) does all of these for you. Open this to use them separately.</small></summary>
           <div class="v2-action-grid">
             <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
               <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
@@ -724,6 +720,10 @@
               <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles and joins touching/overlapping parts. Multiple closed components are valid; SHRINK only reports a repair problem when the mesh itself is open or non-manifold.</p></div></details>
             </section>
 
+          </div>
+          </details>
+
+          <div class="v2-action-grid v2-download-grid">
             <section class="v2-card v2-action-card v2-download-card">
               <div class="v2-card-head"><div><h2>Download</h2><p>Save one STL, or split it into printable sections with pegs.</p></div></div>
               <div class="v2-download-options"><label>Split into<select id="v2SplitMode"><option value="off">One STL</option><option value="2">2 parts</option><option value="3">3 parts</option><option value="max">Auto by maximum height</option></select></label><label>Joint<select id="v2Joint"><option value="pegs">Keyed twin pegs</option><option value="flat">Flat cut — no pegs</option></select></label></div>
