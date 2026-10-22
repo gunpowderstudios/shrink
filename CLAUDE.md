@@ -36,7 +36,7 @@ Reduced previews and FIX/FUSE results get their shading normals from `crease-nor
 ### FUSE IT size guard (v2.124)
 `fuseCheck()` in `print-v2-ui.js` refuses above `FUSE_MAX_TRIANGLES` (1,000,000; tests can override with `window.__shrinkFuseTriLimit`) and tells the person to SHRINK IT first. Manifold runs on the main thread, so a multi-million triangle model freezes the tab. The proper fix would be moving fuse into a worker. (v2.125) `updateSizeWarning()` shows the yellow `#v2SizeWarn` banner above the Fuse card from `updateHealthCard()` while the working model is over the limit.
 
-### SHRINK MY MODEL! (v2.130)
+### SHRINK MY MODEL! (v2.131)
 `shrinkMyModel()` in `print-v2-ui.js` (button `#v2MagicBtn` in `.topbar`, report `#v2MagicNote`) just calls the existing `shrinkModel()`, `fixHealthModel()` (only if the health score is not 100), `fuseCheck()` (success read from `#v2FuseCard` `data-state`), then `centreOnBed()`. `centreOnBed()` moves the working model root's `position` (exports use `matrixWorld`, so it follows into STL/split); it never replaces the model object. Do not copy the step logic: change the individual tools.
 
 ### Make watertight

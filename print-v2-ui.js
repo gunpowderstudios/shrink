@@ -442,6 +442,12 @@
     const c = box.getCenter(new THREE.Vector3()), d = new THREE.Vector3(-c.x, -box.min.y, -c.z);
     if (d.length() < 1e-6) return { ok: true, text: 'already centred and flat on the bed' };
     model.position.add(d); model.updateMatrixWorld(true);
+    // keep the view on the model: move the camera and orbit target by the same shift
+    const v = window.__shrinkViewer;
+    if (v?.camera && v?.controls) {
+      v.camera.position.add(d); v.controls.target.add(d); v.camera.updateMatrixWorld(true); v.controls.update?.();
+    }
+    model.visible = true;
     return { ok: true, text: 'centred, with its base flat on the bed' };
   }
   async function shrinkMyModel() {

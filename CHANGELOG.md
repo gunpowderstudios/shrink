@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.131
+- Fix: after **SHRINK MY MODEL!** the model could vanish from the viewer. Centring moved the model to the origin but left the camera looking at the old spot. The camera and orbit target now move by the same amount, so the model stays in view.
+
 ## v2.130
 - New friendly **SHRINK MY MODEL!** button top right (3D Print mode, once a model is loaded). One click runs SHRINK IT, then FIX IT (skipped if the model is already clean), then FUSE IT, then centres the model on the origin with its base flat on the bed, each step only if it can. A small report under the button says what each step did (click it to dismiss); a step that cannot be done is flagged and the rest carry on. Download is still your decision.
 
