@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.126
+- 3D Print downloads are now simply `<original name>-SHRINK` (e.g. `dwarf-SHRINK.stl`): the height, FIX, FUSE, REBUILD and reduction tags are gone. A split still names its parts `-PART1of2` and the zip `-SPLIT2` so they stay distinguishable.
+
 ## v2.125
 - A yellow warning triangle now appears above the tools as soon as a model is too detailed to fuse or fix safely (over 1,000,000 triangles), with the triangle count and what to do: press SHRINK IT first, then FIX IT or FUSE IT. It clears itself once the model has been shrunk.
 

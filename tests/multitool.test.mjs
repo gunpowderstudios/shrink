@@ -30,7 +30,7 @@ await block(1, async () => {
   ok(await waitFor(() => zipOf(page)), 'A1 flat 2 parts: DOWNLOAD IT produced a ZIP');
   ok(page.$('fuseSolidToggle').checked === false, 'A1 DOWNLOAD IT did not switch Fuse on');
   const r = await readParts(page);
-  ok(r.zip.name === 'dwarf-H40-SHRINK-SPLIT2.zip' && r.names.join() === 'dwarf-H40-SHRINK-PART1of2.stl,dwarf-H40-SHRINK-PART2of2.stl', 'A1 file names: ' + r.zip.name + ' / ' + r.names.join(' '));
+  ok(r.zip.name === 'dwarf-SHRINK-SPLIT2.zip' && r.names.join() === 'dwarf-SHRINK-PART1of2.stl,dwarf-SHRINK-PART2of2.stl', 'A1 file names: ' + r.zip.name + ' / ' + r.names.join(' '));
   const [p1, p2] = r.parts;
   ok(Math.abs(p1.stl.maxZ - 20) < 0.05 && Math.abs(p2.stl.minZ - 20) < 0.05, `A1 cut at 50% of the height (lower part tops out at ${p1.stl.maxZ.toFixed(2)}, upper starts at ${p2.stl.minZ.toFixed(2)})`);
   ok((await stlHealth(p1.stl)).clean && (await stlHealth(p2.stl)).clean, 'A1 both sections are watertight (no open, tangled or flipped edges)');

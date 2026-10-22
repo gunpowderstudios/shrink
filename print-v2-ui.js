@@ -33,35 +33,12 @@
   }
 
   function cleanBaseName(base = 'model') {
-    // If the source already ends in a height such as H37mm, replace it with the
-    // current print height rather than creating H37mm-H100.
-    return String(base || 'model')
-      .replace(/[-_ ]H\d+(?:\.\d+)?(?:mm)?$/i, '')
-      .replace(/[-_ ]+$/g, '') || 'model';
+    return String(base || 'model').replace(/[-_ ]+$/g, '') || 'model';
   }
 
+  // Downloads are simply <original name>-SHRINK (no height / FIX / FUSE / reduction tags). Split parts keep their -PARTnofN suffix elsewhere.
   function downloadStem(base) {
-    const parts = [cleanBaseName(base)];
-    const height = Math.max(1, Number($('v2Height')?.value || $('figureHeightMm')?.value || 75));
-    const hText = Number.isInteger(height) ? String(height) : String(Number(height.toFixed(1))).replace('.', 'p');
-    parts.push(`H${hText}`, 'SHRINK');
-
-    if (appliedChanges.has('fixed')) parts.push('FIX');
-    if (appliedChanges.has('rebuilt')) parts.push('REBUILD');
-    if (appliedChanges.has('fused')) parts.push('FUSE');
-
-    if (appliedChanges.has('shrunk')) {
-      const original = modelTriangles(app()?.originalModel);
-      const current = modelTriangles(sourceModel());
-      if (original > 0 && current > 0) {
-        const pct = current / original * 100;
-        const r = pct < 10 ? Math.max(0.1, Math.round(pct * 10) / 10) : Math.round(pct);
-        parts.push(`R${String(r).replace('.', 'p')}`);
-      } else {
-        parts.push('REDUCED');
-      }
-    }
-    return parts.join('-');
+    return `${cleanBaseName(base)}-SHRINK`;
   }
 
   window.__shrinkDownloadStem = downloadStem;
