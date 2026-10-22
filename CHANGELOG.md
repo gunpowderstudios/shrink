@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.124
+- FUSE IT no longer freezes the page on a huge model. The solid work runs on the page's main thread, so a model of several million triangles (a 226 MB STL) gave Chrome's "Page Unresponsive" box. Above 1,000,000 triangles FUSE IT now stops straight away and says to press SHRINK IT first (shrink, then fuse is the order that works).
+
 ## v2.123
 - Stamp ghost really hides now. The dashed ghost is a canvas inside the viewer, and the viewer's `canvas { display:block }` rule overrode its `hidden` attribute, so it was never hidden at all once it had been shown (this was the real cause of the ghosting after Esc or a paste). Added `.stamp-ghost[hidden]{display:none!important}`.
 

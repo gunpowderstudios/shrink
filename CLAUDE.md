@@ -33,6 +33,9 @@ The simplifier can leave a few non-manifold edges on a model of many small piece
 ### Display shading (v2.56, unchanged in v2.57)
 Reduced previews and FIX/FUSE results get their shading normals from `crease-normals.js` (`creaseSplit`), not `computeVertexNormals()`. Plain smooth normals smear shading over big flat triangles across hard edges and look like dark patches; the geometry is fine and the STL never contains them. `creaseSplit` only appends duplicate vertices and never changes positions or triangles; the original vertex numbers stay valid, which `live-reduce.js` relies on (worker indices refer to the original numbering). Keep `src.baseAttrs` (pristine attributes) in `live-reduce.js` and rebuild the display geometry from `s.positions` on every reduction.
 
+### FUSE IT size guard (v2.124)
+`fuseCheck()` in `print-v2-ui.js` refuses above `FUSE_MAX_TRIANGLES` (1,000,000; tests can override with `window.__shrinkFuseTriLimit`) and tells the person to SHRINK IT first. Manifold runs on the main thread, so a multi-million triangle model freezes the tab. The proper fix would be moving fuse into a worker.
+
 ### Make watertight
 Rebuilds the **working model** (not the original), checks the result with the shared `meshHealth`, and only then installs it. On refusal or an unhealthy result nothing changes and nothing is downloaded.
 

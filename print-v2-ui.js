@@ -298,6 +298,7 @@
     if (label) label.textContent = text || '';
   }
 
+  const FUSE_MAX_TRIANGLES = 1000000;
   async function fuseCheck() {
     const btn = $('v2FuseBtn');
     const card = $('v2FuseCard');
@@ -311,6 +312,13 @@
       if (!window.__shrinkFuse?.modelToSolid) throw new Error('The repair tool is still loading. Try again in a moment.');
       const model = sourceModel();
       if (!model) throw new Error('Load a model first.');
+      // The solid work runs on the page's main thread: a multi-million triangle model freezes the tab ("Page Unresponsive"). Say so up front instead of hanging.
+      const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
+      if (tris > limit) {
+        fuseReady = false; progress(card, 100, 'Too detailed to fuse as it is.'); markStep(2, 'pending');
+        $('v2FuseResult').innerHTML = `<strong>Press SHRINK IT first</strong><span>This model has ${tris.toLocaleString()} triangles, which is too many to fuse in the browser without freezing the page (the limit is ${limit.toLocaleString()}). SHRINK IT keeps the shape and cuts the triangles right down; then FUSE IT will work in a moment.</span>`;
+        btn.disabled = false; return;
+      }
       progress(card, 36, 'Repairing seams and joining touching parts…');
       await wait(20);
       const built = await window.__shrinkFuse.fuseModel(model);
