@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.138
+- The big top-right button is now labelled **QUICK-FIX (shrink, fix and fuse)**. It still also levels and centres the model on the bed.
+
 ## v2.137
 - Fix: SHRINK AND FIX MY MODEL could report "flat on the bed" while the model hovered above the grid. Levelling and centring now work in world space (the model can sit inside a parent with its own scale or rotation), refresh the parent matrices first, and measure the model's true extents from its vertices instead of a cached bounding box. Checked with a model inside a scaled and rotated parent: base exactly at y=0, centred.
 
