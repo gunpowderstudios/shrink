@@ -111,9 +111,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(!fi || clicks === 1, 'R1 RELOAD opens the file chooser');
   const qb = page.$('v2MagicBtn');
   w.dispatchEvent(new w.CustomEvent('shrink:model-opened', { detail: { kind: 'stl', triangles: 12, vertices: 8 } })); await wait(110);
-  ok(qb.dataset.state === 'checking', 'Q1 QUICK-FIX shimmers while the health check runs');
+  ok(qb.dataset.state === 'checking' && qb.disabled, 'Q1 QUICK-FIX is grey (state checking) and unclickable while the health check runs');
   await wait(1500);
-  ok(qb.dataset.state === 'ready', 'Q1 and goes green once the check has finished');
+  ok(qb.dataset.state === 'ready' && !qb.disabled, 'Q1 and goes green once the check has finished');
 }
 
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');

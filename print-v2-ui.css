@@ -474,8 +474,5 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-magic-reset:hover:not(:disabled){background:rgba(255,255,255,.16)}
 .v2-magic-reset:disabled{background:#2a313b;border-color:#3a414c;color:#7b8594;opacity:1;cursor:not-allowed}
 
-/* QUICK-FIX: grey and shimmering while the health check runs, green once it has finished */
-.v2-magic[data-state="checking"]{background:linear-gradient(110deg,#3a4452 30%,#6b7a8d 50%,#3a4452 70%);background-size:220% 100%;animation:v2-magic-shimmer 1.4s linear infinite;box-shadow:none;color:#cfd8e3}
-.v2-magic[data-state="ready"]:not(:disabled){animation:none}
-@keyframes v2-magic-shimmer{from{background-position:120% 0}to{background-position:-120% 0}}
-@media(prefers-reduced-motion:reduce){.v2-magic[data-state="checking"]{animation:none}}
+/* QUICK-FIX: grey like DOWNLOAD while the health check runs, green once it has finished */
+.v2-magic[data-state="checking"]{background:#3a414c;color:#8a93a0;box-shadow:none;opacity:1;cursor:not-allowed;filter:none}

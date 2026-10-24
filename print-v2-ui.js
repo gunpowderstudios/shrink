@@ -152,8 +152,8 @@
   }
   window.__shrinkRefreshSizeWarning = updateSizeWarning;
 
-  // QUICK-FIX shimmers (grey) while the health check runs and turns green when it has finished, so it is clear when to press it (v2.148).
-  const quickState = (st) => { const b = $('v2MagicBtn'); if (b && b.dataset.state !== st) b.dataset.state = st; };
+  // QUICK-FIX is grey and unclickable (like DOWNLOAD) while the health check runs and turns green when it has finished, so it is clear when to press it (v2.148).
+  const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; } };
   async function updateHealthCard() {
     updateSizeWarning();
     const card = ensureHealthCard();
@@ -1121,7 +1121,7 @@
 
   function onMode() {
     ensureMagicButton();
-    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel(); }
+    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel() || mb.dataset.state === 'checking'; }
     const print = document.body.classList.contains('app-mode-print');
     if (!print) removeBedGuide();
     if (print) activate(); else deactivate();
