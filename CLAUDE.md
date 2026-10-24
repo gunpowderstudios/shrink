@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.141** (CLAY, see below; earlier text says v2.57 for the multitool core) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.143** (CLAY, see below; earlier text says v2.57 for the multitool core) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -41,6 +41,9 @@ Reduced previews and FIX/FUSE results get their shading normals from `crease-nor
 
 ### CLAY (v2.141)
 `clay.js` (ES module, loaded by `ui-mode.js`; card built into `#v2ClayHost`, which `print-v2-ui.js` puts above the Advanced drawer) + `clay-core.js` (no DOM, no three.js: icosphere, `dabSoup`, `dabsAlong`, `thin`, `joinSoups`). Strokes are lists of world-space balls `{x,y,z,r}` kept in `window.__shrinkClay` (`hasClay`, `apply`, `finish`, `addStroke` for tests). The preview is two `InstancedMesh`es in a `shrinkClay` scene group (pink = add, orange = cut); they ignore raycasts. Painting raycasts the working model; Ctrl/Cmd+drag rotates, Esc leaves the tool, as the other brushes do. `fixHealthModel()` calls `__shrinkClay.apply(model)` instead of the gentle repair when clay exists, and `shrinkMyModel()` no longer skips the fix step when clay is present. `apply()`: route A = `modelToSolid` (exact Manifold union/difference, keeps all detail); route B (Manifold rejects a leaky mesh, e.g. piece_55) = add balls to the triangle soup and run `makeWatertight` (balanced, then fast; `high` pinches), then subtract cuts with Manifold. The result must pass `healthOfModel` or nothing is installed. Ball count is thinned and coarsened (`ballLevel`) because the wrap refuses above 1.5M triangles. Tests: `tests/clay.test.mjs`.
+
+### Compare pose (v2.143)
+The levelling, centring and stretch tools move the working model root, never the original. `notePose()` in `print-v2-ui.js` records each change in `poseD`; `window.__shrinkComparePose()` returns it (null when nothing moved); `app.js` `enterCompare()` applies it to `originalModel` and `leaveCompare()` restores the saved position/quaternion/scale. Any new tool that moves or turns the working root must go through `moveWorld`/`rotateAboutCentre`/`notePose`. `poseD` resets on `shrink:model-opened`.
 
 ### Uniform / Width / Depth (v2.140)
 Width/Depth read-outs come from `modelSize()` (precise world box of the working model; cached on uuid + `reducedTick` + matrixWorld). With `#v2Uniform` ticked they just set the Height (everything scales together via `mmPerUnit`). Unticked, they call `applyStretch(fx, fz)`: stretch lives on the working root's `scale` in WORLD axes, so `normalizeRoot()` first moves any root rotation into an inner `shrinkInner` group (root keeps identity rotation, so no shear). Factors are in `model.userData.shrinkStretch`. FIX/FUSE bake the world transform into a new root, so the stretch is then baked in and the factors read 1. `levelModel()` must run on an unstretched root (`resetStretch()` first). `window.__shrinkStretchTick` invalidates split-print's auto-cut signature.

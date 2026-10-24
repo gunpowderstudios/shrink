@@ -298,7 +298,7 @@
     fx = Math.max(0.05, Math.min(20, fx)); fz = Math.max(0.05, Math.min(20, fz));
     normalizeRoot(model, THREE);
     const st = stretchOf(model), b0 = worldBoxOf(model, THREE), c0 = b0.getCenter(new THREE.Vector3());
-    st.x = fx; st.z = fz; model.scale.set(st.base.x * fx, st.base.y, st.base.z * fz);
+    st.x = fx; st.z = fz; notePose(model, () => model.scale.set(st.base.x * fx, st.base.y, st.base.z * fz));
     const b1 = worldBoxOf(model, THREE), c1 = b1.getCenter(new THREE.Vector3());
     moveWorld(model, new THREE.Vector3(c0.x - c1.x, b0.min.y - b1.min.y, c0.z - c1.z), THREE);   // grow about the middle, keep it on the bed
     reducedTick++; window.__shrinkStretchTick = (window.__shrinkStretchTick || 0) + 1;
@@ -590,13 +590,25 @@
     return { ok: true, text: bits.length ? bits.join(' and ') : 'already sitting flat and square', changed: bits.length > 0, tiltDeg, yawDeg };
   }
   // World-space helpers: the working model may sit inside a parent with its own scale/rotation, so never add world offsets to .position directly
-  function moveWorld(model, dWorld, THREE) {
+  // Compare needs the untouched original in the same place as the working model. Every move / turn / stretch of the working model root
+  // adds its change to poseD, and app.js applies poseD to the original while Compare is on (it removes it again afterwards).
+  let poseD = null;
+  function notePose(model, fn) {
+    model.updateWorldMatrix(true, true); const m0 = model.matrixWorld.clone();
+    fn();
+    model.updateWorldMatrix(true, true); const delta = model.matrixWorld.clone().multiply(m0.invert());
+    poseD = poseD ? delta.multiply(poseD) : delta;
+  }
+  window.__shrinkComparePose = () => (poseD && poseD.elements.some((v, i) => Math.abs(v - (i % 5 === 0 ? 1 : 0)) > 1e-9)) ? poseD.clone() : null;
+  function moveWorld(model, dWorld, THREE) { notePose(model, () => moveWorldRaw(model, dWorld, THREE)); }
+  function rotateAboutCentre(model, qWorld, THREE) { notePose(model, () => rotateAboutCentreRaw(model, qWorld, THREE)); }
+  function moveWorldRaw(model, dWorld, THREE) {
     model.updateWorldMatrix(true, false);
     const pw = model.getWorldPosition(new THREE.Vector3()), target = pw.clone().add(dWorld);
     if (model.parent) { model.parent.updateWorldMatrix(true, false); model.position.copy(model.parent.worldToLocal(target)); } else model.position.copy(target);
     model.updateWorldMatrix(true, true);
   }
-  function rotateAboutCentre(model, qWorld, THREE) {
+  function rotateAboutCentreRaw(model, qWorld, THREE) {
     model.updateWorldMatrix(true, true);
     const c = new THREE.Box3().setFromObject(model, true).getCenter(new THREE.Vector3());
     const pw = model.getWorldPosition(new THREE.Vector3()), newPw = pw.sub(c).applyQuaternion(qWorld).add(c);
@@ -1057,7 +1069,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', () => { removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', () => { poseD = null; removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 

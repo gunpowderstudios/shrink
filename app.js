@@ -3,11 +3,11 @@ import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/control
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://esm.sh/three@0.180.0/examples/jsm/environments/RoomEnvironment.js';
 import { WebIO, Document } from '@gltf-transform/core';
-import { stripEmpty } from './remove-part-core.js?v=2.142';
-import { mergePart as mergePartCore } from './add-part-core.js?v=2.142';
+import { stripEmpty } from './remove-part-core.js?v=2.143';
+import { mergePart as mergePartCore } from './add-part-core.js?v=2.143';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt, mergeDocuments, getBounds } from '@gltf-transform/functions';
-import { centreOnGround } from './ground-core.js?v=2.142';
+import { centreOnGround } from './ground-core.js?v=2.143';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import { simplifyWithProtection, smoothNormals } from './mesh-tools.js?v=2.18';
 
@@ -46,7 +46,7 @@ let optimizedModel = null;
 let currentModel = null;
 let wireframeEnabled = false;
 let currentWhich = 'original';
-let compareOn = false;
+let compareOn = false, comparePose = null;
 let compareSplit = 0.5;
 let sourceKind = 'glb';          // glb | stl | obj | ply (what the user opened)
 let lastReduce = null;
@@ -222,6 +222,9 @@ function enterCompare() {
   if (!originalModel || !optimizedModel) return false;
   if (currentModel) scene.remove(currentModel);
   scene.add(originalModel); scene.add(optimizedModel);
+  // the print tools may have moved / turned / stretched the working model (levelled, centred on the bed): put the original in the same pose while comparing
+  const pose = window.__shrinkComparePose?.();
+  if (pose) { comparePose = { model: originalModel, p: originalModel.position.clone(), q: originalModel.quaternion.clone(), s: originalModel.scale.clone() }; originalModel.applyMatrix4(pose); originalModel.updateMatrixWorld(true); }
   applyWireframe(originalModel, wireframeEnabled); applyWireframe(optimizedModel, wireframeEnabled);
   compareOn = true;
   els.showOriginalBtn.classList.remove('active'); els.showOptimizedBtn.classList.remove('active');
@@ -232,6 +235,7 @@ function enterCompare() {
 function leaveCompare() {
   if (!compareOn) return;
   compareOn = false;
+  if (comparePose) { const c = comparePose; comparePose = null; c.model.position.copy(c.p); c.model.quaternion.copy(c.q); c.model.scale.copy(c.s); c.model.updateMatrix(); c.model.updateMatrixWorld(true); }
   if (originalModel) { scene.remove(originalModel); originalModel.visible = true; }
   if (optimizedModel) { scene.remove(optimizedModel); optimizedModel.visible = true; }
   currentModel = null;

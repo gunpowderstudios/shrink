@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.143
+- **Compare** lines up again. QUICK-FIX (and the Width/Depth stretch) move, turn and stretch the working model on the print bed, but the untouched original stayed where it was, so the two halves of the split screen no longer matched. The viewer now puts the original in the same pose while Compare is on (and puts it back when you leave Compare).
+
 ## v2.142
 - The QUICK-FIX report no longer drops down from the top-right button. It now sits directly above the **MODEL HEALTH** card (same width, bottom-right of the viewer) with a small **×** in its corner to close it (clicking anywhere on it still closes it too).
 

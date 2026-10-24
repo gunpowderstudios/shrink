@@ -71,5 +71,25 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   note.hidden = false; note.click(); ok(note.hidden === true, 'C6 clicking the report closes it');
 }
 
+/* ---- Compare: the original must follow the working model when the print tools move it ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(300);
+  const m = w.__shrinkWorkingModel();
+  ok(w.__shrinkComparePose() === null, 'C7 nothing moved yet: no pose change for Compare');
+  m.position.set(30, 17, -9); m.updateMatrixWorld(true);                       // the model starts somewhere else
+  const before = bbox(m).getCenter(new THREE.Vector3());
+  w.__shrinkCentre();                                                           // QUICK-FIX's centre-on-bed step
+  const after = bbox(m).getCenter(new THREE.Vector3());
+  const pose = w.__shrinkComparePose();
+  ok(!!pose, 'C7 centring is remembered as a pose change');
+  const moved = before.clone().applyMatrix4(pose);
+  ok(moved.distanceTo(after) < 1e-4, `C7 applying the remembered change to the original's old spot lands on the working model (off by ${moved.distanceTo(after).toExponential(1)})`);
+  w.__shrinkLevel();                                                            // turning is remembered too
+  const pose2 = w.__shrinkComparePose(), c2 = bbox(m).getCenter(new THREE.Vector3());
+  ok(before.clone().applyMatrix4(pose2).distanceTo(c2) < 1e-3, 'C7 and it stays right after levelling');
+  w.dispatchEvent?.(new w.CustomEvent('shrink:model-opened')); await wait(50);
+  ok(w.__shrinkComparePose() === null, 'C7 a newly opened model starts with no pose change');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

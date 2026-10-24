@@ -2,7 +2,7 @@
 // Nothing in the model changes until FIX IT / QUICK-FIX runs: then the clay is joined to the model (or carved out of it) and the
 // usual repair makes the result printable. Geometry maths lives in clay-core.js; this file is the brush, the preview and the apply step.
 import * as THREE from 'https://esm.sh/three@0.180.0';
-import { dabSoup, dabsAlong, joinSoups, thin } from './clay-core.js?v=2.142';
+import { dabSoup, dabsAlong, joinSoups, thin } from './clay-core.js?v=2.143';
 import { gatherWorldMesh } from './solid-rebuild.js?v=2.27';
 import { healthOfModel } from './repair-core.js?v=2.27';
 
