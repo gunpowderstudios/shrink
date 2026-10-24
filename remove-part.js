@@ -2,7 +2,7 @@
 // press "Remove selected", and those triangles are cut out of the model. The cut goes into the source GLB (like applying a texture edit), so Optimise, the wheels and
 // the download all use the trimmed model. Up to five removals can be undone. The picking maths and the document edit are in remove-part-core.js (tested in Node).
 import { ensureBVH, raycasterFor } from './bvh-support.js?v=2.18';
-import { prepare, select, selectAll, clearSelection, selectedCorners, deadCorners, applySelection, aliveTotal, snapshotMasks, restoreMasks, rewrite } from './remove-part-core.js?v=2.143';
+import { prepare, select, selectAll, clearSelection, selectedCorners, deadCorners, applySelection, aliveTotal, snapshotMasks, restoreMasks, rewrite } from './remove-part-core.js?v=2.144';
 
 const $ = id => document.getElementById(id);
 const A = () => window.__shrinkApp, V = () => window.__shrinkViewer;

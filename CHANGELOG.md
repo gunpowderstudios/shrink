@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.144
+- The **ADVANCED** drawer (Shrink, Fix and Fuse one at a time) is now open by default; click its heading to fold it away.
+
 ## v2.143
 - **Compare** lines up again. QUICK-FIX (and the Width/Depth stretch) move, turn and stretch the working model on the print bed, but the untouched original stayed where it was, so the two halves of the split screen no longer matched. The viewer now puts the original in the same pose while Compare is on (and puts it back when you leave Compare).
 

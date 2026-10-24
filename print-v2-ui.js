@@ -902,7 +902,7 @@
 
           <section id="v2ClayCard" class="v2-card v2-clay-card"><div id="v2ClayHost"></div></section>
 
-          <details id="v2AdvTools" class="v2-adv-tools">
+          <details id="v2AdvTools" class="v2-adv-tools" open>
             <summary><span>ADVANCED</span><strong>Shrink, fix and fuse one at a time</strong><small>QUICK-FIX (top right) does all of these for you. Open this to use them separately.</small></summary>
           <div class="v2-action-grid">
             <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
