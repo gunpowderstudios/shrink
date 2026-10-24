@@ -1,4 +1,4 @@
-import { rebuildSolid } from './solid-rebuild.js?v=2.27';
+import { rebuildSolid } from './solid-rebuild.js?v=2.147';
 
 // SHRINK 3D v2.43 — "Make watertight": higher-detail fallback rebuild.
 // The surface is traced into a voxel grid, small gaps are sealed, everything the outside cannot reach becomes solid,

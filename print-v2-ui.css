@@ -468,3 +468,8 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 /* v2.145: red DOWNLOAD next to QUICK-FIX, grey until QUICK-FIX has finished */
 .v2-magic-dl{background:linear-gradient(180deg,#f0525a,#c8262f);box-shadow:0 6px 18px rgba(220,50,60,.35)}
 .v2-magic-dl:disabled{background:#3a414c;color:#8a93a0;box-shadow:none;opacity:1;cursor:not-allowed;filter:none}
+
+/* v2.147: RESET beside DOWNLOAD */
+.v2-magic-reset{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.28);box-shadow:none;color:#e7edf5}
+.v2-magic-reset:hover:not(:disabled){background:rgba(255,255,255,.16)}
+.v2-magic-reset:disabled{background:#2a313b;border-color:#3a414c;color:#7b8594;opacity:1;cursor:not-allowed}

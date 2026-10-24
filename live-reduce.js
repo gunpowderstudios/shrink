@@ -1,7 +1,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { reduceIndices } from './reduce-core.js?v=2.18';
 import { creaseSplit } from './crease-normals.js?v=2.57';
-import { meshHealth, repairMesh } from './repair-core.js?v=2.27';
+import { meshHealth, repairMesh } from './repair-core.js?v=2.147';
 
 /* SHRINK 3D v2.57 — a reduction of a CLEAN model is tidied inside apply() (see setTidy), so the preview the slider drives is always the tidied one.
  * Previously v2.56 — cumulative reduction; the reduced preview gets crease-aware shading (hard edges stay crisp, no dark smudges on big flat triangles).

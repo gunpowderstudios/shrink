@@ -135,7 +135,9 @@ export async function makePage({ model, heightMm = 52, splitMax = 80, live = nul
     show(which) { calls.show.push(which); },
     getViewState: () => ({ cam: 'saved' }), restoreViewState: () => { calls.restore++; },
     notifyReduced(meta) { calls.notify.push(meta); w.dispatchEvent(new w.CustomEvent('shrink:reduced', { detail: meta })); },
-    clearPreview() {}
+    clearPreview() {},
+    sourceBytes: new Uint8Array([7, 7, 7]), replaced: 0,
+    async replaceSource(bytes) { this.replaced++; this.lastReplaced = bytes; this.sourceBytes = bytes; }
   };
   w.__shrinkApp = app;
   w.__shrinkPrint = { mmPerUnit: () => 1, detailMM: () => 0.05, state: { dabs: [] }, getReduceOptions: () => ({ protectKeep: 1 }) };

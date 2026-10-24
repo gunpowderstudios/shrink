@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.147
+- **QUICK-FIX repairs first.** A model under 600,000 triangles is now repaired at full detail *before* it is shrunk (then shrunk, then repaired again only if it still needs it). Shrinking a model that still had holes baked the holes into a coarse mesh that was much harder to close, which is why some figures ended at health 45 and needed the voxel rebuild. Bigger models are still shrunk first.
+- **Repair closes more holes.** After the usual hole filling, anything still open (thin slits and boundaries that run both ways next to a flipped triangle) gets a second, direction-free pass. It is kept only if it leaves fewer problem edges than before. On the test part that pass closes all 98 open edges (but leaves 61 flipped slivers, so that part still needs Make watertight).
+- New **RESET** button at the top right (next to DOWNLOAD): puts the model back exactly as it was when opened. It reloads the untouched upload through the normal open path, so shrink, fix, fuse, clay, turning, resizing, the reducer and the change chips all start fresh.
+- Repair cache key bumped 2.27 → 2.147 (repair-core, repair-worker, solid-rebuild and their importers).
+
 ## v2.146
 - The **ADVANCED** drawer (Clay, Shrink, Fix and Fuse) starts folded again; click its heading to open it.
 

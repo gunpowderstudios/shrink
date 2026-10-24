@@ -4,7 +4,7 @@
 (() => {
   const RELEASE = '2.25';
   const CORE = '2.18';
-  const FIX = '2.27';            // repair graph key (repair-core.js)
+  const FIX = '2.147';            // repair graph key (repair-core.js)
   const $ = id => document.getElementById(id);
   const body = document.body;
   const wait = ms => new Promise(r => setTimeout(r, ms));

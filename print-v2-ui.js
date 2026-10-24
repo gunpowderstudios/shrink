@@ -682,6 +682,23 @@
   }
   window.__shrinkBedGuide = { show: showBedGuide, remove: removeBedGuide };
   window.__shrinkCentre = () => centreOnBed();
+  // RESET (v2.147): reload the model exactly as it was opened. The untouched upload bytes are kept at open time and put back through the same
+  // path the app uses when it reopens a file, so every tool's state (working model, reducer, clay, bed guide, size, change chips) starts fresh.
+  let initialBytes = null, initialDetail = null, resettingModel = false;
+  async function resetModel() {
+    const a = app(), btn = $('v2MagicReset');
+    if (!a?.replaceSource || !initialBytes || resettingModel || !btn || btn.disabled) return;
+    resettingModel = true; btn.disabled = true; btn.textContent = 'RESETTING…';
+    try {
+      window.__shrinkClay?.finish?.();
+      const note = $('v2MagicNote'); if (note) note.hidden = true;
+      await a.replaceSource(initialBytes);
+      window.dispatchEvent(new CustomEvent('shrink:model-opened', { detail: { ...(initialDetail || {}), reset: true } }));
+      a.setStatus?.('Back to the model exactly as you loaded it.');
+    } catch (err) { console.error('[SHRINK 3D] reset failed', err); a.setStatus?.(`Could not reset: ${err.message || err}`, true); }
+    finally { resettingModel = false; btn.textContent = 'RESET'; btn.disabled = !sourceModel(); }
+  }
+  const FIX_FIRST_MAX = 600000;
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
@@ -690,6 +707,18 @@
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
       const startTris = modelTriangles(sourceModel());
+      // 0. REPAIR FIRST, at full detail (v2.147). Shrinking a model that still has holes bakes the holes into a coarse mesh that is much harder to
+      //    close, so a model under FIX_FIRST_MAX triangles is repaired before it is reduced. Bigger ones are shrunk first (repair runs on the main thread).
+      if (startTris <= FIX_FIRST_MAX) {
+        btn.textContent = '1/4 Fixing…'; show('Checking and repairing at full detail…'); await updateHealthCard(); await paintNow();
+        if ($('v2HealthScore')?.textContent !== '100' || window.__shrinkClay?.hasClay?.()) {
+          try {
+            await fixHealthModel(); await wait(60);
+            const sc0 = Number($('v2HealthScore')?.textContent);
+            done(sc0 === 100 ? 'ok' : 'warn', sc0 === 100 ? '✓' : '⚠', sc0 === 100 ? 'Repaired at full detail before shrinking' : `Repaired what it could at full detail (health ${Number.isFinite(sc0) ? sc0 + '/100' : 'unknown'})`);
+          } catch (err) { done('warn', '⚠', `Could not repair first (${err.message || err})`); }
+        }
+      }
       // 1. SHRINK
       btn.textContent = '1/4 Shrinking…'; show('Shrinking…'); await paintNow();
       try { await shrinkModel(); const now = modelTriangles(sourceModel()); done('ok', '✓', `Shrunk: ${startTris.toLocaleString()} → ${now.toLocaleString()} triangles`); }
@@ -729,9 +758,10 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when QUICK-FIX has finished. Downloads your finished model.">DOWNLOAD</button>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when QUICK-FIX has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" disabled title="Puts everything back exactly as it was when you loaded the model: no shrinking, fixing, fusing, clay, turning or resizing.">RESET</button>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
+    $('v2MagicReset').addEventListener('click', resetModel);
     $('v2MagicDownload').addEventListener('click', () => { const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
   }
 
@@ -1071,7 +1101,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', () => { poseD = null; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { if (!resettingModel && !e?.detail?.reset) { initialBytes = app()?.sourceBytes || null; initialDetail = e?.detail ? { kind: e.detail.kind, triangles: e.detail.triangles, vertices: e.detail.vertices } : null; } poseD = null; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
@@ -1100,7 +1130,7 @@
 
   function onMode() {
     ensureMagicButton();
-    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel(); }
+    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel(); const rb = $('v2MagicReset'); if (rb && !resettingModel) rb.disabled = !sourceModel() || !initialBytes; }
     const print = document.body.classList.contains('app-mode-print');
     if (!print) removeBedGuide();
     if (print) activate(); else deactivate();

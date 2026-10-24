@@ -1,6 +1,6 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl } from './mesh-tools.js?v=2.18';
-import { healthOfModel } from './repair-core.js?v=2.27';
+import { healthOfModel } from './repair-core.js?v=2.147';
 
 // SHRINK 3D v2.63 — safety layer; loads current print helpers including draggable split pegs.
 const VERSION = '2.63';

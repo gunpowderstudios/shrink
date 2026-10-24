@@ -95,10 +95,29 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); await wait(300);
   const dl = page.$('v2MagicDownload');
-  ok(!!dl && dl.disabled && dl.nextElementSibling === null && dl.previousElementSibling === page.$('v2MagicBtn'), 'C8 the DOWNLOAD button sits next to QUICK-FIX and starts greyed out');
+  ok(!!dl && dl.disabled && dl.nextElementSibling === page.$('v2MagicReset') && dl.previousElementSibling === page.$('v2MagicBtn'), 'C8 the DOWNLOAD button sits next to QUICK-FIX and starts greyed out');
   dl.disabled = false; page.w.dispatchEvent(new page.w.CustomEvent('shrink:model-opened')); await wait(50);
   ok(dl.disabled, 'C8 a newly opened model greys it out again');
   ok(!!page.$('v2AdvTools').querySelector('#v2ClayCard'), 'C8 the CLAY card is inside the ADVANCED drawer');
+}
+
+/* ---- RESET: back to the model exactly as it was opened ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(300);
+  const rb = page.$('v2MagicReset');
+  ok(!!rb && rb.previousElementSibling === page.$('v2MagicDownload'), 'R1 RESET sits beside DOWNLOAD at the top right');
+  const opened = []; w.addEventListener('shrink:model-opened', e => opened.push(e.detail));
+  const first = page.app.sourceBytes;
+  w.dispatchEvent(new w.CustomEvent('shrink:model-opened', { detail: { kind: 'stl', triangles: 123, vertices: 60 } })); await wait(100);
+  ok(!rb.disabled, 'R1 it switches on once a model is open');
+  page.app.sourceBytes = new Uint8Array([9]);                                  // pretend something else changed the bytes afterwards
+  rb.click(); await wait(300);
+  ok(page.app.replaced === 1 && page.app.lastReplaced === first, 'R1 RESET puts the bytes from when the model was opened back');
+  const last = opened[opened.length - 1];
+  ok(opened.length === 2 && last.reset === true && last.kind === 'stl' && last.triangles === 123, 'R1 and reopens it so every tool starts fresh (model-opened with the original details)');
+  ok(page.$('v2MagicDownload').disabled && !rb.disabled, 'R1 DOWNLOAD greys out again and RESET stays usable');
+  w.__shrinkClay.addStroke('add', [{ x: 0, y: 0, z: 0, r: 1 }]); rb.click(); await wait(300);
+  ok(!w.__shrinkClay.hasClay(), 'R1 RESET also throws away any clay');
 }
 
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');

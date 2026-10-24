@@ -1,6 +1,6 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=2.18';
-import { gatherWorld, repairMesh } from './repair-core.js?v=2.27';
+import { gatherWorld, repairMesh } from './repair-core.js?v=2.147';
 import { creaseSplit } from './crease-normals.js?v=2.57';
 
 // SHRINK 3D v2.55 — gentle repair + optional Boolean union / make-manifold pass (inside-out parts turned outward; multi-piece results allowed),

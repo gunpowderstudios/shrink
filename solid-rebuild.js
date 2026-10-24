@@ -2,7 +2,7 @@
 import * as THREE from 'https://esm.sh/three@0.180.0';
 
 const VERSION = '2.18';          // rebuild graph (solid-core.js, remesh-worker.js)
-const FIX = '2.27';              // repair graph (repair-core.js, repair-worker.js, this file)
+const FIX = '2.147';              // repair graph (repair-core.js, repair-worker.js, this file)
 
 export function gatherWorldMesh(model) {
   model.updateMatrixWorld(true);

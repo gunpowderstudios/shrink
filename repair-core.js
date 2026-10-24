@@ -235,9 +235,11 @@ export function repairMesh({ positions, indices, weldTolerance = 0, maxDpLoop = 
   onProgress(48, 'Turning flipped triangles round…');
   stats.flipped = flood(buildEdges(F, nf), true).flips;
 
-  /* 5. fill holes */
+  /* 5. fill holes. Round 1 follows the boundary in the direction the triangles run. Round 2 (v2.147) picks up what is left: boundaries
+        that run both ways (thin slits, or edges next to a flipped neighbour) have no consistent direction, so they are traced without one
+        and each cap is turned to face the way the triangle beside it needs. */
   onProgress(60, 'Closing holes…');
-  {
+  const fillHoles = undirected => {
     const E = buildEdges(F, nf), out = new Map();
     for (let e = 0; e < nf * 3; e++) {
       if (E.count[E.slotOf[e]] !== 1) continue;
@@ -245,7 +247,7 @@ export function repairMesh({ positions, indices, weldTolerance = 0, maxDpLoop = 
       const l = out.get(a); if (l) l.push(b); else out.set(a, [b]);
     }
     const loops = [];
-    while (out.size) {
+    if (!undirected) while (out.size) {
       const start = out.keys().next().value, path = [start], pos = new Map([[start, 0]]);
       let cur = start;
       for (;;) {
@@ -258,6 +260,38 @@ export function repairMesh({ positions, indices, weldTolerance = 0, maxDpLoop = 
           path.length = at + 1; cur = nxt;
           if (!out.get(cur)?.length) break;
         } else { pos.set(nxt, path.length); path.push(nxt); cur = nxt; }
+      }
+    }
+    if (undirected) {
+      // boundary edges with the direction the triangle beside them gives; trace cycles through them either way
+      const adj = new Map(), dirOf = new Map(), used = new Set();
+      const key = (a, b) => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
+      for (let e = 0; e < nf * 3; e++) {
+        if (E.count[E.slotOf[e]] !== 1) continue;
+        const f = (e / 3) | 0, k = e % 3, a = F[f * 3 + k], b = F[f * 3 + (k + 1) % 3];
+        dirOf.set(key(a, b), a);                       // the vertex the triangle's edge starts from
+        (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a);
+      }
+      const nextFree = v => { const l = adj.get(v); if (!l) return undefined; while (l.length) { const w = l.pop(); if (!used.has(key(v, w))) return w; } return undefined; };
+      for (const s of [...adj.keys()]) {
+        for (;;) {
+          let w0 = nextFree(s); if (w0 === undefined) break;
+          const path = [s], pos = new Map([[s, 0]]); used.add(key(s, w0)); let cur = w0, ok = true;
+          for (;;) {
+            if (pos.has(cur)) {
+              const at = pos.get(cur), loop = path.slice(at);
+              if (loop.length >= 3) { const fwd = dirOf.get(key(loop[0], loop[1])) === loop[0]; loops.push(fwd ? loop : loop.slice().reverse()); }
+              for (let i = at + 1; i < path.length; i++) pos.delete(path[i]);
+              path.length = at + 1; cur = path[at]; if (path.length === 1) break;
+              const nx = nextFree(cur); if (nx === undefined) { cur = path[path.length - 1]; const back = path.pop(); pos.delete(back); if (!path.length) break; continue; }
+              used.add(key(cur, nx)); cur = nx; continue;
+            }
+            pos.set(cur, path.length); path.push(cur);
+            const nx = nextFree(cur); if (nx === undefined) { ok = false; break; }
+            used.add(key(cur, nx)); cur = nx;
+          }
+          if (!ok) break;
+        }
       }
     }
     const added = new Set(), addKey = (a, b) => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
@@ -300,6 +334,17 @@ export function repairMesh({ positions, indices, weldTolerance = 0, maxDpLoop = 
     if (newFaces.length) {
       const G = new Int32Array((nf + newFaces.length / 3) * 3); G.set(F.subarray(0, nf * 3)); G.set(newFaces, nf * 3);
       F = G; nf += newFaces.length / 3;
+    }
+  };
+  fillHoles(false);
+  {
+    const Eleft = buildEdges(F, nf); let open = false; for (let e = 0; e < nf * 3 && !open; e++) if (Eleft.count[Eleft.slotOf[e]] === 1) open = true;
+    if (open) {
+      // keep the second round only if it leaves the mesh with fewer problem edges than before it
+      const problems = () => { const h = meshHealth(P.subarray(0, nP * 3), F.subarray(0, nf * 3)); return h.open + h.tangled + h.flipped; };
+      const before = problems(), keepF = F.slice(0, nf * 3), keepNf = nf, keepNP = nP, keepHoleLoops = stats.holeLoops, keepHoleTris = stats.holeTriangles, keepFlipped = stats.flipped;
+      fillHoles(true); stats.flipped += flood(buildEdges(F, nf), true).flips;
+      if (problems() >= before) { F = keepF; nf = keepNf; nP = keepNP; stats.holeLoops = keepHoleLoops; stats.holeTriangles = keepHoleTris; stats.flipped = keepFlipped; }
     }
   }
 

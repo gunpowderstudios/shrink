@@ -2,7 +2,7 @@
 (() => {
   const RELEASE = '2.37';
   const CORE = '2.18';           // engine graph (mesh-tools)
-  const FIX = '2.27';            // repair graph: repair-core.js, repair-worker.js, solid-rebuild.js. Bump these three + their importers together.
+  const FIX = '2.147';            // repair graph: repair-core.js, repair-worker.js, solid-rebuild.js. Bump these three + their importers together.
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
