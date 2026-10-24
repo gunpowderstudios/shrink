@@ -440,3 +440,20 @@
 .v2-uniform-row small{font-weight:600;color:#93a3b7}
 .v2-uniform-row input{accent-color:#18a96e;width:16px;height:16px}
 .v2-dim-row input[type=number]{font-size:19px;padding-left:10px;padding-right:4px}
+
+/* ---- CLAY (v2.141) ---- */
+.v2-clay-card{margin:16px 0 0}
+.v2-clay-card .v2-card-head em{font-style:normal;font-weight:500;opacity:.6;font-size:.7em}
+.v2-clay-tools{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.v2-clay-tools button,.v2-clay-row button{border:1px solid #3a4b61;border-radius:12px;background:#142033;color:#dbe7f5;font:inherit;font-weight:700;padding:12px 10px;cursor:pointer}
+.v2-clay-tools button#v2ClayAdd[aria-pressed="true"]{background:#ff4fb8;border-color:#ff4fb8;color:#2a0a1d}
+.v2-clay-tools button#v2ClayCut[aria-pressed="true"]{background:#ff5a1f;border-color:#ff5a1f;color:#2a0e03}
+.v2-clay-size{display:flex;align-items:center;gap:10px;margin:6px 0}
+.v2-clay-size input{flex:1;accent-color:#ff4fb8}
+.v2-clay-row{display:flex;align-items:center;gap:8px;margin:8px 0}
+.v2-clay-row span{flex:1;opacity:.75}
+.v2-clay-row button{padding:8px 12px}
+.v2-clay-row button:disabled,#v2ClayApply:disabled{opacity:.4;cursor:default}
+#v2ClayNote[data-bad="1"]{color:#ff8a8f}
+.viewer.v2-clay-on canvas{cursor:crosshair}
+body:not(.app-mode-print) .v2-clay-card{display:none}

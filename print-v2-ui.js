@@ -53,7 +53,7 @@
     app()?.show?.('optimized');
     if (view) app()?.restoreViewState?.(view);
     app()?.notifyReduced?.({ kind });
-    markApplied(kind === 'rebuild' ? 'rebuilt' : 'fixed');
+    markApplied(kind === 'rebuild' ? 'rebuilt' : kind === 'clay' ? 'clay' : 'fixed');
     window.__shrinkPrintSafety?.clearDiagnostic?.();
     return root;
   }
@@ -62,8 +62,8 @@
   function renderAppliedChanges() {
     const wrap = $('v2HealthChanges');
     if (!wrap) return;
-    const order = ['fixed','rebuilt','fused','shrunk'];
-    const labels = { fixed:'FIXED', rebuilt:'REBUILT', fused:'FUSED', shrunk:'SHRUNK' };
+    const order = ['clay','fixed','rebuilt','fused','shrunk'];
+    const labels = { clay:'CLAY', fixed:'FIXED', rebuilt:'REBUILT', fused:'FUSED', shrunk:'SHRUNK' };
     const chips = order.filter(k => appliedChanges.has(k))
       .map(k => `<span class="v2-change-chip ${k}"><i></i>${labels[k]}</span>`)
       .join('');
@@ -210,16 +210,25 @@
       await fixStep(8, 'Getting ready…');
       for (let i = 0; i < 50 && !window.__shrinkFuse?.repairModel; i++) await wait(100);
       if (!window.__shrinkFuse?.repairModel) throw new Error('The repair engine is still loading.');
+      let clayNote = '';
+      if (window.__shrinkClay?.hasClay?.()) {
+        // pink clay first: it is joined to (or carved out of) the model, then the normal repair runs on the result if it is still not clean
+        await fixStep(30, 'Joining the clay to the model…');
+        const cr = await window.__shrinkClay.apply(model, t => fixStep(40, t));
+        await fixStep(75, 'Putting the result on screen…');
+        installWorkingResult(cr.root, 'clay'); window.__shrinkClay.finish(); clayNote = cr.note;
+      } else {
       await fixStep(30, 'Repairing the mesh…');
       const { root } = window.__shrinkFuse.repairModel(model);
       await fixStep(75, 'Putting the fixed model on screen…');
       installWorkingResult(root, 'repair');
+      }
       // (the big FIX IT button resets itself in finally)
       await fixStep(90, 'Checking the result…');
       await wait(80);
       await updateHealthCard();
       await fixStep(100, 'Done');
-      { const sc = Number($('v2HealthScore')?.textContent); bigResult(sc === 100 ? '<strong>✓ Fixed</strong><span>The model is watertight and clean now.</span>' : `<strong>✓ Fixed what could be fixed</strong><span>Model health is ${Number.isFinite(sc) ? sc + '/100' : 'updated'}. See the Model Health box for what is left.</span>`); }
+      { const sc = Number($('v2HealthScore')?.textContent); bigResult(sc === 100 ? `<strong>✓ Fixed</strong><span>The model is watertight and clean now.${clayNote ? ' ' + clayNote : ''}</span>` : `<strong>✓ Fixed what could be fixed</strong><span>Model health is ${Number.isFinite(sc) ? sc + '/100' : 'updated'}. See the Model Health box for what is left.</span>`); }
       setTimeout(() => { if ($('v2FixProgress') && !big.disabled) $('v2FixProgress').hidden = true; }, 1500);
     } catch (err) {
       console.error('[SHRINK 3D v2.55] Health repair failed', err);
@@ -673,7 +682,7 @@
       catch (err) { done('warn', '⚠', `Could not shrink (${err.message || err})`); }
       // 2. FIX (only if the health check says something is wrong)
       btn.textContent = '2/4 Fixing…'; show('Checking and fixing…'); await updateHealthCard(); await paintNow();
-      if ($('v2HealthScore')?.textContent === '100') done('ok', '✓', 'Already clean: nothing to fix');
+      if ($('v2HealthScore')?.textContent === '100' && !window.__shrinkClay?.hasClay?.()) done('ok', '✓', 'Already clean: nothing to fix');
       else {
         await fixHealthModel(); await wait(60);
         const sc = Number($('v2HealthScore')?.textContent);
@@ -877,6 +886,8 @@
             <div id="v2Step1Summary" class="v2-summary">Resin · 75 mm high</div>
             <details class="v2-advanced"><summary>Advanced printer settings</summary><div class="v2-advanced-body"><label id="v2CustomPrinter" hidden>Smallest detail to keep (mm)<input id="v2PrinterDetail" type="number" min="0.005" step="0.005" value="0.05"></label><p>Technical users can set the printer's smallest visible detail here. SHRINK uses this when judging whether a change will be visible.</p></div></details>
           </section>
+
+          <section id="v2ClayCard" class="v2-card v2-clay-card"><div id="v2ClayHost"></div></section>
 
           <details id="v2AdvTools" class="v2-adv-tools">
             <summary><span>ADVANCED</span><strong>Shrink, fix and fuse one at a time</strong><small>QUICK-FIX (top right) does all of these for you. Open this to use them separately.</small></summary>

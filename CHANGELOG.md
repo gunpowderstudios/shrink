@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.141
+- New **CLAY** card in the 3D Print tools. **ADD CLAY** paints bright pink clay over a hole or gap; **CUT AWAY** marks (orange) parts to carve off. Brush size is in mm, with Undo and Clear. Nothing changes until **FIX IT** or **QUICK-FIX** runs: then the clay is joined to the model (or carved out of it), the result must pass the shared health check, and it becomes the working model with a CLAY change chip. If the model is already a proper solid the join is exact and loses no detail. If the surface leaks (Manifold cannot read it) the clay balls are added to the surface and the voxel wrap seals everything (Balanced, then Fast). On failure the model and the clay are left as they were.
+
 ## v2.140
 - New **Uniform (keep proportions)** tick box under Finished height, on by default. Untick it and Width and Depth can be set on their own (the stretch is applied to the model on screen, so exports and splits follow it); Height and the −10% / +10% buttons still scale everything together. Ticking Uniform again snaps Width and Depth back to the original proportions. The stretch is applied to the model's world X/Z, so it works on a levelled/rotated model without shearing; QUICK-FIX clears an unbaked stretch before it levels. A new model opens with Uniform ticked.
 

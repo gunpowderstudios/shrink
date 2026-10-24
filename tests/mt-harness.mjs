@@ -42,7 +42,7 @@ export function prepareMultitool() {
   // the helper `collectTriangles` is not exported, so take it as a plain function too
   const helper = (() => { const i = mt.indexOf('function collectTriangles'); const open = mt.indexOf('{', mt.indexOf(')', i)); let d = 0; for (let k = open; k < mt.length; k++) { if (mt[k] === '{') d++; else if (mt[k] === '}' && --d === 0) return mt.slice(i, k + 1); } })();
   fs.writeFileSync(path.join(mtBuild, 'mesh-tools.js'), helper + '\n\n' + ['buildBinaryStl', 'buildObjBlob', 'analyzeTopology', 'modelHeight'].map(n => extractFn(mt, n)).join('\n\n') + '\n');
-  for (const f of ['live-reduce.js', 'crease-normals.js', 'reduce-core.js', 'repair-core.js', 'solid-core.js', 'solid-rebuild.js', 'raw-split.js', 'split-print.js', 'split-fallback.js', 'fuse-export.js', 'watertight-remesh.js', 'print-export-safety.js', 'preview-material-fix.js']) {
+  for (const f of ['live-reduce.js', 'crease-normals.js', 'reduce-core.js', 'repair-core.js', 'solid-core.js', 'solid-rebuild.js', 'clay-core.js', 'clay.js', 'raw-split.js', 'split-print.js', 'split-fallback.js', 'fuse-export.js', 'watertight-remesh.js', 'print-export-safety.js', 'preview-material-fix.js']) {
     if (fs.existsSync(path.join(repoRoot, f))) fs.writeFileSync(path.join(mtBuild, f), rewrite(sh(f)));
   }
   fs.writeFileSync(path.join(mtBuild, 'package.json'), '{"type":"module"}\n');
@@ -150,6 +150,7 @@ export async function makePage({ model, heightMm = 52, splitMax = 80, live = nul
     mods.split = await imp('split-print.js');
     mods.fallback = await imp('split-fallback.js');
     mods.safety = await imp('print-export-safety.js');
+    mods.clay = await imp('clay.js');
     await wait(50);
   };
   // print-v2-ui.js is a classic script (an IIFE): run it in the page's globals
