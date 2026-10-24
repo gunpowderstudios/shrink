@@ -417,7 +417,7 @@
 .v2-magic-note .ok i{color:#46d796}.v2-magic-note .warn i{color:#ffc43c}.v2-magic-note .warn{color:#ffe3a6}.v2-magic-note .busy{color:#9fb4d0}.v2-magic-note .end{margin-top:4px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1);font-weight:800;color:#fff}
 @media(max-width:700px){.v2-magic-wrap{margin-left:0;width:100%}.v2-magic{width:100%}}
 
-/* v2.138 — Shrink / Fix / Fuse tucked into a collapsed Advanced drawer */
+/* v2.139 — Shrink / Fix / Fuse tucked into a collapsed Advanced drawer */
 .v2-adv-tools{margin:16px 0 0;border:1px solid #2b3a4d;border-radius:14px;background:rgba(10,18,28,.55)}
 .v2-adv-tools>summary{list-style:none;cursor:pointer;padding:12px 14px 12px 38px;position:relative;text-align:left}
 .v2-adv-tools>summary::-webkit-details-marker{display:none}
@@ -428,3 +428,11 @@
 .v2-adv-tools>summary small{display:block;margin-top:3px;color:#93a3b7;font-size:11.5px}
 .v2-adv-tools>.v2-action-grid{padding:0 12px 12px}
 .v2-left-stack .v2-download-grid{margin-top:14px}
+
+/* v2.139 — Width / Depth read-outs and proportional scale buttons */
+.v2-dim-row{grid-template-columns:1fr 1fr auto;margin-top:0}
+.v2-scale-btns{display:flex;gap:6px}
+.v2-scale-btns button{height:40px;padding:0 10px;border:1px solid #39485d;border-radius:11px;background:#17202d;color:#dbe4ee;font-weight:800;font-size:12px;cursor:pointer}
+.v2-scale-btns button:hover:not(:disabled){background:#1f2c3e;border-color:#5b7391}.v2-scale-btns button:disabled{opacity:.45;cursor:default}
+.v2-dim-row input:disabled{opacity:.5}
+@media(max-width:620px){.v2-dim-row{grid-template-columns:1fr 1fr}.v2-scale-btns{grid-column:1/-1}}

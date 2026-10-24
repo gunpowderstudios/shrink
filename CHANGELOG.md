@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.139
+- **Width and Depth** now sit under Finished height in the printer & size card, showing the model's size in mm at the chosen height. Type a new Width or Depth (or Height) and the other two follow, so the model is always scaled in proportion; the new **−10% / +10%** buttons make it smaller or bigger in proportion. They refresh after shrinking, QUICK-FIX levelling or opening a new model, and are greyed out until a model is loaded. Height is still capped at 500 mm.
+
 ## v2.138
 - The big top-right button is now labelled **QUICK-FIX (shrink, fix and fuse)**. It still also levels and centres the model on the bed.
 

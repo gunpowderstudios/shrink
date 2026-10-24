@@ -242,8 +242,42 @@
     range.value = String(Math.max(Number(range.min), Math.min(Number(range.max), v)));
     setNative('figureHeightMm', v, 'input');
     updateStep1Summary();
+    refreshDims();
   }
 
+
+  // ---- Width / Depth read-outs: the print is always scaled uniformly from the height, so width and depth follow it ----
+  let sizeCache = { key: '', size: null }, reducedTick = 0;
+  function modelSize() {
+    const THREE = app()?.THREE, model = sourceModel();
+    if (!THREE || !model) return null;
+    model.updateWorldMatrix(true, true);
+    const key = [model.uuid, reducedTick, ...model.matrixWorld.elements.map(v => v.toFixed(4))].join('|');
+    if (sizeCache.key === key) return sizeCache.size;
+    const b = new THREE.Box3().setFromObject(model, true);
+    const size = b.isEmpty() ? null : b.getSize(new THREE.Vector3());
+    sizeCache = { key, size }; return size;
+  }
+  function refreshDims() {
+    const w = $('v2Width'), d = $('v2Depth'); if (!w || !d) return;
+    const sz = modelSize(), h = Number($('v2Height')?.value) || 0;
+    const ok = !!(sz && sz.y > 1e-9 && h);
+    [w, d].forEach(i => { i.disabled = !ok; });
+    $('v2ScaleUp') && ($('v2ScaleUp').disabled = !ok); $('v2ScaleDown') && ($('v2ScaleDown').disabled = !ok);
+    if (!ok) { if (w.value !== '') w.value = ''; if (d.value !== '') d.value = ''; return; }
+    const k = h / sz.y, set = (el, v) => { if (document.activeElement !== el) { const t = (Math.round(v * 10) / 10).toString(); if (el.value !== t) el.value = t; } };
+    set(w, sz.x * k); set(d, sz.z * k);
+  }
+  function setHeightMm(h) {
+    const v = Math.max(1, Math.min(500, Math.round(h * 100) / 100));
+    $('v2Height').value = String(v); updateHeight();
+  }
+  function dimInput(axis) {
+    const sz = modelSize(), el = $(axis === 'x' ? 'v2Width' : 'v2Depth'), val = Number(el.value);
+    if (!sz || !(val > 0) || sz[axis] < 1e-9) return;
+    setHeightMm(val * sz.y / sz[axis]);          // keep it in proportion: the other two follow
+  }
+  function scaleBy(f) { setHeightMm((Number($('v2Height').value) || 75) * f); }
   function updateStep1Summary() {
     const out = $('v2Step1Summary');
     if (!out) return;
@@ -622,7 +656,7 @@
       btn.textContent = '4/4 Levelling…'; show('Levelling and centring…'); await paintNow();
       let lv = null; try { lv = levelModel(); } catch (e) { console.warn('level', e); }
       if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);
-      const cr = centreOnBed(); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
+      reducedTick++; const cr = centreOnBed(); setTimeout(refreshDims, 50); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
       markStep?.(4, 'active');
     } catch (err) {
@@ -794,6 +828,11 @@
               <label><span>Finished height</span><div><input id="v2Height" type="number" min="1" max="500" step="1" value="75"><em>mm</em></div></label>
               <input id="v2HeightRange" type="range" min="10" max="300" step="1" value="75">
             </div>
+            <div class="v2-size-row v2-dim-row" title="Width and depth follow the height, so the model is always scaled in proportion. Type any of the three to resize.">
+              <label><span>Width</span><div><input id="v2Width" type="number" min="1" step="0.1" value="" placeholder="–"><em>mm</em></div></label>
+              <label><span>Depth</span><div><input id="v2Depth" type="number" min="1" step="0.1" value="" placeholder="–"><em>mm</em></div></label>
+              <div class="v2-scale-btns"><button id="v2ScaleDown" type="button" title="Make 10% smaller, in proportion">−10%</button><button id="v2ScaleUp" type="button" title="Make 10% bigger, in proportion">+10%</button></div>
+            </div>
             <div class="v2-quality-row">
               <span>Quality</span>
               <button type="button" class="active" data-quality="standard">Standard</button>
@@ -868,6 +907,13 @@
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
     $('v2Height').addEventListener('input', updateHeight);
+    $('v2Width').addEventListener('change', () => dimInput('x'));
+    $('v2Depth').addEventListener('change', () => dimInput('z'));
+    $('v2ScaleUp').addEventListener('click', () => scaleBy(1.1));
+    $('v2ScaleDown').addEventListener('click', () => scaleBy(0.9));
+    window.addEventListener('shrink:reduced', () => { reducedTick++; refreshDims(); });
+    window.addEventListener('shrink:model-opened', () => setTimeout(refreshDims, 150));
+    setTimeout(refreshDims, 300);
     $('v2HeightRange').addEventListener('input', () => { $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });
     $('v2FuseBtn').addEventListener('click', fuseCheck);
