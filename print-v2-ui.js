@@ -152,6 +152,8 @@
   }
   window.__shrinkRefreshSizeWarning = updateSizeWarning;
 
+  // QUICK-FIX shimmers (grey) while the health check runs and turns green when it has finished, so it is clear when to press it (v2.148).
+  const quickState = (st) => { const b = $('v2MagicBtn'); if (b && b.dataset.state !== st) b.dataset.state = st; };
   async function updateHealthCard() {
     updateSizeWarning();
     const card = ensureHealthCard();
@@ -159,6 +161,7 @@
     if (!card || !model) return;
     const run = ++healthRun;
     card.className = 'v2-health-card checking';
+    quickState('checking');
     $('v2HealthLabel').textContent = 'Checking…';
     $('v2HealthScore').textContent = '—';
     $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Running mesh checks…</div>';
@@ -167,10 +170,12 @@
     try {
       for (let i = 0; i < 40 && !window.__shrinkPrintSafety?.topologySummary; i++) await wait(50);
       const h = window.__shrinkPrintSafety?.topologySummary?.(model);
-      if (!h || run !== healthRun) return;
+      if (run !== healthRun) return;
+      if (!h) { quickState('ready'); return; }
       lastHealth = { model, h };
       const rating = healthScore(h);
       card.className = `v2-health-card ${rating.level}`;
+      quickState('ready');
       $('v2HealthLabel').textContent = rating.label;
       $('v2HealthScore').textContent = String(rating.score);
       const watertight = h.openEdges === 0;
@@ -185,6 +190,7 @@
         healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens);
     } catch (err) {
       card.className = 'v2-health-card bad';
+      quickState('ready');
       $('v2HealthLabel').textContent = 'Check failed';
       $('v2HealthScore').textContent = '—';
       $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Could not analyse this mesh.</div>';
@@ -682,22 +688,6 @@
   }
   window.__shrinkBedGuide = { show: showBedGuide, remove: removeBedGuide };
   window.__shrinkCentre = () => centreOnBed();
-  // RESET (v2.147): reload the model exactly as it was opened. The untouched upload bytes are kept at open time and put back through the same
-  // path the app uses when it reopens a file, so every tool's state (working model, reducer, clay, bed guide, size, change chips) starts fresh.
-  let initialBytes = null, initialDetail = null, resettingModel = false;
-  async function resetModel() {
-    const a = app(), btn = $('v2MagicReset');
-    if (!a?.replaceSource || !initialBytes || resettingModel || !btn || btn.disabled) return;
-    resettingModel = true; btn.disabled = true; btn.textContent = 'RESETTING…';
-    try {
-      window.__shrinkClay?.finish?.();
-      const note = $('v2MagicNote'); if (note) note.hidden = true;
-      await a.replaceSource(initialBytes);
-      window.dispatchEvent(new CustomEvent('shrink:model-opened', { detail: { ...(initialDetail || {}), reset: true } }));
-      a.setStatus?.('Back to the model exactly as you loaded it.');
-    } catch (err) { console.error('[SHRINK 3D] reset failed', err); a.setStatus?.(`Could not reset: ${err.message || err}`, true); }
-    finally { resettingModel = false; btn.textContent = 'RESET'; btn.disabled = !sourceModel(); }
-  }
   const FIX_FIRST_MAX = 600000;
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
@@ -759,10 +749,10 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when QUICK-FIX has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" disabled title="Puts everything back exactly as it was when you loaded the model: no shrinking, fixing, fusing, clay, turning or resizing.">RESET</button>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when QUICK-FIX has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
-    $('v2MagicReset').addEventListener('click', resetModel);
+    $('v2MagicReset').addEventListener('click', () => { const f = $('fileInput'); if (f) { f.value = ''; f.click(); } });
     $('v2MagicDownload').addEventListener('click', () => { const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
   }
 
@@ -1102,7 +1092,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', e => { if (!resettingModel && !e?.detail?.reset) { initialBytes = app()?.sourceBytes || null; initialDetail = e?.detail ? { kind: e.detail.kind, triangles: e.detail.triangles, vertices: e.detail.vertices } : null; } poseD = null; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { poseD = null; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
@@ -1131,7 +1121,7 @@
 
   function onMode() {
     ensureMagicButton();
-    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel(); const rb = $('v2MagicReset'); if (rb && !resettingModel) rb.disabled = !sourceModel() || !initialBytes; }
+    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel(); }
     const print = document.body.classList.contains('app-mode-print');
     if (!print) removeBedGuide();
     if (print) activate(); else deactivate();

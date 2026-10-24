@@ -101,23 +101,19 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(!!page.$('v2AdvTools').querySelector('#v2ClayCard'), 'C8 the CLAY card is inside the ADVANCED drawer');
 }
 
-/* ---- RESET: back to the model exactly as it was opened ---- */
+/* ---- RELOAD: opens the file chooser for a new model ---- */
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(300);
   const rb = page.$('v2MagicReset');
-  ok(!!rb && rb.previousElementSibling === page.$('v2MagicDownload'), 'R1 RESET sits beside DOWNLOAD at the top right');
-  const opened = []; w.addEventListener('shrink:model-opened', e => opened.push(e.detail));
-  const first = page.app.sourceBytes;
-  w.dispatchEvent(new w.CustomEvent('shrink:model-opened', { detail: { kind: 'stl', triangles: 123, vertices: 60 } })); await wait(100);
-  ok(!rb.disabled, 'R1 it switches on once a model is open');
-  page.app.sourceBytes = new Uint8Array([9]);                                  // pretend something else changed the bytes afterwards
-  rb.click(); await wait(300);
-  ok(page.app.replaced === 1 && page.app.lastReplaced === first, 'R1 RESET puts the bytes from when the model was opened back');
-  const last = opened[opened.length - 1];
-  ok(opened.length === 2 && last.reset === true && last.kind === 'stl' && last.triangles === 123, 'R1 and reopens it so every tool starts fresh (model-opened with the original details)');
-  ok(page.$('v2MagicDownload').disabled && !rb.disabled, 'R1 DOWNLOAD greys out again and RESET stays usable');
-  w.__shrinkClay.addStroke('add', [{ x: 0, y: 0, z: 0, r: 1 }]); rb.click(); await wait(300);
-  ok(!w.__shrinkClay.hasClay(), 'R1 RESET also throws away any clay');
+  ok(!!rb && rb.textContent === 'RELOAD' && rb.previousElementSibling === page.$('v2MagicDownload'), 'R1 RELOAD sits beside DOWNLOAD at the top right');
+  let clicks = 0; const fi = page.$('fileInput'); if (fi) fi.addEventListener('click', e => { clicks++; e.preventDefault(); });
+  rb.click(); await wait(50);
+  ok(!fi || clicks === 1, 'R1 RELOAD opens the file chooser');
+  const qb = page.$('v2MagicBtn');
+  w.dispatchEvent(new w.CustomEvent('shrink:model-opened', { detail: { kind: 'stl', triangles: 12, vertices: 8 } })); await wait(110);
+  ok(qb.dataset.state === 'checking', 'Q1 QUICK-FIX shimmers while the health check runs');
+  await wait(1500);
+  ok(qb.dataset.state === 'ready', 'Q1 and goes green once the check has finished');
 }
 
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');

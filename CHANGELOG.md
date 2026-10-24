@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.149
+- The top-right **RESET** button is now **RELOAD**: it opens the file chooser so you can load a different model (it no longer reverts the current one).
+- **QUICK-FIX shimmers** (grey, moving highlight) while the health check is running and turns green when the check has finished, so it is clear when to press it.
+
 ## v2.148
 - QUICK-FIX no longer wraps a model on its own. If the model is still not watertight after repair, the report says so, says detail was kept, and points to Advanced > Make watertight (Balanced) as a choice that can soften fine detail. The remaining flipped slivers in repair were not changed (no test file in that session).
 
