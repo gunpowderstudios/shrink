@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.140
+- New **Uniform (keep proportions)** tick box under Finished height, on by default. Untick it and Width and Depth can be set on their own (the stretch is applied to the model on screen, so exports and splits follow it); Height and the −10% / +10% buttons still scale everything together. Ticking Uniform again snaps Width and Depth back to the original proportions. The stretch is applied to the model's world X/Z, so it works on a levelled/rotated model without shearing; QUICK-FIX clears an unbaked stretch before it levels. A new model opens with Uniform ticked.
+
 ## v2.139
 - **Width and Depth** now sit under Finished height in the printer & size card, showing the model's size in mm at the chosen height. Type a new Width or Depth (or Height) and the other two follow, so the model is always scaled in proportion; the new **−10% / +10%** buttons make it smaller or bigger in proportion. They refresh after shrinking, QUICK-FIX levelling or opening a new model, and are greyed out until a model is loaded. Height is still capped at 500 mm.
 

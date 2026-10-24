@@ -902,7 +902,7 @@ function scheduleAutoCut() {
   clearTimeout(autoTimer);
   const model = sourceModel();
   if (!autoCut || !model || partCount() !== 2 || !document.body.classList.contains('app-mode-print')) return;
-  const sig = `${model.uuid}|${finishedHeightMM()}`;
+  const sig = `${model.uuid}|${finishedHeightMM()}|${window.__shrinkStretchTick || 0}`;
   if (sig === autoSig) return;
   autoTimer = setTimeout(async () => {
     if (!autoCut || partCount() !== 2 || sourceModel() !== model) return;

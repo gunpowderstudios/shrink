@@ -272,10 +272,43 @@
     const v = Math.max(1, Math.min(500, Math.round(h * 100) / 100));
     $('v2Height').value = String(v); updateHeight();
   }
+  // Non-uniform stretch: lives on the working model root's scale, in WORLD axes. The root keeps an identity rotation (any tilt/yaw is moved into an inner group),
+  // so root.scale.x/z are world X/Z and no shear is possible. The Height field still scales everything uniformly (mm per unit).
+  function normalizeRoot(model, THREE) {
+    if (model.quaternion.angleTo(new THREE.Quaternion()) < 1e-6) return;
+    const kids = [...model.children]; if (!kids.length) return;
+    const g = new THREE.Group(); g.name = 'shrinkInner'; g.quaternion.copy(model.quaternion); model.quaternion.identity();
+    kids.forEach(k => g.add(k)); model.add(g); model.updateWorldMatrix(true, true);
+  }
+  const stretchOf = model => (model.userData.shrinkStretch ||= { x: 1, z: 1, base: model.scale.clone() });
+  function worldBoxOf(model, THREE) { model.updateWorldMatrix(true, true); return new THREE.Box3().setFromObject(model, true); }
+  function applyStretch(fx, fz) {
+    const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return;
+    fx = Math.max(0.05, Math.min(20, fx)); fz = Math.max(0.05, Math.min(20, fz));
+    normalizeRoot(model, THREE);
+    const st = stretchOf(model), b0 = worldBoxOf(model, THREE), c0 = b0.getCenter(new THREE.Vector3());
+    st.x = fx; st.z = fz; model.scale.set(st.base.x * fx, st.base.y, st.base.z * fz);
+    const b1 = worldBoxOf(model, THREE), c1 = b1.getCenter(new THREE.Vector3());
+    moveWorld(model, new THREE.Vector3(c0.x - c1.x, b0.min.y - b1.min.y, c0.z - c1.z), THREE);   // grow about the middle, keep it on the bed
+    reducedTick++; window.__shrinkStretchTick = (window.__shrinkStretchTick || 0) + 1;
+    refreshDims();
+    try { window.__shrinkSplit?.updatePreview?.(); } catch (e) { /* preview refresh is best effort */ }
+    if (window.__shrinkViewer?.scene.getObjectByName('shrinkBedGuide')) showBedGuide();
+  }
+  function resetStretch() {
+    const model = sourceModel(); if (!model) return false;
+    const st = model.userData.shrinkStretch; const had = !!st && (st.x !== 1 || st.z !== 1);
+    if (had) { applyStretch(1, 1); const u = $('v2Uniform'); if (u && !u.checked) u.checked = true; }
+    return had;
+  }
   function dimInput(axis) {
-    const sz = modelSize(), el = $(axis === 'x' ? 'v2Width' : 'v2Depth'), val = Number(el.value);
-    if (!sz || !(val > 0) || sz[axis] < 1e-9) return;
-    setHeightMm(val * sz.y / sz[axis]);          // keep it in proportion: the other two follow
+    const sz = modelSize(), el = $(axis === 'x' ? 'v2Width' : 'v2Depth'), val = Number(el.value), model = sourceModel();
+    if (!sz || !model || !(val > 0) || sz[axis] < 1e-9) return;
+    if ($('v2Uniform')?.checked !== false) { setHeightMm(val * sz.y / sz[axis]); return; }       // uniform: the other two follow
+    const st = stretchOf(model), k = (Number($('v2Height').value) || 75) / sz.y;               // mm per world unit
+    const baseW = sz[axis] / (axis === 'x' ? st.x : st.z);                                       // unstretched size in units
+    const f = val / (baseW * k);
+    axis === 'x' ? applyStretch(f, st.z) : applyStretch(st.x, f);
   }
   function scaleBy(f) { setHeightMm((Number($('v2Height').value) || 75) * f); }
   function updateStep1Summary() {
@@ -654,6 +687,7 @@
       done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
       // 4. CENTRE
       btn.textContent = '4/4 Levelling…'; show('Levelling and centring…'); await paintNow();
+      try { if (resetStretch()) done('ok', '✓', 'Width and depth set back to the original proportions'); } catch (e) { console.warn('stretch reset', e); }
       let lv = null; try { lv = levelModel(); } catch (e) { console.warn('level', e); }
       if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);
       reducedTick++; const cr = centreOnBed(); setTimeout(refreshDims, 50); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
@@ -828,6 +862,7 @@
               <label><span>Finished height</span><div><input id="v2Height" type="number" min="1" max="500" step="1" value="75"><em>mm</em></div></label>
               <input id="v2HeightRange" type="range" min="10" max="300" step="1" value="75">
             </div>
+            <label class="v2-check v2-uniform-row" title="On: Width, Depth and Height always scale together. Untick to stretch Width and Depth on their own."><input id="v2Uniform" type="checkbox" checked> Uniform <small>(keep proportions)</small></label>
             <div class="v2-size-row v2-dim-row" title="Width and depth follow the height, so the model is always scaled in proportion. Type any of the three to resize.">
               <label><span>Width</span><div><input id="v2Width" type="number" min="1" step="0.1" value="" placeholder="–"><em>mm</em></div></label>
               <label><span>Depth</span><div><input id="v2Depth" type="number" min="1" step="0.1" value="" placeholder="–"><em>mm</em></div></label>
@@ -909,10 +944,11 @@
     $('v2Height').addEventListener('input', updateHeight);
     $('v2Width').addEventListener('change', () => dimInput('x'));
     $('v2Depth').addEventListener('change', () => dimInput('z'));
+    $('v2Uniform').addEventListener('change', () => { if ($('v2Uniform').checked) resetStretch(); });
     $('v2ScaleUp').addEventListener('click', () => scaleBy(1.1));
     $('v2ScaleDown').addEventListener('click', () => scaleBy(0.9));
     window.addEventListener('shrink:reduced', () => { reducedTick++; refreshDims(); });
-    window.addEventListener('shrink:model-opened', () => setTimeout(refreshDims, 150));
+    window.addEventListener('shrink:model-opened', () => { const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(refreshDims, 150); });
     setTimeout(refreshDims, 300);
     $('v2HeightRange').addEventListener('input', () => { $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });
