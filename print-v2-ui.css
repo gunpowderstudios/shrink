@@ -457,3 +457,10 @@
 #v2ClayNote[data-bad="1"]{color:#ff8a8f}
 .viewer.v2-clay-on canvas{cursor:crosshair}
 body:not(.app-mode-print) .v2-clay-card{display:none}
+
+.v2-magic-note{padding-right:38px}
+.v2-magic-x{position:absolute;top:8px;right:8px;width:26px;height:26px;border:0;border-radius:50%;background:rgba(255,255,255,.1);color:#dbe4ee;font:inherit;font-size:20px;line-height:1;cursor:pointer;padding:0}
+.v2-magic-x:hover{background:rgba(255,255,255,.22)}
+
+/* v2.142: the QUICK-FIX report sits on top of the MODEL HEALTH card, same width, with its x to close */
+.v2-health-card .v2-magic-note{position:absolute;left:0;right:auto;top:auto;bottom:calc(100% + 8px);width:100%;min-width:0;max-width:none;box-sizing:border-box;max-height:70vh;overflow:auto;font-size:12px;pointer-events:auto}

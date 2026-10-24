@@ -63,5 +63,13 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(w.__shrinkWorkingModel() === m0 && w.__shrinkClay.hasClay(), 'C5 the model and the clay are both kept');
 }
 
+/* ---- the QUICK-FIX report sits on the MODEL HEALTH card ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); await wait(300);
+  const note = page.$('v2MagicNote');
+  ok(!!note && note.closest('#v2HealthCard') && !note.closest('.v2-magic-wrap'), 'C6 the QUICK-FIX report lives inside the MODEL HEALTH card, not under the top button');
+  note.hidden = false; note.click(); ok(note.hidden === true, 'C6 clicking the report closes it');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

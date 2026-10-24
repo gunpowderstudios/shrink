@@ -130,8 +130,10 @@
       <div id="v2HealthRows" class="v2-health-rows"><div class="v2-health-checking">Running mesh checks…</div></div>
       <div id="v2HealthChanges" class="v2-health-changes"><small>CHANGES</small><div class="v2-change-none">None yet</div></div>
       <div id="v2FixProgress" class="v2-fix-progress" hidden><div class="v2-fix-bar"><i id="v2FixFill"></i></div><small id="v2FixLabel"></small></div>
+      <div id="v2MagicNote" class="v2-magic-note" role="status" hidden></div>
     `;
     viewer.appendChild(card);
+    $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
     return card;
   }
 
@@ -669,10 +671,10 @@
   window.__shrinkBedGuide = { show: showBedGuide, remove: removeBedGuide };
   window.__shrinkCentre = () => centreOnBed();
   async function shrinkMyModel() {
-    const btn = $('v2MagicBtn'), note = $('v2MagicNote');
+    ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
     btn.disabled = true; btn.dataset.busy = '1'; const label = btn.textContent;
-    const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : ''); };
+    const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
       const startTris = modelTriangles(sourceModel());
@@ -714,10 +716,9 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><div id="v2MagicNote" class="v2-magic-note" role="status" hidden></div>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
-    $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
   }
 
   let activePegCut = 0;

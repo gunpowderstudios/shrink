@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.142
+- The QUICK-FIX report no longer drops down from the top-right button. It now sits directly above the **MODEL HEALTH** card (same width, bottom-right of the viewer) with a small **×** in its corner to close it (clicking anywhere on it still closes it too).
+
 ## v2.141
 - New **CLAY** card in the 3D Print tools. **ADD CLAY** paints bright pink clay over a hole or gap; **CUT AWAY** marks (orange) parts to carve off. Brush size is in mm, with Undo and Clear. Nothing changes until **FIX IT** or **QUICK-FIX** runs: then the clay is joined to the model (or carved out of it), the result must pass the shared health check, and it becomes the working model with a CLAY change chip. If the model is already a proper solid the join is exact and loses no detail. If the surface leaks (Manifold cannot read it) the clay balls are added to the surface and the voxel wrap seals everything (Balanced, then Fast). On failure the model and the clay are left as they were.
 
