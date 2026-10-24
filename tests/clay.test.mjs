@@ -91,5 +91,15 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(w.__shrinkComparePose() === null, 'C7 a newly opened model starts with no pose change');
 }
 
+/* ---- red DOWNLOAD next to QUICK-FIX ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); await wait(300);
+  const dl = page.$('v2MagicDownload');
+  ok(!!dl && dl.disabled && dl.nextElementSibling === null && dl.previousElementSibling === page.$('v2MagicBtn'), 'C8 the DOWNLOAD button sits next to QUICK-FIX and starts greyed out');
+  dl.disabled = false; page.w.dispatchEvent(new page.w.CustomEvent('shrink:model-opened')); await wait(50);
+  ok(dl.disabled, 'C8 a newly opened model greys it out again');
+  ok(!!page.$('v2AdvTools').querySelector('#v2ClayCard'), 'C8 the CLAY card is inside the ADVANCED drawer');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

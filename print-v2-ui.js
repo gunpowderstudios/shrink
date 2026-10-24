@@ -685,7 +685,7 @@
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
-    btn.disabled = true; btn.dataset.busy = '1'; const label = btn.textContent;
+    btn.disabled = true; btn.dataset.busy = '1'; const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
     const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
@@ -716,6 +716,7 @@
       reducedTick++; const cr = centreOnBed(); setTimeout(refreshDims, 50); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
       markStep?.(4, 'active');
+      { const dl = $('v2MagicDownload'); if (dl) dl.disabled = false; }
     } catch (err) {
       console.error('[SHRINK 3D] SHRINK MY MODEL failed', err);
       done('warn', '⚠', `Stopped: ${err.message || err}`);
@@ -728,9 +729,10 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when QUICK-FIX has finished. Downloads your finished model.">DOWNLOAD</button>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
+    $('v2MagicDownload').addEventListener('click', () => { const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
   }
 
   let activePegCut = 0;
@@ -900,10 +902,10 @@
             <details class="v2-advanced"><summary>Advanced printer settings</summary><div class="v2-advanced-body"><label id="v2CustomPrinter" hidden>Smallest detail to keep (mm)<input id="v2PrinterDetail" type="number" min="0.005" step="0.005" value="0.05"></label><p>Technical users can set the printer's smallest visible detail here. SHRINK uses this when judging whether a change will be visible.</p></div></details>
           </section>
 
+          <details id="v2AdvTools" class="v2-adv-tools" open>
+            <summary><span>ADVANCED</span><strong>Clay, shrink, fix and fuse</strong><small>QUICK-FIX (top right) does shrink, fix and fuse for you. Open this to use the tools separately or to paint clay.</small></summary>
           <section id="v2ClayCard" class="v2-card v2-clay-card"><div id="v2ClayHost"></div></section>
 
-          <details id="v2AdvTools" class="v2-adv-tools" open>
-            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse one at a time</strong><small>QUICK-FIX (top right) does all of these for you. Open this to use them separately.</small></summary>
           <div class="v2-action-grid">
             <section id="v2ShrinkCard" class="v2-card v2-action-card v2-shrink-card">
               <div class="v2-card-head"><div><h2>SHRINK my model</h2><p>Automatically find the smallest version that still looks the same.</p></div></div>
@@ -1069,7 +1071,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', () => { poseD = null; removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', () => { poseD = null; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 

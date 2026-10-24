@@ -3,11 +3,11 @@ import { OrbitControls } from 'https://esm.sh/three@0.180.0/examples/jsm/control
 import { GLTFLoader } from 'https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://esm.sh/three@0.180.0/examples/jsm/environments/RoomEnvironment.js';
 import { WebIO, Document } from '@gltf-transform/core';
-import { stripEmpty } from './remove-part-core.js?v=2.144';
-import { mergePart as mergePartCore } from './add-part-core.js?v=2.144';
+import { stripEmpty } from './remove-part-core.js?v=2.145';
+import { mergePart as mergePartCore } from './add-part-core.js?v=2.145';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, quantize, meshopt, mergeDocuments, getBounds } from '@gltf-transform/functions';
-import { centreOnGround } from './ground-core.js?v=2.144';
+import { centreOnGround } from './ground-core.js?v=2.145';
 import { MeshoptSimplifier, MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import { simplifyWithProtection, smoothNormals } from './mesh-tools.js?v=2.18';
 
@@ -78,6 +78,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 els.viewer.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -88,6 +89,7 @@ window.__shrinkViewer = { renderer, scene, camera, controls };
 const hemi = new THREE.HemisphereLight(0xffffff, 0x303540, 2.2); scene.add(hemi);
 const key = new THREE.DirectionalLight(0xffffff, 3.0); key.position.set(4, 8, 6); scene.add(key);
 const fill = new THREE.DirectionalLight(0xbfd2ff, 1.2); fill.position.set(-6, 3, -4); scene.add(fill);
+key.shadow.mapSize.set(4096, 4096); key.shadow.camera.near = 0.01; scene.add(key.target);
 
 // Game GLBs often use PBR metallic materials. Without an environment map, chrome/silver
 // can look almost black even though the GLB is correct. Use a neutral studio reflection
@@ -104,9 +106,11 @@ function syncViewerEnvironment(mode = null) {
   scene.environment = game ? studioEnvironment : null;
   // Game mode shows the file as it is: the studio environment already lights the model, so the extra lamps are kept low and the
   // Khronos "neutral" tone mapping is used (ACES washes out and shifts saturated colours). Print mode keeps its lamp-only look.
-  hemi.intensity = game ? 0.5 : 2.2; key.intensity = game ? 0.9 : 3.0; fill.intensity = game ? 0.3 : 1.2;
+  // Print mode (v2.145): low ambient light and one strong lamp that casts real shadows, so folds, creases and sculpted detail stand out.
+  hemi.intensity = game ? 0.5 : 0.55; key.intensity = game ? 0.9 : 4.6; fill.intensity = game ? 0.3 : 0.35;
+  key.castShadow = !game;
   renderer.toneMapping = game ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = game ? 1.0 : 1.05;
+  renderer.toneMappingExposure = game ? 1.0 : 1.0;
 }
 syncViewerEnvironment('game');
 window.addEventListener('shrink:ui-mode', e => syncViewerEnvironment(e.detail?.mode));
@@ -123,8 +127,23 @@ function resizeViewer() {
 }
 new ResizeObserver(resizeViewer).observe(els.viewer);
 
-const _size = new THREE.Vector2();
+const _size = new THREE.Vector2(), _sbox = new THREE.Box3(), _ssph = new THREE.Sphere(), _keyDir = new THREE.Vector3(4, 8, 6).normalize();
+let shadowTick = 0;
+// Make the print model cast and receive shadows, and keep the shadow lamp fitted around it (cheap: every 20 frames).
+function fitShadows() {
+  if (!key.castShadow) return;
+  const model = (compareOn ? optimizedModel : currentModel) || currentModel; if (!model) return;
+  for (const m of [originalModel, optimizedModel, currentModel]) m?.traverse(o => { if (o.isMesh && !o.castShadow) { o.castShadow = true; o.receiveShadow = true; } });
+  if ((shadowTick++ % 20) !== 0) return;
+  _sbox.setFromObject(model); if (_sbox.isEmpty()) return;
+  _sbox.getBoundingSphere(_ssph); const r = Math.max(_ssph.radius, 0.001);
+  key.target.position.copy(_ssph.center); key.target.updateMatrixWorld();
+  key.position.copy(_ssph.center).addScaledVector(_keyDir, r * 4);
+  const c = key.shadow.camera; c.left = -r * 1.15; c.right = r * 1.15; c.top = r * 1.15; c.bottom = -r * 1.15; c.near = r * 0.5; c.far = r * 8; c.updateProjectionMatrix();
+  key.shadow.bias = -0.0004; key.shadow.normalBias = r * 0.004;
+}
 function renderFrame() {
+  fitShadows();
   if (compareOn && originalModel && optimizedModel) {
     // Split-screen: original on the left of the divider, reduced on the right.
     renderer.getSize(_size);

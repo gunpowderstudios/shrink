@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.145
+- **Darker, contrasty lighting with real shadows** in the 3D Print viewer: much less flat ambient light and one strong lamp that casts shadows (and the model shades itself), so folds, creases and fine sculpted detail stand out. Game mode is unchanged (it shows the file as it is).
+- New red **DOWNLOAD** button beside **QUICK-FIX** at the top. It is greyed out until QUICK-FIX has finished, then downloads exactly what the DOWNLOAD IT card would. It greys out again when a new model is opened or QUICK-FIX is run again.
+- The **ADVANCED** drawer now holds **CLAY** as well as Shrink, Fix and Fuse, so one click folds or opens all of them (it still starts open).
+
 ## v2.144
 - The **ADVANCED** drawer (Shrink, Fix and Fuse one at a time) is now open by default; click its heading to fold it away.
 

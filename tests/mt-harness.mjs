@@ -105,7 +105,7 @@ globalThis.setTimeout = (fn, ms, ...args) => { const run = currentRun; return re
 export async function makePage({ model, heightMm = 52, splitMax = 80, live = null } = {}) {
   const run = ++pageCounter; currentRun = run;
   prepareMultitool();
-  const html = `<!doctype html><html><body class="app-mode-print">
+  const html = `<!doctype html><html><body class="app-mode-print"><header class="topbar"></header>
   <div class="mode-chooser"></div>
   <main id="workspace" class="workspace">
     <section class="viewer-panel"><div id="viewer" class="viewer"><div class="viewer-help">help</div></div></section>
