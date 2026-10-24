@@ -17,7 +17,7 @@ export function collect() {
   const values = {};
   for (const el of controls()) values[el.id] = el.type === 'checkbox' ? el.checked : el.value;
   return {
-    kind: KIND, version: FILE_VERSION, app: 'SHRINK 3D', release: window.__shrinkRelease || '2.145',
+    kind: KIND, version: FILE_VERSION, app: 'SHRINK 3D', release: window.__shrinkRelease || '2.146',
     saved: new Date().toISOString(), model: modelName(),
     target: document.querySelector('.control-panel .target-card.active')?.dataset.target || '',
     values,
