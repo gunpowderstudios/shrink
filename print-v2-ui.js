@@ -131,6 +131,7 @@
       <div id="v2HealthChanges" class="v2-health-changes"><small>CHANGES</small><div class="v2-change-none">None yet</div></div>
       <div id="v2FixProgress" class="v2-fix-progress" hidden><div class="v2-fix-bar"><i id="v2FixFill"></i></div><small id="v2FixLabel"></small></div>
       <div id="v2MagicNote" class="v2-magic-note" role="status" hidden></div>
+      <div class="v2-health-working" aria-live="polite"><span class="v2-working-disk" aria-hidden="true"></span><b>Working…</b></div>
     `;
     viewer.appendChild(card);
     $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
@@ -761,7 +762,7 @@
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
-    btn.disabled = true; btn.dataset.busy = '1'; const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
+    btn.disabled = true; btn.dataset.busy = '1'; { const hc = $('v2HealthCard'); if (hc) hc.dataset.working = '1'; } const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
     const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
@@ -810,6 +811,8 @@
       console.error('[SHRINK 3D] SHRINK MY MODEL failed', err);
       done('warn', '⚠', `Stopped: ${err.message || err}`);
     } finally {
+      try { await updateHealthCard(); } catch (e) { console.warn('health refresh', e); }      // show the final result in one go, not the in-between checks
+      { const hc = $('v2HealthCard'); if (hc) hc.dataset.working = ''; }
       delete btn.dataset.busy; btn.disabled = false; btn.textContent = label;
     }
   }

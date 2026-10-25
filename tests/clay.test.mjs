@@ -237,5 +237,17 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(!!ax && ax.position.distanceTo(mid) < 1e-6 && mid.y > 0, 'G1 the axis arrows are centred on the model, sideways and in height');
 }
 
+/* ---- health box: one "Working…" disk during QUICK-FIX ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
+  const card = page.$('v2HealthCard'); let seen = false;
+  ok(!!card.querySelector('.v2-health-working .v2-working-disk') && /Working/.test(card.querySelector('.v2-health-working').textContent), 'H1 the health box has a rotating disk with the word Working…');
+  const mo = new w.MutationObserver(() => { if (card.dataset.working === '1') seen = true; }); mo.observe(card, { attributes: true });
+  page.$('v2MagicBtn').click(); await wait(2500);
+  ok(seen || card.dataset.working !== '1', 'H1 the disk shows while QUICK-FIX works');
+  for (let i = 0; i < 80 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250);
+  ok(card.dataset.working !== '1' && !page.$('v2MagicBtn').dataset.busy, 'H1 and goes away when QUICK-FIX has finished');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

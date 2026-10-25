@@ -530,3 +530,13 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 
 .v2-batch.floating{right:16px}
 @media(max-width:900px){.v2-batch{right:94px}}
+
+/* QUICK-FIX is running: the health box shows one rotating green disk with "Working…" instead of flicking through every check (v2.164) */
+.v2-health-working{display:none}
+.v2-health-card[data-working="1"]{min-height:150px}
+.v2-health-card[data-working="1"]>*:not(.v2-health-working){visibility:hidden}
+.v2-health-card[data-working="1"] .v2-health-working{display:flex;position:absolute;inset:0;align-items:center;justify-content:center;visibility:visible}
+.v2-working-disk{position:absolute;width:96px;height:96px;border-radius:50%;background:conic-gradient(from 0deg,rgba(39,194,125,0) 0%,rgba(39,194,125,.25) 35%,#27c27d 100%);animation:v2-working-spin 1s linear infinite}
+.v2-health-working b{position:relative;font-size:13px;letter-spacing:.3px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+@keyframes v2-working-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.v2-working-disk{animation-duration:3s}}

@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.164
+- While QUICK-FIX runs, the MODEL HEALTH box no longer flicks between checks: it shows one rotating green disk with "Working…" in the middle, then the final result in one go.
+
 ## v2.163
 - The final front view now **fits the whole model** in the window and centres it exactly, measured from where the model's corners land on screen. A wide model is kept narrower (half the window or more) so the health box and the TURN pad do not cover it; a tall figure fills about 84% of the height.
 - The TURN pad now sits at the bottom-right of the viewer, level with the bottom of the MODEL HEALTH box; the BATCH window sits to its left.
