@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.168
+- BATCH: a model that is still below 100/100 health after QUICK-FIX is highlighted in amber with a warning mark and "still has issues". Its file is still in the ZIP (use it as it is, or open it alone to fix it), and the finish message says how many there are.
+
 ## v2.167
 - BATCH: the memory bar and its text are hidden while memory is fine. They only appear (amber or red) when the queue is getting too big; a red bar still blocks START unless "Try anyway" is ticked.
 

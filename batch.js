@@ -121,7 +121,7 @@ function render() {
   const panel = $('v2BatchPanel'); if (!panel) return;
   dock();
   const list = $('v2BatchList');
-  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}" data-id="${i.id}"><i>${ICON[i.status]}</i><span class="n" title="${i.name.replace(/"/g, '&quot;')}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m">${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : '<button type="button" class="x" title="Remove">×</button>'}</div>`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
+  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : ICON[i.status]}</i><span class="n" title="${i.name.replace(/"/g, '&quot;')}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m">${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : '<button type="button" class="x" title="Remove">×</button>'}</div>`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
   list.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => remove(Number(b.closest('.v2-batch-row').dataset.id))));
   // memory bar: what is still to be processed, plus what is already finished
   const sizes = S.items.filter(i => i.status === 'queued' || i.status === 'working').map(i => i.size);
@@ -184,7 +184,7 @@ async function start() {
   if ($('v2BatchStart').disabled) return;
   S.running = true; S.stop = false; render(); note('');
   if (!document.body.classList.contains('app-mode-print')) { document.querySelector('.mode-card[data-mode="print"]')?.click(); await wait(600); }
-  const total = pending().length; let n = 0, ok = 0;
+  const total = pending().length; let n = 0, ok = 0, warned = 0;
   try {
     for (const item of S.items) {
       if (item.status !== 'queued') continue;
@@ -203,13 +203,15 @@ async function start() {
         const files = await deps.capture();
         for (const f of files) S.results.push({ name: f.name, blob: f.blob, source: item.name });
         item.status = 'done'; item.msg = score ? `health ${score}/100` : 'done'; ok++;
+        const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100;      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
+        if (item.warn) { item.msg += ' · still has issues'; warned++; }
       } catch (err) {
         console.warn('[SHRINK 3D] batch item failed', item.name, err);
         item.status = 'failed'; item.msg = String(err.message || err).slice(0, 80);
       }
       render(); await wait(300);    // a moment for the browser to let go of the last model
     }
-    if (!S.stop && !$('v2BatchNote').classList.contains('bad')) note(`Finished: ${ok} of ${total} models ready. Press DOWNLOAD ZIP.`);
+    if (!S.stop && !$('v2BatchNote').classList.contains('bad')) note(`Finished: ${ok} of ${total} models ready.${warned ? ` ${warned} still ${warned === 1 ? 'has' : 'have'} issues (highlighted in amber). They are in the ZIP too: use them as they are, or open one on its own to fix it.` : ''} Press DOWNLOAD ZIP.`);
   } finally { S.running = false; S.stop = false; render(); }
 }
 
