@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.169
+- BATCH: a model flagged as still unhealthy gets an **OPEN** button in the list. It opens that file in the main viewer (the original file is kept in memory, no re-upload) so you can QUICK-FIX it again, use Clay/TURN and download it on its own.
+
 ## v2.168
 - BATCH: a model that is still below 100/100 health after QUICK-FIX is highlighted in amber with a warning mark and "still has issues". Its file is still in the ZIP (use it as it is, or open it alone to fix it), and the finish message says how many there are.
 

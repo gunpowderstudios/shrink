@@ -121,7 +121,8 @@ function render() {
   const panel = $('v2BatchPanel'); if (!panel) return;
   dock();
   const list = $('v2BatchList');
-  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : ICON[i.status]}</i><span class="n" title="${i.name.replace(/"/g, '&quot;')}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m">${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : '<button type="button" class="x" title="Remove">×</button>'}</div>`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
+  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : ICON[i.status]}</i><span class="n" title="${i.name.replace(/"/g, '&quot;')}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m">${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn ? '<button type="button" class="open" title="Open this model on its own to fix it">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
+  list.querySelectorAll('.open').forEach(b => b.addEventListener('click', () => { const it = S.items.find(x => x.id === Number(b.closest('.v2-batch-row').dataset.id)); if (it) { note(`Opened ${it.name} on its own. Fix it, download it, then come back here.`); window.__shrinkApp?.openFile?.(it.file); } }));
   list.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => remove(Number(b.closest('.v2-batch-row').dataset.id))));
   // memory bar: what is still to be processed, plus what is already finished
   const sizes = S.items.filter(i => i.status === 'queued' || i.status === 'working').map(i => i.size);
