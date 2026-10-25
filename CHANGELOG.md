@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.173
+- The Clay tool is switched off for now: `ui-mode.js` no longer loads `clay.js` (flag `CLAY_ENABLED = false`), its card is hidden and the Advanced drawer is titled "Shrink, fix and fuse". `clay.js` / `clay-core.js` and their tests stay in the repo; set the flag back to true to restore it.
+
 ## v2.172
 - The Advanced drawer (Clay, shrink, fix and fuse) inside the left panel is open by default.
 - BATCH: hovering a flagged row (or its OPEN button) explains what to try. OPEN now also opens the left panel and the Advanced drawer. While that model is open for fixing, its next DOWNLOAD IT saves normally AND replaces its file in the batch ZIP (the row updates to "fixed · health N/100"). Start batch or Clear ends this.
