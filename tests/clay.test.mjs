@@ -211,5 +211,16 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(w.__shrinkComparePose() !== null, 'T1 the turn is recorded for Compare');
 }
 
+/* ---- QUICK-FIX ends in the front view (blue Z arrow towards the person) ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
+  const TH = w.__shrinkApp.THREE;
+  const cam = new TH.PerspectiveCamera(45, 1.5, 0.1, 1e6); cam.position.set(900, 400, -700);
+  w.__shrinkViewer.camera = cam; w.__shrinkViewer.controls = { target: new TH.Vector3(5, 5, 5), update() {} };
+  ok(w.__shrinkFaceFront() === true, 'F1 the front view can be set');
+  const t = w.__shrinkViewer.controls.target, d = cam.position.clone().sub(t);
+  ok(d.z > 0 && Math.abs(d.x) < 1e-6 && d.y > 0 && d.y < d.z, 'F1 the camera is on the +Z side, centred, a little above (Z arrow points at the person)');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

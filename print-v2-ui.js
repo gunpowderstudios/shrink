@@ -728,6 +728,21 @@
   }
   window.__shrinkBedGuide = { show: showBedGuide, remove: removeBedGuide };
   window.__shrinkCentre = () => centreOnBed();
+  // Front view (v2.162): QUICK-FIX ends with the camera on the +Z side, so the blue Z arrow of the plate points at the person and the model's front faces them.
+  function faceFront() {
+    const model = sourceModel(), THREE = app()?.THREE, v = window.__shrinkViewer;
+    if (!model || !THREE || !v?.camera || !v?.controls) return false;
+    model.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return false;
+    const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+    const fov = (v.camera.fov || 45) * Math.PI / 180, fit = Math.max(size.x, size.y * 1.1, size.z) / (2 * Math.tan(fov / 2)) * 1.6 + size.z / 2;
+    const dist = Math.max(fit, 1e-6), el = 20 * Math.PI / 180;
+    v.controls.target.copy(c);
+    v.camera.position.set(c.x, c.y + Math.sin(el) * dist, c.z + Math.cos(el) * dist);
+    v.camera.up.set(0, 1, 0); v.camera.lookAt(c); v.camera.updateProjectionMatrix?.(); v.camera.updateMatrixWorld(true); v.controls.update?.();
+    return true;
+  }
+  window.__shrinkFaceFront = faceFront;
   const FIX_FIRST_MAX = 600000;
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
@@ -773,7 +788,7 @@
       try { if (resetStretch()) done('ok', '✓', 'Width and depth set back to the original proportions'); } catch (e) { console.warn('stretch reset', e); }
       let lv = null; try { lv = levelModel(); } catch (e) { console.warn('level', e); }
       if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);
-      reducedTick++; const cr = centreOnBed(); setTimeout(refreshDims, 50); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
+      reducedTick++; const cr = centreOnBed(); setTimeout(refreshDims, 50); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } try { faceFront(); } catch (e) { console.warn('front view', e); } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
       markStep?.(4, 'active');
       { const dl = $('v2MagicDownload'); if (dl) dl.disabled = false; }

@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.162
+- QUICK-FIX (and so BATCH) now always finishes in the **front view**: the camera goes to the +Z side, a little above, centred on the model, so the plate's blue Z arrow points at you and the model's front faces you (`window.__shrinkFaceFront`).
+
 ## v2.161
 - **TURN pad** in the viewer, to the right of the figure: ↺ ↻ turn the model about the upright axis, ⤓ ⤒ tip it forward or back, ⇠ ⇢ lean it left or right, in steps of 5, 15, 45 or 90 degrees. After each move the model is put back flat on the bed and centred, and the move is recorded for Compare. It needs the model unstretched (Uniform on). In the viewer the green arrow is up (Y) and the blue arrow (Z) points towards you; the STL itself is written Z-up for slicers when "Z-up for slicers" is ticked.
 
