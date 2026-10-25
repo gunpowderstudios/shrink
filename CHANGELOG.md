@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.155
+- The top-right **BATCH** button is gone: BATCH lives on the load screen only.
+- BATCH Height is now optional and starts empty ("as uploaded"): each model keeps its own size (file units taken as mm, a small GLB read as metres, capped at 500 mm). Type a height to force every model to that size. Resize afterwards as usual.
+
 ## v2.154
 - **BATCH on the load screen**, under the main drop box. It switches to 3D print mode and opens the BATCH panel before any model is loaded.
 - The BATCH panel has its own **Printer** (resin 12K/16K, 8K/9K fine, 8K/9K, 2K-4K, FDM) and **Height (mm)**. They are applied to every model in the batch just before its QUICK-FIX, through the real printer / quality / height controls (scoped to the print dashboard, because other elements on the page share the `data-quality` name).

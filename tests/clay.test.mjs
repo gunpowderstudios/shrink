@@ -131,7 +131,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
   const B = w.__shrinkBatch;
-  ok(!!B && !!page.$('v2BatchBtn'), 'B1 the BATCH button is added next to RELOAD');
+  ok(!!B && !page.$('v2BatchBtn'), 'B1 there is no BATCH button in the top bar any more');
   const GBn = 1024 ** 3;
   ok(B.estimate([10e6], 4 * GBn).level === 'green', 'B1 a 10 MB model on a 4 GB budget is green');
   ok(B.estimate([320e6], 4 * GBn).level === 'red', 'B1 a 320 MB model on a 4 GB budget is red');
@@ -143,6 +143,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   page.$('v2BatchHeight').value = '55'; page.$('v2BatchHeight').dispatchEvent(new w.Event('input', { bubbles: true }));
   B.applySettings(); await wait(60);
   ok(Number(w.document.getElementById('printerDetailMm').value) === 0.018 && Number(page.$('v2Height').value) === 55, 'B1 the chosen printer (16K) and height are applied to the print tools');
+  page.$('v2BatchHeight').value = ''; page.$('v2BatchHeight').dispatchEvent(new w.Event('input', { bubbles: true }));
+  w.__shrinkPrint.state.modelHeightUnits = 32.5; B.applySettings(); await wait(60);
+  ok(Number(page.$('v2Height').value) === 32.5, 'B1 with Height empty the model keeps its own height (32.5 mm)');
   const mk = (n, size) => ({ name: n, size });
   B.add([mk('a.stl', 5e6), mk('b.obj', 5e6), mk('c.txt', 10)]);
   ok(page.$('v2BatchList').querySelectorAll('.v2-batch-row').length === 2, 'B2 only STL/OBJ/PLY/GLB files are queued');

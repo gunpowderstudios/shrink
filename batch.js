@@ -33,15 +33,20 @@ const PRINTERS = [
   { id: 'r4', label: 'Resin 2K–4K (0.1 mm)', type: 'resin', quality: 'large' },
   { id: 'fdm', label: 'FDM filament (0.2 mm)', type: 'fdm', quality: 'standard' }
 ];
-const S = { items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: 'r8', height: 75 };
+const S = { items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: 'r8', height: 0 };     // height 0 = keep each model's own size
 function applySettings() {
   const p = PRINTERS.find(x => x.id === S.printer) || PRINTERS[2];
   // scoped to the print dashboard: other parts of the page also use data-quality / data-printer attributes
   const dash = document.querySelector('.print-v2-dashboard') || document;
   dash.querySelector(`[data-printer="${p.type}"]`)?.click();
   dash.querySelector(`[data-quality="${p.quality}"]`)?.click();
-  const h = $('v2Height');
-  if (h && Number(S.height) > 0) { h.value = String(S.height); h.dispatchEvent(new Event('input', { bubbles: true })); }
+  const h = $('v2Height'); let mm = Number(S.height) || 0;
+  if (!mm) {                      // "as uploaded": the model's own height in file units, taken as mm (a GLB is in metres: small numbers are scaled up)
+    const units = window.__shrinkPrint?.state?.modelHeightUnits || 0, glb = window.__shrinkApp?.sourceKind === 'glb';
+    mm = units > 0 ? (glb && units < 10 ? units * 1000 : units) : 0;
+    mm = mm > 0 ? Math.max(1, Math.min(500, Math.round(mm * 10) / 10)) : 0;     // the Height box allows 1 to 500 mm
+  }
+  if (h && mm > 0) { h.value = String(mm); h.dispatchEvent(new Event('input', { bubbles: true })); }
 }
 
 function buildPanel() {
@@ -52,9 +57,9 @@ function buildPanel() {
     <div id="v2BatchDrop" class="v2-batch-drop">Drop STL, OBJ, PLY or GLB files here, or <button id="v2BatchAdd" type="button">choose files…</button></div>
  <div class="v2-batch-set">
       <label>Printer<select id="v2BatchPrinter">${PRINTERS.map(x => `<option value="${x.id}">${x.label}</option>`).join('')}</select></label>
-      <label>Height<span class="v2-batch-h"><input id="v2BatchHeight" type="number" min="1" max="500" step="1" value="75"><em>mm</em></span></label>
+      <label>Height (optional)<span class="v2-batch-h"><input id="v2BatchHeight" type="number" min="1" max="500" step="1" value="" placeholder="as uploaded"><em>mm</em></span></label>
     </div>
-    <div class="v2-batch-hint">These settings are used for every model in the batch. Set them before you press START.</div>
+    <div class="v2-batch-hint">The printer is used for every model. Leave Height empty to keep each model at the size it was uploaded; you can resize afterwards.</div>
     <input id="v2BatchFiles" type="file" multiple accept=".stl,.obj,.ply,.glb" hidden>
     <div id="v2BatchList" class="v2-batch-list"></div>
     <div class="v2-batch-mem" id="v2BatchMem" data-level="green"><div class="v2-batch-bar"><i id="v2BatchBarFill"></i></div><div id="v2BatchMemText" class="v2-batch-memtext">Memory: add some models to see the estimate.</div></div>
@@ -71,7 +76,7 @@ function buildPanel() {
   p.addEventListener('drop', e => add([...(e.dataTransfer?.files || [])]));
   $('v2BatchPrinter').value = S.printer;
   $('v2BatchPrinter').addEventListener('change', e => { S.printer = e.target.value; });
-  $('v2BatchHeight').addEventListener('input', e => { S.height = Number(e.target.value) || 75; });
+  $('v2BatchHeight').addEventListener('input', e => { S.height = Number(e.target.value) || 0; });
   $('v2BatchTry').addEventListener('change', e => { S.tryAnyway = e.target.checked; render(); });
   $('v2BatchStart').addEventListener('click', start);
   $('v2BatchStop').addEventListener('click', () => { S.stop = true; note('Stopping after the current model…'); });
@@ -135,7 +140,6 @@ function render() {
   $('v2BatchPrinter').disabled = S.running; $('v2BatchHeight').disabled = S.running;
   $('v2BatchZip').disabled = S.running || !S.results.length;
   $('v2BatchClear').disabled = S.running;
-  const btn = $('v2BatchBtn'); if (btn) btn.dataset.count = S.items.length ? String(S.items.length) : '';
 }
 
 // ---- the work, one model at a time ----
@@ -223,15 +227,6 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// ---- button next to RELOAD ----
-function ensureButton() {
-  if ($('v2BatchBtn')) return true;
-  const wrap = document.querySelector('.v2-magic-wrap'); if (!wrap) return false;
-  const b = document.createElement('button'); b.id = 'v2BatchBtn'; b.type = 'button'; b.className = 'v2-magic v2-magic-reset v2-magic-batch';
-  b.title = 'Run QUICK-FIX on many models in a row and get them all as one ZIP.'; b.textContent = 'BATCH';
-  b.addEventListener('click', () => toggle());
-  wrap.appendChild(b); return true;
-}
 // BATCH on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
@@ -246,8 +241,7 @@ function ensureHomeButton() {
   return true;
 }
 ensureHomeButton();
-let tries = 0; const iv = setInterval(() => { if (ensureButton() || ++tries > 100) clearInterval(iv); }, 300);
-ensureButton();
+let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
 window.__shrinkBatch = { applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip };
