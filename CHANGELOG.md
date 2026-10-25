@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.179
+- 3D Print screen fits the browser window: on a desktop-sized window (wider than 900 px) with a model loaded, the page no longer scrolls. The viewer takes whatever height is left between the header and the "Model loaded" bar, and the viewer canvas follows it. The opened left panel scrolls inside itself, and if the window is very short the page falls back to scrolling (viewer never smaller than about 340 px). Load screen, Game mode and phones/tablets are unchanged. This is CSS only (`@media(min-width:901px)` block at the end of `print-v2-ui.css`), no JavaScript sizing.
+
 ## v2.178
 - The Matrix rain in the MODEL HEALTH box now shows whenever SHRINK is working, not only during QUICK-FIX: SHRINK IT, FIX IT, FUSE IT, Make watertight and any health check that takes longer than about a third of a second. It is counted, so nested steps keep it running until the last one ends.
 

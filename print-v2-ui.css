@@ -555,3 +555,20 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-batch-row .n.view{cursor:pointer}.v2-batch-row .n.view:hover{color:#fff;text-decoration:underline}
 .v2-batch-head{cursor:pointer}.v2-batch-fold{position:absolute;top:-4px;right:-2px;width:28px;height:28px;border-radius:50%;border:1px solid #35455a;background:#182230;color:#cdd6e2;font-size:14px;cursor:pointer;line-height:1}.v2-batch-fold:hover{color:#fff;border-color:#2f8cff}
 .v2-batch.folded{padding:10px 14px;overflow:hidden}.v2-batch.folded>*:not(.v2-batch-head){display:none!important}.v2-batch.folded .v2-batch-head{padding-right:34px}
+
+/* v2.179: on a desktop-sized window the whole 3D Print screen fits the browser window (no page scrolling); the viewer takes the spare height */
+@media(min-width:901px){
+  body.app-mode-print.print-v2-active .app-shell{display:flex;flex-direction:column;height:100vh;height:100dvh;box-sizing:border-box;padding:10px 0 6px;overflow-x:hidden;overflow-y:auto}
+  body.app-mode-print.print-v2-active .app-shell>.print-v2-dashboard{flex:1 1 auto;min-height:0;margin:0 0 8px;display:flex;flex-direction:column;overflow:auto}
+  body.app-mode-print.print-v2-active .app-shell>.print-v2-dashboard>.v2-top-grid{flex:1 1 auto;min-height:340px}
+  body.app-mode-print.print-v2-active .app-shell>.print-v2-dashboard>*:not(.v2-top-grid){flex:0 0 auto}
+  body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-panel{min-height:0!important;height:100%!important}
+  body.app-mode-print.print-v2-active .v2-top-grid{align-items:stretch}
+  body.app-mode-print.print-v2-active .v2-viewer-slot{align-self:stretch;position:relative;top:0;min-height:0}
+  body.app-mode-print.print-v2-active .v2-left-stack{min-height:0;overflow-y:auto}
+  body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-panel{display:flex;flex-direction:column;overflow:hidden}
+  body.app-mode-print.print-v2-active .v2-viewer-slot .viewer{min-height:0!important;height:auto!important;flex:1 1 0}
+  body.app-mode-print.print-v2-active .v2-viewer-slot .viewer>canvas:first-of-type{position:absolute;inset:0;width:100%!important;height:100%!important}
+  body.app-mode-print.print-v2-active .app-shell>.printUploadHero{flex:0 0 auto;margin:0 0 6px}
+  body.app-mode-print.print-v2-active .site-footer{flex:0 0 auto;padding:2px 0;margin:0}
+}
