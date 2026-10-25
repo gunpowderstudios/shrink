@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.157
+- The BATCH window now sits at the bottom-right of the viewer; the MODEL HEALTH box stays bottom-left.
+
 ## v2.156
 - The **MODEL HEALTH** box moved to the bottom-left of the viewer, and the BATCH window docks above it, so neither covers the other.
 - Phones and tablets see: "Please use a laptop or desktop for better shrinking!" (the existing dismissible mobile note, new wording). Its script is now cache-keyed with the page release.

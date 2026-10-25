@@ -137,7 +137,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(B.estimate([320e6], 4 * GBn).level === 'red', 'B1 a 320 MB model on a 4 GB budget is red');
   ok(B.estimate([100e6, 100e6], 4 * GBn).need > B.estimate([100e6], 4 * GBn).need, 'B1 more models need more memory');
   B.toggle(true);
-  ok(page.$('v2BatchPanel').parentElement === page.$('v2HealthCard'), 'B1 with a model open the panel docks in the health card');
+  ok(page.$('v2BatchPanel').parentElement === page.$('v2HealthCard').parentElement, 'B1 with a model open the panel docks in the viewer, beside the health box');
   ok(!!page.$('v2BatchPrinter') && !!page.$('v2BatchHeight'), 'B1 the batch panel has its own printer and height settings');
   page.$('v2BatchPrinter').value = 'r16'; page.$('v2BatchPrinter').dispatchEvent(new w.Event('change', { bubbles: true }));
   page.$('v2BatchHeight').value = '55'; page.$('v2BatchHeight').dispatchEvent(new w.Event('input', { bubbles: true }));

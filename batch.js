@@ -84,10 +84,10 @@ function buildPanel() {
   $('v2BatchClear').addEventListener('click', clear);
 }
 
-// Docked above the MODEL HEALTH box once that exists (it is created when a model is opened); floating at the top right until then (v2.153).
+// Docked at the bottom-right of the viewer once the MODEL HEALTH box (bottom-left) exists (it is created when a model is opened); floating at the top right until then (v2.153).
 function dock() {
   const p = $('v2BatchPanel'); if (!p) return;
-  const card = $('v2HealthCard');
+  const card = $('v2HealthCard')?.parentElement;      // the viewer panel: the health box is bottom-left, this window is bottom-right
   if (card && p.parentElement !== card) { card.appendChild(p); p.classList.remove('floating'); }
   else if (!card && p.parentElement !== document.body) { document.body.appendChild(p); p.classList.add('floating'); }
   else if (!card) p.classList.add('floating');
