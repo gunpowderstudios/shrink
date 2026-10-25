@@ -179,6 +179,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const oldBlob = B.state.results[0].blob;
   const keep = w.__shrinkCapture?.(new w.Blob([new Uint8Array(20)]), 'tarak-SHRINK-16K.stl');
   ok(keep === false && B.state.results.length === 1 && B.state.results[0].blob !== oldBlob, 'B5 the next download replaces its file in the ZIP and still saves normally');
+  const seen = []; w.__shrinkApp = Object.assign(w.__shrinkApp || {}, { openFile: async f => { seen.push(f.name); } });
+  page.$('v2BatchList').querySelector('.n.view').click(); await wait(30);
+  ok(seen.length === 1 && seen[0] === 'tarak-SHRINK-16K.stl', 'B6 clicking a row opens its processed file in the main window (' + seen.join() + ')');
 }
 
 /* ---- the printer and quality are remembered ---- */

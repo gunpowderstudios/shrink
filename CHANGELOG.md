@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.174
+- BATCH: click a model name in the list to load it in the main window (the processed STL/OBJ/PLY if there is one, otherwise the original) so you can rotate it and check its size. Not while a batch is running.
+
 ## v2.173
 - The Clay tool is switched off for now: `ui-mode.js` no longer loads `clay.js` (flag `CLAY_ENABLED = false`), its card is hidden and the Advanced drawer is titled "Shrink, fix and fuse". `clay.js` / `clay-core.js` and their tests stay in the repo; set the flag back to true to restore it.
 
