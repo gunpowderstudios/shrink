@@ -57,7 +57,7 @@ function buildPanel() {
   if ($('v2BatchPanel')) return;
   const p = document.createElement('section'); p.id = 'v2BatchPanel'; p.className = 'v2-batch'; p.hidden = true;
   p.innerHTML = `
-    <div class="v2-batch-head"><strong>BATCH</strong><span>QUICK-FIX many models, get one ZIP</span><button id="v2BatchClose" type="button" class="v2-magic-x" title="Close">×</button></div>
+    <div class="v2-batch-head"><strong>BATCH</strong><span>QUICK-FIX many models, get one ZIP</span><button id="v2BatchFold" type="button" class="v2-batch-fold" aria-expanded="true" title="Fold the batch window up or open it again">▾</button></div>
     <div id="v2BatchDrop" class="v2-batch-drop">Drop STL, OBJ, PLY or GLB files here, or <button id="v2BatchAdd" type="button">choose files…</button></div>
  <div class="v2-batch-set">
       <label>Printer<select id="v2BatchPrinter">${PRINTERS.map(x => `<option value="${x.id}">${x.label}</option>`).join('')}</select></label>
@@ -71,7 +71,9 @@ function buildPanel() {
     <div class="v2-batch-actions"><button id="v2BatchStart" type="button" class="v2-magic">START BATCH</button><button id="v2BatchStop" type="button" class="v2-magic v2-magic-reset" hidden>STOP AFTER THIS ONE</button><button id="v2BatchZip" type="button" class="v2-magic v2-magic-dl" disabled>DOWNLOAD ZIP</button><button id="v2BatchClear" type="button" class="v2-magic v2-magic-reset">CLEAR</button></div>
     <div id="v2BatchNote" class="v2-batch-note"></div>`;
   document.body.appendChild(p); dock();
-  $('v2BatchClose').addEventListener('click', () => toggle(false));
+  const fold = () => { const f = p.classList.toggle('folded'); $('v2BatchFold').textContent = f ? '▸' : '▾'; $('v2BatchFold').setAttribute('aria-expanded', String(!f)); };
+  $('v2BatchFold').addEventListener('click', fold);
+  p.querySelector('.v2-batch-head').addEventListener('click', e => { if (e.target.id !== 'v2BatchFold') fold(); });      // the whole title bar folds it
   $('v2BatchAdd').addEventListener('click', () => $('v2BatchFiles').click());
   $('v2BatchFiles').addEventListener('change', e => { add([...e.target.files]); e.target.value = ''; });
   const drop = $('v2BatchDrop');

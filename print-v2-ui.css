@@ -553,3 +553,5 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 @media(max-width:900px){.print-v2-dashboard[data-left="closed"] .v2-top-grid{grid-template-columns:1fr!important}.print-v2-dashboard[data-left="closed"] .v2-left-toggle{writing-mode:horizontal-tb;width:100%;height:auto}}
 .v2-top-grid{transition:grid-template-columns .22s ease}
 .v2-batch-row .n.view{cursor:pointer}.v2-batch-row .n.view:hover{color:#fff;text-decoration:underline}
+.v2-batch-head{cursor:pointer}.v2-batch-fold{position:absolute;top:-4px;right:-2px;width:28px;height:28px;border-radius:50%;border:1px solid #35455a;background:#182230;color:#cdd6e2;font-size:14px;cursor:pointer;line-height:1}.v2-batch-fold:hover{color:#fff;border-color:#2f8cff}
+.v2-batch.folded{padding:10px 14px;overflow:hidden}.v2-batch.folded>*:not(.v2-batch-head){display:none!important}.v2-batch.folded .v2-batch-head{padding-right:34px}

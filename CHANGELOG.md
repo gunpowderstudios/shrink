@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.177
+- BATCH window: the × close button is gone. Click the title bar (or the little arrow) to fold the window up to just its header, and again to open it. It is open by default.
+
 ## v2.176
 - The "Working…" spinner in the MODEL HEALTH box is now Matrix-style green 0s and 1s raining down the box, with "Working…" in a glowing pill in the middle (still at one fixed size until QUICK-FIX finishes; static frame if the computer is set to reduce motion).
 

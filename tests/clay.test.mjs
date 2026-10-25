@@ -174,6 +174,8 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   B.deps.healthScore = () => '65'; B.deps.quickFix = async () => {};
   B.deps.capture = async () => [{ name: 'tarak-SHRINK-16K.stl', blob: new w.Blob([new Uint8Array(10)]) }];
   B.start(); await wait(2500);
+  { const pn = page.$('v2BatchPanel'); ok(!page.$('v2BatchClose') && !pn.classList.contains('folded'), 'B7 no close button, and the batch window is open by default');
+    page.$('v2BatchFold').click(); ok(pn.classList.contains('folded'), 'B7 the arrow folds the window'); pn.querySelector('.v2-batch-head').click(); ok(!pn.classList.contains('folded'), 'B7 the title bar opens it again'); }
   ok(B.state.items[0].warn === true && page.$('v2BatchList').querySelector('.open'), 'B5 a model below 100 is flagged and gets an OPEN button');
   page.$('v2BatchList').querySelector('.open').click(); await wait(50);
   const oldBlob = B.state.results[0].blob;
