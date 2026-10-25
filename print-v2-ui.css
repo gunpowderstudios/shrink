@@ -578,3 +578,4 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 
 /* v2.181: the TURN pad is hidden for now (code and tests stay; remove this rule to bring it back) */
 #v2TurnPad{display:none!important}
+.v2-batch-why{margin:2px 0 6px 26px;padding:6px 9px;border-left:3px solid #ffc43c;background:rgba(255,196,60,.08);color:#f0d9a0;font-size:12px;line-height:1.35;border-radius:0 8px 8px 0}.v2-batch-why b{color:#fff}.v2-batch-why.good{border-left-color:#46d796;background:rgba(70,215,150,.1);color:#bff2d9}

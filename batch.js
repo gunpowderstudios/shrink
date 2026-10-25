@@ -119,7 +119,8 @@ function fixingCapture(blob, name) {
   if (S.fixingFresh) { S.results = S.results.filter(r => r.source !== it.name); S.fixingFresh = false; }
   S.results.push({ name, blob, source: it.name });
   const sc = Number($('v2HealthScore')?.textContent); it.warn = !(Number.isFinite(sc) && sc >= 100);
-  it.msg = Number.isFinite(sc) ? `fixed · health ${sc}/100${it.warn ? ' · still has issues' : ''}` : 'fixed';
+  it.issues = it.warn ? (deps.healthIssues?.() || []) : [];
+  it.msg = Number.isFinite(sc) ? `fixed · health ${sc}/100` : 'fixed';
   render(); note(`${it.name}: the downloaded file has replaced the old one in the ZIP.`);
   setTimeout(() => { S.fixingFresh = true; }, 1500);      // a split export hands over several files at once; a later download replaces them again
   return false;                                           // false = the file is also saved normally
@@ -137,7 +138,7 @@ async function viewItem(id) {
 function openToFix(id) {
   if (S.running) return; const it = S.items.find(x => x.id === id); if (!it) return;
   S.fixing = id; S.fixingFresh = true; window.__shrinkCapture = fixingCapture;
-  note(`Opened ${it.name} on its own. Try FIX IT or Make watertight in the left panel, then DOWNLOAD IT: the fixed file also replaces this one in the ZIP.`);
+  note(`Opened ${it.name} on its own. Fix it in the left panel (FIX IT or Make watertight), then press DOWNLOAD: the fixed file also replaces this one in the ZIP.`);
   window.__shrinkApp?.openFile?.(it.file);
   window.__shrinkLeftPanel?.(true);
   setTimeout(() => { const d = $('v2AdvTools'); if (d) d.open = true; }, 600);
@@ -150,11 +151,19 @@ function clear() {
 
 const ICON = { queued: '·', working: '…', done: '✓', failed: '⚠', skipped: '–' };
 function pending() { return S.items.filter(i => i.status === 'queued'); }
+// The guidance under a flagged row: what is not fixed, and the three steps to fix it. Once the model open in the main window reaches 100/100 it says to press DOWNLOAD.
+function whyLine(i) {
+  const fixedNow = S.fixing === i.id && !S.running && Number($('v2HealthScore')?.textContent) >= 100 && window.__shrinkApp?.sourceFile === i.file;
+  if (fixedNow) return '<div class="v2-batch-why good">✓ Fixed in the main window. Press <b>DOWNLOAD</b> (top right) to put the fixed file in the ZIP.</div>';
+  const what = (i.issues && i.issues.length ? i.issues.join(', ') : 'health is below 100');
+  const going = S.fixing === i.id ? 'Now fix it in the main window: <b>FIX IT</b> (or <b>Make watertight</b>), then <b>DOWNLOAD</b>.' : 'To fix: <b>OPEN</b> it, press <b>FIX IT</b> (or <b>Make watertight</b>), then <b>DOWNLOAD</b>.';
+  return `<div class="v2-batch-why">Not fixed: ${what.replace(/</g, '&lt;')}. ${going} Or ignore it: the ZIP already holds this file.</div>`;
+}
 function render() {
   const panel = $('v2BatchPanel'); if (!panel) return;
   dock();
   const list = $('v2BatchList');
-  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : ICON[i.status]}</i><span class="n${S.running ? '' : ' view'}" title="${i.name.replace(/"/g, '&quot;')}${S.running ? '' : ' (click to view it in the main window)'}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m"${i.warn ? ' title="Still not fully clean after QUICK-FIX. It is in the ZIP as it is. Click OPEN, expand the left panel and try FIX IT or Make watertight on it by itself."' : ''}>${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn ? '<button type="button" class="open" title="Opens this model on its own with the left panel open. Try FIX IT or Make watertight, then DOWNLOAD IT: the fixed file replaces this one in the ZIP.">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
+  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : ICON[i.status]}</i><span class="n${S.running ? '' : ' view'}" title="${i.name.replace(/"/g, '&quot;')}${S.running ? '' : ' (click to view it in the main window)'}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m"${i.warn ? ' title="Still not fully clean after QUICK-FIX. It is in the ZIP as it is. Click OPEN, expand the left panel and try FIX IT or Make watertight on it by itself."' : ''}>${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn ? '<button type="button" class="open" title="Opens this model on its own with the left panel open. Try FIX IT or Make watertight, then DOWNLOAD IT: the fixed file replaces this one in the ZIP.">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>${i.warn ? whyLine(i) : ''}`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
   list.querySelectorAll('.n.view').forEach(n => n.addEventListener('click', () => viewItem(Number(n.closest('.v2-batch-row').dataset.id))));
   list.querySelectorAll('.open').forEach(b => b.addEventListener('click', () => openToFix(Number(b.closest('.v2-batch-row').dataset.id))));
   list.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => remove(Number(b.closest('.v2-batch-row').dataset.id))));
@@ -203,7 +212,17 @@ const deps = {
     return got;
   },
   applySettings,
-  healthScore: () => $('v2HealthScore')?.textContent || ''
+  healthScore: () => $('v2HealthScore')?.textContent || '',
+  // what is still wrong, read from the MODEL HEALTH box: e.g. ['13 non-manifold edges']
+  healthIssues: () => {
+    const words = { 'Open edges': n => `${n} open edge${n === '1' ? '' : 's'}`, 'Non-manifold': n => `${n} non-manifold edge${n === '1' ? '' : 's'}`, 'Flipped faces': n => `${n} flipped face${n === '1' ? '' : 's'}`, 'Degenerates': n => `${n} degenerate triangle${n === '1' ? '' : 's'}` };
+    const out = [];
+    document.querySelectorAll('#v2HealthCard .v2-health-row').forEach(r => {
+      const label = r.querySelector('span')?.textContent?.trim(), v = r.querySelector('strong'); if (!label || !v || !v.classList.contains('issue')) return;
+      out.push(label === 'Watertight' ? 'not watertight' : (words[label] ? words[label](v.textContent.trim()) : `${label}: ${v.textContent.trim()}`));
+    });
+    return out;
+  }
 };
 async function waitFor(fn, ms, msg) {
   const t0 = Date.now();
@@ -240,7 +259,7 @@ async function start() {
         for (const f of files) S.results.push({ name: f.name, blob: f.blob, source: item.name });
         item.status = 'done'; item.msg = score ? `health ${score}/100` : 'done'; ok++;
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100;      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
-        if (item.warn) { item.msg += ' · still has issues'; warned++; }
+        if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
       } catch (err) {
         console.warn('[SHRINK 3D] batch item failed', item.name, err);
         item.status = 'failed'; item.msg = String(err.message || err).slice(0, 80);

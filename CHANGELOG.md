@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.183
+- BATCH: a flagged model now gets a plain amber note under its row saying what is NOT fixed (e.g. "13 non-manifold edges") and the three steps: OPEN it, press FIX IT (or Make watertight), then DOWNLOAD. Once the model open in the main window reaches 100/100 the note turns green and says to press DOWNLOAD (top right) to put the fixed file in the ZIP. It also says the ZIP already holds the file if you would rather ignore it.
+
 ## v2.182
 - Width / Depth (with Uniform unticked): the model now follows as you type. The stretch applies about 0.7 s after you stop typing, on Enter, and when you leave the box. Before, it only happened on Tab/Enter, so it looked as if the box did nothing.
 - Width / Depth no longer get stuck greyed out and empty: an empty size measurement (taken while a model was being swapped) is no longer remembered, the boxes re-check a few times, and unticking Uniform or opening the left panel refreshes them.

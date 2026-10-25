@@ -177,6 +177,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   { const pn = page.$('v2BatchPanel'); ok(!page.$('v2BatchClose') && !pn.classList.contains('folded'), 'B7 no close button, and the batch window is open by default');
     page.$('v2BatchFold').click(); ok(pn.classList.contains('folded'), 'B7 the arrow folds the window'); pn.querySelector('.v2-batch-head').click(); ok(!pn.classList.contains('folded'), 'B7 the title bar opens it again'); }
   ok(B.state.items[0].warn === true && page.$('v2BatchList').querySelector('.open'), 'B5 a model below 100 is flagged and gets an OPEN button');
+  ok(!!page.$('v2BatchList').querySelector('.v2-batch-why') && /Not fixed/.test(page.$('v2BatchList').querySelector('.v2-batch-why').textContent) && /OPEN/.test(page.$('v2BatchList').querySelector('.v2-batch-why').textContent), 'B8 a flagged row says what is not fixed and the steps to fix it');
   page.$('v2BatchList').querySelector('.open').click(); await wait(50);
   const oldBlob = B.state.results[0].blob;
   const keep = w.__shrinkCapture?.(new w.Blob([new Uint8Array(20)]), 'tarak-SHRINK-16K.stl');
