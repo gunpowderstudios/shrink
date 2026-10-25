@@ -25,7 +25,24 @@ function estimate(sizes, budget = memoryBudget()) {
   return { need, budget, frac, level: frac >= STOP_AT ? 'red' : frac >= WARN_AT ? 'amber' : 'green', biggest, total };
 }
 
-const S = { items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false };
+// Print settings used for EVERY model in the batch (set here, before any file is loaded). Each maps onto the real printer / quality buttons.
+const PRINTERS = [
+  { id: 'r16', label: 'Resin 12K / 16K (0.018 mm, most detail)', type: 'resin', quality: 'ultra' },
+  { id: 'r8f', label: 'Resin 8K / 9K, fine detail (0.03 mm)', type: 'resin', quality: 'fine' },
+  { id: 'r8', label: 'Resin 8K / 9K (0.05 mm)', type: 'resin', quality: 'standard' },
+  { id: 'r4', label: 'Resin 2K–4K (0.1 mm)', type: 'resin', quality: 'large' },
+  { id: 'fdm', label: 'FDM filament (0.2 mm)', type: 'fdm', quality: 'standard' }
+];
+const S = { items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: 'r8', height: 75 };
+function applySettings() {
+  const p = PRINTERS.find(x => x.id === S.printer) || PRINTERS[2];
+  // scoped to the print dashboard: other parts of the page also use data-quality / data-printer attributes
+  const dash = document.querySelector('.print-v2-dashboard') || document;
+  dash.querySelector(`[data-printer="${p.type}"]`)?.click();
+  dash.querySelector(`[data-quality="${p.quality}"]`)?.click();
+  const h = $('v2Height');
+  if (h && Number(S.height) > 0) { h.value = String(S.height); h.dispatchEvent(new Event('input', { bubbles: true })); }
+}
 
 function buildPanel() {
   if ($('v2BatchPanel')) return;
@@ -33,6 +50,11 @@ function buildPanel() {
   p.innerHTML = `
     <div class="v2-batch-head"><strong>BATCH</strong><span>QUICK-FIX many models, get one ZIP</span><button id="v2BatchClose" type="button" class="v2-magic-x" title="Close">×</button></div>
     <div id="v2BatchDrop" class="v2-batch-drop">Drop STL, OBJ, PLY or GLB files here, or <button id="v2BatchAdd" type="button">choose files…</button></div>
+ <div class="v2-batch-set">
+      <label>Printer<select id="v2BatchPrinter">${PRINTERS.map(x => `<option value="${x.id}">${x.label}</option>`).join('')}</select></label>
+      <label>Height<span class="v2-batch-h"><input id="v2BatchHeight" type="number" min="1" max="500" step="1" value="75"><em>mm</em></span></label>
+    </div>
+    <div class="v2-batch-hint">These settings are used for every model in the batch. Set them before you press START.</div>
     <input id="v2BatchFiles" type="file" multiple accept=".stl,.obj,.ply,.glb" hidden>
     <div id="v2BatchList" class="v2-batch-list"></div>
     <div class="v2-batch-mem" id="v2BatchMem" data-level="green"><div class="v2-batch-bar"><i id="v2BatchBarFill"></i></div><div id="v2BatchMemText" class="v2-batch-memtext">Memory: add some models to see the estimate.</div></div>
@@ -47,6 +69,9 @@ function buildPanel() {
   ['dragenter', 'dragover'].forEach(t => p.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(t => p.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
   p.addEventListener('drop', e => add([...(e.dataTransfer?.files || [])]));
+  $('v2BatchPrinter').value = S.printer;
+  $('v2BatchPrinter').addEventListener('change', e => { S.printer = e.target.value; });
+  $('v2BatchHeight').addEventListener('input', e => { S.height = Number(e.target.value) || 75; });
   $('v2BatchTry').addEventListener('change', e => { S.tryAnyway = e.target.checked; render(); });
   $('v2BatchStart').addEventListener('click', start);
   $('v2BatchStop').addEventListener('click', () => { S.stop = true; note('Stopping after the current model…'); });
@@ -107,6 +132,7 @@ function render() {
   start.disabled = S.running || !pending().length || blocked;
   start.title = blocked ? 'The memory bar is in the red. Remove some models, or tick Try anyway.' : '';
   $('v2BatchStop').hidden = !S.running;
+  $('v2BatchPrinter').disabled = S.running; $('v2BatchHeight').disabled = S.running;
   $('v2BatchZip').disabled = S.running || !S.results.length;
   $('v2BatchClear').disabled = S.running;
   const btn = $('v2BatchBtn'); if (btn) btn.dataset.count = S.items.length ? String(S.items.length) : '';
@@ -133,6 +159,7 @@ const deps = {
     } finally { window.__shrinkCapture = null; }
     return got;
   },
+  applySettings,
   healthScore: () => $('v2HealthScore')?.textContent || ''
 };
 async function waitFor(fn, ms, msg) {
@@ -148,6 +175,7 @@ async function start() {
   buildPanel(); render();
   if ($('v2BatchStart').disabled) return;
   S.running = true; S.stop = false; render(); note('');
+  if (!document.body.classList.contains('app-mode-print')) { document.querySelector('.mode-card[data-mode="print"]')?.click(); await wait(600); }
   const total = pending().length; let n = 0, ok = 0;
   try {
     for (const item of S.items) {
@@ -160,6 +188,8 @@ async function start() {
         const a = deps.app();
         if (a && a.sourceFile && a.sourceFile !== item.file) throw new Error('Could not open this file');
         await wait(350);            // let the open settle and the health check start
+        deps.applySettings();       // printer resolution and height chosen in the panel
+        await wait(150);
         await deps.quickFix();
         const score = deps.healthScore();
         const files = await deps.capture();
@@ -202,8 +232,22 @@ function ensureButton() {
   b.addEventListener('click', () => toggle());
   wrap.appendChild(b); return true;
 }
+// BATCH on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+function ensureHomeButton() {
+  if ($('v2BatchHome')) return true;
+  const dz = $('dropZone'); if (!dz) return false;
+  const row = document.createElement('div'); row.className = 'v2-batch-home';
+  row.innerHTML = '<button id="v2BatchHome" type="button" class="v2-magic">BATCH</button><span>Shrink many models in one go: choose your printer first, then add the files.</span>';
+  dz.insertAdjacentElement('afterend', row);
+  $('v2BatchHome').addEventListener('click', () => {
+    if (!document.body.classList.contains('app-mode-print')) document.querySelector('.mode-card[data-mode="print"]')?.click();
+    toggle(true);
+  });
+  return true;
+}
+ensureHomeButton();
 let tries = 0; const iv = setInterval(() => { if (ensureButton() || ++tries > 100) clearInterval(iv); }, 300);
 ensureButton();
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
-window.__shrinkBatch = { add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip };
+window.__shrinkBatch = { applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip };

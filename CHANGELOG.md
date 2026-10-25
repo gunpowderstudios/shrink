@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.154
+- **BATCH on the load screen**, under the main drop box. It switches to 3D print mode and opens the BATCH panel before any model is loaded.
+- The BATCH panel has its own **Printer** (resin 12K/16K, 8K/9K fine, 8K/9K, 2K-4K, FDM) and **Height (mm)**. They are applied to every model in the batch just before its QUICK-FIX, through the real printer / quality / height controls (scoped to the print dashboard, because other elements on the page share the `data-quality` name).
+
 ## v2.153
 - **BATCH works before any model is loaded.** The panel floats at the top right until a model is open, then docks above MODEL HEALTH. A batch can be started from an empty page.
 

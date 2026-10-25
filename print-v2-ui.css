@@ -504,3 +504,14 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-health-card .v2-magic-note{display:none!important}
 
 .v2-batch.floating{position:fixed;right:16px;top:70px;bottom:auto;z-index:90}
+
+/* BATCH on the load screen + its printer settings (v2.154) */
+.v2-batch-home{display:flex;align-items:center;gap:14px;margin:14px 0 4px;padding:0 4px;color:#9fb4d0;font-size:13px}
+#dropZone.hidden + .v2-batch-home{display:none}
+.v2-batch-home .v2-magic{padding:10px 26px}
+.v2-batch-set{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 6px}
+.v2-batch-set label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#9fb4d0;flex:1 1 120px}
+.v2-batch-set label:first-child{flex:2 1 200px}
+.v2-batch-set select,.v2-batch-set input{padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:#0b1118;color:#e7edf5;font:inherit;font-size:13px;width:100%;box-sizing:border-box}
+.v2-batch-h{display:flex;align-items:center;gap:6px}.v2-batch-h em{font-style:normal;color:#9fb4d0}
+.v2-batch-hint{font-size:11px;color:#7b8594;margin-bottom:8px}
