@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.153
+- **BATCH works before any model is loaded.** The panel floats at the top right until a model is open, then docks above MODEL HEALTH. A batch can be started from an empty page.
+
 ## v2.152
 - The **BATCH** window now docks directly above the MODEL HEALTH box (it moves with it) instead of floating at the top.
 - The QUICK-FIX step report box is switched off for now (CSS only; the code still fills it, so it can come back).

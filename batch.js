@@ -39,7 +39,7 @@ function buildPanel() {
     <label class="v2-check v2-batch-try" id="v2BatchTryRow" hidden><input id="v2BatchTry" type="checkbox"> Try anyway (the tab may crash)</label>
     <div class="v2-batch-actions"><button id="v2BatchStart" type="button" class="v2-magic">START BATCH</button><button id="v2BatchStop" type="button" class="v2-magic v2-magic-reset" hidden>STOP AFTER THIS ONE</button><button id="v2BatchZip" type="button" class="v2-magic v2-magic-dl" disabled>DOWNLOAD ZIP</button><button id="v2BatchClear" type="button" class="v2-magic v2-magic-reset">CLEAR</button></div>
     <div id="v2BatchNote" class="v2-batch-note"></div>`;
-  ($('v2HealthCard') || document.body).appendChild(p);      // docked above the MODEL HEALTH box (v2.152)
+  document.body.appendChild(p); dock();
   $('v2BatchClose').addEventListener('click', () => toggle(false));
   $('v2BatchAdd').addEventListener('click', () => $('v2BatchFiles').click());
   $('v2BatchFiles').addEventListener('change', e => { add([...e.target.files]); e.target.value = ''; });
@@ -54,6 +54,14 @@ function buildPanel() {
   $('v2BatchClear').addEventListener('click', clear);
 }
 
+// Docked above the MODEL HEALTH box once that exists (it is created when a model is opened); floating at the top right until then (v2.153).
+function dock() {
+  const p = $('v2BatchPanel'); if (!p) return;
+  const card = $('v2HealthCard');
+  if (card && p.parentElement !== card) { card.appendChild(p); p.classList.remove('floating'); }
+  else if (!card && p.parentElement !== document.body) { document.body.appendChild(p); p.classList.add('floating'); }
+  else if (!card) p.classList.add('floating');
+}
 function toggle(open) {
   buildPanel(); S.open = open ?? !S.open; $('v2BatchPanel').hidden = !S.open; if (S.open) render();
 }
@@ -77,6 +85,7 @@ const ICON = { queued: '·', working: '…', done: '✓', failed: '⚠', skipped
 function pending() { return S.items.filter(i => i.status === 'queued'); }
 function render() {
   const panel = $('v2BatchPanel'); if (!panel) return;
+  dock();
   const list = $('v2BatchList');
   list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}" data-id="${i.id}"><i>${ICON[i.status]}</i><span class="n" title="${i.name.replace(/"/g, '&quot;')}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m">${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : '<button type="button" class="x" title="Remove">×</button>'}</div>`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
   list.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => remove(Number(b.closest('.v2-batch-row').dataset.id))));

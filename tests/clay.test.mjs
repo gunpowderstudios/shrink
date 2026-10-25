@@ -137,6 +137,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(B.estimate([320e6], 4 * GBn).level === 'red', 'B1 a 320 MB model on a 4 GB budget is red');
   ok(B.estimate([100e6, 100e6], 4 * GBn).need > B.estimate([100e6], 4 * GBn).need, 'B1 more models need more memory');
   B.toggle(true);
+  ok(page.$('v2BatchPanel').parentElement === page.$('v2HealthCard'), 'B1 with a model open the panel docks in the health card');
   const mk = (n, size) => ({ name: n, size });
   B.add([mk('a.stl', 5e6), mk('b.obj', 5e6), mk('c.txt', 10)]);
   ok(page.$('v2BatchList').querySelectorAll('.v2-batch-row').length === 2, 'B2 only STL/OBJ/PLY/GLB files are queued');

@@ -502,3 +502,5 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 
 /* the QUICK-FIX step report box is switched off for now (v2.152); the code still fills it */
 .v2-health-card .v2-magic-note{display:none!important}
+
+.v2-batch.floating{position:fixed;right:16px;top:70px;bottom:auto;z-index:90}
