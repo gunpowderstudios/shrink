@@ -131,7 +131,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
   const B = w.__shrinkBatch;
-  ok(!!B && !page.$('v2BatchBtn'), 'B1 there is no BATCH button in the top bar any more');
+  await wait(700); ok(!!B && !page.$('v2BatchBtn') && !!page.$('v2BatchTop') && page.$('v2MagicReset').nextElementSibling === page.$('v2BatchTop'), 'B1 the top bar has a BATCH button right after RELOAD');
   const GBn = 1024 ** 3;
   ok(B.estimate([10e6], 4 * GBn).level === 'green', 'B1 a 10 MB model on a 4 GB budget is green');
   ok(B.estimate([320e6], 4 * GBn).level === 'red', 'B1 a 320 MB model on a 4 GB budget is red');

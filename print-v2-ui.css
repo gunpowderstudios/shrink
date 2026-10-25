@@ -572,3 +572,6 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
   body.app-mode-print.print-v2-active .app-shell>.printUploadHero{flex:0 0 auto;margin:0 0 6px}
   body.app-mode-print.print-v2-active .site-footer{flex:0 0 auto;padding:2px 0;margin:0}
 }
+
+/* v2.180: the MODEL LOADED strip is gone (RELOAD in the top bar loads another model); before a model is loaded it is still the drop area */
+.print-upload-hero.has-model{display:none!important}

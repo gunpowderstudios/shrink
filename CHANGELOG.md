@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.180
+- The "MODEL LOADED" strip (with its Change model button) is gone once a model is open; RELOAD does that job. Before a model is loaded the same area is still the drop zone.
+- A BATCH button sits in the top bar right after RELOAD (the load-screen BATCH button stays).
+
 ## v2.179
 - 3D Print screen fits the browser window: on a desktop-sized window (wider than 900 px) with a model loaded, the page no longer scrolls. The viewer takes whatever height is left between the header and the "Model loaded" bar, and the viewer canvas follows it. The opened left panel scrolls inside itself, and if the window is very short the page falls back to scrolling (viewer never smaller than about 340 px). Load screen, Game mode and phones/tablets are unchanged. This is CSS only (`@media(min-width:901px)` block at the end of `print-v2-ui.css`), no JavaScript sizing.
 

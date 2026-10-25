@@ -282,7 +282,18 @@ function ensureHomeButton() {
   });
   return true;
 }
-ensureHomeButton();
+// (v2.180) A BATCH button in the top bar, right after RELOAD, opens the same window as the load-screen button.
+function ensureTopButton() {
+  if ($('v2BatchTop')) return true;
+  const rl = $('v2MagicReset'); if (!rl) return false;
+  const btn = document.createElement('button'); btn.id = 'v2BatchTop'; btn.type = 'button'; btn.className = 'v2-magic v2-magic-reset'; btn.textContent = 'BATCH';
+  btn.title = 'Shrink many models in one go';
+  btn.addEventListener('click', () => toggle(true));
+  rl.insertAdjacentElement('afterend', btn);
+  return true;
+}
+ensureHomeButton(); ensureTopButton();
+let tries2 = 0; const iv2 = setInterval(() => { if (ensureTopButton() || ++tries2 > 100) clearInterval(iv2); }, 300);
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
