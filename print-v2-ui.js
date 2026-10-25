@@ -157,7 +157,7 @@
   // QUICK-FIX is grey and unclickable (like DOWNLOAD) while the health check runs and turns green when it has finished, so it is clear when to press it (v2.148).
   const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; } };
   async function updateHealthCard() {
-    updateSizeWarning();
+    updateSizeWarning(); ensureTurnPad();
     const card = ensureHealthCard();
     const model = healthModel();
     if (!card || !model) return;
@@ -653,6 +653,36 @@
     }
     model.visible = true;
     return { ok: true, text: 'centred, with its base flat on the bed' };
+  }
+
+  // ---- manual TURN pad (v2.161): turn, tip or lean the model by hand before DOWNLOAD. Always about the model's centre, then back flat on the bed ----
+  function turnModel(axisName, deg) {
+    const model = sourceModel(), THREE = app()?.THREE; if (!model || !THREE) return false;
+    const st = model.userData.shrinkStretch;
+    if (st && (st.x !== 1 || st.z !== 1)) { app()?.setStatus?.('Turn needs the model unstretched: tick Uniform, or press the width and depth back to normal, then turn it.', true); return false; }
+    const axis = axisName === 'y' ? new THREE.Vector3(0, 1, 0) : axisName === 'x' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+    rotateAboutCentre(model, new THREE.Quaternion().setFromAxisAngle(axis, deg * Math.PI / 180), THREE);
+    reducedTick++; window.__shrinkStretchTick = (window.__shrinkStretchTick || 0) + 1;
+    centreOnBed(); setTimeout(refreshDims, 50);
+    try { showBedGuide(); } catch (e) { console.warn('bed guide', e); }
+    return true;
+  }
+  window.__shrinkTurn = turnModel;
+  function ensureTurnPad() {
+    const viewer = $('viewer'); if (!viewer || $('v2TurnPad')) return;
+    const pad = document.createElement('div'); pad.id = 'v2TurnPad'; pad.className = 'v2-turn';
+    pad.innerHTML = `<b>TURN</b>
+      <div class="v2-turn-row" title="Turn about the upright axis (green Y)"><button type="button" data-turn="y" data-sign="1" aria-label="Turn left">↺</button><button type="button" data-turn="y" data-sign="-1" aria-label="Turn right">↻</button></div>
+      <small>Turn</small>
+      <div class="v2-turn-row" title="Tip forward or back (about the red X arrow)"><button type="button" data-turn="x" data-sign="-1" aria-label="Tip forward">⤓</button><button type="button" data-turn="x" data-sign="1" aria-label="Tip back">⤒</button></div>
+      <small>Tip</small>
+      <div class="v2-turn-row" title="Lean left or right (about the blue Z arrow)"><button type="button" data-turn="z" data-sign="1" aria-label="Lean left">⇠</button><button type="button" data-turn="z" data-sign="-1" aria-label="Lean right">⇢</button></div>
+      <small>Lean</small>
+      <select id="v2TurnStep" aria-label="Step size"><option value="5">5°</option><option value="15" selected>15°</option><option value="45">45°</option><option value="90">90°</option></select>
+      <small class="v2-turn-note">Front = blue Z arrow, up = green Y</small>`;
+    viewer.appendChild(pad);
+    pad.addEventListener('click', e => { const b = e.target.closest('[data-turn]'); if (!b) return; turnModel(b.dataset.turn, Number(b.dataset.sign) * (Number($('v2TurnStep').value) || 15)); });
+    ['pointerdown', 'wheel'].forEach(t => pad.addEventListener(t, e => e.stopPropagation()));
   }
 
   // ---- matrix-style print bed + X/Y/Z arrows, shown once the model is centred ----

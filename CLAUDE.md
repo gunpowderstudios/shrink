@@ -57,6 +57,9 @@ The printer type + quality are saved in `localStorage['shrink-printer']` (`saveP
 ### Viewer lighting (v2.145)
 `syncViewerEnvironment()` in `app.js` sets print mode to low hemisphere/fill light plus a strong `key` lamp with `castShadow` (game mode keeps the old gentle lamps and no shadows). `fitShadows()` runs each frame: it flags the original/optimized/current model meshes `castShadow`/`receiveShadow` and, every 20 frames, refits the key lamp and its orthographic shadow camera around the shown model (bounding sphere), so a moved or replaced model keeps good shadows. New meshes added to the scene need nothing extra unless they should not cast shadows (guide/clay groups are not flagged).
 
+### TURN pad (v2.161)
+`turnModel(axis, deg)` / `ensureTurnPad()` in `print-v2-ui.js` (`#v2TurnPad`, built from `updateHealthCard()`, `window.__shrinkTurn`): rotates the working root about its centre through `rotateAboutCentre` (so `notePose`/Compare follow), refuses when the root is stretched (non-uniform scale would shear), then `centreOnBed()` and the bed guide. Tests: T1 in `tests/clay.test.mjs`.
+
 ### Compare pose (v2.143)
 The levelling, centring and stretch tools move the working model root, never the original. `notePose()` in `print-v2-ui.js` records each change in `poseD`; `window.__shrinkComparePose()` returns it (null when nothing moved); `app.js` `enterCompare()` applies it to `originalModel` and `leaveCompare()` restores the saved position/quaternion/scale. Any new tool that moves or turns the working root must go through `moveWorld`/`rotateAboutCentre`/`notePose`. `poseD` resets on `shrink:model-opened`.
 

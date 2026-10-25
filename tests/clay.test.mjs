@@ -196,5 +196,20 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   w.__shrinkFuseTriLimit = undefined;
 }
 
+/* ---- manual TURN pad ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
+  ok(!!page.$('v2TurnPad') && page.$('v2TurnPad').querySelectorAll('[data-turn]').length === 6, 'T1 the TURN pad is in the viewer with turn, tip and lean arrows');
+  const m = w.__shrinkWorkingModel(); const TH = w.__shrinkApp.THREE;
+  const q0 = m.quaternion.clone();
+  page.$('v2TurnStep').value = '90'; page.$('v2TurnPad').querySelector('[data-turn="y"][data-sign="1"]').click(); await wait(100);
+  const ang = m.quaternion.angleTo(q0) * 180 / Math.PI;
+  ok(Math.abs(ang - 90) < 0.5, 'T1 the turn arrow turns the model by the chosen step (got ' + ang.toFixed(1) + ')');
+  page.$('v2TurnPad').querySelector('[data-turn="x"][data-sign="1"]').click(); await wait(100);
+  const box = new TH.Box3().setFromObject(m, true);
+  ok(Math.abs(box.min.y) < 1e-4 && Math.abs((box.min.x + box.max.x) / 2) < 1e-3, 'T1 after tipping it, the model is put back flat on the bed and centred');
+  ok(w.__shrinkComparePose() !== null, 'T1 the turn is recorded for Compare');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);
