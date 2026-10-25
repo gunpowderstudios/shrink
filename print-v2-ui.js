@@ -762,7 +762,7 @@
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
-    btn.disabled = true; btn.dataset.busy = '1'; { const hc = $('v2HealthCard'); if (hc) hc.dataset.working = '1'; } const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
+    btn.disabled = true; btn.dataset.busy = '1'; { const hc = $('v2HealthCard'); if (hc) { const r = hc.getBoundingClientRect(); hc.style.width = r.width + 'px'; hc.style.height = Math.max(r.height, 150) + 'px'; hc.dataset.working = '1'; } } const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
     const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
@@ -812,7 +812,7 @@
       done('warn', '⚠', `Stopped: ${err.message || err}`);
     } finally {
       try { await updateHealthCard(); } catch (e) { console.warn('health refresh', e); }      // show the final result in one go, not the in-between checks
-      { const hc = $('v2HealthCard'); if (hc) hc.dataset.working = ''; }
+      { const hc = $('v2HealthCard'); if (hc) { hc.dataset.working = ''; hc.style.width = ''; hc.style.height = ''; } }
       delete btn.dataset.busy; btn.disabled = false; btn.textContent = label;
     }
   }

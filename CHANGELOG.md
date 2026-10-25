@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.165
+- The MODEL HEALTH box keeps one fixed size (its width and height at the moment QUICK-FIX starts) until QUICK-FIX finishes, then goes back to normal sizing.
+
 ## v2.164
 - While QUICK-FIX runs, the MODEL HEALTH box no longer flicks between checks: it shows one rotating green disk with "Working…" in the middle, then the final result in one go.
 
