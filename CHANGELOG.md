@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.160
+- **Over the fuse limit** (1,000,000 triangles, common at 16K ultra): the yellow banner now says why FUSE IT / QUICK-FIX's fuse step are skipped and what to do (choose Fine detail or Standard and SHRINK IT again, or carry on as it is: separate closed pieces print fine, the slicer can merge them).
+
+## v2.160
+- The yellow size banner now explains what happened when a model is still over the fuse limit after SHRINK IT or at 16K ultra ("Too many triangles to fuse"): FUSE IT and QUICK-FIX's fuse step are skipped, and it says what to do (pick Fine detail or Standard and SHRINK again, or carry on unfused: separate closed pieces print fine and DOWNLOAD still works).
+
 ## v2.159
 - **Your printer and quality are remembered** in this browser (`localStorage['shrink-printer']`: printer type + quality) and put back the next time the print tools open. The BATCH printer list starts from the same choice.
 - **Highest detail by default:** with nothing saved yet, the print tools start on Resin with **16K ultra** (0.018 mm), and BATCH starts on Resin 12K / 16K. Pick Standard or another quality any time; that choice is then remembered instead.

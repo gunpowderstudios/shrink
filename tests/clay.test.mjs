@@ -184,5 +184,17 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(saved && saved.type === 'fdm', 'P1 choosing FDM saves that too');
 }
 
+/* ---- over the fuse limit: say what happened and what to do ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(300);
+  w.__shrinkFuseTriLimit = 10;
+  w.document.querySelector('.print-v2-dashboard [data-quality="ultra"]').click(); w.__shrinkRefreshSizeWarning(); await wait(30);
+  const el = page.$('v2SizeWarn');
+  ok(el && !el.hidden && /Too many triangles to fuse/.test(el.textContent) && /Fine detail/.test(el.textContent) && /16K ultra/.test(el.textContent), 'W1 at 16K over the fuse limit the banner explains why and what to do');
+  w.document.querySelector('.print-v2-dashboard [data-quality="standard"]').click(); w.__shrinkRefreshSizeWarning(); await wait(30);
+  ok(/Press SHRINK IT first|SHRINK IT/.test(el.textContent) && !/Too many triangles to fuse/.test(el.textContent), 'W1 before shrinking at a lower quality it still says to press SHRINK IT first');
+  w.__shrinkFuseTriLimit = undefined;
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

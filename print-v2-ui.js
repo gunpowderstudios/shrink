@@ -147,7 +147,9 @@
     if (!el) { el = document.createElement('div'); el.id = 'v2SizeWarn'; el.className = 'v2-size-warn'; el.hidden = true; el.setAttribute('role', 'status'); anchor.before(el); }
     const model = sourceModel(), tris = model ? modelTriangles(model) : 0, limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
     const big = tris > limit;
-    if (big) el.innerHTML = `<span class="v2-size-warn-icon" aria-hidden="true">⚠</span><div><strong>This model is very detailed (${tris.toLocaleString()} triangles)</strong><span>Press <b>SHRINK IT</b> first, then <b>FIX IT</b> or <b>FUSE IT</b>. Fusing or fixing this many triangles can freeze the page.</span></div>`;
+    const ultra = (dashboard?.dataset.quality) === 'ultra', shrunk = !!shrinkReady;
+    if (big && (shrunk || ultra)) el.innerHTML = `<span class="v2-size-warn-icon" aria-hidden="true">⚠</span><div><strong>Too many triangles to fuse (${tris.toLocaleString()})</strong><span>${ultra ? '16K ultra keeps a huge amount of detail, ' : ''}so FUSE IT and QUICK-FIX\'s fuse step are skipped above ${limit.toLocaleString()} triangles to stop the page freezing. What you can do: <b>1)</b> choose <b>Fine detail</b> or <b>Standard</b> under Quality and press <b>SHRINK IT</b> again; <b>2)</b> or carry on as it is: separate closed pieces print fine, and your slicer can merge touching parts; DOWNLOAD still works, the file is just large.</span></div>`;
+    else if (big) el.innerHTML = `<span class="v2-size-warn-icon" aria-hidden="true">⚠</span><div><strong>This model is very detailed (${tris.toLocaleString()} triangles)</strong><span>Press <b>SHRINK IT</b> first, then <b>FIX IT</b> or <b>FUSE IT</b>. Fusing or fixing this many triangles can freeze the page.</span></div>`;
     if (el.hidden === big) el.hidden = !big;
   }
   window.__shrinkRefreshSizeWarning = updateSizeWarning;
