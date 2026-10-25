@@ -220,6 +220,21 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(w.__shrinkFaceFront() === true, 'F1 the front view can be set');
   const t = w.__shrinkViewer.controls.target, d = cam.position.clone().sub(t);
   ok(d.z > 0 && Math.abs(d.x) < 1e-6 && d.y > 0 && d.y < d.z, 'F1 the camera is on the +Z side, centred, a little above (Z arrow points at the person)');
+  const bx = new TH.Box3().setFromObject(w.__shrinkWorkingModel(), true); let a0 = 9, a1 = -9, b0 = 9, b1 = -9;
+  for (const x of [bx.min.x, bx.max.x]) for (const y of [bx.min.y, bx.max.y]) for (const z of [bx.min.z, bx.max.z]) { const n = new TH.Vector3(x, y, z).project(cam); a0 = Math.min(a0, n.x); a1 = Math.max(a1, n.x); b0 = Math.min(b0, n.y); b1 = Math.max(b1, n.y); }
+  ok(Math.abs((a0 + a1) / 2) < 0.02 && Math.abs((b0 + b1) / 2) < 0.02, 'F2 the whole model is centred in the window (' + ((a0 + a1) / 2).toFixed(3) + ', ' + ((b0 + b1) / 2).toFixed(3) + ')');
+  const fill = Math.max(a1 - a0, b1 - b0) / 2;
+  ok(fill > 0.45 && fill < 0.9, 'F2 and the whole model fits inside the window, clear of the side boxes (' + fill.toFixed(2) + ')');
+}
+
+/* ---- the X/Y/Z arrows start at the middle of the whole model ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
+  w.HTMLCanvasElement.prototype.getContext = () => ({ fillText() {}, fillRect() {}, clearRect() {} });      // jsdom has no canvas: the arrow labels only need a drawing context
+  w.__shrinkCentre(); w.__shrinkBedGuide.show();
+  const TH = w.__shrinkApp.THREE, ax = w.__shrinkViewer.scene.getObjectByName('shrinkBedGuide')?.getObjectByName('shrinkAxes');
+  const mid = new TH.Box3().setFromObject(w.__shrinkWorkingModel(), true).getCenter(new TH.Vector3());
+  ok(!!ax && ax.position.distanceTo(mid) < 1e-6 && mid.y > 0, 'G1 the axis arrows are centred on the model, sideways and in height');
 }
 
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');

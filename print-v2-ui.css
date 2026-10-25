@@ -478,7 +478,7 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-magic[data-state="checking"]{background:#3a414c;color:#8a93a0;box-shadow:none;opacity:1;cursor:not-allowed;filter:none}
 
 /* BATCH panel (v2.151) */
-.v2-batch{position:absolute;right:14px;bottom:14px;z-index:70;width:min(400px,calc(100vw - 32px));max-height:calc(100% - 28px);overflow:auto;box-sizing:border-box;padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:#10161f;color:#dbe4ee;box-shadow:0 18px 50px rgba(0,0,0,.55);font-size:13px}
+.v2-batch{position:absolute;right:120px;bottom:14px;z-index:70;width:min(400px,calc(100vw - 32px));max-height:calc(100% - 28px);overflow:auto;box-sizing:border-box;padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:#10161f;color:#dbe4ee;box-shadow:0 18px 50px rgba(0,0,0,.55);font-size:13px}
 .v2-batch[hidden]{display:none!important}
 .v2-batch-head{display:flex;align-items:baseline;gap:8px;padding-right:34px;position:relative}.v2-batch-head strong{font-size:16px;letter-spacing:.5px}.v2-batch-head span{color:#9fb4d0;font-size:12px}
 .v2-batch-head .v2-magic-x{position:absolute;top:-2px;right:-2px}
@@ -517,7 +517,7 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-batch-hint{font-size:11px;color:#7b8594;margin-bottom:8px}
 
 /* manual TURN pad (v2.161): right of the figure, mid-height */
-.v2-turn{position:absolute;right:14px;top:50%;transform:translateY(-50%);z-index:12;display:flex;flex-direction:column;align-items:center;gap:4px;width:92px;padding:10px 8px;border:1px solid #354458;border-radius:14px;background:rgba(10,16,24,.88);backdrop-filter:blur(8px);color:#dbe4ee;box-shadow:0 14px 34px rgba(0,0,0,.34)}
+.v2-turn{position:absolute;right:14px;bottom:14px;z-index:12;display:flex;flex-direction:column;align-items:center;gap:4px;width:92px;padding:10px 8px;border:1px solid #354458;border-radius:14px;background:rgba(10,16,24,.88);backdrop-filter:blur(8px);color:#dbe4ee;box-shadow:0 14px 34px rgba(0,0,0,.34)}
 .v2-turn>b{font-size:11px;letter-spacing:1.2px;color:#9fb4d0}
 .v2-turn-row{display:flex;gap:6px}
 .v2-turn-row button{width:34px;height:34px;border:1px solid rgba(255,255,255,.22);border-radius:10px;background:rgba(255,255,255,.07);color:#fff;font-size:20px;line-height:1;cursor:pointer;padding:0}
@@ -527,3 +527,6 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-turn .v2-turn-note{text-align:center;line-height:1.25;margin-top:4px}
 .app-mode-game .v2-turn{display:none!important}
 @media(max-width:900px){.v2-turn{width:78px;right:8px}}
+
+.v2-batch.floating{right:16px}
+@media(max-width:900px){.v2-batch{right:94px}}

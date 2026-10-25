@@ -700,7 +700,7 @@
     if (!THREE || !v || !model) return;
     removeBedGuide();
     model.updateWorldMatrix(true, true);
-    const size = new THREE.Box3().setFromObject(model, true).getSize(new THREE.Vector3());
+    const mbox = new THREE.Box3().setFromObject(model, true), size = mbox.getSize(new THREE.Vector3()), mid = mbox.getCenter(new THREE.Vector3());
     const span = Math.max(size.x, size.z, size.y * 0.8, 1e-6);
     const pow = Math.pow(10, Math.floor(Math.log10(span / 8)));
     const cell = [1, 2, 5, 10].map(m => m * pow).find(c => span * 1.7 / c <= 24) || 10 * pow;
@@ -712,15 +712,16 @@
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(half * 2, half * 2), new THREE.MeshBasicMaterial({ color: 0x021a0c, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
     plane.rotation.x = -Math.PI / 2; plane.position.y = -span * 0.001; g.add(plane);
     const len = span * 0.7, head = len * 0.16;
+    const axes = new THREE.Group(); axes.name = 'shrinkAxes'; axes.position.copy(mid); g.add(axes);      // the X/Y/Z arrows start at the middle of the whole model (v2.163)
     const label = (txt, col, pos) => {
       const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
       x.font = 'bold 44px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = col; x.fillText(txt, 32, 34);
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
-      sp.scale.setScalar(len * 0.16); sp.position.copy(pos); sp.renderOrder = 10; g.add(sp);
+      sp.scale.setScalar(len * 0.16); sp.position.copy(pos); sp.renderOrder = 10; axes.add(sp);
     };
     [['X', 0xff4d4d, '#ff6b6b', new THREE.Vector3(1, 0, 0)], ['Y', 0x4dff7a, '#7dff9d', new THREE.Vector3(0, 1, 0)], ['Z', 0x4d9bff, '#7db4ff', new THREE.Vector3(0, 0, 1)]].forEach(([t, hex, css, dir]) => {
       const a = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), len, hex, head, head * 0.55);
-      a.line.material.depthTest = false; a.cone.material.depthTest = false; a.renderOrder = 9; a.line.renderOrder = 9; a.cone.renderOrder = 9; g.add(a);
+      a.line.material.depthTest = false; a.cone.material.depthTest = false; a.renderOrder = 9; a.line.renderOrder = 9; a.cone.renderOrder = 9; axes.add(a);
       label(t, css, dir.clone().multiplyScalar(len + head * 1.1));
     });
     v.scene.add(g);
@@ -735,11 +736,24 @@
     model.updateWorldMatrix(true, true);
     const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return false;
     const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
-    const fov = (v.camera.fov || 45) * Math.PI / 180, fit = Math.max(size.x, size.y * 1.1, size.z) / (2 * Math.tan(fov / 2)) * 1.6 + size.z / 2;
-    const dist = Math.max(fit, 1e-6), el = 20 * Math.PI / 180;
-    v.controls.target.copy(c);
-    v.camera.position.set(c.x, c.y + Math.sin(el) * dist, c.z + Math.cos(el) * dist);
-    v.camera.up.set(0, 1, 0); v.camera.lookAt(c); v.camera.updateProjectionMatrix?.(); v.camera.updateMatrixWorld(true); v.controls.update?.();
+    const cam = v.camera, fov = (cam.fov || 45) * Math.PI / 180, aspect = cam.aspect || 1.5, el = 20 * Math.PI / 180;
+    const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el)), right = new THREE.Vector3(1, 0, 0), up = new THREE.Vector3(0, Math.cos(el), -Math.sin(el));
+    const corners = []; for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z));
+    let dist = Math.max(size.x, size.y, size.z, 1e-6) / (2 * Math.tan(fov / 2)) * 2, target = c.clone();
+    // the health box (left) and the TURN pad (right) cover about 250px at each side of the window, so a wide model is kept narrower than that
+    const W = v.renderer?.domElement?.clientWidth || 900, hxLimit = Math.max(0.5, Math.min(0.84, 1 - 500 / W));
+    const place = () => { cam.near = Math.max(dist / 1000, 1e-6); cam.far = dist * 1000; cam.position.copy(target).addScaledVector(dir, dist); cam.up.set(0, 1, 0); cam.lookAt(target); cam.updateProjectionMatrix?.(); cam.updateMatrixWorld(true); };
+    // Fit so the whole model fills about 84% of the window and sits exactly in the middle: measure where the 8 corners land on screen, then nudge and zoom (a few rounds settle it)
+    for (let i = 0; i < 8; i++) {
+      place();
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const p of corners) { const n = p.clone().project(cam); x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, half = Math.max((x1 - x0) / 2 / hxLimit, (y1 - y0) / 2 / 0.84, 1e-6);
+      const hh = dist * Math.tan(fov / 2), hw = hh * aspect;
+      target.addScaledVector(right, cx * hw).addScaledVector(up, cy * hh);
+      dist *= half;
+    }
+    place(); v.controls.target.copy(target); v.controls.update?.();
     return true;
   }
   window.__shrinkFaceFront = faceFront;

@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.163
+- The final front view now **fits the whole model** in the window and centres it exactly, measured from where the model's corners land on screen. A wide model is kept narrower (half the window or more) so the health box and the TURN pad do not cover it; a tall figure fills about 84% of the height.
+- The TURN pad now sits at the bottom-right of the viewer, level with the bottom of the MODEL HEALTH box; the BATCH window sits to its left.
+- The X / Y / Z arrows on the plate now start at the middle of the whole model (sideways and in height) instead of at the base, so they are centred on the figure.
+
 ## v2.162
 - QUICK-FIX (and so BATCH) now always finishes in the **front view**: the camera goes to the +Z side, a little above, centred on the model, so the plate's blue Z arrow points at you and the model's front faces you (`window.__shrinkFaceFront`).
 
