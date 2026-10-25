@@ -12,8 +12,8 @@
   banner.innerHTML = `
     <div class="mobile-warning-icon">💻</div>
     <div class="mobile-warning-copy">
-      <strong>Mobiles are for kids! 😄</strong>
-      <span>Hop over to your laptop or PC for best results.</span>
+      <strong>Please use a laptop or desktop for better shrinking!</strong>
+      <span>Phones and tablets can open SHRINK 3D, but big models will struggle.</span>
       <small>Big 3D files, fusing, remeshing and splitting need more memory and run much better on desktop.</small>
     </div>
     <button type="button" aria-label="Dismiss mobile warning">×</button>`;

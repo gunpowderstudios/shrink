@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.156
+- The **MODEL HEALTH** box moved to the bottom-left of the viewer, and the BATCH window docks above it, so neither covers the other.
+- Phones and tablets see: "Please use a laptop or desktop for better shrinking!" (the existing dismissible mobile note, new wording). Its script is now cache-keyed with the page release.
+
 ## v2.155
 - The top-right **BATCH** button is gone: BATCH lives on the load screen only.
 - BATCH Height is now optional and starts empty ("as uploaded"): each model keeps its own size (file units taken as mm, a small GLB read as metres, capped at 500 mm). Type a height to force every model to that size. Resize afterwards as usual.

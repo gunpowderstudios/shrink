@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.155';
+  const PRINT_RELEASE = '2.156';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -22,7 +22,7 @@
   import(`./clay.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Clay tool did not load`, err));
   import(`./print-v2-ui.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
   import(`./print-upload.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Print upload control did not load`, err));
-  import(`./mobile-warning.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Mobile warning did not load`, err));
+  import(`./mobile-warning.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Mobile warning did not load`, err));
 
   if (!document.querySelector('link[data-shrink-matrix-theme]')) {
     const theme = document.createElement('link'); theme.rel = 'stylesheet'; theme.href = `./matrix-theme.css?v=${VERSION}`; theme.dataset.shrinkMatrixTheme = 'true'; document.head.appendChild(theme);
