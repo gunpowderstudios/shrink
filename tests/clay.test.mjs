@@ -127,5 +127,39 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(Number(w.document.getElementById('printerDetailMm').value) === 0.05 && !w.__shrinkStrict, 'U1 Standard puts both back');
 }
 
+/* ---- BATCH ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
+  const B = w.__shrinkBatch;
+  ok(!!B && !!page.$('v2BatchBtn'), 'B1 the BATCH button is added next to RELOAD');
+  const GBn = 1024 ** 3;
+  ok(B.estimate([10e6], 4 * GBn).level === 'green', 'B1 a 10 MB model on a 4 GB budget is green');
+  ok(B.estimate([320e6], 4 * GBn).level === 'red', 'B1 a 320 MB model on a 4 GB budget is red');
+  ok(B.estimate([100e6, 100e6], 4 * GBn).need > B.estimate([100e6], 4 * GBn).need, 'B1 more models need more memory');
+  B.toggle(true);
+  const mk = (n, size) => ({ name: n, size });
+  B.add([mk('a.stl', 5e6), mk('b.obj', 5e6), mk('c.txt', 10)]);
+  ok(page.$('v2BatchList').querySelectorAll('.v2-batch-row').length === 2, 'B2 only STL/OBJ/PLY/GLB files are queued');
+  ok(page.$('v2BatchMem').dataset.level !== 'red' && !page.$('v2BatchStart').disabled, 'B2 a small queue leaves START on');
+  B.add([mk('huge.stl', 900e6)]);
+  ok(page.$('v2BatchMem').dataset.level === 'red' && page.$('v2BatchStart').disabled && !page.$('v2BatchTryRow').hidden, 'B3 a huge file turns the memory bar red and blocks START');
+  page.$('v2BatchTry').click(); await wait(20);
+  ok(!page.$('v2BatchStart').disabled, 'B3 Try anyway lets START through');
+  page.$('v2BatchTry').click(); page.$('v2BatchList').querySelectorAll('.x')[2].click(); await wait(20);
+  ok(page.$('v2BatchList').querySelectorAll('.v2-batch-row').length === 2 && page.$('v2BatchMem').dataset.level !== 'red', 'B3 removing the big file clears the red');
+  // a run with the real work swapped for fakes: one file works, one fails, the loop keeps going
+  const opened = [];
+  B.deps.openFile = async f => { opened.push(f.name); };
+  B.deps.app = () => null;
+  B.deps.quickFix = async () => { if (opened.length === 2) throw new Error('boom'); };
+  B.deps.healthScore = () => '100';
+  B.deps.capture = async () => [{ name: opened[opened.length - 1].replace(/\.\w+$/, '') + '-SHRINK.stl', blob: new w.Blob([new Uint8Array(10)]) }];
+  B.start(); await wait(1500);
+  const st = B.state.items.map(i => i.status).join();
+  ok(st === 'done,failed', 'B4 a failing model is marked and the next one still runs (got ' + st + ')');
+  ok(B.state.results.length === 1 && !page.$('v2BatchZip').disabled, 'B4 the finished model is kept and DOWNLOAD ZIP switches on');
+  ok(!B.state.running, 'B4 the run ends');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

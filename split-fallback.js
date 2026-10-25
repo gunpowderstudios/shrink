@@ -12,7 +12,7 @@ function mmPerUnit() { return window.__shrinkPrint?.mmPerUnit?.() || 1; }
 function partCount() { return window.__shrinkSplit?.partCount?.() || 1; }
 function cutFractions() { return window.__shrinkSplit?.cutFractions?.(partCount()) || []; }
 
-function saveBlob(blob, filename) {
+function saveBlob(blob, filename) { if (window.__shrinkCapture?.(blob, filename)) return;
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download=filename;
   document.body.appendChild(a); a.click(); a.remove();

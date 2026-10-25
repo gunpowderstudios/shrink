@@ -393,7 +393,7 @@ divider.addEventListener('pointerup', e => { draggingDivider = false; try { divi
 /* ------------------------------------------------------------------ */
 /* Export                                                               */
 /* ------------------------------------------------------------------ */
-function saveBlob(blob, filename) {
+function saveBlob(blob, filename) { if (window.__shrinkCapture?.(blob, filename)) return;
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = filename;

@@ -24,7 +24,7 @@ async function loadManifold() {
   return manifoldPromise;
 }
 
-function saveBlob(blob, filename) {
+function saveBlob(blob, filename) { if (window.__shrinkCapture?.(blob, filename)) return;
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = filename;

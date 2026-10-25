@@ -11,7 +11,7 @@ const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 const say = (msg, error = false) => app()?.setStatus?.(msg, error);
 
-function saveBlob(blob, filename) {
+function saveBlob(blob, filename) { if (window.__shrinkCapture?.(blob, filename)) return;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();

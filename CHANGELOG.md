@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.151
+- **BATCH** button (top right, beside RELOAD). Add many STL / OBJ / PLY / GLB files (drop them or choose them), press START BATCH and each one is opened, QUICK-FIXed and exported in turn; DOWNLOAD ZIP then gives every result in one file. A model that fails is marked and the run carries on. STOP AFTER THIS ONE ends it early.
+- A **memory bar** warns before you start: it estimates the biggest model's working memory plus the finished results against the browser's limit (green / amber / red). Red blocks START unless you tick "Try anyway", and a running batch stops itself if the browser reports its memory nearly full.
+- Every `saveBlob` (print-tools, fuse-export, split-print, split-fallback) first offers the file to `window.__shrinkCapture`; that is how BATCH collects downloads instead of saving them one by one. `__shrinkApp.openFile` is now exposed.
+
 ## v2.150
 - New **16K ultra** quality button (and a "Resin 12K / 16K" printer choice) for very fine resin printers: smallest detail 0.018 mm and the surface check tightens from 99% to 99.5%, so SHRINK / QUICK-FIX keep far more triangles. Files get bigger, and a model that stays above 1,000,000 triangles is not fused (the usual size guard).
 

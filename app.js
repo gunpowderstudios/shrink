@@ -986,6 +986,7 @@ window.__shrinkApp = {
   writeDoc: doc => io.writeBinary(doc),
   pruneDoc: doc => doc.transform(prune()),
   replaceSource,
+  openFile,
   get lastReduce() { return lastReduce; },
   get wireframe() { return wireframeEnabled; },
   baseName,
