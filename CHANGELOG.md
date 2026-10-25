@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.166
+- One detail choice for single models and BATCH: the Resin/FDM/Custom cards and the Quality row (Standard, Fine, 16K ultra, Large / fast) are replaced by a single **Printer detail** dropdown (12K/16K, 8K/9K fine, 8K/9K, 2K–4K, FDM, Custom). BATCH uses the same list and the two stay in step. The old buttons remain in the page, hidden, for code and tests.
+- Downloads carry the detail in the name: `name-SHRINK-16K.stl` (also `8K-fine`, `8K`, `4K`, `FDM`, `custom`); split files too (`name-SHRINK-16K-SPLIT2.zip`).
+
 ## v2.165
 - The MODEL HEALTH box keeps one fixed size (its width and height at the moment QUICK-FIX starts) until QUICK-FIX finishes, then goes back to normal sizing.
 
