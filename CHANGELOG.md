@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.181
+- The TURN pad is hidden (it was confusing). Its code and tests stay; delete the `#v2TurnPad{display:none}` rule at the end of `print-v2-ui.css` to bring it back. The BATCH window no longer leaves room for it.
+
 ## v2.180
 - The "MODEL LOADED" strip (with its Change model button) is gone once a model is open; RELOAD does that job. Before a model is loaded the same area is still the drop zone.
 - A BATCH button sits in the top bar right after RELOAD (the load-screen BATCH button stays).
