@@ -1014,7 +1014,7 @@
             <details class="v2-advanced"><summary>Advanced printer settings</summary><div class="v2-advanced-body"><label id="v2CustomPrinter" hidden>Smallest detail to keep (mm)<input id="v2PrinterDetail" type="number" min="0.005" step="0.005" value="0.05"></label><p>Technical users can set the printer's smallest visible detail here. SHRINK uses this when judging whether a change will be visible.</p></div></details>
           </section>
 
-          <details id="v2AdvTools" class="v2-adv-tools">
+          <details id="v2AdvTools" class="v2-adv-tools" open>
             <summary><span>ADVANCED</span><strong>Clay, shrink, fix and fuse</strong><small>QUICK-FIX (top right) does shrink, fix and fuse for you. Open this to use the tools separately or to paint clay.</small></summary>
           <section id="v2ClayCard" class="v2-card v2-clay-card"><div id="v2ClayHost"></div></section>
 

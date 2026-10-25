@@ -37,7 +37,7 @@ function savedPrinterId() {     // the printer last chosen in the main panel (or
   try { const v = JSON.parse(localStorage.getItem('shrink-printer') || 'null'); const p = v && PRINTERS.find(x => x.type === v.type && x.quality === v.quality); if (p) return p.id; } catch { /* nothing saved */ }
   return 'r16';          // nothing saved yet: the highest resolution
 }
-const S = { items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: savedPrinterId(), height: 0 };     // height 0 = keep each model's own size
+const S = { fixing: null, fixingFresh: true, items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: savedPrinterId(), height: 0 };     // height 0 = keep each model's own size
 function applySettings() {
   const p = PRINTERS.find(x => x.id === S.printer) || PRINTERS[2];
   // scoped to the print dashboard: other parts of the page also use data-quality / data-printer attributes
@@ -109,10 +109,31 @@ function add(files) {
   note(bad ? `${bad} file${bad === 1 ? '' : 's'} skipped: only STL, OBJ, PLY and GLB files work.` : '');
   render();
 }
+// A flagged model is opened on its own, with the left panel and the Advanced tools open, so it can be fixed there. While it is
+// the "fixing" model, its next DOWNLOAD still saves normally AND replaces its file in the batch ZIP (the row is updated too).
+function fixingCapture(blob, name) {
+  const it = S.items.find(x => x.id === S.fixing); const a = window.__shrinkApp;
+  if (!it || (a && a.sourceFile && a.sourceFile !== it.file)) return false;       // a different model is open now: ignore
+  if (S.fixingFresh) { S.results = S.results.filter(r => r.source !== it.name); S.fixingFresh = false; }
+  S.results.push({ name, blob, source: it.name });
+  const sc = Number($('v2HealthScore')?.textContent); it.warn = !(Number.isFinite(sc) && sc >= 100);
+  it.msg = Number.isFinite(sc) ? `fixed · health ${sc}/100${it.warn ? ' · still has issues' : ''}` : 'fixed';
+  render(); note(`${it.name}: the downloaded file has replaced the old one in the ZIP.`);
+  setTimeout(() => { S.fixingFresh = true; }, 1500);      // a split export hands over several files at once; a later download replaces them again
+  return false;                                           // false = the file is also saved normally
+}
+function openToFix(id) {
+  if (S.running) return; const it = S.items.find(x => x.id === id); if (!it) return;
+  S.fixing = id; S.fixingFresh = true; window.__shrinkCapture = fixingCapture;
+  note(`Opened ${it.name} on its own. Try FIX IT or Make watertight in the left panel, then DOWNLOAD IT: the fixed file also replaces this one in the ZIP.`);
+  window.__shrinkApp?.openFile?.(it.file);
+  window.__shrinkLeftPanel?.(true);
+  setTimeout(() => { const d = $('v2AdvTools'); if (d) d.open = true; }, 600);
+}
 function remove(id) { if (S.running) return; S.items = S.items.filter(i => i.id !== id); render(); }
 function clear() {
   if (S.running) return;
-  S.items = []; S.results = []; note(''); render();
+  S.items = []; S.results = []; S.fixing = null; if (window.__shrinkCapture === fixingCapture) window.__shrinkCapture = null; note(''); render();
 }
 
 const ICON = { queued: '·', working: '…', done: '✓', failed: '⚠', skipped: '–' };
@@ -121,8 +142,8 @@ function render() {
   const panel = $('v2BatchPanel'); if (!panel) return;
   dock();
   const list = $('v2BatchList');
-  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : ICON[i.status]}</i><span class="n" title="${i.name.replace(/"/g, '&quot;')}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m">${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn ? '<button type="button" class="open" title="Open this model on its own to fix it">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
-  list.querySelectorAll('.open').forEach(b => b.addEventListener('click', () => { const it = S.items.find(x => x.id === Number(b.closest('.v2-batch-row').dataset.id)); if (it) { note(`Opened ${it.name} on its own. Fix it, download it, then come back here.`); window.__shrinkApp?.openFile?.(it.file); } }));
+  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : ICON[i.status]}</i><span class="n" title="${i.name.replace(/"/g, '&quot;')}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m"${i.warn ? ' title="Still not fully clean after QUICK-FIX. It is in the ZIP as it is. Click OPEN, expand the left panel and try FIX IT or Make watertight on it by itself."' : ''}>${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn ? '<button type="button" class="open" title="Opens this model on its own with the left panel open. Try FIX IT or Make watertight, then DOWNLOAD IT: the fixed file replaces this one in the ZIP.">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
+  list.querySelectorAll('.open').forEach(b => b.addEventListener('click', () => openToFix(Number(b.closest('.v2-batch-row').dataset.id))));
   list.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => remove(Number(b.closest('.v2-batch-row').dataset.id))));
   // memory bar: what is still to be processed, plus what is already finished
   const sizes = S.items.filter(i => i.status === 'queued' || i.status === 'working').map(i => i.size);
@@ -180,6 +201,7 @@ function memoryTight() {
 }
 
 async function start() {
+  S.fixing = null; if (window.__shrinkCapture === fixingCapture) window.__shrinkCapture = null;
   if (S.running) return;
   buildPanel(); render();
   if ($('v2BatchStart').disabled) return;

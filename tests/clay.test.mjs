@@ -168,6 +168,17 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(st === 'done,failed', 'B4 a failing model is marked and the next one still runs (got ' + st + ')');
   ok(B.state.results.length === 1 && !page.$('v2BatchZip').disabled, 'B4 the finished model is kept and DOWNLOAD ZIP switches on');
   ok(!B.state.running, 'B4 the run ends');
+  // a model that stays below 100 is flagged, can be opened to fix, and its next download replaces its file in the ZIP
+  B.state.items = []; B.state.results = [];
+  B.add([new w.File([new Uint8Array(10)], 'tarak.stl')]); await wait(50);
+  B.deps.healthScore = () => '65'; B.deps.quickFix = async () => {};
+  B.deps.capture = async () => [{ name: 'tarak-SHRINK-16K.stl', blob: new w.Blob([new Uint8Array(10)]) }];
+  B.start(); await wait(2500);
+  ok(B.state.items[0].warn === true && page.$('v2BatchList').querySelector('.open'), 'B5 a model below 100 is flagged and gets an OPEN button');
+  page.$('v2BatchList').querySelector('.open').click(); await wait(50);
+  const oldBlob = B.state.results[0].blob;
+  const keep = w.__shrinkCapture?.(new w.Blob([new Uint8Array(20)]), 'tarak-SHRINK-16K.stl');
+  ok(keep === false && B.state.results.length === 1 && B.state.results[0].blob !== oldBlob, 'B5 the next download replaces its file in the ZIP and still saves normally');
 }
 
 /* ---- the printer and quality are remembered ---- */
