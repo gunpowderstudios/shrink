@@ -37,8 +37,24 @@
   }
 
   // Downloads are simply <original name>-SHRINK (no height / FIX / FUSE / reduction tags). Split parts keep their -PARTnofN suffix elsewhere.
+  // One detail choice for single and batch (v2.166). batch.js reads this list too.
+  const PRINTER_LIST = [
+    { id: 'r16', label: 'Resin 12K / 16K (0.018 mm, most detail)', tag: '16K', type: 'resin', quality: 'ultra' },
+    { id: 'r8f', label: 'Resin 8K / 9K, fine detail (0.03 mm)', tag: '8K-fine', type: 'resin', quality: 'fine' },
+    { id: 'r8', label: 'Resin 8K / 9K (0.05 mm)', tag: '8K', type: 'resin', quality: 'standard' },
+    { id: 'r4', label: 'Resin 2K–4K (0.1 mm)', tag: '4K', type: 'resin', quality: 'large' },
+    { id: 'fdm', label: 'FDM filament (0.2 mm)', tag: 'FDM', type: 'fdm', quality: 'standard' },
+    { id: 'custom', label: 'Custom (set in Advanced printer settings)', tag: 'custom', type: 'custom', quality: 'standard' }
+  ];
+  window.__shrinkPrinterList = PRINTER_LIST;
+  function currentPrinter() {
+    const d = document.querySelector('.print-v2-dashboard'); if (!d) return PRINTER_LIST[0];
+    const t = d.dataset.printerType || 'resin', q = d.dataset.quality || 'standard';
+    return PRINTER_LIST.find(x => t === 'custom' ? x.type === 'custom' : x.type === t && x.quality === q) || PRINTER_LIST[0];
+  }
+  // The chosen detail goes on the end of the file name (v2.166) so you can tell the versions apart: name-SHRINK-16K.stl
   function downloadStem(base) {
-    return `${cleanBaseName(base)}-SHRINK`;
+    return `${cleanBaseName(base)}-SHRINK-${currentPrinter().tag}`;
   }
 
   window.__shrinkDownloadStem = downloadStem;
@@ -343,7 +359,8 @@
   // The printer type and quality are remembered in this browser (v2.159); a saved choice is put back when the dashboard is built.
   const PRINTER_KEY = 'shrink-printer'; let restoringPrinter = false;
   const savedPrinter = () => { try { const v = JSON.parse(localStorage.getItem(PRINTER_KEY) || 'null'); return v && typeof v === 'object' ? v : null; } catch { return null; } };
-  const savePrinter = () => { if (restoringPrinter || !dashboard) return; try { localStorage.setItem(PRINTER_KEY, JSON.stringify({ type: dashboard.dataset.printerType || 'resin', quality: dashboard.dataset.quality || 'standard' })); } catch { /* private mode: nothing to remember */ } };
+  const syncPrinterSel = () => { const el = document.getElementById('v2PrinterSel'); if (el && dashboard) { const id = currentPrinter().id; if (el.value !== id) el.value = id; } };
+  const savePrinter = () => { syncPrinterSel(); if (restoringPrinter || !dashboard) return; try { localStorage.setItem(PRINTER_KEY, JSON.stringify({ type: dashboard.dataset.printerType || 'resin', quality: dashboard.dataset.quality || 'standard' })); } catch { /* private mode: nothing to remember */ } };
   function choosePrinter(type) {
     dashboard.dataset.printerType = type;
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.classList.toggle('active', b.dataset.printer === type));
@@ -970,10 +987,11 @@
         <div class="v2-left-stack">
           <section class="v2-card v2-setup-card">
             <div class="v2-card-head"><span class="v2-num">1</span><div><h2>Choose your printer & size</h2><p>No model numbers needed — just choose the kind of printer.</p></div></div>
-            <div class="v2-printer-grid">
-              <button type="button" class="v2-choice active" data-printer="resin"><span>💧</span><strong>Resin printer</strong><small>Best for miniatures & fine detail</small></button>
-              <button type="button" class="v2-choice" data-printer="fdm"><span>🧱</span><strong>FDM printer</strong><small>Best for larger, tougher parts</small></button>
-              <button type="button" class="v2-choice" data-printer="custom"><span>⚙️</span><strong>Custom</strong><small>Set your own detail limit</small></button>
+            <label class="v2-printer-pick"><span>Printer detail</span><select id="v2PrinterSel">${PRINTER_LIST.map(x => `<option value="${x.id}">${x.label}</option>`).join('')}</select></label>
+            <div class="v2-legacy-printer" hidden>
+              <button type="button" class="v2-choice active" data-printer="resin"></button>
+              <button type="button" class="v2-choice" data-printer="fdm"></button>
+              <button type="button" class="v2-choice" data-printer="custom"></button>
             </div>
             <div class="v2-size-row">
               <label><span>Finished height</span><div><input id="v2Height" type="number" min="1" max="500" step="1" value="75"><em>mm</em></div></label>
@@ -985,12 +1003,11 @@
               <label><span>Depth</span><div><input id="v2Depth" type="number" min="1" step="0.1" value="" placeholder="–"><em>mm</em></div></label>
               <div class="v2-scale-btns"><button id="v2ScaleDown" type="button" title="Make 10% smaller, in proportion">−10%</button><button id="v2ScaleUp" type="button" title="Make 10% bigger, in proportion">+10%</button></div>
             </div>
-            <div class="v2-quality-row">
-              <span>Quality</span>
-              <button type="button" class="active" data-quality="standard">Standard</button>
-              <button type="button" data-quality="fine">Fine detail</button>
-              <button type="button" data-quality="ultra" title="For 12K / 16K resin printers (about 18 micron pixels). Keeps far more triangles, so files are bigger.">16K ultra</button>
-              <button type="button" data-quality="large">Large / fast</button>
+            <div class="v2-quality-row v2-legacy-printer" hidden>
+              <button type="button" class="active" data-quality="standard"></button>
+              <button type="button" data-quality="fine"></button>
+              <button type="button" data-quality="ultra"></button>
+              <button type="button" data-quality="large"></button>
             </div>
             <div id="v2Step1Summary" class="v2-summary">Resin · 75 mm high</div>
             <details class="v2-advanced"><summary>Advanced printer settings</summary><div class="v2-advanced-body"><label id="v2CustomPrinter" hidden>Smallest detail to keep (mm)<input id="v2PrinterDetail" type="number" min="0.005" step="0.005" value="0.05"></label><p>Technical users can set the printer's smallest visible detail here. SHRINK uses this when judging whether a change will be visible.</p></div></details>
@@ -1061,6 +1078,7 @@
 
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
+    $('v2PrinterSel').addEventListener('change', e => { const x = PRINTER_LIST.find(y => y.id === e.target.value); if (!x) return; choosePrinter(x.type); if (x.type !== 'custom') setQuality(x.quality); syncPrinterSel(); });
     $('v2Height').addEventListener('input', updateHeight);
     $('v2Width').addEventListener('change', () => dimInput('x'));
     $('v2Depth').addEventListener('change', () => dimInput('z'));

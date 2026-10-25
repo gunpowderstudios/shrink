@@ -540,3 +540,5 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-health-working b{position:relative;font-size:13px;letter-spacing:.3px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 @keyframes v2-working-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.v2-working-disk{animation-duration:3s}}
+.v2-printer-pick{display:block;margin-bottom:14px}.v2-printer-pick>span{display:block;font-size:11px;font-weight:800;color:#cdd6e2;margin-bottom:6px}.v2-printer-pick select{width:100%;border:1px solid #39485d;border-radius:11px;background:#17202d;color:#fff;padding:11px 10px;font-weight:800;font-size:14px}
+.v2-legacy-printer[hidden]{display:none!important}

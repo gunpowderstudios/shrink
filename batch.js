@@ -26,7 +26,7 @@ function estimate(sizes, budget = memoryBudget()) {
 }
 
 // Print settings used for EVERY model in the batch (set here, before any file is loaded). Each maps onto the real printer / quality buttons.
-const PRINTERS = [
+const PRINTERS = (window.__shrinkPrinterList || []).filter(x => x.type !== 'custom').length ? window.__shrinkPrinterList.filter(x => x.type !== 'custom') : [
   { id: 'r16', label: 'Resin 12K / 16K (0.018 mm, most detail)', type: 'resin', quality: 'ultra' },
   { id: 'r8f', label: 'Resin 8K / 9K, fine detail (0.03 mm)', type: 'resin', quality: 'fine' },
   { id: 'r8', label: 'Resin 8K / 9K (0.05 mm)', type: 'resin', quality: 'standard' },

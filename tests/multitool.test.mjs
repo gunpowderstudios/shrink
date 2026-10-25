@@ -30,7 +30,7 @@ await block(1, async () => {
   ok(await waitFor(() => zipOf(page)), 'A1 flat 2 parts: DOWNLOAD IT produced a ZIP');
   ok(page.$('fuseSolidToggle').checked === false, 'A1 DOWNLOAD IT did not switch Fuse on');
   const r = await readParts(page);
-  ok(r.zip.name === 'dwarf-SHRINK-SPLIT2.zip' && r.names.join() === 'dwarf-SHRINK-PART1of2.stl,dwarf-SHRINK-PART2of2.stl', 'A1 file names: ' + r.zip.name + ' / ' + r.names.join(' '));
+  ok(r.zip.name === 'dwarf-SHRINK-16K-SPLIT2.zip' && r.names.join() === 'dwarf-SHRINK-16K-PART1of2.stl,dwarf-SHRINK-16K-PART2of2.stl', 'A1 file names: ' + r.zip.name + ' / ' + r.names.join(' '));
   const [p1, p2] = r.parts;
   ok(Math.abs(p1.stl.maxZ - 20) < 0.05 && Math.abs(p2.stl.minZ - 20) < 0.05, `A1 cut at 50% of the height (lower part tops out at ${p1.stl.maxZ.toFixed(2)}, upper starts at ${p2.stl.minZ.toFixed(2)})`);
   ok((await stlHealth(p1.stl)).clean && (await stlHealth(p2.stl)).clean, 'A1 both sections are watertight (no open, tangled or flipped edges)');
@@ -153,7 +153,7 @@ await block(12, async () => {
 await block(13, async () => {
   const page = await makePage({ model: models.multi(), heightMm: 50 });
   page.$('v2DownloadBtn').click(); await wait(800);
-  ok(page.$('fuseSolidToggle').checked === false && !zipOf(page) && !page.downloads.some(d => /SHRINK\.stl$/.test(d.name)), 'E one-STL download does not fuse or split by itself (it is left to the normal export)');
+  ok(page.$('fuseSolidToggle').checked === false && !zipOf(page) && !page.downloads.some(d => /SHRINK-[\w-]+\.stl$/.test(d.name)), 'E one-STL download does not fuse or split by itself (it is left to the normal export)');
 });
 
 /* ============ F. the legacy Fuse toggle ============ */
@@ -163,12 +163,12 @@ await block(14, async () => {
   await joint(page, 'flat'); await pick(page, '2');
   page.$('saveStlBtn').click();
   ok(await waitFor(() => zipOf(page)), 'F split wins over a stale Fuse toggle');
-  ok(!page.downloads.some(d => /SHRINK\.stl$/.test(d.name)), 'F no fused STL was exported instead');
+  ok(!page.downloads.some(d => /SHRINK-[\w-]+\.stl$/.test(d.name)), 'F no fused STL was exported instead');
 });
 await block(15, async () => {
   const page = await makePage({ model: models.multi(), heightMm: 50 });
   page.$('fuseSolidToggle').checked = true; page.$('saveStlBtn').click();
-  ok(await waitFor(() => page.downloads.some(d => /SHRINK\.stl$/.test(d.name))), 'F Fuse export of a multi-piece model succeeds (separate closed pieces are valid)');
+  ok(await waitFor(() => page.downloads.some(d => /SHRINK-[\w-]+\.stl$/.test(d.name))), 'F Fuse export of a multi-piece model succeeds (separate closed pieces are valid)');
   ok(page.statuses.some(s => /3 separate watertight pieces/.test(s.msg)) && !page.statuses.some(s => /Fuse failed/.test(s.msg)), 'F it reports the pieces instead of failing');
 });
 
