@@ -775,6 +775,8 @@
     return true;
   }
   window.__shrinkFaceFront = faceFront;
+  // The same finishing view QUICK-FIX ends with, for a model that was just opened (BATCH row click): centred on the plate, XYZ arrows, front view.
+  window.__shrinkPlatePreview = () => { try { const cr = centreOnBed(); if (cr.ok) showBedGuide(); faceFront(); return true; } catch (e) { console.warn('plate preview', e); return false; } };
   const FIX_FIRST_MAX = 600000;
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');

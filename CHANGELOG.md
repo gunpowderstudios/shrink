@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.175
+- BATCH: viewing a model from the list (click its name) now ends with the same finishing view as QUICK-FIX: centred on the plate, X/Y/Z arrows and the front view (`window.__shrinkPlatePreview`).
+
 ## v2.174
 - BATCH: click a model name in the list to load it in the main window (the processed STL/OBJ/PLY if there is one, otherwise the original) so you can rotate it and check its size. Not while a batch is running.
 

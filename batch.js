@@ -123,12 +123,14 @@ function fixingCapture(blob, name) {
   return false;                                           // false = the file is also saved normally
 }
 // Click a row to look at it in the main window: the processed file if there is one (STL/OBJ/PLY), otherwise the original.
-function viewItem(id) {
+async function viewItem(id) {
   if (S.running) return; const it = S.items.find(x => x.id === id); if (!it) return;
   const res = S.results.filter(r => r.source === it.name && /\.(stl|obj|ply)$/i.test(r.name))[0];
   const file = res ? new File([res.blob], res.name, { type: res.blob.type || 'model/stl' }) : it.file;
   note(res ? `Showing the processed ${res.name} in the main window: rotate it, check its size, press DOWNLOAD there if you want it on its own.` : `Showing the original ${it.name} (no processed file to show).`);
-  window.__shrinkApp?.openFile?.(file);
+  try { await window.__shrinkApp?.openFile?.(file); } catch { /* the note above already says what was opened */ }
+  await wait(900);                                  // let the model settle and its health check start
+  window.__shrinkPlatePreview?.();                  // plate, X/Y/Z arrows and front view, like the end of QUICK-FIX
 }
 function openToFix(id) {
   if (S.running) return; const it = S.items.find(x => x.id === id); if (!it) return;
