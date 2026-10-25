@@ -78,12 +78,20 @@ async function makeWatertightCopy(){
     }
     btn.textContent='Voxelising…';
     app()?.setStatus?.('Rebuilding the current model as one watertight voxel skin. This can take a little while…',false);
-    const result=await mod.makeWatertight(model,quality,msg=>app()?.setStatus?.(msg,false));
-    root=result.root;
-    // The rebuilt skin has to pass the same health check as everything else before it replaces the current model.
-    const health=healthOfModel(THREE,root);
-    if(!health.clean){
-      const err=new Error(`The rebuilt surface still has ${health.openEdges} open, ${health.pinchedEdges} pinched and ${health.flippedEdges} flipped edges, so nothing was changed.`);
+    // Try the chosen detail first; if the rebuilt skin is not clean (High often leaves a pinched edge), quietly try the others before giving up.
+    const names={high:'High',balanced:'Balanced',fast:'Fast'},order=[quality,...['balanced','fast','high'].filter(q=>q!==quality)],tried=[];
+    let health=null;
+    for(const q of order){
+      tried.push(names[q]||q); btn.textContent=`Rebuilding (${names[q]||q})…`;
+      const msgEl=$('printDiagnosticMessage'); if(msgEl&&tried.length>1)msgEl.textContent=`Still working: ${tried.slice(0,-1).join(', ')} left a pinched edge, trying ${names[q]||q}…`;
+      let res; try{ res=await mod.makeWatertight(model,q,msg=>app()?.setStatus?.(msg,false)); }catch(e){ if(q===order[order.length-1]||e?.code==='REMESH_TOO_HEAVY'||e?.code==='REMESH_LEAKY')throw e; continue; }
+      disposeRoot(root); root=res.root;
+      // The rebuilt skin has to pass the same health check as everything else before it replaces the current model.
+      health=healthOfModel(THREE,root);
+      if(health.clean)break;
+    }
+    if(!health||!health.clean){
+      const err=new Error(`The rebuilt surface still has ${health?.openEdges??'?'} open, ${health?.pinchedEdges??'?'} pinched and ${health?.flippedEdges??'?'} flipped edges (tried ${tried.join(', ')}), so nothing was changed.`);
       err.code='REMESH_UNHEALTHY'; throw err;
     }
     // Same road every tool takes: the rebuilt model becomes the current working model, is shown in the viewer

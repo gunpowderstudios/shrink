@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.170
+- The left column (printer detail, size, Advanced tools, Download) now folds closed to a slim tab on the left edge so the viewer gets the whole width. Click the tab to open it and "Hide panel" to close it; the choice is remembered in this browser. It starts closed.
+- Make watertight: if the rebuilt skin is not clean at the chosen Keep detail (High often leaves a pinched edge), it now quietly tries Balanced, Fast and High in turn before giving up, shows what it is trying, and the failure message lists what was tried. Before, one failed attempt just repeated the same message and looked like nothing happened.
+
 ## v2.169
 - BATCH: a model flagged as still unhealthy gets an **OPEN** button in the list. It opens that file in the main viewer (the original file is kept in memory, no re-upload) so you can QUICK-FIX it again, use Clay/TURN and download it on its own.
 

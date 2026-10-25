@@ -985,6 +985,7 @@
     dashboard.innerHTML = `
       <div class="v2-top-grid">
         <div class="v2-left-stack">
+          <button type="button" id="v2LeftToggle" class="v2-left-toggle" aria-expanded="false" title="Show or hide the printer, size and advanced tools"></button>
           <section class="v2-card v2-setup-card">
             <div class="v2-card-head"><span class="v2-num">1</span><div><h2>Choose your printer & size</h2><p>No model numbers needed — just choose the kind of printer.</p></div></div>
             <label class="v2-printer-pick"><span>Printer detail</span><select id="v2PrinterSel">${PRINTER_LIST.map(x => `<option value="${x.id}">${x.label}</option>`).join('')}</select></label>
@@ -1076,6 +1077,13 @@
     if (!workingModel) setWorkingModel(app()?.originalModel);
     setTimeout(updateHealthCard, 80);
 
+    // The left column (printer, size, advanced tools) starts folded away so the viewer gets the whole width; the choice is remembered (v2.170).
+    { const KEY = 'shrink-left-panel', tg = $('v2LeftToggle');
+      const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = open ? '◂ Hide panel' : '▸ Printer, size & tools'; };
+      let open = false; try { open = localStorage.getItem(KEY) === 'open'; } catch { /* no storage */ }
+      setLeft(open);
+      tg.addEventListener('click', () => { const o = dashboard.dataset.left !== 'open'; setLeft(o); try { localStorage.setItem(KEY, o ? 'open' : 'closed'); } catch { /* private mode */ } window.dispatchEvent(new Event('resize')); });
+      window.__shrinkLeftPanel = setLeft; }
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
     $('v2PrinterSel').addEventListener('change', e => { const x = PRINTER_LIST.find(y => y.id === e.target.value); if (!x) return; choosePrinter(x.type); if (x.type !== 'custom') setQuality(x.quality); syncPrinterSel(); });
