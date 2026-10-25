@@ -312,7 +312,7 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - Viewer stays in the fixed right-hand desktop column in Simple Print mode.
 - Simple control/preflight cards use natural height in the fixed left-hand column.
 - Avoid large dead vertical gaps.
-- Mobile warning is intentionally cheeky but non-blocking.
+- (v2.158) Phones and tablets are blocked by a full-screen message from `mobile-warning.js` (no dismiss). It is a deliberate product decision by Tim; do not make it dismissible without asking.
 
 ## Important files
 

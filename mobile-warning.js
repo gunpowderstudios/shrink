@@ -1,39 +1,34 @@
-// SHRINK 3D v2.02 — friendly mobile/tablet warning.
+// SHRINK 3D (v2.158) — phones and tablets are blocked with a big, friendly message: SHRINK needs a laptop or desktop.
+// The test is the same as before: a mobile browser, or a touch screen with a small display. A narrow desktop window is NOT blocked.
 (() => {
   const isTouchDevice = navigator.maxTouchPoints > 1;
   const isSmallScreen = window.matchMedia('(max-width: 900px)').matches;
   const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
   if (!(mobileUA || (isTouchDevice && isSmallScreen))) return;
-  if (document.getElementById('shrinkMobileWarning')) return;
+  if (document.getElementById('shrinkMobileBlock')) return;
 
-  const banner = document.createElement('div');
-  banner.id = 'shrinkMobileWarning';
-  banner.setAttribute('role', 'note');
-  banner.innerHTML = `
-    <div class="mobile-warning-icon">💻</div>
-    <div class="mobile-warning-copy">
-      <strong>Please use a laptop or desktop for better shrinking!</strong>
-      <span>Phones and tablets can open SHRINK 3D, but big models will struggle.</span>
-      <small>Big 3D files, fusing, remeshing and splitting need more memory and run much better on desktop.</small>
-    </div>
-    <button type="button" aria-label="Dismiss mobile warning">×</button>`;
-
-  const header = document.querySelector('.topbar');
-  header?.insertAdjacentElement('afterend', banner);
-
+  const wall = document.createElement('div');
+  wall.id = 'shrinkMobileBlock';
+  wall.setAttribute('role', 'alertdialog');
+  wall.setAttribute('aria-modal', 'true');
+  wall.innerHTML = `
+    <div class="mb-card">
+      <div class="mb-icon">💻</div>
+      <h1>Please use a laptop or desktop for better shrinking!</h1>
+      <p>SHRINK 3D repairs and shrinks big 3D models, and that needs far more memory and power than a phone or tablet has.</p>
+      <p class="mb-small">Open this page on a laptop or desktop computer and it will work properly.</p>
+    </div>`;
   const style = document.createElement('style');
   style.textContent = `
-    #shrinkMobileWarning{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:12px 14px;border:1px solid #4e87bb;border-radius:14px;background:linear-gradient(135deg,rgba(31,91,145,.30),rgba(12,26,39,.92));box-shadow:0 12px 34px rgba(0,0,0,.24);color:#fff}
-    #shrinkMobileWarning .mobile-warning-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:12px;background:#267ed0;font-size:23px}
-    #shrinkMobileWarning .mobile-warning-copy{min-width:0;flex:1}
-    #shrinkMobileWarning strong,#shrinkMobileWarning span,#shrinkMobileWarning small{display:block}
-    #shrinkMobileWarning strong{font-size:15px;line-height:1.2}
-    #shrinkMobileWarning span{margin-top:2px;font-size:13px;font-weight:700;color:#d7ebff}
-    #shrinkMobileWarning small{margin-top:3px;font-size:10.5px;line-height:1.35;color:#9db8cf}
-    #shrinkMobileWarning button{appearance:none;border:0;background:transparent;color:#9db8cf;font-size:26px;line-height:1;cursor:pointer;padding:4px 5px}
-    #shrinkMobileWarning button:hover{color:#fff}
-    @media(max-width:520px){#shrinkMobileWarning{align-items:flex-start;padding:11px 12px}#shrinkMobileWarning .mobile-warning-icon{width:38px;height:38px;flex-basis:38px;font-size:20px}#shrinkMobileWarning strong{font-size:14px}#shrinkMobileWarning span{font-size:12px}}
+    #shrinkMobileBlock{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;overflow:auto;background:radial-gradient(circle at 50% 20%,#123a5c,#06101a 70%);color:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center}
+    #shrinkMobileBlock .mb-card{max-width:520px;width:100%}
+    #shrinkMobileBlock .mb-icon{font-size:clamp(84px,30vw,150px);line-height:1;margin-bottom:18px}
+    #shrinkMobileBlock h1{margin:0 0 18px;font-size:clamp(30px,9vw,46px);line-height:1.15;font-weight:900;letter-spacing:-.5px}
+    #shrinkMobileBlock p{margin:0 0 14px;font-size:clamp(18px,5vw,22px);line-height:1.4;color:#d7ebff}
+    #shrinkMobileBlock .mb-small{font-size:clamp(15px,4.2vw,18px);color:#9db8cf}
+    html.shrink-mobile-blocked,html.shrink-mobile-blocked body{overflow:hidden!important}
   `;
   document.head.appendChild(style);
-  banner.querySelector('button')?.addEventListener('click', () => banner.remove());
+  document.documentElement.classList.add('shrink-mobile-blocked');
+  document.body.appendChild(wall);
 })();

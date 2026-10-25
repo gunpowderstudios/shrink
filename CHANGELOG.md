@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.158
+- **Phones and tablets are blocked** with a full-screen, non-dismissible message in big type: "Please use a laptop or desktop for better shrinking!" Detection is unchanged (a mobile browser, or a small touch screen); a narrow desktop window is not blocked. This replaces the small dismissible note.
+
 ## v2.157
 - The BATCH window now sits at the bottom-right of the viewer; the MODEL HEALTH box stays bottom-left.
 
