@@ -61,13 +61,29 @@
 
   // Matrix-style rain of 0s and 1s in the MODEL HEALTH box while QUICK-FIX works (v2.176)
   let rainTimer = null;
-  function setWorking(on) {
-    const hc = document.getElementById('v2HealthCard'); if (!hc) return;
+  // Reference-counted: nested tools (QUICK-FIX runs shrink, fix, fuse) keep the rain going until the last one ends.
+  // A delay lets quick things (the health check) finish before the rain shows, so it does not flash.
+  let workCount = 0, workTimer = null, workShown = false;
+  function setWorking(on, delayMs = 0) {
     if (on) {
-      const r = hc.getBoundingClientRect(); hc.style.width = r.width + 'px'; hc.style.height = Math.max(r.height, 150) + 'px'; hc.dataset.working = '1';
-      startRain(hc);
-    } else { stopRain(); hc.dataset.working = ''; hc.style.width = ''; hc.style.height = ''; }
+      workCount++;
+      if (workShown || workTimer) return;
+      if (delayMs > 0) workTimer = setTimeout(() => { workTimer = null; if (workCount > 0) showWork(); }, delayMs); else showWork();
+    } else {
+      workCount = Math.max(0, workCount - 1);
+      if (workCount === 0) { if (workTimer) { clearTimeout(workTimer); workTimer = null; } hideWork(); }
+    }
   }
+  function showWork() {
+    const hc = document.getElementById('v2HealthCard'); if (!hc) return;
+    const r = hc.getBoundingClientRect(); hc.style.width = r.width + 'px'; hc.style.height = Math.max(r.height, 150) + 'px'; hc.dataset.working = '1'; workShown = true;
+    startRain(hc);
+  }
+  function hideWork() {
+    stopRain(); workShown = false;
+    const hc = document.getElementById('v2HealthCard'); if (hc) { hc.dataset.working = ''; hc.style.width = ''; hc.style.height = ''; }
+  }
+  window.__shrinkWork = setWorking;      // other modules (Make watertight) call this around their own long jobs
   function startRain(hc) {
     stopRain();
     const cv = hc.querySelector('.v2-working-rain'), ctx = cv?.getContext?.('2d'); if (!ctx) return;
@@ -203,7 +219,8 @@
 
   // QUICK-FIX is grey and unclickable (like DOWNLOAD) while the health check runs and turns green when it has finished, so it is clear when to press it (v2.148).
   const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; } };
-  async function updateHealthCard() {
+  async function updateHealthCard(...a) { setWorking(true, 350); try { return await updateHealthCardInner(...a); } finally { setWorking(false); } }
+  async function updateHealthCardInner() {
     updateSizeWarning(); ensureTurnPad();
     const card = ensureHealthCard();
     const model = healthModel();
@@ -257,7 +274,8 @@
     progress($('v2FixCard'), pct, text);
     await paintNow();
   }
-  async function fixHealthModel() {
+  async function fixHealthModel(...a) { setWorking(true, 0); try { return await fixHealthModelInner(...a); } finally { setWorking(false); } }
+  async function fixHealthModelInner() {
     const big = $('v2FixBigBtn');
     const model = healthModel();
     if (!big || !model || big.disabled) return;
@@ -436,7 +454,8 @@
   }
 
   const FUSE_MAX_TRIANGLES = 1000000;
-  async function fuseCheck() {
+  async function fuseCheck(...a) { setWorking(true, 0); try { return await fuseCheckInner(...a); } finally { setWorking(false); } }
+  async function fuseCheckInner() {
     const btn = $('v2FuseBtn');
     const card = $('v2FuseCard');
     if (!btn || btn.disabled) return;
@@ -495,7 +514,8 @@
     }
   }
 
-  async function shrinkModel() {
+  async function shrinkModel(...a) { setWorking(true, 0); try { return await shrinkModelInner(...a); } finally { setWorking(false); } }
+  async function shrinkModelInner() {
     const source = $('autoBtn');
     const btn = $('v2ShrinkBtn');
     const card = $('v2ShrinkCard');

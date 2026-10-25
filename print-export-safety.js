@@ -62,7 +62,7 @@ function saveBlob(blob,filename){const a=document.createElement('a');a.href=URL.
 async function makeWatertightCopy(){
   const btn=$('makeWatertightBtn'),model=sourceModel(); if(!btn||!model)return;
   const quality=$('remeshQuality')?.value||'balanced'; const old=btn.textContent; btn.disabled=true; btn.textContent='Checking…';
-  let root=null,installed=false;
+  let root=null,installed=false; window.__shrinkWork?.(true);
   const disposeRoot=r=>r?.traverse?.(o=>{if(o.isMesh){o.geometry?.dispose?.();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m?.dispose?.());}});
   try{
     const mod=await import(`./watertight-remesh.js?v=${VERSION}`);
@@ -126,7 +126,7 @@ async function makeWatertightCopy(){
       if(msg)msg.textContent='SHRINK could not rebuild this model automatically. Try Fast detail, or repair/remesh it in your modelling software.';
     }
   }
-  finally{ if(!installed)disposeRoot(root); btn.disabled=false; btn.textContent=old; }
+  finally{ window.__shrinkWork?.(false); if(!installed)disposeRoot(root); btn.disabled=false; btn.textContent=old; }
 }
 
 function normalExport(kind,message){if(fallbackBusy)return;fallbackBusy=true;const fuse=$('fuseSolidToggle'),split=$('splitMode'),prevFuse=fuse?.checked,prevSplit=split?.value;if(fuse)fuse.checked=false;if(split)split.value='off';setTimeout(()=>{const btn=kind==='obj'?$('saveObjBtn'):$('saveStlBtn');btn?.click();setTimeout(()=>{app()?.setStatus?.(message,false);if(fuse&&prevFuse!=null)fuse.checked=prevFuse;if(split&&prevSplit!=null){split.value=prevSplit;split.dispatchEvent(new Event('change',{bubbles:true}));}fallbackBusy=false;},60);},0);}

@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.178
+- The Matrix rain in the MODEL HEALTH box now shows whenever SHRINK is working, not only during QUICK-FIX: SHRINK IT, FIX IT, FUSE IT, Make watertight and any health check that takes longer than about a third of a second. It is counted, so nested steps keep it running until the last one ends.
+
 ## v2.177
 - BATCH window: the × close button is gone. Click the title bar (or the little arrow) to fold the window up to just its header, and again to open it. It is open by default.
 
