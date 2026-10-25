@@ -116,5 +116,16 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(qb.dataset.state === 'ready' && !qb.disabled, 'Q1 and goes green once the check has finished');
 }
 
+/* ---- 16K quality ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(300);
+  const u = w.document.querySelector('[data-quality="ultra"]');
+  ok(!!u, 'U1 a 16K ultra quality button exists');
+  u.click(); await wait(50);
+  ok(Number(w.document.getElementById('printerDetailMm').value) === 0.018 && w.__shrinkStrict === 'p995', 'U1 16K sets the detail limit to 0.018 mm and the strict 99.5% surface check');
+  w.document.querySelector('[data-quality="standard"]').click(); await wait(50);
+  ok(Number(w.document.getElementById('printerDetailMm').value) === 0.05 && !w.__shrinkStrict, 'U1 Standard puts both back');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

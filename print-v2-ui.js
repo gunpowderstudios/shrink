@@ -354,7 +354,9 @@
     const type = dashboard.dataset.printerType || 'resin';
     let detail = type === 'fdm' ? 0.2 : 0.05;
     if (kind === 'fine') detail = type === 'fdm' ? 0.15 : 0.03;
+    if (kind === 'ultra') detail = type === 'fdm' ? 0.1 : 0.018;     // 16K resin: about 18 micron pixels
     if (kind === 'large') detail = type === 'fdm' ? 0.3 : 0.1;
+    window.__shrinkStrict = kind === 'ultra' ? 'p995' : undefined;     // 16K also holds the last 0.5% of the surface to the limit
     setNative('printerPreset', 'custom');
     setNative('printerDetailMm', detail, 'input');
     const adv = $('v2PrinterDetail'); if (adv) adv.value = String(detail);
@@ -917,6 +919,7 @@
               <span>Quality</span>
               <button type="button" class="active" data-quality="standard">Standard</button>
               <button type="button" data-quality="fine">Fine detail</button>
+              <button type="button" data-quality="ultra" title="For 12K / 16K resin printers (about 18 micron pixels). Keeps far more triangles, so files are bigger.">16K ultra</button>
               <button type="button" data-quality="large">Large / fast</button>
             </div>
             <div id="v2Step1Summary" class="v2-summary">Resin · 75 mm high</div>
