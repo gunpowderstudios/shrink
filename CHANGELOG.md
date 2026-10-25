@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.184
+- The green BATCH button on the load screen is gone. BATCH lives in the top bar next to RELOAD (it is there before a model is loaded too).
+
 ## v2.183
 - BATCH: a flagged model now gets a plain amber note under its row saying what is NOT fixed (e.g. "13 non-manifold edges") and the three steps: OPEN it, press FIX IT (or Make watertight), then DOWNLOAD. Once the model open in the main window reaches 100/100 the note turns green and says to press DOWNLOAD (top right) to put the fixed file in the ZIP. It also says the ZIP already holds the file if you would rather ignore it.
 
