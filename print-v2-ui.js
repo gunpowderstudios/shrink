@@ -59,6 +59,36 @@
 
   window.__shrinkDownloadStem = downloadStem;
 
+  // Matrix-style rain of 0s and 1s in the MODEL HEALTH box while QUICK-FIX works (v2.176)
+  let rainTimer = null;
+  function setWorking(on) {
+    const hc = document.getElementById('v2HealthCard'); if (!hc) return;
+    if (on) {
+      const r = hc.getBoundingClientRect(); hc.style.width = r.width + 'px'; hc.style.height = Math.max(r.height, 150) + 'px'; hc.dataset.working = '1';
+      startRain(hc);
+    } else { stopRain(); hc.dataset.working = ''; hc.style.width = ''; hc.style.height = ''; }
+  }
+  function startRain(hc) {
+    stopRain();
+    const cv = hc.querySelector('.v2-working-rain'), ctx = cv?.getContext?.('2d'); if (!ctx) return;
+    const W = Math.max(60, Math.round(hc.clientWidth)), H = Math.max(60, Math.round(hc.clientHeight)), size = 13;
+    cv.width = W; cv.height = H;
+    const cols = Math.ceil(W / size), drops = Array.from({ length: cols }, () => -Math.floor(Math.random() * H / size));
+    ctx.fillStyle = '#06100d'; ctx.fillRect(0, 0, W, H); ctx.font = `bold ${size}px monospace`;
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    const tick = () => {
+      ctx.fillStyle = 'rgba(6,16,13,.16)'; ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < cols; i++) {
+        const y = drops[i] * size;
+        ctx.fillStyle = 'rgba(39,194,125,.85)'; ctx.fillText(Math.random() < .5 ? '0' : '1', i * size, y - size);
+        ctx.fillStyle = '#d6ffe6'; ctx.fillText(Math.random() < .5 ? '0' : '1', i * size, y);
+        if (y > H && Math.random() > .96) drops[i] = 0; else drops[i]++;
+      }
+    };
+    tick(); if (!still) rainTimer = setInterval(tick, 60);
+  }
+  function stopRain() { if (rainTimer) { clearInterval(rainTimer); rainTimer = null; } }
+
 
   // Make a tool's result the new current working model: show it, keep the camera, tell the rest of the app,
   // record the change chip and clear the red warning. Fix It, Make watertight and any future tool go through here.
@@ -147,7 +177,7 @@
       <div id="v2HealthChanges" class="v2-health-changes"><small>CHANGES</small><div class="v2-change-none">None yet</div></div>
       <div id="v2FixProgress" class="v2-fix-progress" hidden><div class="v2-fix-bar"><i id="v2FixFill"></i></div><small id="v2FixLabel"></small></div>
       <div id="v2MagicNote" class="v2-magic-note" role="status" hidden></div>
-      <div class="v2-health-working" aria-live="polite"><span class="v2-working-disk" aria-hidden="true"></span><b>Working…</b></div>
+      <div class="v2-health-working" aria-live="polite"><canvas class="v2-working-rain" aria-hidden="true"></canvas><b>Working…</b></div>
     `;
     viewer.appendChild(card);
     $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
@@ -781,7 +811,7 @@
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
-    btn.disabled = true; btn.dataset.busy = '1'; { const hc = $('v2HealthCard'); if (hc) { const r = hc.getBoundingClientRect(); hc.style.width = r.width + 'px'; hc.style.height = Math.max(r.height, 150) + 'px'; hc.dataset.working = '1'; } } const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
+    btn.disabled = true; btn.dataset.busy = '1'; setWorking(true); const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
     const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
@@ -831,7 +861,7 @@
       done('warn', '⚠', `Stopped: ${err.message || err}`);
     } finally {
       try { await updateHealthCard(); } catch (e) { console.warn('health refresh', e); }      // show the final result in one go, not the in-between checks
-      { const hc = $('v2HealthCard'); if (hc) { hc.dataset.working = ''; hc.style.width = ''; hc.style.height = ''; } }
+      setWorking(false);
       delete btn.dataset.busy; btn.disabled = false; btn.textContent = label;
     }
   }

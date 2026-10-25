@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.176
+- The "Working…" spinner in the MODEL HEALTH box is now Matrix-style green 0s and 1s raining down the box, with "Working…" in a glowing pill in the middle (still at one fixed size until QUICK-FIX finishes; static frame if the computer is set to reduce motion).
+
 ## v2.175
 - BATCH: viewing a model from the list (click its name) now ends with the same finishing view as QUICK-FIX: centred on the plate, X/Y/Z arrows and the front view (`window.__shrinkPlatePreview`).
 

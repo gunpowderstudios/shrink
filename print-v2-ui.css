@@ -536,10 +536,8 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-health-card[data-working="1"]{box-sizing:border-box}
 .v2-health-card[data-working="1"]>*:not(.v2-health-working){visibility:hidden}
 .v2-health-card[data-working="1"] .v2-health-working{display:flex;position:absolute;inset:0;align-items:center;justify-content:center;visibility:visible}
-.v2-working-disk{position:absolute;width:96px;height:96px;border-radius:50%;background:conic-gradient(from 0deg,rgba(39,194,125,0) 0%,rgba(39,194,125,.25) 35%,#27c27d 100%);animation:v2-working-spin 1s linear infinite}
-.v2-health-working b{position:relative;font-size:13px;letter-spacing:.3px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6)}
-@keyframes v2-working-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.v2-working-disk{animation-duration:3s}}
+.v2-working-rain{position:absolute;inset:0;width:100%;height:100%;border-radius:inherit;background:#06100d}
+.v2-health-working b{position:relative;font-size:14px;letter-spacing:.4px;color:#eafff3;padding:6px 14px;border-radius:999px;background:rgba(6,16,13,.78);border:1px solid rgba(39,194,125,.55);text-shadow:0 0 8px rgba(39,194,125,.9)}
 .v2-printer-pick{display:block;margin-bottom:14px}.v2-printer-pick>span{display:block;font-size:11px;font-weight:800;color:#cdd6e2;margin-bottom:6px}.v2-printer-pick select{width:100%;border:1px solid #39485d;border-radius:11px;background:#17202d;color:#fff;padding:11px 10px;font-weight:800;font-size:14px}
 .v2-legacy-printer[hidden]{display:none!important}
 .v2-batch-mem[data-level="green"]{display:none}

@@ -255,7 +255,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
   const card = page.$('v2HealthCard'); let seen = false;
-  ok(!!card.querySelector('.v2-health-working .v2-working-disk') && /Working/.test(card.querySelector('.v2-health-working').textContent), 'H1 the health box has a rotating disk with the word Working…');
+  ok(!!card.querySelector('.v2-health-working .v2-working-rain') && /Working/.test(card.querySelector('.v2-health-working').textContent), 'H1 the health box has a matrix rain with the word Working…');
   const mo = new w.MutationObserver(() => { if (card.dataset.working === '1') seen = true; }); mo.observe(card, { attributes: true });
   page.$('v2MagicBtn').click(); await wait(2500);
   ok(seen || card.dataset.working !== '1', 'H1 the disk shows while QUICK-FIX works');
