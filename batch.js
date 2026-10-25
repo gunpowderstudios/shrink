@@ -39,7 +39,7 @@ function buildPanel() {
     <label class="v2-check v2-batch-try" id="v2BatchTryRow" hidden><input id="v2BatchTry" type="checkbox"> Try anyway (the tab may crash)</label>
     <div class="v2-batch-actions"><button id="v2BatchStart" type="button" class="v2-magic">START BATCH</button><button id="v2BatchStop" type="button" class="v2-magic v2-magic-reset" hidden>STOP AFTER THIS ONE</button><button id="v2BatchZip" type="button" class="v2-magic v2-magic-dl" disabled>DOWNLOAD ZIP</button><button id="v2BatchClear" type="button" class="v2-magic v2-magic-reset">CLEAR</button></div>
     <div id="v2BatchNote" class="v2-batch-note"></div>`;
-  document.body.appendChild(p);
+  ($('v2HealthCard') || document.body).appendChild(p);      // docked above the MODEL HEALTH box (v2.152)
   $('v2BatchClose').addEventListener('click', () => toggle(false));
   $('v2BatchAdd').addEventListener('click', () => $('v2BatchFiles').click());
   $('v2BatchFiles').addEventListener('change', e => { add([...e.target.files]); e.target.value = ''; });

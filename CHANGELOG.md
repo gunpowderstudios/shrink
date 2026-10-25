@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.152
+- The **BATCH** window now docks directly above the MODEL HEALTH box (it moves with it) instead of floating at the top.
+- The QUICK-FIX step report box is switched off for now (CSS only; the code still fills it, so it can come back).
+
 ## v2.151
 - **BATCH** button (top right, beside RELOAD). Add many STL / OBJ / PLY / GLB files (drop them or choose them), press START BATCH and each one is opened, QUICK-FIXed and exported in turn; DOWNLOAD ZIP then gives every result in one file. A model that fails is marked and the run carries on. STOP AFTER THIS ONE ends it early.
 - A **memory bar** warns before you start: it estimates the biggest model's working memory plus the finished results against the browser's limit (green / amber / red). Red blocks START unless you tick "Try anyway", and a running batch stops itself if the browser reports its memory nearly full.
