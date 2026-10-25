@@ -340,15 +340,18 @@
     if (sizeCache.key === key) return sizeCache.size;
     const b = new THREE.Box3().setFromObject(model, true);
     const size = b.isEmpty() ? null : b.getSize(new THREE.Vector3());
-    sizeCache = { key, size }; return size;
+    if (size) sizeCache = { key, size };        // an empty box (model mid-swap) is never remembered, or Width/Depth stay greyed out until something else changes (v2.182)
+    return size;
   }
+  let dimRetry = 0;
   function refreshDims() {
     const w = $('v2Width'), d = $('v2Depth'); if (!w || !d) return;
     const sz = modelSize(), h = Number($('v2Height')?.value) || 0;
     const ok = !!(sz && sz.y > 1e-9 && h);
     [w, d].forEach(i => { i.disabled = !ok; });
     $('v2ScaleUp') && ($('v2ScaleUp').disabled = !ok); $('v2ScaleDown') && ($('v2ScaleDown').disabled = !ok);
-    if (!ok) { if (w.value !== '') w.value = ''; if (d.value !== '') d.value = ''; return; }
+    if (!ok) { if (w.value !== '') w.value = ''; if (d.value !== '') d.value = ''; if (sourceModel() && dimRetry++ < 8) setTimeout(refreshDims, 500); return; }
+    dimRetry = 0;
     const k = h / sz.y, set = (el, v) => { if (document.activeElement !== el) { const t = (Math.round(v * 10) / 10).toString(); if (el.value !== t) el.value = t; } };
     set(w, sz.x * k); set(d, sz.z * k);
   }
@@ -1134,15 +1137,22 @@
       const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = open ? '◂ Hide panel' : '▸ Printer, size & tools'; };
       let open = false; try { open = localStorage.getItem(KEY) === 'open'; } catch { /* no storage */ }
       setLeft(open);
-      tg.addEventListener('click', () => { const o = dashboard.dataset.left !== 'open'; setLeft(o); try { localStorage.setItem(KEY, o ? 'open' : 'closed'); } catch { /* private mode */ } window.dispatchEvent(new Event('resize')); });
+      tg.addEventListener('click', () => { const o = dashboard.dataset.left !== 'open'; setLeft(o); try { localStorage.setItem(KEY, o ? 'open' : 'closed'); } catch { /* private mode */ } window.dispatchEvent(new Event('resize')); dimRetry = 0; refreshDims(); });
       window.__shrinkLeftPanel = setLeft; }
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
     $('v2PrinterSel').addEventListener('change', e => { const x = PRINTER_LIST.find(y => y.id === e.target.value); if (!x) return; choosePrinter(x.type); if (x.type !== 'custom') setQuality(x.quality); syncPrinterSel(); });
     $('v2Height').addEventListener('input', updateHeight);
-    $('v2Width').addEventListener('change', () => dimInput('x'));
-    $('v2Depth').addEventListener('change', () => dimInput('z'));
-    $('v2Uniform').addEventListener('change', () => { if ($('v2Uniform').checked) resetStretch(); });
+    // Width / Depth apply when you stop typing (about 0.7 s), on Enter and when you leave the box, so the model follows without having to press Tab (v2.182)
+    [['v2Width', 'x'], ['v2Depth', 'z']].forEach(([id, axis]) => {
+      const el = $(id); let t = null, last = '';
+      const go = () => { clearTimeout(t); if (el.value === last || el.value === '') return; last = el.value; dimInput(axis); };
+      el.addEventListener('input', () => { clearTimeout(t); t = setTimeout(go, 700); });
+      el.addEventListener('change', go);
+      el.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+      el.addEventListener('focus', () => { last = ''; });
+    });
+    $('v2Uniform').addEventListener('change', () => { if ($('v2Uniform').checked) resetStretch(); dimRetry = 0; refreshDims(); });
     $('v2ScaleUp').addEventListener('click', () => scaleBy(1.1));
     $('v2ScaleDown').addEventListener('click', () => scaleBy(0.9));
     window.addEventListener('shrink:reduced', () => { reducedTick++; refreshDims(); });

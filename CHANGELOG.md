@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.182
+- Width / Depth (with Uniform unticked): the model now follows as you type. The stretch applies about 0.7 s after you stop typing, on Enter, and when you leave the box. Before, it only happened on Tab/Enter, so it looked as if the box did nothing.
+- Width / Depth no longer get stuck greyed out and empty: an empty size measurement (taken while a model was being swapped) is no longer remembered, the boxes re-check a few times, and unticking Uniform or opening the left panel refreshes them.
+
 ## v2.181
 - The TURN pad is hidden (it was confusing). Its code and tests stay; delete the `#v2TurnPad{display:none}` rule at the end of `print-v2-ui.css` to bring it back. The BATCH window no longer leaves room for it.
 

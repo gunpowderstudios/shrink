@@ -221,6 +221,13 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   page.$('v2TurnStep').value = '90'; page.$('v2TurnPad').querySelector('[data-turn="y"][data-sign="1"]').click(); await wait(100);
   const ang = m.quaternion.angleTo(q0) * 180 / Math.PI;
   ok(Math.abs(ang - 90) < 0.5, 'T1 the turn arrow turns the model by the chosen step (got ' + ang.toFixed(1) + ')');
+
+  // Width/Depth follow typing without pressing Tab (v2.182)
+  { const u = page.$('v2Uniform'); u.checked = false; u.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(100);
+    const wi = page.$('v2Width'); const w0 = Number(wi.value); const sx0 = m.scale.x;
+    wi.value = String(Math.round(w0 * 0.5 * 10) / 10); wi.dispatchEvent(new w.Event('input', { bubbles: true })); await wait(1000);
+    ok(w0 > 0 && Math.abs(m.scale.x / sx0 - 0.5) < 0.02, 'T2 typing a Width (no Tab or Enter needed) stretches the model: x scale went ' + sx0.toFixed(3) + ' to ' + m.scale.x.toFixed(3));
+    u.checked = true; u.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(100); }
   page.$('v2TurnPad').querySelector('[data-turn="x"][data-sign="1"]').click(); await wait(100);
   const box = new TH.Box3().setFromObject(m, true);
   ok(Math.abs(box.min.y) < 1e-4 && Math.abs((box.min.x + box.max.x) / 2) < 1e-3, 'T1 after tipping it, the model is put back flat on the bed and centred');
