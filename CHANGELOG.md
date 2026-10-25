@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.159
+- **Your printer and quality are remembered** in this browser (`localStorage['shrink-printer']`: printer type + quality) and put back the next time the print tools open. The BATCH printer list starts from the same choice.
+- **Highest detail by default:** with nothing saved yet, the print tools start on Resin with **16K ultra** (0.018 mm), and BATCH starts on Resin 12K / 16K. Pick Standard or another quality any time; that choice is then remembered instead.
+
 ## v2.158
 - **Phones and tablets are blocked** with a full-screen, non-dismissible message in big type: "Please use a laptop or desktop for better shrinking!" Detection is unchanged (a mobile browser, or a small touch screen); a narrow desktop window is not blocked. This replaces the small dismissible note.
 

@@ -33,7 +33,11 @@ const PRINTERS = [
   { id: 'r4', label: 'Resin 2K–4K (0.1 mm)', type: 'resin', quality: 'large' },
   { id: 'fdm', label: 'FDM filament (0.2 mm)', type: 'fdm', quality: 'standard' }
 ];
-const S = { items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: 'r8', height: 0 };     // height 0 = keep each model's own size
+function savedPrinterId() {     // the printer last chosen in the main panel (or here) is the starting choice
+  try { const v = JSON.parse(localStorage.getItem('shrink-printer') || 'null'); const p = v && PRINTERS.find(x => x.type === v.type && x.quality === v.quality); if (p) return p.id; } catch { /* nothing saved */ }
+  return 'r16';          // nothing saved yet: the highest resolution
+}
+const S = { items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: savedPrinterId(), height: 0 };     // height 0 = keep each model's own size
 function applySettings() {
   const p = PRINTERS.find(x => x.id === S.printer) || PRINTERS[2];
   // scoped to the print dashboard: other parts of the page also use data-quality / data-printer attributes
@@ -75,7 +79,7 @@ function buildPanel() {
   ['dragleave', 'drop'].forEach(t => p.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
   p.addEventListener('drop', e => add([...(e.dataTransfer?.files || [])]));
   $('v2BatchPrinter').value = S.printer;
-  $('v2BatchPrinter').addEventListener('change', e => { S.printer = e.target.value; });
+  $('v2BatchPrinter').addEventListener('change', e => { S.printer = e.target.value; const p = PRINTERS.find(x => x.id === S.printer); try { if (p) localStorage.setItem('shrink-printer', JSON.stringify({ type: p.type, quality: p.quality })); } catch { /* private mode */ } });
   $('v2BatchHeight').addEventListener('input', e => { S.height = Number(e.target.value) || 0; });
   $('v2BatchTry').addEventListener('change', e => { S.tryAnyway = e.target.checked; render(); });
   $('v2BatchStart').addEventListener('click', start);

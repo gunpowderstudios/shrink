@@ -51,8 +51,8 @@ Reduced previews and FIX/FUSE results get their shading normals from `crease-nor
 ### QUICK-FIX button state (v2.149)
 `quickState()` in `print-v2-ui.js` sets `#v2MagicBtn[data-state]` (`checking` = grey and disabled, like DOWNLOAD; `ready` = green) from `updateHealthCard()`. BATCH waits for `ready`.
 
-### 16K ultra (v2.150)
-`setQuality('ultra')`: detail 0.018 mm for resin and `window.__shrinkStrict='p995'`; Standard/Fine/Large put it back to default.
+### 16K ultra (v2.150, default since v2.159)
+The printer type + quality are saved in `localStorage['shrink-printer']` (`savePrinter()`/`savedPrinter()` in `print-v2-ui.js`; BATCH reads the same key) and restored when the dashboard is built; with nothing saved the default is resin + `ultra`. `setQuality('ultra')`: detail 0.018 mm for resin and `window.__shrinkStrict='p995'`; Standard/Fine/Large put it back to default.
 
 ### Viewer lighting (v2.145)
 `syncViewerEnvironment()` in `app.js` sets print mode to low hemisphere/fill light plus a strong `key` lamp with `castShadow` (game mode keeps the old gentle lamps and no shadows). `fitShadows()` runs each frame: it flags the original/optimized/current model meshes `castShadow`/`receiveShadow` and, every 20 frames, refits the key lamp and its orthographic shadow camera around the shown model (bounding sphere), so a moved or replaced model keeps good shadows. New meshes added to the scene need nothing extra unless they should not cast shadows (guide/clay groups are not flagged).

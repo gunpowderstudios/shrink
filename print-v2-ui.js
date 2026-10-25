@@ -337,6 +337,10 @@
     out.textContent = `${label} · ${h} mm high`;
   }
 
+  // The printer type and quality are remembered in this browser (v2.159); a saved choice is put back when the dashboard is built.
+  const PRINTER_KEY = 'shrink-printer'; let restoringPrinter = false;
+  const savedPrinter = () => { try { const v = JSON.parse(localStorage.getItem(PRINTER_KEY) || 'null'); return v && typeof v === 'object' ? v : null; } catch { return null; } };
+  const savePrinter = () => { if (restoringPrinter || !dashboard) return; try { localStorage.setItem(PRINTER_KEY, JSON.stringify({ type: dashboard.dataset.printerType || 'resin', quality: dashboard.dataset.quality || 'standard' })); } catch { /* private mode: nothing to remember */ } };
   function choosePrinter(type) {
     dashboard.dataset.printerType = type;
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.classList.toggle('active', b.dataset.printer === type));
@@ -346,6 +350,7 @@
     $('v2CustomPrinter').hidden = type !== 'custom';
     updateStep1Summary();
     markStep(1, 'done');
+    savePrinter();
   }
 
   function setQuality(kind) {
@@ -360,6 +365,7 @@
     setNative('printerPreset', 'custom');
     setNative('printerDetailMm', detail, 'input');
     const adv = $('v2PrinterDetail'); if (adv) adv.value = String(detail);
+    savePrinter();
   }
 
   function markStep(n, state = 'active') {
@@ -1090,8 +1096,9 @@
     const h = Number(nativeValue('figureHeightMm', 75)) || 75;
     $('v2Height').value = h; $('v2HeightRange').value = Math.max(10, Math.min(300, h));
     const geom = Number(nativeValue('geometry', 70)) || 70; $('v2Detail').value = geom; $('v2DetailNumber').value = geom;
-    choosePrinter('resin');
-    setQuality('standard');
+    { const sp = savedPrinter(), okT = ['resin', 'fdm', 'custom'], okQ = ['standard', 'fine', 'ultra', 'large'];
+      restoringPrinter = true;
+      try { choosePrinter(sp && okT.includes(sp.type) ? sp.type : 'resin'); setQuality(sp && okQ.includes(sp.quality) ? sp.quality : 'ultra'); } finally { restoringPrinter = false; } }
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });

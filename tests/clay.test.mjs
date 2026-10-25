@@ -170,5 +170,19 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(!B.state.running, 'B4 the run ends');
 }
 
+/* ---- the printer and quality are remembered ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(300);
+  const store = {}; globalThis.localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };      // the multitool runs in Node's global here
+  ok(w.document.querySelector('.print-v2-dashboard [data-quality="ultra"]').classList.contains('active') && Number(w.document.getElementById('printerDetailMm').value) === 0.018, 'P1 with nothing saved the highest quality (16K ultra) is on by default');
+  w.document.querySelector('[data-quality="fine"]').click(); await wait(30);
+  w.document.querySelector('[data-quality="ultra"]').click(); await wait(30);
+  let saved = null; try { saved = JSON.parse(store['shrink-printer']); } catch {}
+  ok(saved && saved.type === 'resin' && saved.quality === 'ultra', 'P1 choosing 16K ultra saves the printer choice in this browser');
+  w.document.querySelector('[data-printer="fdm"]').click(); await wait(30);
+  try { saved = JSON.parse(store['shrink-printer']); } catch {}
+  ok(saved && saved.type === 'fdm', 'P1 choosing FDM saves that too');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);
