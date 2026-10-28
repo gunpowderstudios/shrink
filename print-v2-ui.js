@@ -498,6 +498,7 @@
   }
 
   const FUSE_MAX_TRIANGLES = 1000000;
+  const BIG_TASK_TRIANGLES = 1000000;           // QUICK-FIX shows the "complex one" note above this many triangles
   async function fuseCheck(...a) { setWorking(true, 0); try { return await fuseCheckInner(...a); } finally { setWorking(false); } }
   async function fuseCheckInner() {
     const btn = $('v2FuseBtn');
@@ -880,6 +881,7 @@
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
       const startTris = modelTriangles(sourceModel());
+      { const big = $('v2BigTask'); if (big && startTris > (window.__shrinkBigTaskTris || BIG_TASK_TRIANGLES)) big.hidden = false; }      // a very detailed model takes a while: say so (v2.191)
       // 0. REPAIR FIRST, at full detail (v2.147). Shrinking a model that still has holes bakes the holes into a coarse mesh that is much harder to
       //    close, so a model under FIX_FIRST_MAX triangles is repaired before it is reduced. Bigger ones are shrunk first (repair runs on the main thread).
       if (startTris <= FIX_FIRST_MAX) {
@@ -953,6 +955,7 @@
       try { await updateHealthCard(); } catch (e) { console.warn('health refresh', e); }      // show the final result in one go, not the in-between checks
       setWorking(false);
       delete btn.dataset.busy; btn.disabled = false; btn.textContent = label;
+      { const big = $('v2BigTask'); if (big) big.hidden = true; }
     }
   }
 
@@ -993,7 +996,7 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when QUICK-FIX has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when QUICK-FIX has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
     $('v2MagicReset').addEventListener('click', () => { const f = $('fileInput'); if (f) { f.value = ''; f.click(); } });

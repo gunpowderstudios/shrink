@@ -350,5 +350,19 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(!/degenerateTriangles > 0\) score -= 10/.test(src) && /const cleanDegens = true/.test(src), 'S1 degenerate triangles no longer take points off or show red');
 }
 
+
+/* ---- v2.191: a "complex one" note appears while QUICK-FIX works on a very detailed model, and goes away after ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(900);
+  const big = page.$('v2BigTask');
+  ok(!!big && big.hidden && /complex one/.test(big.textContent) && /Hold tight/.test(big.textContent), 'M1 the note exists, hidden, with the wording');
+  let shown = false; const mo = new w.MutationObserver(() => { if (!big.hidden) shown = true; }); mo.observe(big, { attributes: true });
+  const run = async () => { shown = false; page.$('v2MagicBtn').click(); await wait(500); for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250); await wait(300); return shown; };
+  ok(!(await run()), 'M1 a normal model never shows it');
+  w.__shrinkBigTaskTris = 100;
+  ok(await run(), 'M1 a model over the limit shows it while QUICK-FIX works');
+  ok(big.hidden, 'M1 and it goes away when QUICK-FIX finishes');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

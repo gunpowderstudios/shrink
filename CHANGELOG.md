@@ -2,11 +2,15 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.191
+- A very detailed model (over 1,000,000 triangles) now shows a note under the top-right buttons while QUICK-FIX works: "This is a complex one! Hold tight while SHRINK works its magic!". It disappears when QUICK-FIX finishes.
+
 ## v2.190
 - Degenerate (zero-area) triangles no longer take 10 points off the health score or show red. They are still listed, but slicers skip them and they never blocked printing, so a watertight, fused model now reads 100 "Excellent". (They are not deleted: removing a zero-area triangle can open an edge.)
 
 ## v2.189
 - **Russ's tiger now fuses to one solid in the browser too.** The v2.188 report showed the main body fused but 8 inside-out specks (about -0.01 mm3 each) left over, from the repair fallback path (used when a mesh has a stacked duplicate shell). That path now splits into shells like the main one, and anything under 1e-5 of the biggest volume, or inside-out, is dust and dropped.
+- Confirmed in the browser on Russ's real tiger (5,997,284 triangles at 16K): QUICK-FIX shrinks it, repairs it and fuses it to one solid (240,170 triangles), health 100.
 - The QUICK-FIX verdict and BATCH no longer call a model "not fixed" just because it has degenerate triangles (they never blocked printing): FIXED means no open, non-manifold or flipped edges.
 
 ## v2.188
