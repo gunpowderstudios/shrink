@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.199
+- MODEL HEALTH: a handful of stray edges (no open edges, 10 or fewer non-manifold edges and flipped faces together) now scores 95/100 "Good" in green/amber instead of 65 "Needs attention" in red, with a note "N minor edges: your slicer will handle this. Fine to print." Real problems keep their big deductions. The batch rows therefore show "health 95/100 · N minor edges, fine to print".
+
 ## v2.198
 - The red "This model isn't one clean printable solid" box no longer appears while a BATCH is running, is hidden when the batch ends, and is not shown for a model with no open edges and only a few (10 or fewer) non-manifold edges / flipped faces. Previously the last model's failed Fuse left it on screen even though every row was green.
 

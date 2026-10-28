@@ -160,8 +160,17 @@
     return el ? el.value : fallback;
   }
 
+  // v2.199: a handful of stray edges (no holes) is "minor": slicers repair it on their own, so it costs 5 points and shows green/amber, not red.
+  const MINOR_MAX = 10;
+  function minorCount(h) {
+    if (!h || h.openEdges > 0) return 0;
+    const n = (h.pinchedEdges || 0) + (h.flippedEdges || 0);
+    return n > 0 && n <= MINOR_MAX ? n : 0;
+  }
   function healthScore(h) {
     if (!h) return { score: 0, label: 'Checking…', level: 'checking' };
+    const minor = minorCount(h);
+    if (minor) return { score: 95, label: 'Good', level: 'good', minor };
     let score = 100;
     if (h.openEdges > 0) score -= 35;
     if (h.pinchedEdges > 0) score -= 35;
@@ -207,8 +216,8 @@
     } catch (e) { console.warn('piece count', e); return null; }
   }
 
-  function healthRow(label, value, ok) {
-    return `<div class="v2-health-row"><span>${label}</span><strong class="${ok ? 'ok' : 'issue'}">${value}</strong></div>`;
+  function healthRow(label, value, ok, minor) {
+    return `<div class="v2-health-row"><span>${label}</span><strong class="${ok ? 'ok' : (minor ? 'note' : 'issue')}">${value}</strong></div>`;
   }
 
   function ensureHealthCard() {
@@ -286,9 +295,10 @@
       $('v2HealthRows').innerHTML =
         healthRow('Watertight', watertight ? 'YES' : 'NO', watertight) +
         healthRow('Open edges', new Intl.NumberFormat().format(h.openEdges), h.openEdges === 0) +
-        healthRow('Non-manifold', new Intl.NumberFormat().format(h.pinchedEdges), manifold) +
-        healthRow('Flipped faces', new Intl.NumberFormat().format(h.flippedEdges), oriented) +
-        healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens);
+        healthRow('Non-manifold', new Intl.NumberFormat().format(h.pinchedEdges), manifold, !!rating.minor) +
+        healthRow('Flipped faces', new Intl.NumberFormat().format(h.flippedEdges), oriented, !!rating.minor) +
+        healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens) +
+        (rating.minor ? `<div class="v2-health-minor">${rating.minor} minor ${rating.minor === 1 ? 'edge' : 'edges'}: your slicer will handle this. Fine to print.</div>` : '');
       const rowsEl = $('v2HealthRows'); delete rowsEl.dataset.pieces;
       countPieces(model).then(np => {
         if (run !== healthRun || !np) return;

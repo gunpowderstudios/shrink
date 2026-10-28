@@ -119,7 +119,7 @@ function fixingCapture(blob, name) {
   if (!it || (!S.busyRow && a && a.sourceFile && a.sourceFile !== it.file)) return false;       // a different model is open now: ignore
   if (S.fixingFresh) { S.results = S.results.filter(r => r.source !== it.name); S.fixingFresh = false; }
   S.results.push({ name, blob, source: it.name });
-  const sc = Number($('v2HealthScore')?.textContent); it.warn = !(Number.isFinite(sc) && sc >= 100);
+  const sc = Number($('v2HealthScore')?.textContent); it.warn = !(Number.isFinite(sc) && sc >= 100) && !deps.minor?.();
   it.issues = it.warn ? (deps.healthIssues?.() || []) : [];
   it.msg = Number.isFinite(sc) ? `fixed · health ${sc}/100` : 'fixed'; if (!it.warn) it.fixed = true;
   render(); note(`${it.name}: the downloaded file has replaced the old one in the ZIP.`);

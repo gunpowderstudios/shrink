@@ -597,3 +597,4 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 
 .v2-batch-row.fixed{background:rgba(70,215,150,.14)}.v2-batch-row.fixed i,.v2-batch-row.fixed .m{color:#46d796}.v2-batch-row .wt{border:1px solid #ff6b72;background:rgba(255,91,98,.14);color:#ff9ca1;border-radius:8px;font-size:11px;font-weight:800;padding:3px 8px;cursor:pointer;white-space:nowrap}.v2-batch-row .wt:hover{background:rgba(255,91,98,.3)}
 .v2-batch-row .m{white-space:normal;max-width:210px;line-height:1.25}
+.v2-health-minor{margin:6px 0 2px;padding:5px 8px;border-left:3px solid #ffc43c;background:rgba(255,196,60,.08);color:#f0d9a0;font-size:11px;line-height:1.35;border-radius:0 6px 6px 0}
