@@ -115,7 +115,7 @@ function add(files) {
 // the "fixing" model, its next DOWNLOAD still saves normally AND replaces its file in the batch ZIP (the row is updated too).
 function fixingCapture(blob, name) {
   const it = S.items.find(x => x.id === S.fixing); const a = window.__shrinkApp;
-  if (!it || (a && a.sourceFile && a.sourceFile !== it.file)) return false;       // a different model is open now: ignore
+  if (!it || (!S.busyRow && a && a.sourceFile && a.sourceFile !== it.file)) return false;       // a different model is open now: ignore
   if (S.fixingFresh) { S.results = S.results.filter(r => r.source !== it.name); S.fixingFresh = false; }
   S.results.push({ name, blob, source: it.name });
   const sc = Number($('v2HealthScore')?.textContent); it.warn = !(Number.isFinite(sc) && sc >= 100);
@@ -133,14 +133,18 @@ async function watertightRow(id) {
   S.busyRow = id; S.fixing = id; S.fixingFresh = true; window.__shrinkCapture = fixingCapture;
   it.msg = 'making watertight…'; render();
   try {
-    await window.__shrinkApp?.openFile?.(it.file);
+    // open the processed (shrunk, levelled) STL when there is one, not the raw upload, so Make watertight works on what is in the ZIP
+    const res = S.results.filter(r => r.source === it.name && /\.(stl|obj|ply)$/i.test(r.name))[0];
+    await window.__shrinkApp?.openFile?.(res ? new File([res.blob], res.name, { type: res.blob.type || 'model/stl' }) : it.file);
     for (let k = 0; k < 120 && $('v2MagicBtn')?.dataset.state !== 'ready'; k++) await wait(500);
-    const ok = await window.__shrinkMakeWatertight?.();
+    const ok = await window.__shrinkMakeWatertight?.({ noFast: true });      // never the coarse Fast rebuild from a list: it would quietly ruin the detail
+    const lw = window.__shrinkLastWatertight, nf = new Intl.NumberFormat();
     if (!ok) { it.msg = 'could not make watertight'; note(`${it.name}: ${$('printDiagnosticMessage')?.textContent || 'Make watertight did not work.'} It stays in the ZIP as it was.`, true); return; }
     window.__shrinkRefreshHealth?.(); await wait(800);
+    try { window.__shrinkLevel?.(); window.__shrinkCentre?.(); } catch { /* the rebuilt skin keeps its own pose */ }      // the rebuilt model must sit on the plate again
     S.silent = true;
     try { $('saveStlBtn')?.click(); await wait(1500); } finally { S.silent = false; }
-    if (it.fixed) { it.warn = false; it.issues = []; note(`${it.name}: now watertight. The fixed file has replaced the old one in the ZIP.`); }
+    if (it.fixed) { it.warn = false; it.issues = []; if (lw) it.msg = `watertight · ${lw.quality} · ${nf.format(lw.trianglesAfter)} tris (was ${nf.format(lw.trianglesBefore)})`; note(`${it.name}: now watertight (${lw ? lw.quality + ' detail, ' + nf.format(lw.trianglesBefore) + ' → ' + nf.format(lw.trianglesAfter) + ' triangles' : 'rebuilt'}). The fixed file has replaced the old one in the ZIP.`); }
     else { it.msg = 'rebuilt, still not 100'; note(`${it.name}: rebuilt, but the health check is still below 100.`, true); }
   } catch (e) { it.msg = 'could not make watertight'; note(`${it.name}: ${e?.message || e}`, true); }
   finally { S.busyRow = null; S.silent = false; render(); }

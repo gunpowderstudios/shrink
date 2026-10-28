@@ -969,7 +969,7 @@
     add('fuse-export build', window.__shrinkFuseBuild || 'OLD (the shell-splitting fuse is NOT loaded: hard-refresh the page)');
     add('Fuse triangle limit', window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES);
     const tris = model ? modelTriangles(model) : 0; add('Working model triangles', tris.toLocaleString());
-    add('Shrink applied', !!shrinkReady); add('Applied chips', [...appliedChanges].join(', ') || 'none'); add('Last fuse', JSON.stringify(window.__shrinkLastFuse || 'not run this session'));
+    add('Shrink applied', !!shrinkReady); add('Applied chips', [...appliedChanges].join(', ') || 'none'); add('Last fuse', JSON.stringify(window.__shrinkLastFuse || 'not run this session')); add('Last Make watertight', JSON.stringify(window.__shrinkLastWatertight || 'not run this session'));
     add('Health score', $('v2HealthScore')?.textContent); add('Health rows', [...document.querySelectorAll('#v2HealthRows .v2-health-row')].map(r => r.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
     const np = await countPieces(model); add('Separate pieces now', np); add('Triangles per piece (largest first)', (window.__shrinkPieceInfo || []).slice(0, 15).join(', '));
     add('Fuse card says', ($('v2FuseResult')?.textContent || '').replace(/\s+/g, ' ').trim()); add('Last verdict', JSON.stringify(window.__shrinkLastVerdict || null));

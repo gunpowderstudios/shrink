@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.194
+- The "Keep detail" choice is gone from Make watertight: it always starts at High and only drops to Balanced (and, for a single model, Fast) if High cannot make a clean skin. (The select stays in the page, hidden, for tests.)
+- Make watertight on a BATCH row opens the file QUICK-FIX already processed (shrunk, levelled) instead of the raw upload, and levels and centres the rebuilt model on the plate again, so it no longer ends up off the build plate.
+- Make watertight from a BATCH row no longer falls back to the coarse **Fast** rebuild (it kept the row's file only if High/Balanced produced a clean skin; Fast could quietly shrink a detailed model to a rough one). The row now says which detail was used and the triangle count before and after. The diagnostic report has a "Last Make watertight" line.
+
 ## v2.193
 - BATCH rows that are still not watertight get a small red **Make watertight** button. It opens the file, rebuilds it, puts the fixed STL in the ZIP in place of the old one (nothing is downloaded) and the row turns green with a tick.
 - The single-model Make watertight box moved from the bottom of the viewer to the top-right, the same place as the BATCH window; while BATCH is open it sits at the top inside it. Same button id, same behaviour (`window.__shrinkMakeWatertight` is the same function the row button calls).
