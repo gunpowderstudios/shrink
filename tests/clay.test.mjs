@@ -185,6 +185,13 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const seen = []; w.__shrinkApp = Object.assign(w.__shrinkApp || {}, { openFile: async f => { seen.push(f.name); } });
   page.$('v2BatchList').querySelector('.n.view').click(); await wait(30);
   ok(seen.length === 1 && seen[0] === 'tarak-SHRINK-16K.stl', 'B6 clicking a row opens its processed file in the main window (' + seen.join() + ')');
+  // W2: one stray non-manifold edge is not worth a warning (v2.195)
+  { const keep = B.deps.minor; const card = w.document.createElement('div'); card.id = 'v2HealthCard';
+    card.innerHTML = '<div class="v2-health-row"><span>Open edges</span><strong>0</strong></div><div class="v2-health-row"><span>Non-manifold</span><strong>1</strong></div><div class="v2-health-row"><span>Flipped faces</span><strong>0</strong></div>'; w.document.body.appendChild(card);
+    ok(B.deps.minor() === 1, 'W2 one non-manifold edge and nothing else counts as minor');
+    card.querySelectorAll('strong')[0].textContent = '3'; ok(B.deps.minor() === null, 'W2 any open edge is a real problem');
+    card.querySelectorAll('strong')[0].textContent = '0'; card.querySelectorAll('strong')[1].textContent = '40'; ok(B.deps.minor() === null, 'W2 forty bad edges is not minor');
+    card.remove(); B.deps.minor = keep; }
   // W1: the small Make watertight button on a flagged row (v2.193)
   { B.state.items[0].issues = ['3 open edges']; B.state.items[0].warn = true; B.render();
     ok(!!page.$('v2BatchList').querySelector('.wt'), 'W1 a flagged row has a small Make watertight button');

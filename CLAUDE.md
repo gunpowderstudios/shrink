@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.194** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.195** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -38,6 +38,9 @@ Reduced previews and FIX/FUSE results get their shading normals from `crease-nor
 
 ### Make watertight in one place (v2.193)
 `makeWatertightCopy()` (print-export-safety.js, `window.__shrinkMakeWatertight`) works with or without its button and returns true when a clean model was installed. The red box `#printDiagnosticPanel` sits top-right like `#v2BatchPanel` and `placeDiagnostic()` moves it inside the batch window while that is open. BATCH's `watertightRow(id)` opens the file, waits for QUICK-FIX `ready`, calls it, then clicks `#saveStlBtn` with `S.silent` set so `fixingCapture` returns true (ZIP updated, nothing saved); the row gets `.fixed` (green). Rows that only have "separate pieces" get no such button (they need FUSE IT). Test W1 in `tests/clay.test.mjs`.
+
+### Minor edges are fine (v2.195)
+`deps.minor()` in batch.js reads the MODEL HEALTH rows: no open edges, no flipped faces and 1 to `MINOR_EDGES` (10) non-manifold edges = fine to print (row stays green, no Make watertight button). Voxel rebuilds drop detail (104k to 21k triangles in a real run) so they are not worth it for that.
 
 ### Big-task note (v2.191, centred since v2.192)
 `#v2BigTask` (still built inside `.v2-magic-wrap`, but `position:fixed` in the middle of the screen with `pointer-events:none`) is shown by `shrinkMyModel()` when the model starts above `BIG_TASK_TRIANGLES` (1,000,000; tests override with `window.__shrinkBigTaskTris`) and hidden in its `finally`. Tests: M1 in `tests/clay.test.mjs`.

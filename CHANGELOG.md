@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.195
+- BATCH no longer flags a model whose only fault is a handful (10 or fewer) of non-manifold edges with no open edges and no flipped faces: slicers cope with that, and Make watertight would cost far more detail than it saves. The row stays green and says "1 minor edge, fine to print". Real problems still get the amber row and the Make watertight button.
+
 ## v2.194
 - The "Keep detail" choice is gone from Make watertight: it always starts at High and only drops to Balanced (and, for a single model, Fast) if High cannot make a clean skin. (The select stays in the page, hidden, for tests.)
 - Make watertight on a BATCH row opens the file QUICK-FIX already processed (shrunk, levelled) instead of the raw upload, and levels and centres the rebuilt model on the plate again, so it no longer ends up off the build plate.

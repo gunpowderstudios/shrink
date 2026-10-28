@@ -9,6 +9,7 @@ const PEAK_FACTOR = 12;      // working memory for the biggest file while it is 
 const RESULT_FACTOR = 0.6;   // finished files kept until the ZIP is made
 const WARN_AT = 0.6, STOP_AT = 0.9;
 const fmtBytes = n => n >= GB ? `${(n / GB).toFixed(1)} GB` : n >= MB ? `${(n / MB).toFixed(n >= 100 * MB ? 0 : 1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+const MINOR_EDGES = 10;      // up to this many non-manifold edges (and nothing else wrong) count as fine to print
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 // ---- memory model (pure; tested) ----
@@ -241,6 +242,13 @@ const deps = {
   applySettings,
   verdict: () => window.__shrinkLastVerdict || null,
   healthScore: () => $('v2HealthScore')?.textContent || '',
+  // v2.195: no open edges, no flipped faces and only a handful of non-manifold edges: slicers cope, so it is not worth a warning
+  minor: () => {
+    const v = {}; document.querySelectorAll('#v2HealthCard .v2-health-row').forEach(r => { const l = r.querySelector('span')?.textContent?.trim(), t = r.querySelector('strong')?.textContent?.trim(); if (l) v[l] = t; });
+    if (!('Non-manifold' in v)) return null;
+    const n = x => Number(String(x ?? '0').replace(/,/g, '')) || 0;
+    return n(v['Open edges']) === 0 && n(v['Flipped faces']) === 0 && n(v['Non-manifold']) > 0 && n(v['Non-manifold']) <= MINOR_EDGES ? n(v['Non-manifold']) : null;
+  },
   // what is still wrong, read from the MODEL HEALTH box: e.g. ['13 non-manifold edges']
   healthIssues: () => {
     const words = { 'Open edges': n => `${n} open edge${n === '1' ? '' : 's'}`, 'Non-manifold': n => `${n} non-manifold edge${n === '1' ? '' : 's'}`, 'Flipped faces': n => `${n} flipped face${n === '1' ? '' : 's'}`, 'Degenerates': n => `${n} degenerate triangle${n === '1' ? '' : 's'}` };
@@ -287,6 +295,7 @@ async function start() {
         for (const f of files) S.results.push({ name: f.name, blob: f.blob, source: item.name });
         item.status = 'done'; item.msg = score ? `health ${score}/100` : 'done'; ok++;
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
+        if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) { if (!item.warn) warned++; item.warn = true; item.issues = (item.issues || []).concat(`${v.pieces} separate pieces (not fused)`); } }
       } catch (err) {
