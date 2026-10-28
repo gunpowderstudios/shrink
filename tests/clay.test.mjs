@@ -185,6 +185,19 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const seen = []; w.__shrinkApp = Object.assign(w.__shrinkApp || {}, { openFile: async f => { seen.push(f.name); } });
   page.$('v2BatchList').querySelector('.n.view').click(); await wait(30);
   ok(seen.length === 1 && seen[0] === 'tarak-SHRINK-16K.stl', 'B6 clicking a row opens its processed file in the main window (' + seen.join() + ')');
+  // W1: the small Make watertight button on a flagged row (v2.193)
+  { B.state.items[0].issues = ['3 open edges']; B.state.items[0].warn = true; B.render();
+    ok(!!page.$('v2BatchList').querySelector('.wt'), 'W1 a flagged row has a small Make watertight button');
+    let made = 0; w.__shrinkMakeWatertight = async () => { made++; return true; };
+    w.__shrinkRefreshHealth = () => {}; page.$('v2HealthScore').textContent = '100';
+    const stl = w.document.getElementById('saveStlBtn'); const oldB = B.state.results[0].blob;
+    if (stl) stl.addEventListener('click', () => { w.__shrinkCapture?.(new w.Blob([new Uint8Array(30)]), 'tarak-SHRINK-16K.stl'); });
+    const mb = w.document.getElementById('v2MagicBtn'); if (mb) mb.dataset.state = 'ready';
+    w.__shrinkApp.sourceFile = B.state.items[0].file;
+    await B.watertightRow(B.state.items[0].id);
+    ok(made === 1 && B.state.items[0].warn === false && B.state.items[0].fixed === true, 'W1 Make watertight ran and the row is fixed');
+    ok(!!page.$('v2BatchList').querySelector('.v2-batch-row.fixed') && !page.$('v2BatchList').querySelector('.wt'), 'W1 the row turns green and loses the button');
+    ok(B.state.results.some(r => r.blob.size === 30), 'W1 the fixed file replaced the old one in the ZIP'); }
 }
 
 /* ---- the printer and quality are remembered ---- */

@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.193
+- BATCH rows that are still not watertight get a small red **Make watertight** button. It opens the file, rebuilds it, puts the fixed STL in the ZIP in place of the old one (nothing is downloaded) and the row turns green with a tick.
+- The single-model Make watertight box moved from the bottom of the viewer to the top-right, the same place as the BATCH window; while BATCH is open it sits at the top inside it. Same button id, same behaviour (`window.__shrinkMakeWatertight` is the same function the row button calls).
+- The "complex one" note is a little smaller.
+
 ## v2.192
 - The "This is a complex one! Hold tight while SHRINK works its magic!" note is now big and in the centre of the screen (it ignores clicks, so nothing underneath is blocked) while QUICK-FIX works on a very detailed model.
 

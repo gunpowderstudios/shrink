@@ -120,10 +120,30 @@ function fixingCapture(blob, name) {
   S.results.push({ name, blob, source: it.name });
   const sc = Number($('v2HealthScore')?.textContent); it.warn = !(Number.isFinite(sc) && sc >= 100);
   it.issues = it.warn ? (deps.healthIssues?.() || []) : [];
-  it.msg = Number.isFinite(sc) ? `fixed · health ${sc}/100` : 'fixed';
+  it.msg = Number.isFinite(sc) ? `fixed · health ${sc}/100` : 'fixed'; if (!it.warn) it.fixed = true;
   render(); note(`${it.name}: the downloaded file has replaced the old one in the ZIP.`);
   setTimeout(() => { S.fixingFresh = true; }, 1500);      // a split export hands over several files at once; a later download replaces them again
+  if (S.silent) { it.fixed = !it.warn; return true; }     // v2.193: Make watertight on a row only replaces the file in the ZIP, nothing is saved
   return false;                                           // false = the file is also saved normally
+}
+// v2.193: the small "Make watertight" button on a flagged row. Opens the file in the main window, rebuilds it, and (if the result is clean)
+// puts the fixed STL in the ZIP in place of the old one. The row turns green.
+async function watertightRow(id) {
+  if (S.running || S.busyRow) return; const it = S.items.find(x => x.id === id); if (!it) return;
+  S.busyRow = id; S.fixing = id; S.fixingFresh = true; window.__shrinkCapture = fixingCapture;
+  it.msg = 'making watertight…'; render();
+  try {
+    await window.__shrinkApp?.openFile?.(it.file);
+    for (let k = 0; k < 120 && $('v2MagicBtn')?.dataset.state !== 'ready'; k++) await wait(500);
+    const ok = await window.__shrinkMakeWatertight?.();
+    if (!ok) { it.msg = 'could not make watertight'; note(`${it.name}: ${$('printDiagnosticMessage')?.textContent || 'Make watertight did not work.'} It stays in the ZIP as it was.`, true); return; }
+    window.__shrinkRefreshHealth?.(); await wait(800);
+    S.silent = true;
+    try { $('saveStlBtn')?.click(); await wait(1500); } finally { S.silent = false; }
+    if (it.fixed) { it.warn = false; it.issues = []; note(`${it.name}: now watertight. The fixed file has replaced the old one in the ZIP.`); }
+    else { it.msg = 'rebuilt, still not 100'; note(`${it.name}: rebuilt, but the health check is still below 100.`, true); }
+  } catch (e) { it.msg = 'could not make watertight'; note(`${it.name}: ${e?.message || e}`, true); }
+  finally { S.busyRow = null; S.silent = false; render(); }
 }
 // Click a row to look at it in the main window: the processed file if there is one (STL/OBJ/PLY), otherwise the original.
 async function viewItem(id) {
@@ -165,8 +185,9 @@ function render() {
   const panel = $('v2BatchPanel'); if (!panel) return;
   dock();
   const list = $('v2BatchList');
-  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : ICON[i.status]}</i><span class="n${S.running ? '' : ' view'}" title="${i.name.replace(/"/g, '&quot;')}${S.running ? '' : ' (click to view it in the main window)'}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m"${i.warn ? ' title="Still not fully clean after QUICK-FIX. It is in the ZIP as it is. Click OPEN, expand the left panel and try FIX IT or Make watertight on it by itself."' : ''}>${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn ? '<button type="button" class="open" title="Opens this model on its own with the left panel open. Try FIX IT or Make watertight, then DOWNLOAD IT: the fixed file replaces this one in the ZIP.">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>${i.warn ? whyLine(i) : ''}`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
+  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}${i.fixed && !i.warn ? ' fixed' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : (i.fixed ? '✓' : ICON[i.status])}</i><span class="n${S.running ? '' : ' view'}" title="${i.name.replace(/"/g, '&quot;')}${S.running ? '' : ' (click to view it in the main window)'}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m"${i.warn ? ' title="Still not fully clean after QUICK-FIX. It is in the ZIP as it is. Click OPEN, expand the left panel and try FIX IT or Make watertight on it by itself."' : ''}>${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn && !(i.issues && i.issues.length && i.issues.every(x => /separate pieces/.test(x))) ? '<button type="button" class="wt" title="Rebuild this model as one watertight skin and put the fixed file in the ZIP.">Make watertight</button>' : '') + (i.warn ? '<button type="button" class="open" title="Opens this model on its own with the left panel open. Try FIX IT or Make watertight, then DOWNLOAD IT: the fixed file replaces this one in the ZIP.">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>${i.warn ? whyLine(i) : ''}`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
   list.querySelectorAll('.n.view').forEach(n => n.addEventListener('click', () => viewItem(Number(n.closest('.v2-batch-row').dataset.id))));
+  list.querySelectorAll('.wt').forEach(b => b.addEventListener('click', () => watertightRow(Number(b.closest('.v2-batch-row').dataset.id))));
   list.querySelectorAll('.open').forEach(b => b.addEventListener('click', () => openToFix(Number(b.closest('.v2-batch-row').dataset.id))));
   list.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => remove(Number(b.closest('.v2-batch-row').dataset.id))));
   // memory bar: what is still to be processed, plus what is already finished
@@ -310,4 +331,4 @@ ensureTopButton();
 let tries2 = 0; const iv2 = setInterval(() => { if (ensureTopButton() || ++tries2 > 100) clearInterval(iv2); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
-window.__shrinkBatch = { applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip };
+window.__shrinkBatch = { applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip, watertightRow };
