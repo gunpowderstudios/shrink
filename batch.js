@@ -274,7 +274,7 @@ async function start() {
   if (S.running) return;
   buildPanel(); render();
   if ($('v2BatchStart').disabled) return;
-  S.running = true; S.stop = false; render(); note('');
+  S.running = true; window.__shrinkBatchRunning = true; S.stop = false; render(); note('');
   if (!document.body.classList.contains('app-mode-print')) { document.querySelector('.mode-card[data-mode="print"]')?.click(); await wait(600); }
   const total = pending().length; let n = 0, ok = 0, warned = 0;
   try {
@@ -306,7 +306,7 @@ async function start() {
       render(); await wait(300);    // a moment for the browser to let go of the last model
     }
     if (!S.stop && !$('v2BatchNote').classList.contains('bad')) note(`Finished: ${ok} of ${total} models ready.${warned ? ` ${warned} still ${warned === 1 ? 'has' : 'have'} issues (highlighted in amber). They are in the ZIP too: use them as they are, or open one on its own to fix it.` : ''} Press DOWNLOAD ZIP.`);
-  } finally { S.running = false; S.stop = false; render(); }
+  } finally { S.running = false; window.__shrinkBatchRunning = false; S.stop = false; document.getElementById('printDiagnosticPanel')?.setAttribute('hidden', ''); render(); }
 }
 
 async function downloadZip() {

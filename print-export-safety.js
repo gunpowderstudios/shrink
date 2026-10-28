@@ -50,6 +50,8 @@ function friendlyReason(kind,raw){const t=String(raw||'');if(/disconnected solid
 
 function showDiagnostic(kind,rawMessage){
   const panel=ensureDiagnosticPanel();if(!panel)return;const topo=topologySummary(sourceModel());
+  // v2.198: no red box while a BATCH runs (the rows carry the verdict), and none for a model with no holes and only a handful of stray edges: slicers cope with those
+  if(window.__shrinkBatchRunning||(topo&&topo.openEdges===0&&(topo.pinchedEdges+(topo.flippedEdges||0))>0&&(topo.pinchedEdges+(topo.flippedEdges||0))<=10)){panel.hidden=true;return;}
   const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats');
   panel.querySelector('.print-diagnostic-title').textContent=`⚠ This model isn't one clean printable solid`;
   if(msg)msg.textContent=friendlyReason(kind,rawMessage);

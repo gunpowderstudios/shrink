@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.198
+- The red "This model isn't one clean printable solid" box no longer appears while a BATCH is running, is hidden when the batch ends, and is not shown for a model with no open edges and only a few (10 or fewer) non-manifold edges / flipped faces. Previously the last model's failed Fuse left it on screen even though every row was green.
+
 ## v2.197
 - BATCH: a few flipped faces (up to 10 together with any non-manifold edges, and no open edges) are now also "fine to print" like a few non-manifold edges, so a model such as the one left at 80/100 with 9 flipped faces no longer stops the list on Make watertight.
 
