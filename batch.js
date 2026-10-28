@@ -9,7 +9,7 @@ const PEAK_FACTOR = 12;      // working memory for the biggest file while it is 
 const RESULT_FACTOR = 0.6;   // finished files kept until the ZIP is made
 const WARN_AT = 0.6, STOP_AT = 0.9;
 const fmtBytes = n => n >= GB ? `${(n / GB).toFixed(1)} GB` : n >= MB ? `${(n / MB).toFixed(n >= 100 * MB ? 0 : 1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
-const MINOR_EDGES = 10;      // up to this many non-manifold edges (and nothing else wrong) count as fine to print
+const MINOR_EDGES = 10;      // up to this many non-manifold edges and flipped faces together (and no open edges) count as fine to print
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 // ---- memory model (pure; tested) ----
@@ -247,7 +247,8 @@ const deps = {
     const v = {}; document.querySelectorAll('#v2HealthCard .v2-health-row').forEach(r => { const l = r.querySelector('span')?.textContent?.trim(), t = r.querySelector('strong')?.textContent?.trim(); if (l) v[l] = t; });
     if (!('Non-manifold' in v)) return null;
     const n = x => Number(String(x ?? '0').replace(/,/g, '')) || 0;
-    return n(v['Open edges']) === 0 && n(v['Flipped faces']) === 0 && n(v['Non-manifold']) > 0 && n(v['Non-manifold']) <= MINOR_EDGES ? n(v['Non-manifold']) : null;
+    const bad = n(v['Non-manifold']) + n(v['Flipped faces']);      // v2.197: a few flipped faces count like a few non-manifold edges
+    return n(v['Open edges']) === 0 && bad > 0 && bad <= MINOR_EDGES ? bad : null;
   },
   // what is still wrong, read from the MODEL HEALTH box: e.g. ['13 non-manifold edges']
   healthIssues: () => {

@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.197
+- BATCH: a few flipped faces (up to 10 together with any non-manifold edges, and no open edges) are now also "fine to print" like a few non-manifold edges, so a model such as the one left at 80/100 with 9 flipped faces no longer stops the list on Make watertight.
+
 ## v2.196
 - Repair: after closing holes, SHRINK untangles any edge that now has three triangles and closes again (kept only if it leaves fewer problem edges). This targets the "1 non-manifold edge" models that QUICK-FIX left at 65/100. The repair graph cache key moved to 2.196 so browsers pick up the new repair-core.js. Test: stray triangle on a sphere edge in `tests/repair.test.mjs`. Not yet confirmed on the real 44 MB model.
 - BATCH rows: the file name no longer gets squeezed to nothing by a long message (the message wraps now).

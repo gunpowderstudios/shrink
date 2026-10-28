@@ -191,6 +191,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
     ok(B.deps.minor() === 1, 'W2 one non-manifold edge and nothing else counts as minor');
     card.querySelectorAll('strong')[0].textContent = '3'; ok(B.deps.minor() === null, 'W2 any open edge is a real problem');
     card.querySelectorAll('strong')[0].textContent = '0'; card.querySelectorAll('strong')[1].textContent = '40'; ok(B.deps.minor() === null, 'W2 forty bad edges is not minor');
+    card.querySelectorAll('strong')[1].textContent = '0'; card.querySelectorAll('strong')[2].textContent = '9'; ok(B.deps.minor() === 9, 'W2 nine flipped faces and nothing else is minor too (v2.197)');
     card.remove(); B.deps.minor = keep; }
   // W1: the small Make watertight button on a flagged row (v2.193)
   { B.state.items[0].issues = ['3 open edges']; B.state.items[0].warn = true; B.render();
