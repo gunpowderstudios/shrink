@@ -121,13 +121,14 @@
   }
   window.__shrinkInstallWorkingModel = installWorkingResult;
   window.__shrinkRefreshHealth = () => updateHealthCard();
+  let fusedPieces = 1;                          // how many pieces the last fuse left (v2.187): the chip says so when it is not one
   function renderAppliedChanges() {
     const wrap = $('v2HealthChanges');
     if (!wrap) return;
     const order = ['clay','fixed','rebuilt','fused','shrunk'];
     const labels = { clay:'CLAY', fixed:'FIXED', rebuilt:'REBUILT', fused:'FUSED', shrunk:'SHRUNK' };
     const chips = order.filter(k => appliedChanges.has(k))
-      .map(k => `<span class="v2-change-chip ${k}"><i></i>${labels[k]}</span>`)
+      .map(k => `<span class="v2-change-chip ${k}"><i></i>${k === 'fused' && fusedPieces > 1 ? `FUSED · ${fusedPieces} PIECES` : labels[k]}</span>`)
       .join('');
     wrap.innerHTML = chips
       ? `<small>CHANGES</small><div>${chips}</div>`
@@ -140,7 +141,7 @@
   }
 
   function clearApplied() {
-    appliedChanges.clear();
+    appliedChanges.clear(); fusedPieces = 1;
     renderAppliedChanges();
   }
 
@@ -525,7 +526,7 @@
       setWorkingModel(built.root);
       app()?.show?.('optimized');
       app()?.notifyReduced?.({ kind: 'fuse', components });
-      markApplied('fused');
+      fusedPieces = components; markApplied('fused');
       window.__shrinkPrintSafety?.clearDiagnostic?.();
       card.dataset.state = 'good';
       markStep(2, 'done');

@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.187
+- **FUSE IT now really fuses STL models.** An STL loads as one mesh holding every shell, and the fuse treated that one mesh as already solid, so overlapping shells inside it were never merged: a model such as Russ's tiger came out of "fused" still in 39 separate pieces. The fuse now splits each mesh into its shells before the union, drops specks with no volume, and the tiger comes out as one solid.
+- The FUSED chip tells the truth: "FUSED · 3 PIECES" when pieces remain (they do not touch).
+
 ## v2.186
 - (v2.185 was the mobile-screen restyle, committed without a note.)
 - QUICK-FIX now says plainly whether the model is fixed and fused. The MODEL HEALTH box has a **Pieces** row: "1 (one solid)" in green, or "N (not fused)" in amber (several closed pieces are valid, so it is not a health fault and does not change the score). QUICK-FIX's last line reads e.g. "FIXED · NOT FUSED: 35 separate pieces (it still has too many triangles to fuse)".

@@ -303,5 +303,20 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   let saved = ''; try { saved = w.localStorage.getItem('shrink-printer'); } catch {} ok(/ultra/.test(saved || 'ultra'), 'L1 your own saved printer choice is put back for the next model');
 }
 
+
+/* ---- v2.187: overlapping shells inside ONE mesh (every STL) are unioned by FUSE IT ---- */
+{
+  const page = await makePage({ model: models.overlap(), heightMm: 40 }); const w = page.w; await wait(900);
+  ok(page.$('v2HealthRows').dataset.pieces === '2', 'U1 two overlapping spheres in one mesh start as 2 pieces');
+  page.$('v2FuseBtn').click();
+  for (let i = 0; i < 120 && !/Fused/.test(page.$('v2FuseResult')?.textContent || ''); i++) await wait(250);
+  await wait(1200);
+  ok(/✓ Fused/.test(page.$('v2FuseResult').textContent), 'U1 FUSE IT reports one fused solid: ' + page.$('v2FuseResult').textContent.slice(0, 80));
+  ok(page.$('v2HealthRows').dataset.pieces === '1' && !/PIECES/.test(page.$('v2HealthChanges').textContent), 'U1 afterwards the health box says 1 piece and the FUSED chip has no "pieces" note');
+  const page3 = await makePage({ model: models.multi(), heightMm: 40 }); await wait(900);
+  page3.$('v2FuseBtn').click(); await wait(4000);
+  ok(/FUSED · 3 PIECES/.test(page3.$('v2HealthChanges').textContent), 'U2 spheres that do not touch stay 3 pieces, and the FUSED chip says so: ' + page3.$('v2HealthChanges').textContent.replace(/\s+/g, ' '));
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

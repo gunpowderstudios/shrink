@@ -212,6 +212,32 @@ function repairedRootFromModel(model) {
   return { root, stats: repaired.stats };
 }
 
+// One mesh can hold many separate shells that overlap (every STL does). Manifold treats a single solid as already valid, so overlapping shells
+// inside it were never unioned and "fused" models still came out in dozens of pieces (v2.187). Split into shells first, so union() merges them.
+function splitShells(solid, wasm) {
+  let parts = [];
+  try { parts = solid.decompose(); } catch (err) { console.warn('decompose failed', err); return [solid]; }
+  if (parts.length <= 1) { for (const q of parts) try { q.delete?.(); } catch {} return [solid]; }
+  try { solid.delete?.(); } catch {}
+  const out = [];
+  for (let q of parts) {
+    let vol = 0; try { vol = q.volume(); } catch {}
+    if (vol < 0) {                                           // an inside-out shell: turn it outward, as orientOutward does for a whole mesh
+      try {
+        const m = q.getMesh(), np = m.numProp || 3, vp = m.vertProperties, tv = m.triVerts, verts = new Float32Array((vp.length / np) * 3), tris = new Uint32Array(tv.length);
+        for (let i = 0; i < vp.length / np; i++) { verts[i * 3] = vp[i * np]; verts[i * 3 + 1] = vp[i * np + 1]; verts[i * 3 + 2] = vp[i * np + 2]; }
+        for (let i = 0; i + 2 < tv.length; i += 3) { tris[i] = tv[i]; tris[i + 1] = tv[i + 2]; tris[i + 2] = tv[i + 1]; }
+        try { q.delete?.(); } catch {}
+        q = solidFromData({ verts, tris }, wasm);
+      } catch (err) { console.warn('could not turn a shell outward', err); }
+    }
+    let tiny = false; try { tiny = !(Math.abs(q.volume()) > 1e-9); } catch {}
+    if (tiny) { try { q.delete?.(); } catch {} continue; }  // a sliver with no volume cannot be part of a solid
+    out.push(q);
+  }
+  return out;
+}
+
 async function modelToSolid(model) {
   const wasm = await loadManifold();
   const solids = [];
@@ -221,7 +247,7 @@ async function modelToSolid(model) {
     if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
     try {
       const solid = meshToSolid(obj, wasm);
-      if (solid) solids.push(solid);
+      if (solid) solids.push(...splitShells(solid, wasm));
     } catch (err) {
       failures.push(err?.message || String(err));
       console.warn('Could not convert one mesh part to a manifold solid after repair', err);
@@ -247,9 +273,17 @@ async function modelToSolid(model) {
     result = solids.length === 1 ? solids[0] : wasm.Manifold.union(solids);
     const status = statusText(result);
     if (result?.isEmpty?.()) throw new Error(status ? `Boolean union failed: ${status}` : 'Boolean union produced an empty mesh.');
-    const pieces = result.decompose();
-    const components = pieces.length;
-    for (const p of pieces) try { p.delete?.(); } catch {}
+    let pieces = result.decompose();
+    // Dust (v2.187): a union of overlapping shells can leave specks with no real volume. They are not parts of the print: drop them, then count.
+    let vols = pieces.map(q => { try { return Math.abs(q.volume()); } catch { return 0; } });
+    const biggest = Math.max(0, ...vols), keep = pieces.filter((q, i) => vols[i] > biggest * 1e-6);
+    if (keep.length && keep.length < pieces.length && wasm.Manifold.compose) {
+      const composed = wasm.Manifold.compose(keep);
+      for (const q of pieces) try { q.delete?.(); } catch {}
+      try { result.delete?.(); } catch {}
+      result = composed; pieces = keep;
+    } else { for (const q of pieces) try { q.delete?.(); } catch {} }
+    const components = Math.max(1, keep.length);
     for (const s of solids) if (s !== result) try { s.delete?.(); } catch {}
     return { solid: result, components, wasm };
   } catch (err) {
