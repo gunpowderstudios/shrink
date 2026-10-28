@@ -4,6 +4,8 @@ import { healthOfModel } from './repair-core.js?v=2.147';
 
 // SHRINK 3D v2.63 — safety layer; loads current print helpers including draggable split pegs.
 const VERSION = '2.63';
+// Helper modules are loaded under the page release (v2.188). They used to use the fixed key above, so a browser kept serving old copies of fuse-export.js etc. after a fix.
+const REL = (() => { try { return new URL(import.meta.url).searchParams.get('v') || VERSION; } catch { return VERSION; } })();
 const $ = id => document.getElementById(id);
 const app = () => window.__shrinkApp;
 let fallbackBusy = false;
@@ -65,7 +67,7 @@ async function makeWatertightCopy(){
   let root=null,installed=false; window.__shrinkWork?.(true);
   const disposeRoot=r=>r?.traverse?.(o=>{if(o.isMesh){o.geometry?.dispose?.();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m?.dispose?.());}});
   try{
-    const mod=await import(`./watertight-remesh.js?v=${VERSION}`);
+    const mod=await import(`./watertight-remesh.js?v=${REL}`);
     const pre=mod.remeshPreflight?.(model,quality);
     if(pre&&!pre.safe){
       const nf=new Intl.NumberFormat();
@@ -135,5 +137,5 @@ function enforcePriority(){const fuse=$('fuseSolidToggle'),split=$('splitMode');
 function trackAttempts(){const stl=$('saveStlBtn'),obj=$('saveObjBtn');if(stl&&!stl.dataset.safeTrack){stl.dataset.safeTrack='1';stl.addEventListener('click',()=>{lastAttempt={kind:'stl',time:Date.now()};},true);}if(obj&&!obj.dataset.safeTrack){obj.dataset.safeTrack='1';obj.addEventListener('click',()=>{lastAttempt={kind:'obj',time:Date.now()};},true);}}
 function maintain(){ensureDiagnosticPanel();wrapStatus();enforcePriority();trackAttempts();}
 maintain();const observer=new MutationObserver(maintain);observer.observe(document.documentElement,{childList:true,subtree:true});window.addEventListener('shrink:model-opened',()=>{clearDiagnostic();maintain();});window.addEventListener('shrink:reduced',clearDiagnostic);
-Promise.allSettled([import(`./preview-material-fix.js?v=${VERSION}`),import(`./fuse-export.js?v=${VERSION}`),import(`./split-print.js?v=${VERSION}`),import(`./split-fallback.js?v=${VERSION}`)]).then(results=>{results.forEach((r,i)=>{if(r.status==='rejected')console.warn(`[SHRINK 3D ${VERSION}] Optional print helper ${i+1} did not load`,r.reason);});maintain();});
+Promise.allSettled([import(`./preview-material-fix.js?v=${REL}`),import(`./fuse-export.js?v=${REL}`),import(`./split-print.js?v=${REL}`),import(`./split-fallback.js?v=${REL}`)]).then(results=>{results.forEach((r,i)=>{if(r.status==='rejected')console.warn(`[SHRINK 3D ${VERSION}] Optional print helper ${i+1} did not load`,r.reason);});maintain();});
 window.__shrinkPrintSafety={topologySummary,maintain,showDiagnostic,clearDiagnostic};

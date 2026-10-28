@@ -583,3 +583,9 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 /* separate-pieces row in the health box (v2.185): amber, but not a health fault, several closed pieces are valid */
 .v2-health-row strong.note{color:#ffc43c}
 .v2-pieces-row span{color:#ffe3a6}
+
+/* diagnostic report button (v2.188) */
+.v2-diag-row{display:flex;align-items:center;gap:10px;margin:8px 0 4px;padding:0 4px}
+.v2-diag-row button{border:1px solid #3a4e66;border-radius:8px;background:rgba(255,255,255,.04);color:#cfe0f2;font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 10px;cursor:pointer}
+.v2-diag-row button:hover{background:rgba(255,255,255,.09)}
+.v2-diag-row small{color:#9fb4d0;font-size:11px}

@@ -375,4 +375,5 @@ function wire() {
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true }); else wire();
+window.__shrinkFuseBuild = '2.188 splits shells';
 window.__shrinkFuse = { fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };

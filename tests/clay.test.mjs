@@ -318,5 +318,16 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(/FUSED · 3 PIECES/.test(page3.$('v2HealthChanges').textContent), 'U2 spheres that do not touch stay 3 pieces, and the FUSED chip says so: ' + page3.$('v2HealthChanges').textContent.replace(/\s+/g, ' '));
 }
 
+
+/* ---- v2.188: the diagnostic report button, and helper modules load under the page release ---- */
+{
+  const page = await makePage({ model: models.multi(), heightMm: 40 }); const w = page.w; await wait(1200);
+  ok(!!page.$('v2DiagBtn'), 'D1 the Advanced drawer has a COPY DIAGNOSTIC REPORT button');
+  const text = await w.__shrinkDiagReport();
+  ok(/SHRINK release/.test(text) && /fuse-export build: 2\.188/.test(text) && /Separate pieces now: 3/.test(text) && /Working model triangles/.test(text), 'D1 the report names the release, the fuse build, the pieces and the triangles');
+  const src = (await import('fs')).readFileSync(new URL('../print-export-safety.js', import.meta.url), 'utf8');
+  ok(/fuse-export\.js\?v=\$\{REL\}/.test(src) && !/fuse-export\.js\?v=\$\{VERSION\}/.test(src), 'D2 fuse-export.js is loaded under the page release, not the old fixed key');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);

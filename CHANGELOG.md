@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.188
+- **The v2.187 fuse fix never reached browsers.** `fuse-export.js` (and split-print, split-fallback, watertight-remesh) were loaded under a fixed old cache key (`?v=2.63`), so a browser kept running the old fuse after the update. They now load under the page release, so every release refetches them.
+- New **COPY DIAGNOSTIC REPORT** button at the top of the Advanced drawer: copies release, which fuse build is loaded, working-model triangles, health, the pieces and their sizes, the last fuse result and recent console warnings, as plain text to paste back.
+
 ## v2.187
 - **FUSE IT now really fuses STL models.** An STL loads as one mesh holding every shell, and the fuse treated that one mesh as already solid, so overlapping shells inside it were never merged: a model such as Russ's tiger came out of "fused" still in 39 separate pieces. The fuse now splits each mesh into its shells before the union, drops specks with no volume, and the tiger comes out as one solid.
 - The FUSED chip tells the truth: "FUSED · 3 PIECES" when pieces remain (they do not touch).

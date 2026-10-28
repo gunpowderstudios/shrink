@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.187** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.188** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -32,6 +32,9 @@ The simplifier can leave a few non-manifold edges on a model of many small piece
 
 ### Display shading (v2.56, unchanged in v2.57)
 Reduced previews and FIX/FUSE results get their shading normals from `crease-normals.js` (`creaseSplit`), not `computeVertexNormals()`. Plain smooth normals smear shading over big flat triangles across hard edges and look like dark patches; the geometry is fine and the STL never contains them. `creaseSplit` only appends duplicate vertices and never changes positions or triangles; the original vertex numbers stay valid, which `live-reduce.js` relies on (worker indices refer to the original numbering). Keep `src.baseAttrs` (pristine attributes) in `live-reduce.js` and rebuild the display geometry from `s.positions` on every reduction.
+
+### Helper cache keys and the diagnostic report (v2.188)
+`print-export-safety.js` loads fuse-export / split-print / split-fallback / preview-material-fix / watertight-remesh under `REL` (the `?v=` it was itself imported with = `PRINT_RELEASE`), NOT its old fixed `VERSION` ('2.63'): a fixed key made browsers keep stale copies after a fix. Never hard-code a cache key for a module that changes. `#v2DiagBtn` (Advanced drawer) copies `window.__shrinkDiagReport()`; `window.__shrinkFuseBuild` shows which fuse-export is really loaded and `window.__shrinkLastFuse` the last fuse result.
 
 ### Fuse unions shells inside one mesh (v2.187)
 `modelToSolid()` in `fuse-export.js` runs `splitShells()` on every mesh's solid (Manifold `decompose()`, inside-out shells turned outward, zero-volume shells dropped) BEFORE `Manifold.union`. Without it a single STL mesh with overlapping shells was never unioned. After the union, pieces under 1e-6 of the biggest volume are dust and are dropped (`Manifold.compose`), and `components` counts what is left. `fusedPieces` makes the FUSED chip say `FUSED · N PIECES`. Tests: U1/U2 in `tests/clay.test.mjs` (`models.overlap`).

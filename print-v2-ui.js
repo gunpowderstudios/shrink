@@ -201,7 +201,9 @@
         }
         await wait(0);
       }
-      const used = new Set(); for (let i = 0; i < n; i++) used.add(find(i)); return used.size;
+      const used = new Set(); for (let i = 0; i < n; i++) used.add(find(i));
+      try { const tc = new Map(); for (const m of meshes) { const g = m.geometry, idx = g.index, cnt = idx ? idx.count : g.attributes.position.count; /* count triangles per piece from the first vertex of each triangle */ const pos = g.attributes.position; for (let t = 0; t < cnt; t += 3) { v.fromBufferAttribute(pos, idx ? idx.getX(t) : t).applyMatrix4(m.matrixWorld); const id = ids.get(Math.round(v.x / tol) + ',' + Math.round(v.y / tol) + ',' + Math.round(v.z / tol)); const r = find(id); tc.set(r, (tc.get(r) || 0) + 1); } } window.__shrinkPieceInfo = [...tc.values()].sort((a, b) => b - a); } catch { window.__shrinkPieceInfo = null; }
+      return used.size;
     } catch (e) { console.warn('piece count', e); return null; }
   }
 
@@ -526,7 +528,7 @@
       setWorkingModel(built.root);
       app()?.show?.('optimized');
       app()?.notifyReduced?.({ kind: 'fuse', components });
-      fusedPieces = components; markApplied('fused');
+      fusedPieces = components; window.__shrinkLastFuse = { components, build: window.__shrinkFuseBuild || 'OLD fuse-export (no shell split)', triangles: modelTriangles(built.root), at: new Date().toISOString() }; markApplied('fused');
       window.__shrinkPrintSafety?.clearDiagnostic?.();
       card.dataset.state = 'good';
       markStep(2, 'done');
@@ -954,6 +956,39 @@
     }
   }
 
+
+  // ---- diagnostic report (v2.188): one button copies everything needed to see what the page is really doing ----
+  const logRing = []; for (const k of ['warn', 'error']) { const orig = console[k].bind(console); console[k] = (...a) => { try { logRing.push(k + ': ' + a.map(x => (x && x.message) || (typeof x === 'object' ? JSON.stringify(x).slice(0, 200) : String(x))).join(' ').slice(0, 300)); if (logRing.length > 40) logRing.shift(); } catch {} orig(...a); }; }
+  async function diagReport() {
+    const L = []; const add = (k, v) => L.push(`${k}: ${v}`);
+    const model = sourceModel(); add('SHRINK release', document.querySelector('.version-badge')?.textContent || '?'); add('When', new Date().toISOString());
+    add('Browser', navigator.userAgent); add('Printer', `${currentPrinter().tag} (${dashboard?.dataset.printerType}/${dashboard?.dataset.quality})`);
+    add('fuse-export build', window.__shrinkFuseBuild || 'OLD (the shell-splitting fuse is NOT loaded: hard-refresh the page)');
+    add('Fuse triangle limit', window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES);
+    const tris = model ? modelTriangles(model) : 0; add('Working model triangles', tris.toLocaleString());
+    add('Shrink applied', !!shrinkReady); add('Applied chips', [...appliedChanges].join(', ') || 'none'); add('Last fuse', JSON.stringify(window.__shrinkLastFuse || 'not run this session'));
+    add('Health score', $('v2HealthScore')?.textContent); add('Health rows', [...document.querySelectorAll('#v2HealthRows .v2-health-row')].map(r => r.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
+    const np = await countPieces(model); add('Separate pieces now', np); add('Triangles per piece (largest first)', (window.__shrinkPieceInfo || []).slice(0, 15).join(', '));
+    add('Fuse card says', ($('v2FuseResult')?.textContent || '').replace(/\s+/g, ' ').trim()); add('Last verdict', JSON.stringify(window.__shrinkLastVerdict || null));
+    try { const b = new THREE_().Box3().setFromObject(model, true), s = b.getSize(new (THREE_().Vector3)()); add('Size mm-ish (units)', [s.x, s.y, s.z].map(x => x.toFixed(2)).join(' x ')); } catch {}
+    add('Recent console warnings/errors', logRing.length ? '\n  ' + logRing.slice(-25).join('\n  ') : 'none');
+    return L.join('\n');
+  }
+  const THREE_ = () => app()?.THREE;
+  window.__shrinkDiagReport = diagReport;
+  function ensureDiagButton() {
+    const host = document.querySelector('#v2AdvTools'); if (!host || $('v2DiagRow')) return;
+    const row = document.createElement('div'); row.id = 'v2DiagRow'; row.className = 'v2-diag-row';
+    row.innerHTML = '<button id="v2DiagBtn" type="button" title="Copies a plain-text report of what this page is doing, to paste back to the developer.">COPY DIAGNOSTIC REPORT</button><small id="v2DiagNote"></small>';
+    const grid = host.querySelector('.v2-action-grid'); if (grid) grid.before(row); else host.appendChild(row);
+    $('v2DiagBtn').addEventListener('click', async () => {
+      const note = $('v2DiagNote'); note.textContent = 'Collecting…';
+      let text = ''; try { text = await diagReport(); } catch (e) { text = 'Report failed: ' + (e && e.message); }
+      try { await navigator.clipboard.writeText(text); note.textContent = 'Copied. Paste it into the chat.'; }
+      catch { const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;left:8px;top:8px;width:60vw;height:40vh;z-index:9999'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); note.textContent = 'Copied. Paste it into the chat.'; } catch { note.textContent = 'Select all in the box and copy.'; } setTimeout(() => ta.remove(), 15000); }
+    });
+  }
+
   function ensureMagicButton() {
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
@@ -1347,7 +1382,7 @@
   }
 
   function onMode() {
-    ensureMagicButton();
+    ensureMagicButton(); ensureDiagButton();
     { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel() || mb.dataset.state === 'checking'; }
     const print = document.body.classList.contains('app-mode-print');
     if (!print) removeBedGuide();

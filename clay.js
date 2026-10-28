@@ -127,7 +127,7 @@ async function apply(source, onStatus = () => {}) {
     // Route B: the surface leaks, so Manifold cannot read it. The clay balls join the surface and the voxel wrap seals the lot.
     if (!solid) {
       route = 'wrap';
-      const wt = await import('./watertight-remesh.js?v=2.63');
+      const wt = await import('./watertight-remesh.js?v=' + (new URL(import.meta.url).searchParams.get('v') || '2.63'));
       let soup = gatherWorldMesh(source);
       if (adds.length) soup = joinSoups(soup, dabSoup(adds, ballLevel(adds.length)));
       const grp = soupGroup(soup);
