@@ -261,7 +261,7 @@ async function start() {
         const files = await deps.capture();
         for (const f of files) S.results.push({ name: f.name, blob: f.blob, source: item.name });
         item.status = 'done'; item.msg = score ? `health ${score}/100` : 'done'; ok++;
-        const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100;      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
+        const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) { if (!item.warn) warned++; item.warn = true; item.issues = (item.issues || []).concat(`${v.pieces} separate pieces (not fused)`); } }
       } catch (err) {

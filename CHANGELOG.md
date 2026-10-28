@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.189
+- **Russ's tiger now fuses to one solid in the browser too.** The v2.188 report showed the main body fused but 8 inside-out specks (about -0.01 mm3 each) left over, from the repair fallback path (used when a mesh has a stacked duplicate shell). That path now splits into shells like the main one, and anything under 1e-5 of the biggest volume, or inside-out, is dust and dropped.
+- The QUICK-FIX verdict and BATCH no longer call a model "not fixed" just because it has degenerate triangles (they never blocked printing): FIXED means no open, non-manifold or flipped edges.
+
 ## v2.188
 - **The v2.187 fuse fix never reached browsers.** `fuse-export.js` (and split-print, split-fallback, watertight-remesh) were loaded under a fixed old cache key (`?v=2.63`), so a browser kept running the old fuse after the update. They now load under the page release, so every release refetches them.
 - New **COPY DIAGNOSTIC REPORT** button at the top of the Advanced drawer: copies release, which fuse build is loaded, working-model triangles, health, the pieces and their sizes, the last fuse result and recent console warnings, as plain text to paste back.

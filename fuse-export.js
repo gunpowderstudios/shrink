@@ -259,7 +259,7 @@ async function modelToSolid(model) {
     for (const s of solids) try { s.delete?.(); } catch {}
     solids.length = 0;
     try {
-      solids.push(repairWholeModelSolid(model, wasm));
+      solids.push(...splitShells(repairWholeModelSolid(model, wasm), wasm));      // the fallback needs the shell split too (v2.189)
       failures.length = 0;
     } catch (err) {
       const first = failures[0] ? ` ${failures[0]}` : '';
@@ -275,8 +275,8 @@ async function modelToSolid(model) {
     if (result?.isEmpty?.()) throw new Error(status ? `Boolean union failed: ${status}` : 'Boolean union produced an empty mesh.');
     let pieces = result.decompose();
     // Dust (v2.187): a union of overlapping shells can leave specks with no real volume. They are not parts of the print: drop them, then count.
-    let vols = pieces.map(q => { try { return Math.abs(q.volume()); } catch { return 0; } });
-    const biggest = Math.max(0, ...vols), keep = pieces.filter((q, i) => vols[i] > biggest * 1e-6);
+    let vols = pieces.map(q => { try { return q.volume(); } catch { return 0; } });
+    const biggest = Math.max(0, ...vols), keep = pieces.filter((q, i) => vols[i] > biggest * 1e-5);   // inside-out or tiny specks are dust
     if (keep.length && keep.length < pieces.length && wasm.Manifold.compose) {
       const composed = wasm.Manifold.compose(keep);
       for (const q of pieces) try { q.delete?.(); } catch {}
@@ -375,5 +375,5 @@ function wire() {
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true }); else wire();
-window.__shrinkFuseBuild = '2.188 splits shells';
+window.__shrinkFuseBuild = '2.189 splits shells, drops specks';
 window.__shrinkFuse = { fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };

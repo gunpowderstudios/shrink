@@ -932,7 +932,7 @@
       // The verdict (v2.185): said plainly, and kept in the health box (Separate pieces row) because the step list above is hidden.
       await updateHealthCard(); await wait(80);
       let pieces = null; for (let i = 0; i < 40 && !pieces; i++) { pieces = Number($('v2HealthRows')?.dataset.pieces) || null; if (!pieces) await wait(50); }
-      const healthy = $('v2HealthScore')?.textContent === '100', oneSolid = pieces === 1;
+      const healthy = lastHealth?.h ? lastHealth.h.clean === true : $('v2HealthScore')?.textContent === '100', oneSolid = pieces === 1;   // degenerate triangles alone do not make a model unfixed (v2.189)
       const why = modelTriangles(sourceModel()) > fuseLimit ? 'it still has too many triangles to fuse' : fs === 'good' ? 'the pieces do not all touch' : 'the fuse step could not finish (see the Fuse box)';
       verdict = { healthy, pieces, fused: oneSolid, text: (healthy ? 'FIXED' : 'NOT FULLY FIXED') + ' · ' + (oneSolid ? 'FUSED into one solid' : pieces ? `NOT FUSED: ${pieces} separate pieces (${why})` : `fuse not confirmed (${why})`) };
       // 4. CENTRE

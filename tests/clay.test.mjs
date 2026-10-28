@@ -324,9 +324,20 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const page = await makePage({ model: models.multi(), heightMm: 40 }); const w = page.w; await wait(1200);
   ok(!!page.$('v2DiagBtn'), 'D1 the Advanced drawer has a COPY DIAGNOSTIC REPORT button');
   const text = await w.__shrinkDiagReport();
-  ok(/SHRINK release/.test(text) && /fuse-export build: 2\.188/.test(text) && /Separate pieces now: 3/.test(text) && /Working model triangles/.test(text), 'D1 the report names the release, the fuse build, the pieces and the triangles');
+  ok(/SHRINK release/.test(text) && /fuse-export build: 2\.189/.test(text) && /Separate pieces now: 3/.test(text) && /Working model triangles/.test(text), 'D1 the report names the release, the fuse build, the pieces and the triangles');
   const src = (await import('fs')).readFileSync(new URL('../print-export-safety.js', import.meta.url), 'utf8');
   ok(/fuse-export\.js\?v=\$\{REL\}/.test(src) && !/fuse-export\.js\?v=\$\{VERSION\}/.test(src), 'D2 fuse-export.js is loaded under the page release, not the old fixed key');
+}
+
+
+/* ---- v2.189: a model that needs repair first (stacked duplicate shell) still fuses into one solid; degenerate triangles alone do not make it "not fixed" ---- */
+{
+  const page = await makePage({ model: models.overlap(), heightMm: 40 }); const w = page.w; await wait(900);
+  page.$('v2MagicBtn').click(); await wait(2000);
+  for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250);
+  const v = w.__shrinkLastVerdict;
+  ok(!!v && v.fused === true && v.pieces === 1 && /FIXED/.test(v.text) && /FUSED into one solid/.test(v.text), 'V1 two overlapping spheres: QUICK-FIX says FIXED and FUSED into one solid: ' + (v && v.text));
+  ok(/2\.189/.test(w.__shrinkFuseBuild || ''), 'V1 the report names the 2.189 fuse build');
 }
 
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
