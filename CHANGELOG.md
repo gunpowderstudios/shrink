@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.190
+- Degenerate (zero-area) triangles no longer take 10 points off the health score or show red. They are still listed, but slicers skip them and they never blocked printing, so a watertight, fused model now reads 100 "Excellent". (They are not deleted: removing a zero-area triangle can open an edge.)
+
 ## v2.189
 - **Russ's tiger now fuses to one solid in the browser too.** The v2.188 report showed the main body fused but 8 inside-out specks (about -0.01 mm3 each) left over, from the repair fallback path (used when a mesh has a stacked duplicate shell). That path now splits into shells like the main one, and anything under 1e-5 of the biggest volume, or inside-out, is dust and dropped.
 - The QUICK-FIX verdict and BATCH no longer call a model "not fixed" just because it has degenerate triangles (they never blocked printing): FIXED means no open, non-manifold or flipped edges.

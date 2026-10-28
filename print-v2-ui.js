@@ -166,7 +166,7 @@
     if (h.openEdges > 0) score -= 35;
     if (h.pinchedEdges > 0) score -= 35;
     if (h.flippedEdges > 0) score -= 20;
-    if (h.degenerateTriangles > 0) score -= 10;
+    // Degenerate (zero-area) triangles are reported but cost nothing (v2.190): slicers skip them and they never block printing, the same rule as meshHealth.
     score = Math.max(0, score);
     const label = score === 100 ? 'Excellent' : score >= 80 ? 'Good' : score >= 55 ? 'Needs attention' : 'Poor';
     const level = score === 100 ? 'good' : score >= 80 ? 'fair' : 'bad';
@@ -282,7 +282,7 @@
       const watertight = h.openEdges === 0;
       const manifold = h.pinchedEdges === 0;
       const oriented = h.flippedEdges === 0;
-      const cleanDegens = h.degenerateTriangles === 0;
+      const cleanDegens = true;                       // informational only (v2.190): shown, never red
       $('v2HealthRows').innerHTML =
         healthRow('Watertight', watertight ? 'YES' : 'NO', watertight) +
         healthRow('Open edges', new Intl.NumberFormat().format(h.openEdges), h.openEdges === 0) +

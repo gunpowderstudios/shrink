@@ -340,5 +340,15 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(/2\.189/.test(w.__shrinkFuseBuild || ''), 'V1 the report names the 2.189 fuse build');
 }
 
+
+/* ---- v2.190: degenerate triangles are shown but cost no health points ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); await wait(900);
+  const rows = page.$('v2HealthRows');
+  ok(page.$('v2HealthScore').textContent === '100' && !rows.querySelector('strong.issue'), 'S1 a clean model scores 100 with nothing red');
+  const src = (await import('fs')).readFileSync(new URL('../print-v2-ui.js', import.meta.url), 'utf8');
+  ok(!/degenerateTriangles > 0\) score -= 10/.test(src) && /const cleanDegens = true/.test(src), 'S1 degenerate triangles no longer take points off or show red');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);
