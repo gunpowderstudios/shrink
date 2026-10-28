@@ -186,7 +186,7 @@ export function repairMesh({ positions, indices, weldTolerance = 0, maxDpLoop = 
 
   /* 3. tangled edges: keep the two triangles that continue the surface */
   onProgress(36, 'Untangling edges…');
-  {
+  const untangle = () => {
     const E = buildEdges(F, nf), removed = new Uint8Array(nf);
     let any = false;
     for (let h = 0; h < E.size; h++) {
@@ -204,7 +204,8 @@ export function repairMesh({ positions, indices, weldTolerance = 0, maxDpLoop = 
       info.forEach((x, i) => { if (i !== pi && i !== pj) { removed[x.f] = 1; stats.tangledRemoved++; any = true; } });
     }
     if (any) { let w = 0; for (let f = 0; f < nf; f++) if (!removed[f]) { F[w * 3] = F[f * 3]; F[w * 3 + 1] = F[f * 3 + 1]; F[w * 3 + 2] = F[f * 3 + 2]; w++; } nf = w; }
-  }
+  };
+  untangle();
 
   /* shared by step 4 and step 6: face components, optionally with consistent orientation */
   const flood = (E, applyOrientation) => {
@@ -346,6 +347,17 @@ export function repairMesh({ positions, indices, weldTolerance = 0, maxDpLoop = 
       fillHoles(true); stats.flipped += flood(buildEdges(F, nf), true).flips;
       if (problems() >= before) { F = keepF; nf = keepNf; nP = keepNP; stats.holeLoops = keepHoleLoops; stats.holeTriangles = keepHoleTris; stats.flipped = keepFlipped; }
     }
+  }
+
+  /* 5b. (v2.196) closing a hole can leave a handful of tangled edges (a cap triangle meeting an edge that already has two). Untangle once more and
+     re-close; the result is kept only if it leaves fewer problem edges than before. */
+  for (let round = 0; round < 3; round++) {
+    const h0 = meshHealth(P.subarray(0, nP * 3), F.subarray(0, nf * 3));
+    if (h0.tangled === 0 || h0.tangled > 200) break;
+    const before = h0.open + h0.tangled + h0.flipped, keepF = F.slice(0, nf * 3), keepNf = nf, keepNP = nP, keepRemoved = stats.tangledRemoved, keepLoops = stats.holeLoops, keepTris = stats.holeTriangles;
+    untangle(); fillHoles(false);
+    const h1 = meshHealth(P.subarray(0, nP * 3), F.subarray(0, nf * 3));
+    if (h1.open + h1.tangled + h1.flipped >= before) { F = keepF; nf = keepNf; nP = keepNP; stats.tangledRemoved = keepRemoved; stats.holeLoops = keepLoops; stats.holeTriangles = keepTris; break; }
   }
 
   /* 6. every closed shell must face outward */

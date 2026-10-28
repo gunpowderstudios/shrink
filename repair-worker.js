@@ -1,5 +1,5 @@
 // SHRINK 3D v2.18 core — runs the mesh repair / health check off the main thread so the page never freezes.
-import { repairMesh, meshHealth } from './repair-core.js?v=2.147';
+import { repairMesh, meshHealth } from './repair-core.js?v=2.196';
 
 self.onmessage = e => {
   const m = e.data;

@@ -163,4 +163,15 @@ const expectedVolume = 4 / 3 * Math.PI * 20 ** 3;
     'health result is the same whether points arrive pre-welded or as triangle soup');
 }
 
+/* a lone extra triangle stuck on one edge of a closed sphere (one non-manifold edge) is removed and the result is clean (v2.196) */
+{
+  const m = rawSphere(20, 24, 16);
+  const n = m.pos.length / 3;
+  m.pos.push(40, 40, 40);                       // a stray point far away
+  m.idx.push(m.idx[0], m.idx[1], n);            // a triangle hanging off the first triangle's edge: that edge now has three triangles
+  const before = meshHealth(new Float32Array(m.pos), new Uint32Array(m.idx));
+  const r = repair(m);
+  ok(before.tangled > 0 && r.stats.after.tangled === 0 && r.stats.after.open === 0 && r.stats.after.flipped === 0, 'stray triangle on one edge: repaired to a clean mesh (tangled ' + before.tangled + ' -> ' + r.stats.after.tangled + ')');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall repair regressions passed');

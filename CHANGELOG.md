@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.196
+- Repair: after closing holes, SHRINK untangles any edge that now has three triangles and closes again (kept only if it leaves fewer problem edges). This targets the "1 non-manifold edge" models that QUICK-FIX left at 65/100. The repair graph cache key moved to 2.196 so browsers pick up the new repair-core.js. Test: stray triangle on a sphere edge in `tests/repair.test.mjs`. Not yet confirmed on the real 44 MB model.
+- BATCH rows: the file name no longer gets squeezed to nothing by a long message (the message wraps now).
+
 ## v2.195
 - BATCH no longer flags a model whose only fault is a handful (10 or fewer) of non-manifold edges with no open edges and no flipped faces: slicers cope with that, and Make watertight would cost far more detail than it saves. The row stays green and says "1 minor edge, fine to print". Real problems still get the amber row and the Make watertight button.
 

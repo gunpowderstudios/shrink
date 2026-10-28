@@ -198,7 +198,7 @@
     const model = app()?.optimizedModel || app()?.originalModel;
     if (!model) { r.message = 'There is no model to check.'; return; }
     try {
-      const mod = await import('./solid-rebuild.js?v=2.147');
+      const mod = await import('./solid-rebuild.js?v=2.196');
       const h = await mod.healthAsync(model, { signal: S.abort?.signal });
       r.topology = { ...h, openEdges: h.open, pinchedEdges: h.tangled, flippedEdges: h.flipped, degenerateTriangles: h.degenerate };
       r.state = h.clean ? 'ok' : 'needs';
@@ -272,7 +272,7 @@
 
   async function loadRepairModules() {
     if (window.__shrinkRepairModules) return window.__shrinkRepairModules;
-    const [rebuildMod, repairMod] = await Promise.all([import('./solid-rebuild.js?v=2.147'), import('./repair-core.js?v=2.147')]);
+    const [rebuildMod, repairMod] = await Promise.all([import('./solid-rebuild.js?v=2.196'), import('./repair-core.js?v=2.196')]);
     return { gatherWorldMesh: rebuildMod.gatherWorldMesh, buildRoot: rebuildMod.buildRoot, repairMesh: repairMod.repairMesh };
   }
 
@@ -314,7 +314,7 @@
     S.abort = new AbortController();                  // set before the first paint so the Cancel button shows straight away
     render();
     try {
-      const { rebuildSolid } = window.__shrinkRebuildSolid ? { rebuildSolid: window.__shrinkRebuildSolid } : await import('./solid-rebuild.js?v=2.147');   // the override exists for tests
+      const { rebuildSolid } = window.__shrinkRebuildSolid ? { rebuildSolid: window.__shrinkRebuildSolid } : await import('./solid-rebuild.js?v=2.196');   // the override exists for tests
       // Rebuild from the ORIGINAL file when it is not huge: it still has all the fine detail that shrinking trims away.
       const original = app()?.originalModel, shrunk = app()?.optimizedModel;
       const source = original && countTris(original) <= 1500000 ? original : (shrunk || original);

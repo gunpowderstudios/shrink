@@ -3,8 +3,8 @@
 // usual repair makes the result printable. Geometry maths lives in clay-core.js; this file is the brush, the preview and the apply step.
 import * as THREE from 'https://esm.sh/three@0.180.0';
 import { dabSoup, dabsAlong, joinSoups, thin } from './clay-core.js?v=2.147';
-import { gatherWorldMesh } from './solid-rebuild.js?v=2.147';
-import { healthOfModel } from './repair-core.js?v=2.147';
+import { gatherWorldMesh } from './solid-rebuild.js?v=2.196';
+import { healthOfModel } from './repair-core.js?v=2.196';
 
 const $ = id => document.getElementById(id);
 const V = () => window.__shrinkViewer;
