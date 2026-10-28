@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.186
+- (v2.185 was the mobile-screen restyle, committed without a note.)
+- QUICK-FIX now says plainly whether the model is fixed and fused. The MODEL HEALTH box has a **Pieces** row: "1 (one solid)" in green, or "N (not fused)" in amber (several closed pieces are valid, so it is not a health fault and does not change the score). QUICK-FIX's last line reads e.g. "FIXED · NOT FUSED: 35 separate pieces (it still has too many triangles to fuse)".
+- When a model is still over the fuse limit after SHRINK (16K ultra can leave millions of triangles), QUICK-FIX now steps the printer detail down one level at a time (16K, 8K fine, 8K, 4K), shrinks again until it fits, and fuses. The file-name tag shows the level really used; your own saved printer choice is put back for the next model.
+- BATCH flags a model that finished with separate pieces ("N separate pieces (not fused)") in amber, with "OPEN it, press FUSE IT".
+
 ## v2.184
 - The green BATCH button on the load screen is gone. BATCH lives in the top bar next to RELOAD (it is there before a model is loaded too).
 

@@ -156,6 +156,8 @@ function whyLine(i) {
   const fixedNow = S.fixing === i.id && !S.running && Number($('v2HealthScore')?.textContent) >= 100 && window.__shrinkApp?.sourceFile === i.file;
   if (fixedNow) return '<div class="v2-batch-why good">✓ Fixed in the main window. Press <b>DOWNLOAD</b> (top right) to put the fixed file in the ZIP.</div>';
   const what = (i.issues && i.issues.length ? i.issues.join(', ') : 'health is below 100');
+  const onlyPieces = !!(i.issues && i.issues.length && i.issues.every(x => /separate pieces/.test(x)));
+  if (onlyPieces) return `<div class="v2-batch-why">Not fused: ${what.replace(/</g, '&lt;')}. It is clean and prints fine as separate pieces. To join them: <b>OPEN</b> it, press <b>FUSE IT</b>, then <b>DOWNLOAD</b>. Or ignore it: the ZIP already holds this file.</div>`;
   const going = S.fixing === i.id ? 'Now fix it in the main window: <b>FIX IT</b> (or <b>Make watertight</b>), then <b>DOWNLOAD</b>.' : 'To fix: <b>OPEN</b> it, press <b>FIX IT</b> (or <b>Make watertight</b>), then <b>DOWNLOAD</b>.';
   return `<div class="v2-batch-why">Not fixed: ${what.replace(/</g, '&lt;')}. ${going} Or ignore it: the ZIP already holds this file.</div>`;
 }
@@ -212,6 +214,7 @@ const deps = {
     return got;
   },
   applySettings,
+  verdict: () => window.__shrinkLastVerdict || null,
   healthScore: () => $('v2HealthScore')?.textContent || '',
   // what is still wrong, read from the MODEL HEALTH box: e.g. ['13 non-manifold edges']
   healthIssues: () => {
@@ -260,6 +263,7 @@ async function start() {
         item.status = 'done'; item.msg = score ? `health ${score}/100` : 'done'; ok++;
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100;      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
+        { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) { if (!item.warn) warned++; item.warn = true; item.issues = (item.issues || []).concat(`${v.pieces} separate pieces (not fused)`); } }
       } catch (err) {
         console.warn('[SHRINK 3D] batch item failed', item.name, err);
         item.status = 'failed'; item.msg = String(err.message || err).slice(0, 80);

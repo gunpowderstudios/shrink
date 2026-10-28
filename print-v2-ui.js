@@ -172,6 +172,38 @@
     return { score, label, level };
   }
 
+  // How many separate pieces (shells that share no vertex) the working model has. Quantised world positions, union-find; skipped for huge models (v2.185).
+  const PIECES_MAX_TRIANGLES = 1500000;
+  async function countPieces(model) {
+    const THREE = app()?.THREE; if (!model || !THREE) return null;
+    try {
+      model.updateWorldMatrix?.(true, true);
+      const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return null;
+      const size = box.getSize(new THREE.Vector3()), tol = Math.max(size.length() * 1e-6, 1e-9);
+      const meshes = []; let tris = 0;
+      model.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) { meshes.push(o); const g = o.geometry; tris += g.index ? g.index.count / 3 : g.attributes.position.count / 3; } });
+      if (!meshes.length || tris > PIECES_MAX_TRIANGLES) return null;
+      const ids = new Map(), parent = []; const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+      const v = new THREE.Vector3(); let n = 0;
+      for (const m of meshes) {
+        const g = m.geometry, pos = g.attributes.position, idx = g.index, map = new Int32Array(pos.count);
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+          const key = Math.round(v.x / tol) + ',' + Math.round(v.y / tol) + ',' + Math.round(v.z / tol);
+          let id = ids.get(key); if (id === undefined) { id = n++; ids.set(key, id); parent.push(id); }
+          map[i] = id;
+        }
+        const cnt = idx ? idx.count : pos.count;
+        for (let t = 0; t < cnt; t += 3) {
+          const a = map[idx ? idx.getX(t) : t], b = map[idx ? idx.getX(t + 1) : t + 1], c = map[idx ? idx.getX(t + 2) : t + 2];
+          const ra = find(a), rb = find(b), rc = find(c); if (ra !== rb) parent[rb] = ra; const r2 = find(rc); if (r2 !== ra) parent[r2] = ra;
+        }
+        await wait(0);
+      }
+      const used = new Set(); for (let i = 0; i < n; i++) used.add(find(i)); return used.size;
+    } catch (e) { console.warn('piece count', e); return null; }
+  }
+
   function healthRow(label, value, ok) {
     return `<div class="v2-health-row"><span>${label}</span><strong class="${ok ? 'ok' : 'issue'}">${value}</strong></div>`;
   }
@@ -254,6 +286,12 @@
         healthRow('Non-manifold', new Intl.NumberFormat().format(h.pinchedEdges), manifold) +
         healthRow('Flipped faces', new Intl.NumberFormat().format(h.flippedEdges), oriented) +
         healthRow('Degenerates', new Intl.NumberFormat().format(h.degenerateTriangles), cleanDegens);
+      const rowsEl = $('v2HealthRows'); delete rowsEl.dataset.pieces;
+      countPieces(model).then(np => {
+        if (run !== healthRun || !np) return;
+        rowsEl.dataset.pieces = String(np);
+        rowsEl.insertAdjacentHTML('beforeend', np === 1 ? '<div class="v2-health-row"><span>Pieces</span><strong class="ok">1 (one solid)</strong></div>' : `<div class="v2-health-row v2-pieces-row"><span>Separate pieces</span><strong class="note">${np} (not fused)</strong></div>`);
+      });
     } catch (err) {
       card.className = 'v2-health-card bad';
       quickState('ready');
@@ -835,7 +873,7 @@
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
     btn.disabled = true; btn.dataset.busy = '1'; setWorking(true); const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
-    const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
+    window.__shrinkLastVerdict = null; let verdict = null; const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
       const startTris = modelTriangles(sourceModel());
@@ -855,6 +893,24 @@
       btn.textContent = '1/4 Shrinking…'; show('Shrinking…'); await paintNow();
       try { await shrinkModel(); const now = modelTriangles(sourceModel()); done('ok', '✓', `Shrunk: ${startTris.toLocaleString()} → ${now.toLocaleString()} triangles`); }
       catch (err) { done('warn', '⚠', `Could not shrink (${err.message || err})`); }
+      // 1b. Too detailed to fuse (v2.185). 16K ultra can leave millions of triangles, and FUSE is refused above the limit. Step down one detail level at a time
+      //     (16K, 8K fine, 8K, 4K) and shrink again until it fits, and say so. The file name tag then shows the level that was really used.
+      const fuseLimit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES; let loweredFrom = null;
+      if (modelTriangles(sourceModel()) > fuseLimit && dashboard) {
+        const type0 = dashboard.dataset.printerType || 'resin', ladder = ['ultra', 'fine', 'standard', 'large'].filter(k => PRINTER_LIST.some(x => x.type === type0 && x.quality === k)), q0 = dashboard.dataset.quality || 'standard'; 
+        const from = currentPrinter(); let at = ladder.indexOf(q0);
+        while (at >= 0 && at < ladder.length - 1 && modelTriangles(sourceModel()) > fuseLimit && type0 !== 'custom') {
+          at++;
+          loweredFrom = loweredFrom || from; setQuality(ladder[at]);
+          btn.textContent = '1/4 Shrinking more…'; show(`Still ${modelTriangles(sourceModel()).toLocaleString()} triangles: too many to fuse. Shrinking more (${currentPrinter().tag})…`); await paintNow();
+          try { await shrinkModel(); } catch (err) { console.warn('second shrink', err); break; }
+        }
+        if (loweredFrom) {
+          try { localStorage.setItem(PRINTER_KEY, JSON.stringify({ type: type0, quality: q0 })); } catch { /* nothing to remember */ }   // the next model starts from your own choice again
+          const now = modelTriangles(sourceModel());
+          done(now > fuseLimit ? 'warn' : 'ok', now > fuseLimit ? '⚠' : '✓', `Shrunk further for fusing: printer detail went from ${loweredFrom.tag} to ${currentPrinter().tag} (${now.toLocaleString()} triangles)`);
+        }
+      }
       // 2. FIX (only if the health check says something is wrong)
       btn.textContent = '2/4 Fixing…'; show('Checking and fixing…'); await updateHealthCard(); await paintNow();
       if ($('v2HealthScore')?.textContent === '100' && !window.__shrinkClay?.hasClay?.()) done('ok', '✓', 'Already clean: nothing to fix');
@@ -870,12 +926,20 @@
       await fuseCheck(); await wait(60);
       const fs = fc?.dataset.state;
       done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
+      // The verdict (v2.185): said plainly, and kept in the health box (Separate pieces row) because the step list above is hidden.
+      await updateHealthCard(); await wait(80);
+      let pieces = null; for (let i = 0; i < 40 && !pieces; i++) { pieces = Number($('v2HealthRows')?.dataset.pieces) || null; if (!pieces) await wait(50); }
+      const healthy = $('v2HealthScore')?.textContent === '100', oneSolid = pieces === 1;
+      const why = modelTriangles(sourceModel()) > fuseLimit ? 'it still has too many triangles to fuse' : fs === 'good' ? 'the pieces do not all touch' : 'the fuse step could not finish (see the Fuse box)';
+      verdict = { healthy, pieces, fused: oneSolid, text: (healthy ? 'FIXED' : 'NOT FULLY FIXED') + ' · ' + (oneSolid ? 'FUSED into one solid' : pieces ? `NOT FUSED: ${pieces} separate pieces (${why})` : `fuse not confirmed (${why})`) };
       // 4. CENTRE
       btn.textContent = '4/4 Levelling…'; show('Levelling and centring…'); await paintNow();
       try { if (resetStretch()) done('ok', '✓', 'Width and depth set back to the original proportions'); } catch (e) { console.warn('stretch reset', e); }
       let lv = null; try { lv = levelModel(); } catch (e) { console.warn('level', e); }
       if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);
       reducedTick++; const cr = centreOnBed(); setTimeout(refreshDims, 50); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } try { faceFront(); } catch (e) { console.warn('front view', e); } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
+      window.__shrinkLastVerdict = verdict;
+      if (verdict) { rows.push({ cls: verdict.healthy && verdict.fused ? 'ok' : 'warn', icon: verdict.healthy && verdict.fused ? '✓' : '⚠', text: verdict.text }); note.dataset.verdict = verdict.healthy && verdict.fused ? 'ok' : 'warn'; }
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
       markStep?.(4, 'active');
       { const dl = $('v2MagicDownload'); if (dl) dl.disabled = false; }
