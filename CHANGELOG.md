@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.192
+- The "This is a complex one! Hold tight while SHRINK works its magic!" note is now big and in the centre of the screen (it ignores clicks, so nothing underneath is blocked) while QUICK-FIX works on a very detailed model.
+
 ## v2.191
 - A very detailed model (over 1,000,000 triangles) now shows a note under the top-right buttons while QUICK-FIX works: "This is a complex one! Hold tight while SHRINK works its magic!". It disappears when QUICK-FIX finishes.
 

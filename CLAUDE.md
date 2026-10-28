@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.191** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.192** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -36,8 +36,8 @@ Reduced previews and FIX/FUSE results get their shading normals from `crease-nor
 ### Helper cache keys and the diagnostic report (v2.188)
 `print-export-safety.js` loads fuse-export / split-print / split-fallback / preview-material-fix / watertight-remesh under `REL` (the `?v=` it was itself imported with = `PRINT_RELEASE`), NOT its old fixed `VERSION` ('2.63'): a fixed key made browsers keep stale copies after a fix. Never hard-code a cache key for a module that changes. `#v2DiagBtn` (Advanced drawer) copies `window.__shrinkDiagReport()`; `window.__shrinkFuseBuild` shows which fuse-export is really loaded and `window.__shrinkLastFuse` the last fuse result.
 
-### Big-task note (v2.191)
-`#v2BigTask` (inside `.v2-magic-wrap`, top right) is shown by `shrinkMyModel()` when the model starts above `BIG_TASK_TRIANGLES` (1,000,000; tests override with `window.__shrinkBigTaskTris`) and hidden in its `finally`. Tests: M1 in `tests/clay.test.mjs`.
+### Big-task note (v2.191, centred since v2.192)
+`#v2BigTask` (still built inside `.v2-magic-wrap`, but `position:fixed` in the middle of the screen with `pointer-events:none`) is shown by `shrinkMyModel()` when the model starts above `BIG_TASK_TRIANGLES` (1,000,000; tests override with `window.__shrinkBigTaskTris`) and hidden in its `finally`. Tests: M1 in `tests/clay.test.mjs`.
 
 ### Health score ignores degenerates (v2.190)
 `healthScore()` in `print-v2-ui.js` no longer deducts for degenerate triangles and the row is never red; they are informational (same rule as `meshHealth`). Do not delete them to "fix" the row: a zero-area triangle can be part of a closed edge loop.
