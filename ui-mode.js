@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.199';
+  const PRINT_RELEASE = '2.200';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -51,8 +51,8 @@
   const steps = document.createElement('div'); steps.className = 'workflow-strip'; chooser.insertAdjacentElement('afterend', steps);
 
   const TEXT = {
-    game: { subtitle:'Make a model light enough for a game — and see exactly what you gave up.', steps:'<b>Game model</b><span>1&nbsp; Target</span><i>→</i><span>2&nbsp; Detail</span><i>→</i><span>3&nbsp; Touch up</span><i>→</i><span>4&nbsp; Save</span>', setupTitle:'Where will it be used?', setupSub:'Pick one — it sets sensible limits for you.', detailSub:'Drag the slider — the model on the right updates live.', extraNum:'3', extraTitle:'Touch up (optional)', extraSub:'Paint out stickers, plates or marks on the textures.', saveNum:'4', saveTitle:'Save', saveSub:'Builds the final GLB (resized textures, compressed mesh) and downloads it.', btn:'Save game GLB', drop:['Drop a model here','GLB for games · STL, OBJ or PLY also work'], accept:'.glb,.stl,.obj,.ply,model/gltf-binary' },
-    print: { subtitle:'Make big 3D models printable without needing to know the technical stuff.', steps:'<b>3D print</b><span>1&nbsp; Set up</span><i>→</i><span>Use any tool you need</span>', setupTitle:'Choose your printer & size', setupSub:'Tell us what kind of printer you have and how tall the finished model should be.', detailSub:'SHRINK can find the smallest version that still looks the same.', extraNum:'3', extraTitle:'Protect key details (optional)', extraSub:'Paint faces or fine ornament you want to keep sharp. Everything else is reduced first.', saveNum:'4', saveTitle:'Download', saveSub:'Save one STL or split it into sections with pegs.', btn:'Also save GLB (keeps colours)', drop:['Drop a sculpt here','STL, OBJ, PLY or GLB — from ShapeLab, Cinema 4D, Blender…'], accept:'.stl,.obj,.ply,.glb,model/gltf-binary' }
+    game: { subtitle:'Make a model light enough for a game — and see exactly what you gave up.', steps:'<b>Game model</b><span>1&nbsp; Target</span><i>→</i><span>2&nbsp; Detail</span><i>→</i><span>3&nbsp; Touch up</span><i>→</i><span>4&nbsp; Save</span>', setupTitle:'Where will it be used?', setupSub:'Pick one — it sets sensible limits for you.', detailSub:'Drag the slider — the model on the right updates live.', extraNum:'3', extraTitle:'Touch up (optional)', extraSub:'Paint out stickers, plates or marks on the textures.', saveNum:'4', saveTitle:'Save', saveSub:'Builds the final GLB (resized textures, compressed mesh) and downloads it.', btn:'Save game GLB', drop:['Drop a model here','GLB for games · STL, OBJ or PLY for 3D printing'], accept:'.glb,.stl,.obj,.ply,model/gltf-binary' },
+    print: { subtitle:'Make big 3D models printable without needing to know the technical stuff.', steps:'<b>3D print</b><span>1&nbsp; Set up</span><i>→</i><span>Use any tool you need</span>', setupTitle:'Choose your printer & size', setupSub:'Tell us what kind of printer you have and how tall the finished model should be.', detailSub:'SHRINK can find the smallest version that still looks the same.', extraNum:'3', extraTitle:'Protect key details (optional)', extraSub:'Paint faces or fine ornament you want to keep sharp. Everything else is reduced first.', saveNum:'4', saveTitle:'Download', saveSub:'Save one STL or split it into sections with pegs.', btn:'Also save GLB (keeps colours)', drop:['Drop a model here','GLB for games · STL, OBJ or PLY for 3D printing'], accept:'.stl,.obj,.ply,.glb,model/gltf-binary' }
   };
 
   const setText = (id,v) => { const el=$(id); if(el) el.textContent=v; };
@@ -65,7 +65,6 @@
     ['setupTitle','setupSub','detailSub','extraNum','extraTitle','extraSub','saveNum','saveTitle','saveSub'].forEach(k=>setText(k,t[k]));
     const btn=$('optimizeBtn'); if(btn){btn.dataset.label=t.btn;if(!btn.disabled)btn.textContent=t.btn;}
     const s=dropZone?.querySelector('strong'),sp=dropZone?.querySelector('span'); if(s)s.textContent=t.drop[0];if(sp)sp.textContent=t.drop[1];if(fileInput)fileInput.accept=t.accept;
-    try{localStorage.setItem('shrink-mode',mode);}catch{}
     window.dispatchEvent(new CustomEvent('shrink:ui-mode',{detail:{mode}}));
     if(announce) window.__shrinkApp?.setStatus?.(mode==='print'?'Print mode — load a sculpt, choose your printer and size, then use Fuse, SHRINK or Download in any combination.':'Game mode — pick where it will be used, then drag the detail slider.');
   }
@@ -73,7 +72,14 @@
   const sniff=name=>{if(/\.(stl|obj|ply)$/i.test(name||''))setMode('print');};
   fileInput?.addEventListener('change',()=>sniff(fileInput.files?.[0]?.name));
   dropZone?.addEventListener('drop',e=>sniff(e.dataTransfer?.files?.[0]?.name),true);
-  window.addEventListener('shrink:model-opened',()=>{const k=window.__shrinkApp?.sourceKind;if(k&&k!=='glb')setMode('print');});
+  /* v2.200: the file type picks the tools. STL/OBJ/PLY = print, GLB = game; a small link lets a GLB be treated as a print model. */
+  const override=document.createElement('p');override.className='mode-override';
+  override.innerHTML='Game model tools. <button type="button" id="modeUsePrint">Use as a print model</button>';
+  steps.insertAdjacentElement('afterend',override);
+  override.querySelector('button').addEventListener('click',()=>{setMode('print',true);body.classList.remove('has-glb-model');});
+  window.addEventListener('shrink:model-opened',()=>{const k=window.__shrinkApp?.sourceKind;
+    if(k&&k!=='glb'){body.classList.remove('has-glb-model');setMode('print');}
+    else if(k==='glb'){body.classList.add('has-glb-model');setMode('game');}});
   window.__shrinkUI={setMode,getMode:currentMode};
-  let saved='game';try{saved=localStorage.getItem('shrink-mode')||'game';}catch{} setMode(saved);
+  setMode('game');
 })();

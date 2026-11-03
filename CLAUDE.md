@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.199** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.200** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -41,6 +41,9 @@ Reduced previews and FIX/FUSE results get their shading normals from `crease-nor
 
 ### Minor edges are fine (v2.195)
 `deps.minor()` in batch.js reads the MODEL HEALTH rows: no open edges and 1 to `MINOR_EDGES` (10) non-manifold edges plus flipped faces together (v2.197) = fine to print (row stays green, no Make watertight button). Voxel rebuilds drop detail (104k to 21k triangles in a real run) so they are not worth it for that.
+
+### Mode follows the file (v2.200)
+`ui-mode.js` picks Game or Print from `sourceKind` on `shrink:model-opened` (glb = game, anything else = print); nothing is saved. `.mode-chooser` is hidden by CSS but stays in the DOM (batch/tests click `.mode-card`). `.mode-override` ("Use as a print model") shows for a GLB in game mode. The green side tab is `.v2-left-toggle`.
 
 ### Minor score (v2.199)
 `healthScore()` in `print-v2-ui.js` returns 95 / 'Good' / `minor` for no open edges and 1 to `MINOR_MAX` (10) non-manifold edges plus flipped faces. Anything that tests `score === 100` still treats it as not perfectly clean (QUICK-FIX still tries to fix); BATCH decides warnings with `deps.minor()`.

@@ -155,3 +155,9 @@
 
 /* v2.118: in Game mode the slider and the target cards set the detail; "Find the smallest" is for 3D print (SHRINK IT clicks it), so its row is hidden there */
 .app-mode-game .detail-row:has(#autoBtn) { display: none; }
+
+/* v2.200: the mode is chosen by the file type, so the two big cards are gone (kept in the DOM for scripts and tests) */
+.mode-chooser{display:none!important}
+.mode-override{display:none;margin:0 0 10px;font-size:12px;color:#9fb0c3}
+.mode-override button{appearance:none;background:none;border:0;padding:0;color:#33c882;font-weight:800;cursor:pointer;text-decoration:underline;font-size:12px}
+body.app-mode-game.has-glb-model .mode-override{display:block}

@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.200
+- The tools now follow the file: STL/OBJ/PLY opens the 3D print tools, GLB opens the game tools. The two big Game/3D print cards are hidden (still in the DOM for scripts). A GLB shows a small "Use as a print model" link to switch. The saved `shrink-mode` choice is no longer used.
+- The collapsed side tab ("Printer, size & tools") is green so it is easy to see and expand.
+- Print mode: "Advanced optimisation settings" (Detail kept) is open by default.
+
 ## v2.199
 - MODEL HEALTH: a handful of stray edges (no open edges, 10 or fewer non-manifold edges and flipped faces together) now scores 95/100 "Good" in green/amber instead of 65 "Needs attention" in red, with a note "N minor edges: your slicer will handle this. Fine to print." Real problems keep their big deductions. The batch rows therefore show "health 95/100 · N minor edges, fine to print".
 
