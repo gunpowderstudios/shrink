@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.201
+- Game models (GLB) now open with Detail kept at 50% instead of 10%. The target cards and the slider still change it.
+
 ## v2.200
 - The tools now follow the file: STL/OBJ/PLY opens the 3D print tools, GLB opens the game tools. The two big Game/3D print cards are hidden (still in the DOM for scripts). A GLB shows a small "Use as a print model" link to switch. The saved `shrink-mode` choice is no longer used.
 - The collapsed side tab ("Printer, size & tools") is green so it is easy to see and expand.
