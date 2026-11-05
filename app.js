@@ -815,7 +815,10 @@ async function optimizeModel() {
     stripEmpty(document);      // parts cut out with the Remove brush leave a collapsed placeholder triangle; the saved file does not need it
     window.__shrinkMaterial?.applyToDocument?.(document);      // Material look: the saved GLB gets the same metallic setting as the preview
     await window.__shrinkMaterial?.applyColourToDocument?.(document);   // colour correction repaints the base-colour picture (before it is resized)
-    const keepRatio = Number(els.geometry.value) / 100;
+    const racerOn = window.__shrinkUI?.getMode?.() !== 'print' && !!window.__shrinkRacer?.active?.();
+    // Racer: the polygon count comes from the vertex budget (racer-geometry-core.js), not from the Detail slider. A first reduction brings the car near the
+    // budget so the wheel finder works on a sensible mesh; the exact budget is applied after the wheels are cut out.
+    const keepRatio = racerOn ? window.__shrinkRacer.preRatio(document) : Number(els.geometry.value) / 100;
 
     lastReduce = null;
     setProgress(15, 'Cleaning geometry…');
@@ -838,9 +841,13 @@ async function optimizeModel() {
       const wr = window.__shrinkWheels.apply(document);
       if (wr && !wr.found) setStatus(`No wheels separated: ${wr.reason}`);
     }
-    if (!printMode && $('groundToggle')?.checked) {        // origin in the middle, lowest point on the ground (after the wheels are cut so they move with the car)
+    if (!printMode && !racerOn && $('groundToggle')?.checked) {        // origin in the middle, lowest point on the ground (after the wheels are cut so they move with the car)
       const g = centreOnGround(document, getBounds);
       if (g.moved) setProgress(50, 'Centring the model on the origin…');
+    }
+    if (racerOn) {        // Racer: size, position and orientation stay exactly as in the source (no centring above); the vertex budget is applied here
+      setProgress(50, 'Applying the Racer vertex budget…');
+      await window.__shrinkRacer.geometry(document, MeshoptSimplifier, text => setProgress(50, text));
     }
     if (!printMode && window.__shrinkRacer?.active?.()) {        // Racer preset: per-map sizes, dropped maps, one texture set (racer.js)
       setProgress(52, 'Preparing the textures for the Racer…');

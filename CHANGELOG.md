@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.202
+- Racer preset: vertex budget for the car (`racer-geometry-core.js`). Each wheel (`Wheel_FL` ... or `Wheel_F` / `Wheel_L`, `Wheel_R`) is reduced to about 7,000 vertices and the whole car to about 80,000 (both editable in the Racer panel). Triangles nobody can see (the underside and the enclosed inside, found with a depth render from a ring of directions at or above the horizon) are simplified hard and the rest of the budget goes to what is seen, so the outline, lights and windows keep their shape. The Detail kept slider is not used for Racer.
+- Racer: the single material is renamed `car`; the car is no longer centred on the ground or moved (the "centre on ground" step is skipped for Racer), so size, position and orientation stay as in the source; the 2048 base colour option is gone (textures are 1024 / 1024 / 512 at most).
+- Racer panel: shows vertices per wheel and body, how much was seen / hidden, the file size (warns above 2.5 MB), and warns if the wheel parts are missing or misnamed or a pivot is off-centre.
+
 ## v2.201
 - Game models (GLB) now open with Detail kept at 50% instead of 10%. The target cards and the slider still change it.
 

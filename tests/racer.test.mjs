@@ -57,7 +57,7 @@ assert.equal(memoryStatus(11.9), 'ok'); assert.equal(memoryStatus(20), 'warn'); 
   const r = await apply(doc, { ...O }, ops);
   assert.equal(r.finalMaterials, 1, 'one material for the whole vehicle'); assert.equal(r.merged, 2);
   const root = doc.getRoot(), mats = root.listMaterials();
-  assert.equal(mats.length, 1); assert.equal(root.listTextures().length, 3, 'one base, one ORM, one normal');
+  assert.equal(mats.length, 1); assert.equal(mats[0].getName(), 'car', 'the one material is named car (the game looks it up by name)'); assert.equal(root.listTextures().length, 3, 'one base, one ORM, one normal');
   const m = mats[0], sizes = Object.fromEntries([['base', m.getBaseColorTexture()], ['mr', m.getMetallicRoughnessTexture()], ['normal', m.getNormalTexture()]].map(([k, t]) => [k, imageSize(t.getImage())]));
   assert.deepEqual(sizes.base, { w: 64, h: 64 }); assert.deepEqual(sizes.mr, { w: 64, h: 64 }); assert.deepEqual(sizes.normal, { w: 32, h: 32 });
   assert.equal(m.getOcclusionTexture(), m.getMetallicRoughnessTexture(), 'occlusion shares the ORM map'); assert.equal(m.getEmissiveTexture(), null);

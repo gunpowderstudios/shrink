@@ -229,6 +229,7 @@ export async function apply(doc, options, ops, progress = () => {}) {
   const final = doc.getRoot().listTextures().map((t, i) => { const s = sizeOf(t), r = roles.get(t) || new Set(['base']); return { name: texName(t, i), w: s?.w, h: s?.h, roles: [...r], mb: s ? gpuMB(s.w, s.h) : 0 }; });
   report.final = final; report.afterMB = final.reduce((a, t) => a + t.mb, 0); report.status = memoryStatus(report.afterMB);
   report.finalMaterials = usedMaterials(doc).list.length;
+  if (report.finalMaterials === 1) { const m = usedMaterials(doc).list[0]; if (m.getName() !== 'car') { m.setName('car'); report.notes.push('The material is named "car", as the game expects.'); } }   // v2.202: the game looks the material up by this name
   return report;
 }
 

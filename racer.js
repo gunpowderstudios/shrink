@@ -1,15 +1,19 @@
 // SHRINK 3D v2.140 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
-import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.147';
+import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.202';
+import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.202';
+import { compactPrimitive, getPrimitiveVertexCount } from '@gltf-transform/functions';
 
 const $ = id => document.getElementById(id);
 const A = () => window.__shrinkApp;
 const active = () => document.querySelector('#targetCards .target-card.active')?.dataset.target === 'racer';
-const st = { last: null, est: null, estFor: null, busy: 0 };
+const st = { last: null, est: null, estFor: null, busy: 0, geo: null, bytes: 0 };
+const FILE_MAX_MB = 2.5, FILE_TYPICAL_MB = 1.8;
 const fmtMB = n => (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + ' MB';
 const px = (w, h) => (w && h ? `${w}×${h}` : '?');
 
+const geoOpts = () => ({ totalVerts: Math.max(20000, Number($('racerVerts')?.value) || GEO_DEFAULTS.totalVerts), wheelVerts: Math.max(2000, Number($('racerWheelVerts')?.value) || GEO_DEFAULTS.wheelVerts) });
 function opts() {
-  return { baseSize: $('racerHigh')?.checked ? 2048 : 1024, mrSize: 1024, normalSize: 512, quality: Math.max(0.45, Math.min(0.95, Number($('textureQuality')?.value || 85) / 100)), merge: !!$('racerMerge')?.checked };
+  return { baseSize: 1024, mrSize: 1024, normalSize: 512, quality: Math.max(0.45, Math.min(0.95, Number($('textureQuality')?.value || 85) / 100)), merge: !!$('racerMerge')?.checked };
 }
 
 /* ---------- browser pixel work for racer-core ---------- */
@@ -46,13 +50,14 @@ function build() {
 .racer-panel summary{cursor:pointer;margin-top:4px;font-weight:700}`;
   document.head.appendChild(css);
   const panel = document.createElement('div'); panel.id = 'racerPanel'; panel.className = 'racer-panel game-only'; panel.hidden = true;
-  panel.innerHTML = `<label class="toggle-row" title="Base colour at 2048 instead of 1024 (about +16 MB of GPU memory)"><span>High: 2048 base colour</span><input id="racerHigh" type="checkbox"></label>
+  panel.innerHTML = `<label class="toggle-row" title="Most vertices the whole car may have. The wheels are taken out first, the rest is the body."><span>Whole car, vertices</span><input id="racerVerts" type="number" min="20000" max="300000" step="1000" value="80000" style="width:90px"></label>
+    <label class="toggle-row" title="Vertices for each wheel (a round tyre and a clear rim need about 6,000 to 8,000)"><span>Each wheel, vertices</span><input id="racerWheelVerts" type="number" min="2000" max="30000" step="500" value="7000" style="width:90px"></label>
     <label class="toggle-row" title="If the model has several materials (the wheels often have their own textures), re-pack them into one atlas with one set of textures"><span>Merge into one texture set</span><input id="racerMerge" type="checkbox" checked></label>
-    <div id="racerGpu" class="racer-gpu" data-level="none"></div><div id="racerWarn"></div>
+    <div id="racerGpu" class="racer-gpu" data-level="none"></div><div id="racerGeo" class="racer-warn info"></div><div id="racerWarn"></div>
     <details id="racerList"><summary>Textures and what is dropped</summary><div id="racerDetail"></div></details>`;
   ($('budgetChip') || cards).insertAdjacentElement('afterend', panel);
   cards.addEventListener('click', () => setTimeout(refresh, 0));
-  for (const id of ['racerHigh', 'racerMerge']) $(id).addEventListener('change', () => { st.last = null; refresh(); });
+  for (const id of ['racerMerge']) $(id).addEventListener('change', () => { st.last = null; refresh(); });
   $('textureQuality')?.addEventListener('change', () => refresh());
   return true;
 }
@@ -62,8 +67,15 @@ function render(rep, built) {
   const verdict = lvl === 'ok' ? `within the ~${TARGET_MB} MB target` : lvl === 'warn' ? `over the ~${TARGET_MB} MB target` : `FAIL: ${FAIL_MB} MB or more is likely to run out of memory on phones`;
   $('racerGpu').dataset.level = lvl;
   $('racerGpu').innerHTML = `${built ? 'Built' : 'Estimate'}: GPU texture memory ≈ ${fmtMB(mb)} <small>${verdict}${rep.beforeMB > mb + 0.5 ? ` · the original needs ${fmtMB(rep.beforeMB)}` : ''}${built ? '' : ' · press Optimise to build it'}</small>`;
+  $('racerGeo').innerHTML = built && st.geo ? describeGeometry(st.geo, st.bytes).map(esc).join('<br>') : 'Press Optimise: the car is reduced to the vertex budget, wheels first, and the Detail slider is not used.';
   const warns = [...(rep.warnings || [])]; for (const n of new Set(rep.notes || [])) warns.push({ level: 'info', text: n });
   if (built && rep.finalMaterials > 1) warns.push({ level: 'warn', text: `The file still has ${rep.finalMaterials} materials.` });
+  if (st.geo && built) {
+    for (const w of st.geo.warnings) warns.push({ level: 'warn', text: w });
+    const mb = st.bytes / 1048576;
+    if (mb > FILE_MAX_MB) warns.push({ level: 'warn', text: `The file is ${mb.toFixed(2)} MB, over the ${FILE_MAX_MB} MB limit for a car.` });
+    else if (mb > FILE_TYPICAL_MB) warns.push({ level: 'info', text: `The file is ${mb.toFixed(2)} MB (typical is 1.2 to ${FILE_TYPICAL_MB} MB, ${FILE_MAX_MB} MB at most).` });
+  }
   if (lvl === 'fail') warns.unshift({ level: 'warn', text: 'This is over the phone memory limit. Try the merge, a smaller base colour, or fewer textures.' });
   $('racerWarn').innerHTML = warns.map(w => `<div class="racer-warn ${w.level === 'info' ? 'info' : ''}">${w.level === 'info' ? 'ℹ' : '⚠'} ${esc(w.text)}</div>`).join('');
   const rows = built
@@ -97,8 +109,16 @@ async function process(doc, progress) {
   return rep;
 }
 
-window.__shrinkRacer = { active, process, opts, get last() { return st.last?.report || null; }, refresh };
+async function geometry(doc, simplifier, progress) {
+  await simplifier.ready;
+  st.geo = await applyGeometry(doc, geoOpts(), { simplifier, compactPrimitive, getPrimitiveVertexCount }, progress);
+  return st.geo;
+}
+// first reduction before the wheels are cut out: down to about 1.6 x the budget (never up)
+function preRatio(doc) { const total = vertexReport(doc).total; return total > 0 ? Math.min(1, (geoOpts().totalVerts * 1.6) / total) : 1; }
+
+window.__shrinkRacer = { active, process, opts, geoOpts, geometry, preRatio, get last() { return st.last?.report || null; }, refresh };
 for (const ev of ['shrink:model-opened', 'shrink:source-replaced', 'shrink:texture-applied']) window.addEventListener(ev, () => { st.est = null; st.estFor = null; st.last = null; setTimeout(refresh, 400); });
-window.addEventListener('shrink:optimized', () => refresh());
+window.addEventListener('shrink:optimized', e => { st.bytes = e.detail?.bytes || 0; refresh(); });
 window.addEventListener('shrink:ui-mode', () => setTimeout(refresh, 0));
 if (!build()) { const t = setInterval(() => { if (build()) { clearInterval(t); refresh(); } }, 300); setTimeout(() => clearInterval(t), 20000); }
