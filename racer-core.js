@@ -8,13 +8,13 @@
 // Pixel work is done through `ops` (decode / encode / prune / enableWebP) so this file stays free of the browser.
 
 export const MB = 1048576;
-export const TARGET_MB = 16.5;        // about this much per vehicle is the aim
+export const TARGET_MB = 12;        // about this much per vehicle is the aim
 export const FAIL_MB = 46;          // at or above this a phone is likely to run out of memory
 export const gpuBytes = (w, h) => w * h * 4 * 1.33;
 export const gpuMB = (w, h) => gpuBytes(w, h) / MB;
 export function memoryStatus(mb) { return mb >= FAIL_MB ? 'fail' : mb > TARGET_MB * 1.04 ? 'warn' : 'ok'; }
 
-export const DEFAULTS = { baseSize: 1024, mrSize: 1024, normalSize: 1024, quality: 0.85, merge: true };
+export const DEFAULTS = { baseSize: 1024, mrSize: 1024, normalSize: 512, quality: 0.85, merge: true };
 const SLOT_CAP = (o) => ({ base: o.baseSize, mr: o.mrSize, occ: o.mrSize, normal: o.normalSize, emissive: 0, other: o.mrSize });
 
 /* ---------- image size without decoding (PNG, JPEG, WebP) ---------- */
@@ -222,47 +222,14 @@ export async function apply(doc, options, ops, progress = () => {}) {
     const t = tlist[i]; if (done.has(t)) continue;
     const r = roles.get(t) || new Set(['other']), cap = Math.max(...[...r].map(x => caps[x] || caps.other)), s = sizeOf(t), f = fitTo(s, cap);
     progress(`Sizing texture ${i + 1} of ${tlist.length}…`);
-    const px = await ops.decode(t.getImage(), t.getMimeType(), f.w, f.h), role = r.has('normal') ? 'normal' : r.has('mr') ? 'mr' : r.has('base') ? 'base' : 'other';
-    if (role === 'normal' && (f.w !== s?.w || f.h !== s?.h)) renormalise(px);
-    const srcSd = role === 'normal' ? normalSd(px) : null;
-    const ch = await encodeChosen(px, f.w, f.h, role, o, ops);
-    if (role === 'normal') {   // v2.210: never export a flat normal map quietly
-      const outSd = ch.back ? normalSd(ch.back) : srcSd;
-      (report.normalCheck ||= []).push({ src: srcSd, out: outSd, bytes: ch.enc.bytes.length });
-      if (srcSd >= FLAT_SD && outSd < FLAT_SD) throw new Error(`The normal map came out flat (variation ${outSd.toFixed(1)}, the master has ${srcSd.toFixed(1)}). Nothing was exported: the creases and vents would be lost.`);
-      if (srcSd >= FLAT_SD && outSd < srcSd * 0.5) report.notes.push(`The normal map kept only ${Math.round(100 * outSd / srcSd)}% of the master's detail (variation ${outSd.toFixed(1)} of ${srcSd.toFixed(1)}).`);
-      if (srcSd < FLAT_SD) report.notes.push('The master\'s own normal map is almost flat, so the export has no relief to keep.');
-    }
-    t.setImage(ch.enc.bytes).setMimeType(ch.enc.mime); done.add(t); (report.encodes ||= []).push({ role, w: f.w, h: f.h, quality: ch.q, psnr: ch.psnr, from: s });
+    const px = await ops.decode(t.getImage(), t.getMimeType(), f.w, f.h), enc = await ops.encode(px, f.w, f.h, o.quality);
+    t.setImage(enc.bytes).setMimeType(enc.mime); done.add(t);
   }
   // what the file really holds now
   const final = doc.getRoot().listTextures().map((t, i) => { const s = sizeOf(t), r = roles.get(t) || new Set(['base']); return { name: texName(t, i), w: s?.w, h: s?.h, roles: [...r], mb: s ? gpuMB(s.w, s.h) : 0 }; });
   report.final = final; report.afterMB = final.reduce((a, t) => a + t.mb, 0); report.status = memoryStatus(report.afterMB);
   report.finalMaterials = usedMaterials(doc).list.length;
-  if (report.finalMaterials === 1) { const m = usedMaterials(doc).list[0]; if (m.getName() !== 'car') { m.setName('car'); report.notes.push('The material is named "car", as the game expects.'); } }   // v2.202: the game looks the material up by this name
   return report;
-}
-
-/* ---------- v2.210: textures are only resized and recompressed; the quality is chosen by comparing with the resized original ---------- */
-export function psnr(a, b) { let se = 0, n = 0; for (let i = 0; i < a.length; i += 4) for (let k = 0; k < 3; k++) { const d = a[i + k] - b[i + k]; se += d * d; n++; } return se ? 10 * Math.log10(255 * 255 / (se / n)) : 99; }
-// normal maps lose their length when averaged down: make every texel a unit vector again
-export function renormalise(px) { for (let i = 0; i < px.length; i += 4) { let x = px[i] / 127.5 - 1, y = px[i + 1] / 127.5 - 1, z = px[i + 2] / 127.5 - 1; const l = Math.hypot(x, y, z) || 1; px[i] = clamp8((x / l + 1) * 127.5); px[i + 1] = clamp8((y / l + 1) * 127.5); px[i + 2] = clamp8((z / l + 1) * 127.5); } return px; }
-export const QUALITY_LADDER = [0.7, 0.8, 0.85, 0.9, 0.95];   // higher quality is preferred over smaller pictures
-export const MIN_PSNR = { base: 40, mr: 40, normal: 38, other: 40 };
-// how much a normal map varies: standard deviation of its x/y channels (0-255 units). A flat blue picture is about 0.
-export const FLAT_SD = 2;
-export function normalSd(px) { let n = 0, sx = 0, sy = 0, qx = 0, qy = 0; for (let i = 0; i < px.length; i += 4) { const x = px[i], y = px[i + 1]; sx += x; sy += y; qx += x * x; qy += y * y; n++; } if (!n) return 0; const vx = Math.max(0, qx / n - (sx / n) ** 2), vy = Math.max(0, qy / n - (sy / n) ** 2); return Math.sqrt((vx + vy) / 2); }
-// the lowest quality (<= o.quality) whose result stays within MIN_PSNR of the resized original
-export async function encodeChosen(px, w, h, role, o, ops) {
-  const need = MIN_PSNR[role] || MIN_PSNR.other, steps = QUALITY_LADDER.filter(q => q <= o.quality + 1e-6); if (!steps.length) steps.push(o.quality);
-  let last = null;
-  for (const q of steps) {
-    const enc = await ops.encode(px, w, h, q); last = { enc, q, psnr: null, back: null };
-    if (!ops.decode) break;
-    const back = await ops.decode(enc.bytes, enc.mime, w, h); last.back = back; last.psnr = psnr(px, back);
-    if (last.psnr >= need) return last;
-  }
-  return last;                                                                            // nothing reached the target: the best (highest) quality tried
 }
 
 export function describe(report) {

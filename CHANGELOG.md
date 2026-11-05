@@ -2,46 +2,6 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
-## v2.210
-- Racer: a flat normal map is never exported quietly. After the textures are made, the normal map's variation (standard deviation of x/y) is compared with the master's resized map; if the master has relief and the export is flat the build STOPS with an error, and below half the master's variation a warning is shown. The panel shows the three maps (base, normal, ORM) as pictures with size and KB, and the master/export variation figures, and opens after a build.
-- Quality now prefers higher WebP steps (70–95 %, within 40 dB of the master; 38 dB for normals).
-- Still not built: the side-by-side master/export 3D view with a wheel close-up; no real Dodge export was run in this session (the computer link was down).
-
-## v2.209
-- Racer: stop the car export losing detail. The cause was found in the export itself: the normal map was cut to 512 px (body creases and bonnet vents went smooth), the simplifier ignored the UVs (triangles collapsed across rim art and seams, so alloy rims stretched into plain hubs), and the unseen triangles were crushed to 12 %.
-- The simplifier is UV-aware for the Racer budget (`reduceIndices` takes `uv`/`uvWeight`; Racer uses weight 1.5), the unseen share keeps 20 %.
-- Textures are only resized and recompressed, never redrawn: normal map cap 1024 (was 512), normals are made unit length again after shrinking, and the WebP quality is the lowest step (50–90 %) whose result stays within 38 dB (36 dB for normals) of the resized original.
-- A detail check in the Racer panel after Optimise: says whether the texture layout changed (a multi-material merge re-packs the UVs), warns when a texture lost detail or went over budget, and lists each texture's size change and quality.
-- The GPU texture target is 16.5 MB (was 12): three 1024 px maps are 16 MB. FAIL stays at 46 MB.
-- Not done: a side-by-side original/optimised viewer with a wheel close-up before export (the detail check is text only for now).
-
-## v2.208
-- Racer: the yellow warnings on scanned cars (car over the vertex budget, wheels at 9k–14k instead of 7k, "pivot off-centre") are fixed. Scans carry thousands of tiny loose pieces that the simplifier cannot merge, so it stopped at a floor (about 14k vertices per wheel, 92k for the Dodge's body). When the budget is still missed, the smallest loose pieces (hidden ones first) are now dropped until it fits. The Dodge now comes out at about 79k vertices with every wheel at about 6.9k.
-- Racer: the wheels are found on the full-detail mesh BEFORE the first reduction (`detectWheelsInDoc`, handed to `splitWheels`). The finder gave a different answer at every mesh density (Dodge tyre radius 0.185 at some, 0.104 at others), which put the wheel cut in the wrong place.
-- The pivot warning no longer fires for a tyre that is only partly modelled (its box is not round); a whole off-centre wheel is still reported.
-
-## v2.207
-- Game mode: new **Download master (GLB)** button beside Save project. It saves the edited model (paint, welds, removed parts, look) as a plain full-detail GLB named `<name>-master.glb`: not optimised, wheels not cut, no settings stored inside, so it can be used as a new master model. Save project is unchanged.
-
-## v2.206
-- Wheel sliders (size, position, track, width, up/down) are reset to zero when a new model is opened. Nudges tuned on the previous car used to carry over, which made the wheels of the next car bigger, shifted and the markers wrong ("wheels not detecting"). Checked in a real browser on escort.glb: detection itself was right (radius 0.133, centres on the tyres); a settings file or project still applies its own values after opening. Layout (4/3/2 wheels) is kept.
-
-## v2.205
-- Racer: the first reduction before the wheel finder now keeps about 450,000 vertices (was 1.6 x the budget, about 128,000). The finder was working on a heavily simplified car, which gave uneven wheels and off-centre pivots; the exact budget is still applied after the wheels are cut.
-
-## v2.204
-- Wheel detection no longer assumes the car stands on its tyres. If the file as it is gives no wheels on the ground (car lying on its side, upside down, nose down, Z-up export, any angle), `detectWheels()` looks for the orientation: axle seeds from the model's flat faces, a turn-about-the-axle scan, a fine refinement, and a re-aim at the found wheels. Upright cars take the old path and give the same answer as before.
-- Wheel result for a tilted car carries `upright:false`, `tiltDeg`, `axisVec`, `upVector`; the viewer discs sit on the found axle; the panel says the car was not upright. Racer warns that Centre on ground then uses the lowest point, not the tyres.
-- New tests: `tests/wheel-orient.test.mjs` (synthetic car at six orientations).
-
-## v2.203
-- Racer: the "Centre on ground" step is back (it was skipped in v2.202, which left the car 0.3 m below y = 0 and sank it into the road in the game). It now runs after the vertex budget, so the tyres sit exactly on y = 0 and the car is centred on the origin, as in the earlier exports. The Racer panel says whether the step is on.
-
-## v2.202
-- Racer preset: vertex budget for the car (`racer-geometry-core.js`). Each wheel (`Wheel_FL` ... or `Wheel_F` / `Wheel_L`, `Wheel_R`) is reduced to about 7,000 vertices and the whole car to about 80,000 (both editable in the Racer panel). Triangles nobody can see (the underside and the enclosed inside, found with a depth render from a ring of directions at or above the horizon) are simplified hard and the rest of the budget goes to what is seen, so the outline, lights and windows keep their shape. The Detail kept slider is not used for Racer.
-- Racer: the single material is renamed `car`; the car is no longer centred on the ground or moved (the "centre on ground" step is skipped for Racer), (superseded by v2.203); the 2048 base colour option is gone (textures are 1024 / 1024 / 512 at most).
-- Racer panel: shows vertices per wheel and body, how much was seen / hidden, the file size (warns above 2.5 MB), and warns if the wheel parts are missing or misnamed or a pivot is off-centre.
-
 ## v2.201
 - Game models (GLB) now open with Detail kept at 50% instead of 10%. The target cards and the slider still change it.
 

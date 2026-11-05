@@ -815,12 +815,8 @@ async function optimizeModel() {
     stripEmpty(document);      // parts cut out with the Remove brush leave a collapsed placeholder triangle; the saved file does not need it
     window.__shrinkMaterial?.applyToDocument?.(document);      // Material look: the saved GLB gets the same metallic setting as the preview
     await window.__shrinkMaterial?.applyColourToDocument?.(document);   // colour correction repaints the base-colour picture (before it is resized)
-    const racerOn = window.__shrinkUI?.getMode?.() !== 'print' && !!window.__shrinkRacer?.active?.();
-    // Racer: the polygon count comes from the vertex budget (racer-geometry-core.js), not from the Detail slider. A first reduction brings the car near the
-    // budget so the wheel finder works on a sensible mesh; the exact budget is applied after the wheels are cut out.
-    const keepRatio = racerOn ? window.__shrinkRacer.preRatio(document) : Number(els.geometry.value) / 100;
+    const keepRatio = Number(els.geometry.value) / 100;
 
-    if (racerOn && window.__shrinkWheels?.enabled) { setProgress(12, 'Finding the wheels…'); window.__shrinkWheels.prepare?.(document); }   // on the full-detail mesh: the finder is unreliable once the car has been thinned
     lastReduce = null;
     setProgress(15, 'Cleaning geometry…');
     await document.transform(dedup(), weld());
@@ -841,10 +837,6 @@ async function optimizeModel() {
       setProgress(48, 'Separating the wheels…');
       const wr = window.__shrinkWheels.apply(document);
       if (wr && !wr.found) setStatus(`No wheels separated: ${wr.reason}`);
-    }
-    if (racerOn) {        // Racer: the vertex budget, applied after the wheels are cut out and BEFORE the ground step so the tyres end up exactly on y = 0
-      setProgress(50, 'Applying the Racer vertex budget…');
-      await window.__shrinkRacer.geometry(document, MeshoptSimplifier, text => setProgress(50, text));
     }
     if (!printMode && $('groundToggle')?.checked) {        // origin in the middle, lowest point on the ground (after the wheels are cut so they move with the car)
       const g = centreOnGround(document, getBounds);

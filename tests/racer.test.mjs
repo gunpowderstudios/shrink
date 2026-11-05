@@ -47,8 +47,8 @@ assert.equal(memoryStatus(11.9), 'ok'); assert.equal(memoryStatus(20), 'warn'); 
   assert.ok(p.dropped.some(d => d.name === 'body_ao' && /ORM/.test(d.reason)), 'occlusion is packed into ORM');
   assert.equal(doc.getRoot().listTextures().length, 8, 'plan() does not touch the document');
   assert.ok(p.beforeMB > 90, 'the original is far over budget: ' + p.beforeMB.toFixed(0) + ' MB'); assert.equal(memoryStatus(p.beforeMB), 'fail');
-  // at the real sizes the merged atlas is 1024 + 1024 + 1024
-  const real = plan(doc, {}); assert.ok(Math.abs(real.afterMB - (3 * 5.3203)) < 0.05 && real.status === 'ok', 'merged atlas plan: ' + real.afterMB.toFixed(2));
+  // at the real sizes the merged atlas is 1024 + 1024 + 512
+  const real = plan(doc, {}); assert.ok(Math.abs(real.afterMB - (2 * 5.3203 + 1.3301)) < 0.05 && real.status === 'ok', 'merged atlas plan: ' + real.afterMB.toFixed(2));
 }
 
 // merge into one atlas
@@ -57,7 +57,7 @@ assert.equal(memoryStatus(11.9), 'ok'); assert.equal(memoryStatus(20), 'warn'); 
   const r = await apply(doc, { ...O }, ops);
   assert.equal(r.finalMaterials, 1, 'one material for the whole vehicle'); assert.equal(r.merged, 2);
   const root = doc.getRoot(), mats = root.listMaterials();
-  assert.equal(mats.length, 1); assert.equal(mats[0].getName(), 'car', 'the one material is named car (the game looks it up by name)'); assert.equal(root.listTextures().length, 3, 'one base, one ORM, one normal');
+  assert.equal(mats.length, 1); assert.equal(root.listTextures().length, 3, 'one base, one ORM, one normal');
   const m = mats[0], sizes = Object.fromEntries([['base', m.getBaseColorTexture()], ['mr', m.getMetallicRoughnessTexture()], ['normal', m.getNormalTexture()]].map(([k, t]) => [k, imageSize(t.getImage())]));
   assert.deepEqual(sizes.base, { w: 64, h: 64 }); assert.deepEqual(sizes.mr, { w: 64, h: 64 }); assert.deepEqual(sizes.normal, { w: 32, h: 32 });
   assert.equal(m.getOcclusionTexture(), m.getMetallicRoughnessTexture(), 'occlusion shares the ORM map'); assert.equal(m.getEmissiveTexture(), null);
@@ -123,36 +123,5 @@ assert.equal(memoryStatus(11.9), 'ok'); assert.equal(memoryStatus(20), 'warn'); 
   const uv = pb.getAttribute('TEXCOORD_0'); assert.ok(uv, 'UVs were created'); const e = uv.getElement(0, [0, 0]);
   assert.ok(e[0] > 0 && e[0] < 1 && e[1] > 0 && e[1] < 1, 'inside the atlas');
   assert.equal(doc.getRoot().listMaterials()[0].getDoubleSided(), true, 'double-sided if any part needed it');
-}
-// v2.209: textures keep their layout (single material: UVs untouched), normal map to 1024 cap, quality chosen by comparison
-{
-  const { psnr, renormalise, encodeChosen, DEFAULTS } = await import('../racer-core.js?v=2.210');
-  assert.equal(DEFAULTS.normalSize, 1024);
-  const a = new Uint8ClampedArray(16).fill(100), b = new Uint8ClampedArray(16).fill(100); assert.equal(psnr(a, b), 99); b[0] = 110; assert.ok(psnr(a, b) < 99);
-  const n = new Uint8ClampedArray([200, 128, 128, 255]); renormalise(n); assert.ok(n[0] > 230 && n[1] >= 127 && n[1] <= 129, 'short normal made unit length');
-  const px = new Uint8ClampedArray(64 * 4).fill(120), tried = [];
-  const fake = { encode: async (p, w, h, q) => { tried.push(q); return { bytes: new Uint8Array([q * 100]), mime: 'image/webp' }; }, decode: async (bytes) => { const d = new Uint8ClampedArray(64 * 4).fill(120); if (bytes[0] < 60) d.fill(60); return d; } };
-  const ch = await encodeChosen(px, 8, 8, 'base', { quality: 0.9 }, fake);
-  assert.equal(ch.q, 0.7, 'lowest quality that still matches the original'); assert.deepEqual(tried, [0.7]);
-}
-// the single-material texture path never touches the UVs
-{
-  const doc = new Document(), buf = doc.createBuffer();
-  const a = doc.createMaterial('').setBaseColorTexture(tex(doc, 'a_base', 256, 256, 90));
-  const pr = prim(doc, buf, a, [0, 0, 1, 0, 0, 1]), before = Array.from(pr.getAttribute('TEXCOORD_0').getArray());
-  const sc = doc.createScene(); sc.addChild(doc.createNode('Car').setMesh(doc.createMesh('c').addPrimitive(pr)));
-  const r = await apply(doc, { ...O }, ops);
-  assert.deepEqual(Array.from(pr.getAttribute('TEXCOORD_0').getArray()), before, 'UVs unchanged'); assert.equal(r.merged, 0); assert.equal(doc.getRoot().listMaterials()[0].getName(), 'car');
-}
-// v2.210: a flat normal map is never exported quietly
-{
-  const { normalSd, FLAT_SD } = await import('../racer-core.js?v=2.210');
-  const flat = new Uint8ClampedArray(64 * 4); for (let i = 0; i < flat.length; i += 4) { flat[i] = 128; flat[i + 1] = 128; flat[i + 2] = 255; flat[i + 3] = 255; }
-  const rough = flat.slice(); for (let i = 0; i < rough.length; i += 8) rough[i] = 200;
-  assert.ok(normalSd(flat) < FLAT_SD && normalSd(rough) > 10);
-  const doc = new Document(), buf = doc.createBuffer(), m = doc.createMaterial('').setBaseColorTexture(tex(doc, 'b', 256, 256, 90)).setNormalTexture(tex(doc, 'n', 256, 256, 90));
-  const pr = prim(doc, buf, m, [0, 0, 1, 0, 0, 1]); doc.createScene().addChild(doc.createNode('Car').setMesh(doc.createMesh('c').addPrimitive(pr)));
-  const ops2 = { ...ops, decode: async (bytes, mime, w, h) => { const d = new Uint8ClampedArray(w * h * 4), fl = encoded.has(bytes); for (let k = 0; k < d.length; k += 4) { d[k] = fl ? 128 : (k % 8 ? 90 : 200); d[k + 1] = 128; d[k + 2] = 255; d[k + 3] = 255; } return d; } };
-  await assert.rejects(() => apply(doc, { ...O }, ops2), /flat/);
 }
 console.log('racer tests passed');

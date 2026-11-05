@@ -1,19 +1,15 @@
 // SHRINK 3D v2.140 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
-import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.210';
-import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.210';
-import { compactPrimitive, getPrimitiveVertexCount } from '@gltf-transform/functions';
+import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.147';
 
 const $ = id => document.getElementById(id);
 const A = () => window.__shrinkApp;
 const active = () => document.querySelector('#targetCards .target-card.active')?.dataset.target === 'racer';
-const st = { last: null, est: null, estFor: null, busy: 0, geo: null, bytes: 0 };
-const FILE_MAX_MB = 2.5, FILE_TYPICAL_MB = 1.8;
+const st = { last: null, est: null, estFor: null, busy: 0 };
 const fmtMB = n => (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + ' MB';
 const px = (w, h) => (w && h ? `${w}×${h}` : '?');
 
-const geoOpts = () => ({ totalVerts: Math.max(20000, Number($('racerVerts')?.value) || GEO_DEFAULTS.totalVerts), wheelVerts: Math.max(2000, Number($('racerWheelVerts')?.value) || GEO_DEFAULTS.wheelVerts) });
 function opts() {
-  return { baseSize: 1024, mrSize: 1024, normalSize: 1024, quality: Math.max(0.45, Math.min(0.95, Number($('textureQuality')?.value || 85) / 100)), merge: !!$('racerMerge')?.checked };
+  return { baseSize: $('racerHigh')?.checked ? 2048 : 1024, mrSize: 1024, normalSize: 512, quality: Math.max(0.45, Math.min(0.95, Number($('textureQuality')?.value || 85) / 100)), merge: !!$('racerMerge')?.checked };
 }
 
 /* ---------- browser pixel work for racer-core ---------- */
@@ -50,14 +46,13 @@ function build() {
 .racer-panel summary{cursor:pointer;margin-top:4px;font-weight:700}`;
   document.head.appendChild(css);
   const panel = document.createElement('div'); panel.id = 'racerPanel'; panel.className = 'racer-panel game-only'; panel.hidden = true;
-  panel.innerHTML = `<label class="toggle-row" title="Most vertices the whole car may have. The wheels are taken out first, the rest is the body."><span>Whole car, vertices</span><input id="racerVerts" type="number" min="20000" max="300000" step="1000" value="80000" style="width:90px"></label>
-    <label class="toggle-row" title="Vertices for each wheel (a round tyre and a clear rim need about 6,000 to 8,000)"><span>Each wheel, vertices</span><input id="racerWheelVerts" type="number" min="2000" max="30000" step="500" value="7000" style="width:90px"></label>
+  panel.innerHTML = `<label class="toggle-row" title="Base colour at 2048 instead of 1024 (about +16 MB of GPU memory)"><span>High: 2048 base colour</span><input id="racerHigh" type="checkbox"></label>
     <label class="toggle-row" title="If the model has several materials (the wheels often have their own textures), re-pack them into one atlas with one set of textures"><span>Merge into one texture set</span><input id="racerMerge" type="checkbox" checked></label>
-    <div id="racerGpu" class="racer-gpu" data-level="none"></div><div id="racerGeo" class="racer-warn info"></div><div id="racerWarn"></div>
+    <div id="racerGpu" class="racer-gpu" data-level="none"></div><div id="racerWarn"></div>
     <details id="racerList"><summary>Textures and what is dropped</summary><div id="racerDetail"></div></details>`;
   ($('budgetChip') || cards).insertAdjacentElement('afterend', panel);
   cards.addEventListener('click', () => setTimeout(refresh, 0));
-  for (const id of ['racerMerge']) $(id).addEventListener('change', () => { st.last = null; refresh(); });
+  for (const id of ['racerHigh', 'racerMerge']) $(id).addEventListener('change', () => { st.last = null; refresh(); });
   $('textureQuality')?.addEventListener('change', () => refresh());
   return true;
 }
@@ -65,27 +60,10 @@ function build() {
 function render(rep, built) {
   const lvl = rep.status, mb = rep.afterMB;
   const verdict = lvl === 'ok' ? `within the ~${TARGET_MB} MB target` : lvl === 'warn' ? `over the ~${TARGET_MB} MB target` : `FAIL: ${FAIL_MB} MB or more is likely to run out of memory on phones`;
-  $('racerGpu').dataset.level = lvl; if (built && st.maps?.length) $('racerList').open = true;
+  $('racerGpu').dataset.level = lvl;
   $('racerGpu').innerHTML = `${built ? 'Built' : 'Estimate'}: GPU texture memory ≈ ${fmtMB(mb)} <small>${verdict}${rep.beforeMB > mb + 0.5 ? ` · the original needs ${fmtMB(rep.beforeMB)}` : ''}${built ? '' : ' · press Optimise to build it'}</small>`;
-  $('racerGeo').innerHTML = built && st.geo ? describeGeometry(st.geo, st.bytes).map(esc).join('<br>') : 'Press Optimise: the car is reduced to the vertex budget, wheels first, and the Detail slider is not used.';
   const warns = [...(rep.warnings || [])]; for (const n of new Set(rep.notes || [])) warns.push({ level: 'info', text: n });
   if (built && rep.finalMaterials > 1) warns.push({ level: 'warn', text: `The file still has ${rep.finalMaterials} materials.` });
-  if (st.geo && built) {
-    for (const w of st.geo.warnings) warns.push({ level: 'warn', text: w });
-    const mb = st.bytes / 1048576;
-    if (mb > FILE_MAX_MB) warns.push({ level: 'warn', text: `The file is ${mb.toFixed(2)} MB, over the ${FILE_MAX_MB} MB limit for a car.` });
-    else if (mb > FILE_TYPICAL_MB) warns.push({ level: 'info', text: `The file is ${mb.toFixed(2)} MB (typical is 1.2 to ${FILE_TYPICAL_MB} MB, ${FILE_MAX_MB} MB at most).` });
-  }
-  warns.push($('groundToggle')?.checked === false ? { level: 'info', text: 'Centre on ground is off: the car keeps the position it has in the source file.' } : { level: 'info', text: 'Centre on ground is on: the car is centred on the origin with its tyres on y = 0, like the earlier exports.' });
-  { const wl = window.__shrinkWheels?.last; if (wl?.found && wl.upright === false) warns.push({ level: 'warn', text: `The car is not standing on its wheels in the file (${wl.tiltDeg}° from upright). The wheels were found by turning it, but Centre on ground uses the lowest point of the model, not the tyres: stand the car on its wheels in the source if the tyres do not end on y = 0.` }); }
-  if (built) {   // v2.210 detail check: the textures must be the original paint, only smaller
-    if (rep.merged) warns.push({ level: 'warn', text: 'Texture layout changed: several materials were re-packed into one atlas, so the UVs were rewritten. Untick "Merge into one texture set" to keep the original layout (the file then keeps more than one material).' });
-    else warns.push({ level: 'info', text: 'Texture layout unchanged: the original UVs and textures are kept, only resized and recompressed.' });
-    for (const e of rep.encodes || []) {
-      if (e.psnr != null && e.psnr < 34) warns.push({ level: 'warn', text: `The ${ROLE_LABEL[e.role] || e.role} texture lost detail (${e.psnr.toFixed(1)} dB against the resized original at quality ${Math.round(e.quality * 100)}). Raise the texture quality.` });
-      if (e.from && Math.max(e.from.w, e.from.h) / Math.max(e.w, e.h) > 2) warns.push({ level: 'info', text: `The ${ROLE_LABEL[e.role] || e.role} texture went from ${px(e.from.w, e.from.h)} to ${px(e.w, e.h)} (WebP quality ${Math.round(e.quality * 100)}${e.psnr != null ? `, ${e.psnr.toFixed(1)} dB` : ''}).` });
-    }
-  }
   if (lvl === 'fail') warns.unshift({ level: 'warn', text: 'This is over the phone memory limit. Try the merge, a smaller base colour, or fewer textures.' });
   $('racerWarn').innerHTML = warns.map(w => `<div class="racer-warn ${w.level === 'info' ? 'info' : ''}">${w.level === 'info' ? 'ℹ' : '⚠'} ${esc(w.text)}</div>`).join('');
   const rows = built
@@ -94,8 +72,7 @@ function render(rep, built) {
       ? [`<tr><td>base colour (atlas)</td><td>${px(rep.options.baseSize, rep.options.baseSize)}</td><td></td></tr>`, `<tr><td>metal / rough + occlusion (ORM)</td><td>${px(rep.options.mrSize, rep.options.mrSize)}</td><td></td></tr>`, `<tr><td>normal</td><td>${px(rep.options.normalSize, rep.options.normalSize)}</td><td></td></tr>`]
       : rep.textures.map(t => `<tr><td>${esc(t.roles.map(r => ROLE_LABEL[r] || r).join(' + '))} <small>${esc(t.name)}</small></td><td>${px(t.from?.w, t.from?.h)} → ${px(t.to?.w, t.to?.h)}</td><td></td></tr>`));
   const drop = (rep.dropped || []).map(d => `<tr><td>✂ ${esc(d.name)} <small>${esc(d.reason)}</small></td><td>${px(d.w, d.h)}</td><td></td></tr>`);
-  const nc = rep.normalCheck?.[0], mapsHtml = built && st.maps?.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">${st.maps.map(m => `<figure style="margin:0;width:31%;min-width:90px"><img src="${m.url}" style="width:100%;border-radius:6px;background:#222" alt=""><figcaption style="font-size:11px">${esc(m.role)} · ${px(m.w, m.h)} · ${m.kb.toFixed(0)} KB</figcaption></figure>`).join('')}</div>${nc ? `<div class="racer-warn info">Normal map detail (variation): master ${nc.src.toFixed(1)}, export ${nc.out.toFixed(1)}${nc.out < 2 ? ' — FLAT' : ''}</div>` : ''}` : '';
-  $('racerDetail').innerHTML = mapsHtml + `<table>${rows.join('')}${drop.join('')}</table>` + (!rows.length && !drop.length ? '<div>No textures in this model.</div>' : '');
+  $('racerDetail').innerHTML = `<table>${rows.join('')}${drop.join('')}</table>` + (!rows.length && !drop.length ? '<div>No textures in this model.</div>' : '');
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -117,22 +94,11 @@ async function refresh() {
 async function process(doc, progress) {
   const rep = await apply(doc, opts(), ops, progress);
   st.last = { report: rep, source: A().sourceBytes, key: JSON.stringify(opts()) };
-  for (const m of st.maps || []) URL.revokeObjectURL(m.url);
-  st.maps = doc.getRoot().listTextures().map((t, i) => ({ role: (rep.final?.[i]?.roles || ['other']).map(r => ROLE_LABEL[r] || r).join(' + '), url: URL.createObjectURL(new Blob([t.getImage()], { type: t.getMimeType() })), w: rep.final?.[i]?.w, h: rep.final?.[i]?.h, kb: t.getImage().length / 1024 }));
   return rep;
 }
 
-async function geometry(doc, simplifier, progress) {
-  await simplifier.ready;
-  st.geo = await applyGeometry(doc, geoOpts(), { simplifier, compactPrimitive, getPrimitiveVertexCount }, progress);
-  return st.geo;
-}
-// first reduction before the wheels are cut out: down to about 450k vertices (never up, never below 1.6 x the budget). v2.202 went straight to 1.6 x the budget, which left the wheel finder a mangled tyre ring (uneven wheels, off-centre pivots); the exact budget is applied after the cut.
-const WHEEL_FINDER_VERTS = 450000;
-function preRatio(doc) { const total = vertexReport(doc).total; return total > 0 ? Math.min(1, Math.max(geoOpts().totalVerts * 1.6, WHEEL_FINDER_VERTS) / total) : 1; }
-
-window.__shrinkRacer = { active, process, opts, geoOpts, geometry, preRatio, get last() { return st.last?.report || null; }, refresh };
+window.__shrinkRacer = { active, process, opts, get last() { return st.last?.report || null; }, refresh };
 for (const ev of ['shrink:model-opened', 'shrink:source-replaced', 'shrink:texture-applied']) window.addEventListener(ev, () => { st.est = null; st.estFor = null; st.last = null; setTimeout(refresh, 400); });
-window.addEventListener('shrink:optimized', e => { st.bytes = e.detail?.bytes || 0; refresh(); });
+window.addEventListener('shrink:optimized', () => refresh());
 window.addEventListener('shrink:ui-mode', () => setTimeout(refresh, 0));
 if (!build()) { const t = setInterval(() => { if (build()) { clearInterval(t); refresh(); } }, 300); setTimeout(() => clearInterval(t), 20000); }

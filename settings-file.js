@@ -64,28 +64,23 @@ async function applyPaintFirst() {
   window.__shrinkPaint?.setMode?.('navigate');      // applying paint switches Paint on; go back to rotating
   return true;
 }
-// withSettings = true: "Save project" (settings stored inside, opening the file restores them). false: "Download master" = the same edited model (paint, removed/welded parts,
-// look) as a plain GLB: not optimised, no wheel cut, no settings inside, ready to be opened later as a new master.
-async function saveModel(withSettings) {
+async function saveProject() {
   const app = window.__shrinkApp; if (!app?.sourceBytes) { say('Open a model first.', true); return; }
-  const btn = $(withSettings ? 'settingsProject' : 'settingsMaster'); if (btn) btn.disabled = true;
+  const btn = $('settingsProject'); if (btn) btn.disabled = true;
   try {
     await applyPaintFirst();
-    say(withSettings ? 'Building the project file…' : 'Building the master file…');
+    say('Building the project file…');
     const doc = await app.readDoc(), look = window.__shrinkMaterial;
     app.stripEmpty?.(doc);
     if (look?.changed) { look.applyToDocument(doc); await look.applyColourToDocument?.(doc); }
-    const d = collect(), root = doc.getRoot(), { shrinkProject, ...rest } = root.getExtras() || {};
-    root.setExtras(withSettings ? { ...rest, shrinkProject: d } : rest);
-    const bytes = await app.writeDoc(doc), stem = (d.model || 'model').replace(/\.[^.]+$/, '').replace(/-SHRINK-project$/, '').replace(/-master$/, '');
-    const name = withSettings ? `${stem}-SHRINK-project.glb` : `${stem}-master.glb`;
-    download(bytes, name, 'model/gltf-binary');
-    say(withSettings ? `Saved ${name} — the model with your paint, removed parts and wheel adjustments. Open this file in SHRINK to carry on.`
-      : `Saved ${name} — the full-detail model with your paint, welds and removed parts, not optimised. Use it as your new master.`);
-  } catch (err) { console.error(err); say(`Could not save the ${withSettings ? 'project' : 'master'}: ${err.message}`, true); }
+    const d = collect(), root = doc.getRoot();
+    root.setExtras({ ...(root.getExtras() || {}), shrinkProject: d });
+    const bytes = await app.writeDoc(doc), stem = (d.model || 'model').replace(/\.[^.]+$/, '').replace(/-SHRINK-project$/, '');
+    download(bytes, `${stem}-SHRINK-project.glb`, 'model/gltf-binary');
+    say(`Saved ${stem}-SHRINK-project.glb — the model with your paint, removed parts and wheel adjustments. Open this file in SHRINK to carry on.`);
+  } catch (err) { console.error(err); say(`Could not save the project: ${err.message}`, true); }
   finally { if (btn) btn.disabled = false; }
 }
-const saveProject = () => saveModel(true), saveMaster = () => saveModel(false);
 
 function say(text, bad) { for (const id of ['settingsFileNote', 'settingsStartNote']) { const n = $(id); if (n) { n.textContent = text; n.classList.toggle('stale', !!bad); } } }
 
@@ -140,13 +135,11 @@ function build() {
   const anchor = $('flowNote') || $('stepSave'); if (!anchor) return false;
   const row = document.createElement('div'); row.id = 'settingsFileRow'; row.className = 'settings-file-row game-only';
   row.innerHTML = '<button id="settingsProject" class="button ghost small" type="button" title="Save the whole tweaked model as one .glb: your paint, removed parts, look and wheel adjustments, with every setting stored inside. Open it in SHRINK later to carry on.">Save project (GLB)</button>' +
-    '<button id="settingsMaster" class="button ghost small" type="button" title="Download the model as a plain .glb with your paint, welds and removed parts but NOT optimised, to use as a new master. No settings are stored inside.">Download master (GLB)</button>' +
     '<button id="settingsSave" class="button ghost small" type="button" title="Save only the settings (detail, textures, wheel adjustments) to a small .json file">Settings only</button>' +
     '<button id="settingsLoad" class="button ghost small" type="button" title="Load a settings .json saved earlier (a saved project .glb is simply opened as the model)">Load settings</button>';
   const note = document.createElement('div'); note.id = 'settingsFileNote'; note.className = 'hint flow-note';
   anchor.after(row); row.after(note);
   $('settingsProject').addEventListener('click', saveProject);
-  $('settingsMaster').addEventListener('click', saveMaster);
   $('settingsSave').addEventListener('click', () => {
     const d = collect(); const stem = (window.__shrinkCapShrink?.(d.model || 'model') || 'model').replace(/\.[^.]+$/, '').replace(/[-_ ]SHRINK(?:-project|-settings)?$/i, '');
     download(d, `${stem}-SHRINK-settings.json`);
@@ -161,7 +154,7 @@ function ensureInput() {
   const i = document.createElement('input'); i.id = 'settingsLoadInput'; i.type = 'file'; i.accept = '.json,application/json'; i.hidden = true; document.body.appendChild(i);
   i.addEventListener('change', e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) takeFile(f); });
 }
-window.__shrinkSettings = { collect, apply, takeFile, saveProject, saveMaster, projectFromBytes };
+window.__shrinkSettings = { collect, apply, takeFile, saveProject, projectFromBytes };
 ensureInput(); buildStart();
 if (!$('settingsStartRow')) { const t0 = setInterval(() => { if (buildStart()) clearInterval(t0); }, 300); setTimeout(() => clearInterval(t0), 15000); }
 if (!build()) { const t = setInterval(() => { if (build()) clearInterval(t); }, 300); setTimeout(() => clearInterval(t), 15000); }

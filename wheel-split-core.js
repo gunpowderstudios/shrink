@@ -8,7 +8,6 @@
 // both axles share one tyre size. The tyre's width is measured where the tyre touches the ground, so a body panel or spat that
 // sits outside the tyre stays with the body. The car is expected to sit on its wheels, Y up, its length along X or Z.
 
-let FAST = false;   // v2.204: coarse and quick while the orientation is being searched
 const percentile = (arr, q) => { if (!arr.length) return 0; const s = Float32Array.from(arr).sort(); return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))]; };
 
 // Best circle in the side view for one end of the car (ring density minus what lies just outside it). rfix shares a radius with the other axle.
@@ -18,12 +17,12 @@ const percentile = (arr, q) => { if (!arr.length) return 0; const s = Float32Arr
 function fitAxle(Q, n, sx, L, ymin, W, rfix, centre, ground, opts) {
   const cand = [];   // centre: a single wheel on the middle line (three-wheelers); otherwise the outer pair
   for (let i = 0; i < n; i++) { const x = Q[i * 3], y = Q[i * 3 + 1], z = Q[i * 3 + 2]; if ((opts || x * sx > 0) && y < ymin + 0.25 * L && (centre ? Math.abs(z) < 0.35 * W : Math.abs(z) > 0.6 * W)) cand.push(i); }
-  const step = Math.max(1, Math.ceil(cand.length / (FAST ? 700 : 3000))), xs = [], ys = [], K = FAST ? 2 : 1;
+  const step = Math.max(1, Math.ceil(cand.length / 3000)), xs = [], ys = [];
   for (let t = 0; t < cand.length; t += step) { xs.push(Q[cand[t] * 3]); ys.push(Q[cand[t] * 3 + 1]); }
   let best = null; const m = xs.length;
-  for (let cx = opts ? opts.x0 : 0.10 * L; cx <= (opts ? opts.x1 : 0.45 * L); cx += 0.005 * L * K) {
+  for (let cx = opts ? opts.x0 : 0.10 * L; cx <= (opts ? opts.x1 : 0.45 * L); cx += 0.005 * L) {
     const X = opts ? cx : cx * sx;
-    for (let cy = ymin + 0.05 * L; cy <= ymin + 0.22 * L; cy += 0.005 * L * K) {
+    for (let cy = ymin + 0.05 * L; cy <= ymin + 0.22 * L; cy += 0.005 * L) {
       let rs = rfix ? [rfix] : []; if (!rfix) for (let r = opts ? opts.rmin : 0.05 * L; r <= (opts ? opts.rmax : 0.13 * L); r += 0.0025 * L) rs.push(r);
       if (ground) rs = rs.filter(r => cy - r >= ymin - 0.02 * L && cy - r <= ymin + 0.035 * L);
       if (!rs.length) continue;
@@ -60,8 +59,8 @@ function twoAxles(Q, n, L, W, ymin, ground) {
   return fits;
 }
 function layout4(Q, n, L, W, ymin, maxy) {
-  let fits = twoAxles(Q, n, L, W, ymin, true), grounded = true;
-  if (!fits || fits['-1'].score < 40 || fits['1'].score < 40) { fits = twoAxles(Q, n, L, W, ymin, false); grounded = false; }     // not standing on its wheels: search every height
+  let fits = twoAxles(Q, n, L, W, ymin, true);
+  if (!fits || fits['-1'].score < 40 || fits['1'].score < 40) fits = twoAxles(Q, n, L, W, ymin, false);     // not standing on its wheels: search every height
   if (!fits) return { found: false, reason: 'No wheels found (is the car sitting on its wheels?).' };
   if (fits['-1'].score < 40 || fits['1'].score < 40) return { found: false, reason: 'No clear wheel circles found in the side view.' };
   const zr = [-1, 1].map(sx => groundZ(Q, n, fits[sx], ymin, W, false));
@@ -73,19 +72,19 @@ function layout4(Q, n, L, W, ymin, maxy) {
   const cabinMid = xs.length >= 3 ? (percentile(xs, 0.05) + percentile(xs, 0.95)) / 2 : 0;
   const zc = (z0 + z1) / 2, tyreW = z1 - z0;
   const tyres = [-1, 1].map(sx => ({ sx, f: fits[sx], single: false, zc, lo: zc - z0 * 0.94, hi: z1 * 1.04 - zc, tyreW }));
-  return { found: true, layout: '4', grounded, score: Math.min(fits['-1'].score, fits['1'].score), frontSign: cabinMid > 0 ? -1 : 1, tyres };
+  return { found: true, layout: '4', frontSign: cabinMid > 0 ? -1 : 1, tyres };
 }
 
 // Two wheels: a single axle (a caravan or trailer). The axle may sit anywhere along the length; there is no front or back, so the wheels are Wheel_L / Wheel_R.
 function layout2(Q, n, L, W, ymin) {
   const opts = { x0: -0.35 * L, x1: 0.35 * L, rmin: 0.03 * L, rmax: 0.13 * L };
-  let f = fitAxle(Q, n, 1, L, ymin, W, undefined, false, true, opts), grounded = true;
-  if (!f || f.score < 40) { f = fitAxle(Q, n, 1, L, ymin, W, undefined, false, false, opts); grounded = false; }
+  let f = fitAxle(Q, n, 1, L, ymin, W, undefined, false, true, opts);
+  if (!f || f.score < 40) f = fitAxle(Q, n, 1, L, ymin, W, undefined, false, false, opts);
   if (!f || f.score < 40) return { found: false, reason: 'No clear wheel circles found for a one-axle layout (a caravan or trailer).' };
   const [z0, z1] = groundZ(Q, n, f, ymin, W, false);
   if (!(z1 - z0 > 0.01 * L)) return { found: false, reason: 'Could not measure the tyres.' };
   const zc = (z0 + z1) / 2;
-  return { found: true, layout: '2', grounded, score: f.score, frontSign: 1, tyres: [{ sx: 1, anyX: true, f, single: false, zc, lo: zc - z0 * 0.94, hi: z1 * 1.04 - zc, tyreW: z1 - z0 }] };
+  return { found: true, layout: '2', frontSign: 1, tyres: [{ sx: 1, anyX: true, f, single: false, zc, lo: zc - z0 * 0.94, hi: z1 * 1.04 - zc, tyreW: z1 - z0 }] };
 }
 
 // Three wheels: one on the middle line at the front, a pair at the back (a Reliant-style three-wheeler).
@@ -102,14 +101,14 @@ function layout3(Q, n, L, W, ymin) {
   const [pz0, pz1] = groundZ(Q, n, best.pair, ymin, W, false), [sz0, sz1] = groundZ(Q, n, best.single, ymin, W, true);
   if (!(pz1 - pz0 > 0.02 * L) || !(sz1 - sz0 > 0.02 * L)) return { found: false, reason: 'Could not measure the tyres.' };
   const pzc = (pz0 + pz1) / 2, szm = (sz0 + sz1) / 2, sHalf = (sz1 - sz0) / 2;
-  return { found: true, layout: '3', grounded: true, score: Math.min(best.single.score, best.pair.score), frontSign: best.s, tyres: [
+  return { found: true, layout: '3', frontSign: best.s, tyres: [
     { sx: best.s, f: best.single, single: true, zmid: szm, lo: sHalf * 1.1, hi: sHalf * 1.1, tyreW: sz1 - sz0 },
     { sx: -best.s, f: best.pair, single: false, zc: pzc, lo: pzc - pz0 * 0.94, hi: pz1 * 1.04 - pzc, tyreW: pz1 - pz0 } ] };
 }
 
 // P: Float32Array of world-space x,y,z. Returns { found, reason?, ... }. When found: wheels[] (name, centre[3] in world space, radius, width, index),
 // axle ('z' when the car's length is along X, 'x' when along Z) and classify(x, y, z) -> wheel index or -1 for a WORLD-space point.
-function detectInFrame(P, adj = {}) {
+export function detectWheels(P, adj = {}) {
   const n = P.length / 3;
   if (n < 100) return { found: false, reason: 'The model is too small to hold a car.' };
   let minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity, minz = Infinity, maxz = -Infinity;
@@ -159,123 +158,14 @@ function detectInFrame(P, adj = {}) {
     }
     return -1;
   };
-  return { found: true, grounded: spec.grounded !== false, score: spec.score || 0, axle: alongZ ? 'x' : 'z', lengthAxis: alongZ ? 'z' : 'x', wheels, classify, frontSign, length: L, layout: spec.layout, info: { radius: wheels[0].radius, width: wheels[0].width / (wheels[0].wf || 1), alongZ } };
-}
-
-
-/* ---------- v2.204: a car that does not stand upright in the file ----------
-   The finder above wants Y up, the tyres on the ground, the length along X or Z. A model exported lying on its side, nose-down or at any angle failed
-   with discs in the wrong places. detectWheels() first tries the file as it is (cars that stand upright give exactly the same answer as before). Only when that
-   does not find wheels standing on the ground does it look for the orientation: the length axis comes from the shape (principal axis), then the car is turned
-   about that axis in 15 degree steps (coarse, quick fit each) and the turn with the strongest tyre circles standing on the ground wins; it is refined and
-   fitted again in full. The wheels are then reported in the file's own coordinates. */
-function lengthAxisOf(P) {
-  const n = P.length / 3, step = Math.max(1, Math.floor(n / 20000)); let mx = 0, my = 0, mz = 0, c = 0;
-  for (let i = 0; i < n; i += step) { mx += P[i * 3]; my += P[i * 3 + 1]; mz += P[i * 3 + 2]; c++; } mx /= c; my /= c; mz /= c;
-  let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
-  for (let i = 0; i < n; i += step) { const x = P[i * 3] - mx, y = P[i * 3 + 1] - my, z = P[i * 3 + 2] - mz; xx += x * x; xy += x * y; xz += x * z; yy += y * y; yz += y * z; zz += z * z; }
-  let v = [1, 0.7, 0.3];
-  for (let it = 0; it < 60; it++) { const a = [xx * v[0] + xy * v[1] + xz * v[2], xy * v[0] + yy * v[1] + yz * v[2], xz * v[0] + yz * v[1] + zz * v[2]], l = Math.hypot(...a) || 1; v = [a[0] / l, a[1] / l, a[2] / l]; }
-  return v;
-}
-const unitV = v => { const l = Math.hypot(...v) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-function frameFor(e1, ref, deg) {   // rows X' = length, Y' = up (the reference turned by deg about the length), Z' = X' x Y'
-  const t = deg * Math.PI / 180, c = cross(e1, ref), up = [ref[0] * Math.cos(t) + c[0] * Math.sin(t), ref[1] * Math.cos(t) + c[1] * Math.sin(t), ref[2] * Math.cos(t) + c[2] * Math.sin(t)];
-  return [e1, up, cross(e1, up)];
-}
-function turned(P, M) { const n = P.length / 3, Q = new Float32Array(P.length); for (let i = 0; i < n; i++) { const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2]; for (let k = 0; k < 3; k++) Q[i * 3 + k] = M[k][0] * x + M[k][1] * y + M[k][2] * z; } return Q; }
-function inFileCoordinates(r, M) {   // M: file -> detection frame (rows). Everything the caller reads goes back to the file's coordinates.
-  const back = v => [M[0][0] * v[0] + M[1][0] * v[1] + M[2][0] * v[2], M[0][1] * v[0] + M[1][1] * v[1] + M[2][1] * v[2], M[0][2] * v[0] + M[1][2] * v[1] + M[2][2] * v[2]];
-  const ax = r.axle === 'x' ? [1, 0, 0] : [0, 0, 1], axisVec = back(ax), up = back([0, 1, 0]);
-  const aligned = v => { const a = v.map(Math.abs), k = a.indexOf(Math.max(...a)); return a[k] > 0.9995 ? 'xyz'[k] : null; };
-  const inner = r.classify;
-  return { ...r, wheels: r.wheels.map(w => ({ ...w, centre: back(w.centre) })), classify: (x, y, z) => inner(M[0][0] * x + M[0][1] * y + M[0][2] * z, M[1][0] * x + M[1][1] * y + M[1][2] * z, M[2][0] * x + M[2][1] * y + M[2][2] * z),
-    axle: aligned(axisVec) || 'tilted', axisVec, lengthAxis: aligned(back(r.lengthAxis === 'x' ? [1, 0, 0] : [0, 0, 1])) || 'tilted', upVector: up, upright: false, tiltDeg: Math.round(Math.acos(Math.max(-1, Math.min(1, up[1]))) * 180 / Math.PI) };
-}
-const rotAbout = (axis, deg) => { const t = deg * Math.PI / 180, c = Math.cos(t), sn = Math.sin(t), [x, y, z] = axis, k = 1 - c; return [[c + x * x * k, x * y * k - z * sn, x * z * k + y * sn], [y * x * k + z * sn, c + y * y * k, y * z * k - x * sn], [z * x * k - y * sn, z * y * k + x * sn, c + z * z * k]]; };
-const mulM = (A, B) => A.map(r => [0, 1, 2].map(j => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
-
-// Dominant flat-face directions of the model (area weighted, sign ignored). Side panels and tyre walls both face along the axle, so the strongest peaks are good axle seeds.
-function normalPeaks(P, count) {
-  const nt = Math.floor(P.length / 9), step = Math.max(1, Math.floor(nt / 60000)), K = 1500, dirs = [];
-  for (let i = 0; i < K; i++) { const y = 1 - 2 * (i + 0.5) / K, r = Math.sqrt(1 - y * y), t = i * 2.399963229728653; dirs.push([r * Math.cos(t), y, r * Math.sin(t)]); }
-  const w = new Float64Array(K);
-  for (let t = 0; t < nt; t += step) {
-    const o = t * 9, ux = P[o + 3] - P[o], uy = P[o + 4] - P[o + 1], uz = P[o + 5] - P[o + 2], vx = P[o + 6] - P[o], vy = P[o + 7] - P[o + 1], vz = P[o + 8] - P[o + 2];
-    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, a = Math.hypot(nx, ny, nz); if (a < 1e-12) continue;
-    const X = nx / a, Y = ny / a, Z = nz / a;
-    for (let k = 0; k < K; k++) { const d = Math.abs(dirs[k][0] * X + dirs[k][1] * Y + dirs[k][2] * Z); if (d > 0.985) w[k] += a * (d - 0.985); }
-  }
-  const order = Array.from({ length: K }, (_, i) => i).sort((p, q) => w[q] - w[p]), out = [];
-  for (const i of order) { if (out.length >= count || w[i] <= 0) break; if (out.every(v => Math.abs(v[0] * dirs[i][0] + v[1] * dirs[i][1] + v[2] * dirs[i][2]) < 0.94)) out.push(dirs[i]); }
-  return out;
-}
-export function detectWheels(P, adj = {}) {
-  const first = detectInFrame(P, adj);
-  if (first.found && first.grounded) return { ...first, upright: true };
-  if (P.length / 3 < 100) return first;
-  const e1 = lengthAxisOf(P), pick = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(a => [a, Math.abs(a[0] * e1[0] + a[1] * e1[1] + a[2] * e1[2])]).sort((p, q) => p[1] - q[1])[0][0];
-  const d = pick[0] * e1[0] + pick[1] * e1[1] + pick[2] * e1[2], ref0 = [pick[0] - d * e1[0], pick[1] - d * e1[1], pick[2] - d * e1[2]], rl = Math.hypot(...ref0), ref = ref0.map(v => v / rl);
-  // how well does a frame show two axles of round tyres standing low in the car? (the ring-density score of the finder; 0 when it finds nothing)
-  const evalM = (M, fast) => { FAST = fast; try { const r = detectInFrame(turned(P, M), adj); return r.found ? { r, M, score: r.score } : null; } finally { FAST = false; } };
-  // the length axis from the shape can be 20 degrees out (a tall cabin pulls it), so also try it tilted a little each way
-  const e2 = cross(e1, ref), axes = [e1];
-  for (const t of []) for (const sgn of [-1, 1]) for (const v of [ref, e2]) { const c = Math.cos(sgn * t * Math.PI / 180), sn = Math.sin(sgn * t * Math.PI / 180); axes.push([e1[0] * c + v[0] * sn, e1[1] * c + v[1] * sn, e1[2] * c + v[2] * sn]); }
-  const cands = [];
-  axes.forEach((ax, ai) => {
-    const l = Math.hypot(...ax), a = ax.map(v => v / l), d = ref[0] * a[0] + ref[1] * a[1] + ref[2] * a[2], r0 = ref.map((v, i) => v - d * a[i]), rl2 = Math.hypot(...r0), rf = r0.map(v => v / rl2);
-    for (let deg = 0; deg < 360; deg += ai ? 20 : 10) { const c = evalM(frameFor(a, rf, deg), true); if (c) { c.deg = deg; c.ai = ai; cands.push(c); } }
-  });
-  // axle seeds from the flat faces: the axle is known, so only the turn about it is searched (5 degree steps)
-  normalPeaks(P, 3).forEach((az, pi) => {
-    const helper = Math.abs(az[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], u = unitV(cross(helper, az)), v = cross(az, u);
-    for (let deg = 0; deg < 360; deg += 5) { const t = deg * Math.PI / 180, l = [u[0] * Math.cos(t) + v[0] * Math.sin(t), u[1] * Math.cos(t) + v[1] * Math.sin(t), u[2] * Math.cos(t) + v[2] * Math.sin(t)], M = [l, cross(az, l), az], c = evalM(M, true); if (c) { c.deg = deg; c.ai = 100 + pi; cands.push(c); } }
-  });
-  if (!cands.length) return first.found ? { ...first, upright: true, ungrounded: true } : first;
-  cands.sort((p, q) => q.score - p.score);
-  const starts = []; for (const c of cands) { if (starts.length >= 4) break; if (starts.every(t => t.ai !== c.ai || Math.min(Math.abs(t.deg - c.deg) % 360, 360 - Math.abs(t.deg - c.deg) % 360) >= 30)) starts.push(c); }
-  const polish = start => {
-    let best = start;
-    // refine: small turns about the three frame axes (the length axis from the shape is only good to a few degrees), coarse to fine, keeping what scores higher
-    for (const step of [6, 3, 1.5, 0.75]) for (let round = 0; round < 4; round++) {
-      let improved = false;
-      for (const row of [0, 1, 2]) for (const sgn of [-1, 1]) {
-        const M = mulM(rotAbout(best.M[row], sgn * step), best.M);   // turn the file's frame about one of the detection axes (rows of M, expressed in file coordinates)
-        const c = evalM(M, true); if (c && c.score > best.score) { best = c; improved = true; }
-      }
-      if (!improved) break;
-    }
-    let fin = evalM(best.M, false) || best;
-    // the wheels themselves give a truer axle and length direction than the body shape: re-aim the frame at them (twice) and keep it unless the fit gets clearly worse
-    for (let pass = 0; pass < 4; pass++) {
-      const ws = fin.r.wheels; if (fin.r.layout !== '4' || ws.length !== 4) break;
-      const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], avg = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
-      const get = (role, sz) => ws.find(w => w.role === role && w.sz === sz); const fl = get('front', -1), fr = get('front', 1), rl = get('rear', -1), rr = get('rear', 1);
-      if (!fl || !fr || !rl || !rr) break;
-      const a1 = sub(fr.centre, fl.centre), a2 = sub(rr.centre, rl.centre), axv = [a1[0] + a2[0], a1[1] + a2[1], a1[2] + a2[2]];
-      const lv = sub(avg(fl.centre, fr.centre), avg(rl.centre, rr.centre));
-      const unit = v => { const l = Math.hypot(...v) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }, dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-      const ax = unit(axv); let ln = unit(sub(lv, ax.map(v => v * dot(lv, ax)))); if (dot(ln, lv) < 0) ln = ln.map(v => -v);
-      const alongX = fin.r.axle === 'z';
-      let X = alongX ? ln : ax; const Z = alongX ? ax : ln; let Y = cross(Z, X); if (Y[1] < 0) { X = X.map(v => -v); Y = Y.map(v => -v); }   // keep the car's up side up
-      const M2 = mulM([X, Y, Z], fin.M), c2 = evalM(M2, false);
-      if (c2 && (c2.score > fin.score || (c2.score >= 0.97 * fin.score && c2.r.grounded && !fin.r.grounded))) fin = c2; else break;
-    }
-    return fin;
-  };
-  let fin = null; for (const st of starts) { const f = polish(st); if (!fin || f.score > fin.score || (f.score >= 0.97 * fin.score && f.r.grounded && !fin.r.grounded)) fin = f; if (fin.score >= 100 && fin.r.grounded) break; }
-  if (first.found && fin.score < 1.15 * first.score) return { ...first, upright: true, ungrounded: true };   // not clearly better than the file as it is
-  const out = inFileCoordinates(fin.r, fin.M); out.searchedOrientation = true; out.ungrounded = !fin.r.grounded;
-  return out;
+  return { found: true, axle: alongZ ? 'x' : 'z', lengthAxis: alongZ ? 'z' : 'x', wheels, classify, frontSign, length: L, layout: spec.layout, info: { radius: wheels[0].radius, width: wheels[0].width / (wheels[0].wf || 1), alongZ } };
 }
 
 // The fitted circle can sit a little off the real hub (it is found from ring density), and a wheel that turns about an off-centre pivot wobbles in the game.
 // After the cut, fit a circle to the wheel's outer tread (Kasa least squares) and move the pivot there, and to the middle of the tyre's width. The geometry is
 // shifted back by the same amount, so nothing moves on screen. Skipped when the fit is not trustworthy (few points, not all the way round, or a big jump).
 function refinePivot(w, prims, axle) {
-  if (axle !== 'x' && axle !== 'y' && axle !== 'z') return;   // an angled axis cannot be refined this way
-  const pa = axle === 'z' ? [0, 1] : axle === 'x' ? [2, 1] : [0, 2], ax = axle === 'z' ? 2 : axle === 'x' ? 0 : 1;
+  const pa = axle === 'z' ? [0, 1] : [2, 1], ax = axle === 'z' ? 2 : 0;
   const pts = [];
   for (const pr of prims) { const a = pr.getAttribute('POSITION').getArray(); for (let i = 0; i < a.length; i += 3) pts.push(a[i + pa[0]], a[i + pa[1]], a[i + ax]); }
   const n = pts.length / 3; if (n < 60) return;
@@ -334,14 +224,10 @@ export function unshareMeshes(doc) {
     if (seen.has(m)) { const c = doc.createMesh(m.getName()).setExtras(m.getExtras()); for (const pr of m.listPrimitives()) c.addPrimitive(pr.clone()); node.setMesh(c); } else seen.add(m);
   }
 }
-const orient = det => ({ upright: det.upright !== false, ...(det.upright === false ? { tiltDeg: det.tiltDeg, axisVec: det.axisVec, upVector: det.upVector } : {}), ...(det.ungrounded ? { ungrounded: true } : {}) });
-// v2.210: finding the wheels is fragile when the mesh is thinned first (the same car gave tyre radius 0.185 at one density and 0.104 at another), so the page can
-// run the finder on the full-detail file with detectWheelsInDoc() and hand the result to splitWheels(doc, adj, det) after the first reduction.
-export function detectWheelsInDoc(doc, adj = {}) { const { P } = collectWorldPositions(doc); return detectWheels(P, adj); }
-export function splitWheels(doc, adj = {}, det0 = null) {
+export function splitWheels(doc, adj = {}) {
   unshareMeshes(doc);
   const { P, parts } = collectWorldPositions(doc);
-  const det = det0 || detectWheels(P, adj);
+  const det = detectWheels(P, adj);
   if (!det.found) return { found: false, reason: det.reason };
   const root = doc.getRoot(), buffer = root.listBuffers()[0] || doc.createBuffer(), scene = root.listScenes()[0];
   if (!scene) return { found: false, reason: 'The file has no scene.' };
@@ -436,9 +322,9 @@ export function splitWheels(doc, adj = {}, det0 = null) {
     if (!perWheel[k].length) return;
     if (!nudged) refinePivot(w, perWheel[k], det.axle);
     const mesh = doc.createMesh(w.name); for (const pr of perWheel[k]) mesh.addPrimitive(pr);
-    const nd = doc.createNode(w.name).setTranslation(w.centre).setMesh(mesh).setExtras({ wheel: true, axle: det.axle, radius: w.radius, width: w.width, ...(det.axle === 'tilted' ? { axis: det.axisVec.map(v => +v.toFixed(5)) } : {}) });
+    const nd = doc.createNode(w.name).setTranslation(w.centre).setMesh(mesh).setExtras({ wheel: true, axle: det.axle, radius: w.radius, width: w.width });
     scene.addChild(nd); made.push({ name: w.name, role: w.role, sz: w.sz, single: w.single, triangles: counts[k], centre: w.centre, width: w.width, radius: w.radius });
   });
-  if (made.length < det.wheels.length) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj }, ...orient(det) };
-  return { found: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj }, ...orient(det) };
+  if (made.length < det.wheels.length) return { found: true, partial: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
+  return { found: true, wheels: made, bodyTriangles, axle: det.axle, lengthAxis: det.lengthAxis, radius: det.info.radius, width: det.info.width, frontSign: det.frontSign, adj: { ...adj } };
 }
