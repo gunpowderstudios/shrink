@@ -5,7 +5,7 @@ export function reduceIndices({ simplifier, positions, indices, lock = null, rat
   const target = Math.max(3, Math.floor(ratio * indices.length / 3) * 3);
   const flags = lockBorder ? ['LockBorder'] : [];
   const dummy = new Float32Array(vertexCount);
-  // v2.209: with UVs the simplifier pays for stretching the texture (collapses across a UV seam or over rim art cost more); without them the old dummy attribute keeps the call identical
+  // v2.210: with UVs the simplifier pays for stretching the texture (collapses across a UV seam or over rim art cost more); without them the old dummy attribute keeps the call identical
   const useUv = uv && uv.length === vertexCount * 2;
   const run = (idx, lk, tgt) => (useUv ? simplifier.simplifyWithAttributes(idx, positions, 3, uv, 2, [uvWeight, uvWeight], lk, tgt, error, flags)[0] : simplifier.simplifyWithAttributes(idx, positions, 3, dummy, 1, [0], lk, tgt, error, flags)[0]);
 

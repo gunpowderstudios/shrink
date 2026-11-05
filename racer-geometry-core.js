@@ -8,7 +8,7 @@
 //      interior seen through a window does. The unseen triangles are crushed (`hiddenKeep`), the seen ones get what is left of `totalVerts`;
 //   3. the vertex count is measured again and the seen part is redone with a slightly larger error if the car is still over budget.
 // Meshopt's error limit is tried small first (0.01) so lights, window frames and the silhouette keep their shape when the budget allows it.
-import { reduceIndices } from './reduce-core.js?v=2.209';
+import { reduceIndices } from './reduce-core.js?v=2.210';
 
 export const GEO_DEFAULTS = { totalVerts: 80000, wheelVerts: 7000, hiddenKeep: 0.2, resolution: 1024, maxVerts: 90000 };
 export const WHEEL_NAME = /^Wheel_(FL|FR|RL|RR|F|L|R)$/;
@@ -155,7 +155,7 @@ export async function visibleTriangles(parts, { resolution = GEO_DEFAULTS.resolu
 function concat(...lists) { let n = 0; for (const l of lists) n += l.length; const out = new Uint32Array(n); let o = 0; for (const l of lists) { out.set(l, o); o += l.length; } return out; }
 function pick(idx, flags, want) { const out = []; for (let t = 0; t < flags.length; t++) if (!!flags[t] === want) out.push(idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]); return Uint32Array.from(out); }
 const asU32 = a => (a instanceof Uint32Array ? a : Uint32Array.from(a));
-const UV_WEIGHT = 1.5;   // v2.209: texture stretch counts more than a small shape error, so rims and panel creases keep their paint
+const UV_WEIGHT = 1.5;   // v2.210: texture stretch counts more than a small shape error, so rims and panel creases keep their paint
 const shrinkIdx = (simplifier, pos, idx, ratio, error, lockBorder, uv = null) => (idx.length < 9 || ratio >= 0.999 ? idx : asU32(reduceIndices({ simplifier, positions: pos, indices: idx, ratio: Math.max(0.001, ratio), error, lockBorder, uv, uvWeight: UV_WEIGHT }).indices));
 
 // items: [{ pos, idx, flags|null }]  ->  { outputs: Uint32Array[] (one per item), verts }

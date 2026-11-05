@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.210
+- Racer: a flat normal map is never exported quietly. After the textures are made, the normal map's variation (standard deviation of x/y) is compared with the master's resized map; if the master has relief and the export is flat the build STOPS with an error, and below half the master's variation a warning is shown. The panel shows the three maps (base, normal, ORM) as pictures with size and KB, and the master/export variation figures, and opens after a build.
+- Quality now prefers higher WebP steps (70–95 %, within 40 dB of the master; 38 dB for normals).
+- Still not built: the side-by-side master/export 3D view with a wheel close-up; no real Dodge export was run in this session (the computer link was down).
+
 ## v2.209
 - Racer: stop the car export losing detail. The cause was found in the export itself: the normal map was cut to 512 px (body creases and bonnet vents went smooth), the simplifier ignored the UVs (triangles collapsed across rim art and seams, so alloy rims stretched into plain hubs), and the unseen triangles were crushed to 12 %.
 - The simplifier is UV-aware for the Racer budget (`reduceIndices` takes `uv`/`uvWeight`; Racer uses weight 1.5), the unseen share keeps 20 %.

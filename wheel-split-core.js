@@ -335,7 +335,7 @@ export function unshareMeshes(doc) {
   }
 }
 const orient = det => ({ upright: det.upright !== false, ...(det.upright === false ? { tiltDeg: det.tiltDeg, axisVec: det.axisVec, upVector: det.upVector } : {}), ...(det.ungrounded ? { ungrounded: true } : {}) });
-// v2.209: finding the wheels is fragile when the mesh is thinned first (the same car gave tyre radius 0.185 at one density and 0.104 at another), so the page can
+// v2.210: finding the wheels is fragile when the mesh is thinned first (the same car gave tyre radius 0.185 at one density and 0.104 at another), so the page can
 // run the finder on the full-detail file with detectWheelsInDoc() and hand the result to splitWheels(doc, adj, det) after the first reduction.
 export function detectWheelsInDoc(doc, adj = {}) { const { P } = collectWorldPositions(doc); return detectWheels(P, adj); }
 export function splitWheels(doc, adj = {}, det0 = null) {

@@ -1,6 +1,6 @@
 // SHRINK 3D v2.140 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
-import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.209';
-import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.209';
+import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.210';
+import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.210';
 import { compactPrimitive, getPrimitiveVertexCount } from '@gltf-transform/functions';
 
 const $ = id => document.getElementById(id);
@@ -65,7 +65,7 @@ function build() {
 function render(rep, built) {
   const lvl = rep.status, mb = rep.afterMB;
   const verdict = lvl === 'ok' ? `within the ~${TARGET_MB} MB target` : lvl === 'warn' ? `over the ~${TARGET_MB} MB target` : `FAIL: ${FAIL_MB} MB or more is likely to run out of memory on phones`;
-  $('racerGpu').dataset.level = lvl;
+  $('racerGpu').dataset.level = lvl; if (built && st.maps?.length) $('racerList').open = true;
   $('racerGpu').innerHTML = `${built ? 'Built' : 'Estimate'}: GPU texture memory ≈ ${fmtMB(mb)} <small>${verdict}${rep.beforeMB > mb + 0.5 ? ` · the original needs ${fmtMB(rep.beforeMB)}` : ''}${built ? '' : ' · press Optimise to build it'}</small>`;
   $('racerGeo').innerHTML = built && st.geo ? describeGeometry(st.geo, st.bytes).map(esc).join('<br>') : 'Press Optimise: the car is reduced to the vertex budget, wheels first, and the Detail slider is not used.';
   const warns = [...(rep.warnings || [])]; for (const n of new Set(rep.notes || [])) warns.push({ level: 'info', text: n });
@@ -78,7 +78,7 @@ function render(rep, built) {
   }
   warns.push($('groundToggle')?.checked === false ? { level: 'info', text: 'Centre on ground is off: the car keeps the position it has in the source file.' } : { level: 'info', text: 'Centre on ground is on: the car is centred on the origin with its tyres on y = 0, like the earlier exports.' });
   { const wl = window.__shrinkWheels?.last; if (wl?.found && wl.upright === false) warns.push({ level: 'warn', text: `The car is not standing on its wheels in the file (${wl.tiltDeg}° from upright). The wheels were found by turning it, but Centre on ground uses the lowest point of the model, not the tyres: stand the car on its wheels in the source if the tyres do not end on y = 0.` }); }
-  if (built) {   // v2.209 detail check: the textures must be the original paint, only smaller
+  if (built) {   // v2.210 detail check: the textures must be the original paint, only smaller
     if (rep.merged) warns.push({ level: 'warn', text: 'Texture layout changed: several materials were re-packed into one atlas, so the UVs were rewritten. Untick "Merge into one texture set" to keep the original layout (the file then keeps more than one material).' });
     else warns.push({ level: 'info', text: 'Texture layout unchanged: the original UVs and textures are kept, only resized and recompressed.' });
     for (const e of rep.encodes || []) {
@@ -94,7 +94,8 @@ function render(rep, built) {
       ? [`<tr><td>base colour (atlas)</td><td>${px(rep.options.baseSize, rep.options.baseSize)}</td><td></td></tr>`, `<tr><td>metal / rough + occlusion (ORM)</td><td>${px(rep.options.mrSize, rep.options.mrSize)}</td><td></td></tr>`, `<tr><td>normal</td><td>${px(rep.options.normalSize, rep.options.normalSize)}</td><td></td></tr>`]
       : rep.textures.map(t => `<tr><td>${esc(t.roles.map(r => ROLE_LABEL[r] || r).join(' + '))} <small>${esc(t.name)}</small></td><td>${px(t.from?.w, t.from?.h)} → ${px(t.to?.w, t.to?.h)}</td><td></td></tr>`));
   const drop = (rep.dropped || []).map(d => `<tr><td>✂ ${esc(d.name)} <small>${esc(d.reason)}</small></td><td>${px(d.w, d.h)}</td><td></td></tr>`);
-  $('racerDetail').innerHTML = `<table>${rows.join('')}${drop.join('')}</table>` + (!rows.length && !drop.length ? '<div>No textures in this model.</div>' : '');
+  const nc = rep.normalCheck?.[0], mapsHtml = built && st.maps?.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">${st.maps.map(m => `<figure style="margin:0;width:31%;min-width:90px"><img src="${m.url}" style="width:100%;border-radius:6px;background:#222" alt=""><figcaption style="font-size:11px">${esc(m.role)} · ${px(m.w, m.h)} · ${m.kb.toFixed(0)} KB</figcaption></figure>`).join('')}</div>${nc ? `<div class="racer-warn info">Normal map detail (variation): master ${nc.src.toFixed(1)}, export ${nc.out.toFixed(1)}${nc.out < 2 ? ' — FLAT' : ''}</div>` : ''}` : '';
+  $('racerDetail').innerHTML = mapsHtml + `<table>${rows.join('')}${drop.join('')}</table>` + (!rows.length && !drop.length ? '<div>No textures in this model.</div>' : '');
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -116,6 +117,8 @@ async function refresh() {
 async function process(doc, progress) {
   const rep = await apply(doc, opts(), ops, progress);
   st.last = { report: rep, source: A().sourceBytes, key: JSON.stringify(opts()) };
+  for (const m of st.maps || []) URL.revokeObjectURL(m.url);
+  st.maps = doc.getRoot().listTextures().map((t, i) => ({ role: (rep.final?.[i]?.roles || ['other']).map(r => ROLE_LABEL[r] || r).join(' + '), url: URL.createObjectURL(new Blob([t.getImage()], { type: t.getMimeType() })), w: rep.final?.[i]?.w, h: rep.final?.[i]?.h, kb: t.getImage().length / 1024 }));
   return rep;
 }
 
