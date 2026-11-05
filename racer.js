@@ -1,6 +1,6 @@
 // SHRINK 3D v2.140 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
-import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.204';
-import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.204';
+import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.205';
+import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.205';
 import { compactPrimitive, getPrimitiveVertexCount } from '@gltf-transform/functions';
 
 const $ = id => document.getElementById(id);
@@ -116,8 +116,9 @@ async function geometry(doc, simplifier, progress) {
   st.geo = await applyGeometry(doc, geoOpts(), { simplifier, compactPrimitive, getPrimitiveVertexCount }, progress);
   return st.geo;
 }
-// first reduction before the wheels are cut out: down to about 1.6 x the budget (never up)
-function preRatio(doc) { const total = vertexReport(doc).total; return total > 0 ? Math.min(1, (geoOpts().totalVerts * 1.6) / total) : 1; }
+// first reduction before the wheels are cut out: down to about 450k vertices (never up, never below 1.6 x the budget). v2.202 went straight to 1.6 x the budget, which left the wheel finder a mangled tyre ring (uneven wheels, off-centre pivots); the exact budget is applied after the cut.
+const WHEEL_FINDER_VERTS = 450000;
+function preRatio(doc) { const total = vertexReport(doc).total; return total > 0 ? Math.min(1, Math.max(geoOpts().totalVerts * 1.6, WHEEL_FINDER_VERTS) / total) : 1; }
 
 window.__shrinkRacer = { active, process, opts, geoOpts, geometry, preRatio, get last() { return st.last?.report || null; }, refresh };
 for (const ev of ['shrink:model-opened', 'shrink:source-replaced', 'shrink:texture-applied']) window.addEventListener(ev, () => { st.est = null; st.estFor = null; st.last = null; setTimeout(refresh, 400); });

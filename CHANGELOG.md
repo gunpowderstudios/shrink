@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.205
+- Racer: the first reduction before the wheel finder now keeps about 450,000 vertices (was 1.6 x the budget, about 128,000). The finder was working on a heavily simplified car, which gave uneven wheels and off-centre pivots; the exact budget is still applied after the wheels are cut.
+
 ## v2.204
 - Wheel detection no longer assumes the car stands on its tyres. If the file as it is gives no wheels on the ground (car lying on its side, upside down, nose down, Z-up export, any angle), `detectWheels()` looks for the orientation: axle seeds from the model's flat faces, a turn-about-the-axle scan, a fine refinement, and a re-aim at the found wheels. Upright cars take the old path and give the same answer as before.
 - Wheel result for a tilted car carries `upright:false`, `tiltDeg`, `axisVec`, `upVector`; the viewer discs sit on the found axle; the panel says the car was not upright. Racer warns that Centre on ground then uses the lowest point, not the tyres.
