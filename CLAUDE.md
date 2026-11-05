@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.205** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.206** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -469,7 +469,7 @@ A good Simple-mode run should:
 - (v2.120) `refinePivot()` moves each wheel node's pivot to a Kasa circle fit of its outer tread (and mid-width) after the cut, shifting the geometry back; skipped when `adj` has any nudge. The detection zone is still `radius * 1.06`; whole shells are taken regardless of it.
 - Real-browser check: `tests/browser/` (`run-wheels.py`).
 - Tron (v2.87–v2.89, voxel flattening) was removed in v2.90; it could not represent arches or spats and lost the PBR maps.
-- (v2.204) `detectWheels()` no longer assumes an upright car. It first tries the file as is (`detectInFrame`, the old finder; an upright grounded result returns at once with `upright:true`). Otherwise it seeds the axle from `normalPeaks()` (area-weighted flat-face directions) plus the PCA length axis, scans the turn about the axle, hill-climbs with small rotations (`FAST` flag = coarse quick fit), re-aims the frame at the found wheel centres, and returns the result in FILE coordinates (`inFileCoordinates`: `axle` is 'x'/'y'/'z' or 'tilted', `axisVec`, `upVector`, `tiltDeg`, `upright:false`). `refinePivot` skips angled axes. Markers for tilted cars ignore the slider live-follow. Test: `tests/wheel-orient.test.mjs`. The real campervan.glb was not available for testing; only synthetic rotated cars.
+- (v2.204) `detectWheels()` no longer assumes an upright car. It first tries the file as is (`detectInFrame`, the old finder; an upright grounded result returns at once with `upright:true`). Otherwise it seeds the axle from `normalPeaks()` (area-weighted flat-face directions) plus the PCA length axis, scans the turn about the axle, hill-climbs with small rotations (`FAST` flag = coarse quick fit), re-aims the frame at the found wheel centres, and returns the result in FILE coordinates (`inFileCoordinates`: `axle` is 'x'/'y'/'z' or 'tilted', `axisVec`, `upVector`, `tiltDeg`, `upright:false`). `refinePivot` skips angled axes. Markers for tilted cars ignore the slider live-follow. Test: `tests/wheel-orient.test.mjs`. (v2.206) The wheel adjustment sliders are reset on `shrink:model-opened` (`resetAdjust` in `wheel-split.js`; layout kept); settings files apply later (after `shrink:live-ready`), so they still win. Real cars for checking live in Tim's `Downloads/Car Models` (escort, campervan, bmw, dodge all find 4 correct wheels, upright).
 
 ## Game flow bar (v2.93)
 - `game-flow.js` owns the Game-mode Optimise/Download bar (`#flowBar`, `#flowDownload`). In Game mode `buildAndSave()` in `app.js` does NOT auto-download (`__shrinkGameFlow.active()`); Download is the bar's button (it clicks the hidden `#downloadBtn`). Print mode keeps its old behaviour.

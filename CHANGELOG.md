@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.206
+- Wheel sliders (size, position, track, width, up/down) are reset to zero when a new model is opened. Nudges tuned on the previous car used to carry over, which made the wheels of the next car bigger, shifted and the markers wrong ("wheels not detecting"). Checked in a real browser on escort.glb: detection itself was right (radius 0.133, centres on the tyres); a settings file or project still applies its own values after opening. Layout (4/3/2 wheels) is kept.
+
 ## v2.205
 - Racer: the first reduction before the wheel finder now keeps about 450,000 vertices (was 1.6 x the budget, about 128,000). The finder was working on a heavily simplified car, which gave uneven wheels and off-centre pivots; the exact budget is still applied after the wheels are cut.
 
