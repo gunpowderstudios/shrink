@@ -2,9 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.203
+- Racer: the "Centre on ground" step is back (it was skipped in v2.202, which left the car 0.3 m below y = 0 and sank it into the road in the game). It now runs after the vertex budget, so the tyres sit exactly on y = 0 and the car is centred on the origin, as in the earlier exports. The Racer panel says whether the step is on.
+
 ## v2.202
 - Racer preset: vertex budget for the car (`racer-geometry-core.js`). Each wheel (`Wheel_FL` ... or `Wheel_F` / `Wheel_L`, `Wheel_R`) is reduced to about 7,000 vertices and the whole car to about 80,000 (both editable in the Racer panel). Triangles nobody can see (the underside and the enclosed inside, found with a depth render from a ring of directions at or above the horizon) are simplified hard and the rest of the budget goes to what is seen, so the outline, lights and windows keep their shape. The Detail kept slider is not used for Racer.
-- Racer: the single material is renamed `car`; the car is no longer centred on the ground or moved (the "centre on ground" step is skipped for Racer), so size, position and orientation stay as in the source; the 2048 base colour option is gone (textures are 1024 / 1024 / 512 at most).
+- Racer: the single material is renamed `car`; the car is no longer centred on the ground or moved (the "centre on ground" step is skipped for Racer), (superseded by v2.203); the 2048 base colour option is gone (textures are 1024 / 1024 / 512 at most).
 - Racer panel: shows vertices per wheel and body, how much was seen / hidden, the file size (warns above 2.5 MB), and warns if the wheel parts are missing or misnamed or a pivot is off-centre.
 
 ## v2.201

@@ -841,13 +841,13 @@ async function optimizeModel() {
       const wr = window.__shrinkWheels.apply(document);
       if (wr && !wr.found) setStatus(`No wheels separated: ${wr.reason}`);
     }
-    if (!printMode && !racerOn && $('groundToggle')?.checked) {        // origin in the middle, lowest point on the ground (after the wheels are cut so they move with the car)
-      const g = centreOnGround(document, getBounds);
-      if (g.moved) setProgress(50, 'Centring the model on the origin…');
-    }
-    if (racerOn) {        // Racer: size, position and orientation stay exactly as in the source (no centring above); the vertex budget is applied here
+    if (racerOn) {        // Racer: the vertex budget, applied after the wheels are cut out and BEFORE the ground step so the tyres end up exactly on y = 0
       setProgress(50, 'Applying the Racer vertex budget…');
       await window.__shrinkRacer.geometry(document, MeshoptSimplifier, text => setProgress(50, text));
+    }
+    if (!printMode && $('groundToggle')?.checked) {        // origin in the middle, lowest point on the ground (after the wheels are cut so they move with the car)
+      const g = centreOnGround(document, getBounds);
+      if (g.moved) setProgress(50, 'Centring the model on the origin…');
     }
     if (!printMode && window.__shrinkRacer?.active?.()) {        // Racer preset: per-map sizes, dropped maps, one texture set (racer.js)
       setProgress(52, 'Preparing the textures for the Racer…');

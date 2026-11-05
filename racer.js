@@ -1,6 +1,6 @@
 // SHRINK 3D v2.140 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
-import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.202';
-import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.202';
+import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.203';
+import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.203';
 import { compactPrimitive, getPrimitiveVertexCount } from '@gltf-transform/functions';
 
 const $ = id => document.getElementById(id);
@@ -76,6 +76,7 @@ function render(rep, built) {
     if (mb > FILE_MAX_MB) warns.push({ level: 'warn', text: `The file is ${mb.toFixed(2)} MB, over the ${FILE_MAX_MB} MB limit for a car.` });
     else if (mb > FILE_TYPICAL_MB) warns.push({ level: 'info', text: `The file is ${mb.toFixed(2)} MB (typical is 1.2 to ${FILE_TYPICAL_MB} MB, ${FILE_MAX_MB} MB at most).` });
   }
+  warns.push($('groundToggle')?.checked === false ? { level: 'info', text: 'Centre on ground is off: the car keeps the position it has in the source file.' } : { level: 'info', text: 'Centre on ground is on: the car is centred on the origin with its tyres on y = 0, like the earlier exports.' });
   if (lvl === 'fail') warns.unshift({ level: 'warn', text: 'This is over the phone memory limit. Try the merge, a smaller base colour, or fewer textures.' });
   $('racerWarn').innerHTML = warns.map(w => `<div class="racer-warn ${w.level === 'info' ? 'info' : ''}">${w.level === 'info' ? 'ℹ' : '⚠'} ${esc(w.text)}</div>`).join('');
   const rows = built

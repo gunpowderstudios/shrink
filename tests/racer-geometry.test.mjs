@@ -112,4 +112,14 @@ assert.ok(/expects/.test(wheelSetProblem(['Wheel_FL', 'Wheel_FR'])), 'a half set
   const fl = r.listNodes().find(n => n.getName() === 'Wheel_FL'); assert.deepEqual(fl.getTranslation().map(v => +v.toFixed(5)), [1.3, -0.6, 0.95], 'the wheel pivot is still where the wheel is');
   const wm = fl.getWorldMatrix(); assert.ok(Math.abs(wm[12] - 1.3) < 1e-5 && Math.abs(wm[13] + 0.6) < 1e-5 && Math.abs(wm[14] - 0.95) < 1e-5, 'world position of the wheel centre unchanged');
 }
+// 6. the ground step after the budget puts the tyres exactly on y = 0 and keeps every wheel pivot at its wheel
+{
+  const { getBounds } = await import('@gltf-transform/functions'); const { centreOnGround } = await import('../ground-core.js');
+  const { doc } = car(); await applyGeometry(doc, { resolution: 256 }, ops);
+  const before = getBounds(doc.getRoot().listScenes()[0]); assert.ok(before.min[1] < -0.5, 'the test car starts below the ground');
+  const g = centreOnGround(doc, getBounds); assert.ok(g.moved);
+  const after = getBounds(doc.getRoot().listScenes()[0]); assert.ok(Math.abs(after.min[1]) < 1e-5, 'tyres on y = 0: ' + after.min[1]);
+  assert.ok(Math.abs((after.min[0] + after.max[0]) / 2) < 1e-5 && Math.abs((after.min[2] + after.max[2]) / 2) < 1e-5, 'centred on the origin');
+  assert.equal(pivotProblems(doc).length, 0, 'pivots untouched by the move');
+}
 console.log('racer-geometry tests passed');
