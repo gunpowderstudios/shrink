@@ -1,5 +1,5 @@
 // SHRINK 3D v2.90 — "Separate the wheels" panel (Game mode). The cutting is in wheel-split-core.js; this is the switch and the message. The live preview keeps showing the reduced model; the split exists in the saved GLB only.
-import { splitWheels } from './wheel-split-core.js?v=2.147';
+import { splitWheels } from './wheel-split-core.js?v=2.204';
 
 const $ = id => document.getElementById(id);
 function fresh(layout) { return { layout: layout || '4', shiftFront: 0, shiftRear: 0, trackFront: 0, trackRear: 0, front: 0, rear: 0, dyFront: 0, dyRear: 0, dyW: { Wheel_FL: 0, Wheel_FR: 0, Wheel_RL: 0, Wheel_RR: 0, Wheel_F: 0, Wheel_L: 0, Wheel_R: 0 }, sizeFront: 1, sizeRear: 1, widthFront: 1, widthRear: 1 }; }
@@ -21,7 +21,7 @@ function text(r) {
   if (!r) return '';
   if (!r.found) return `No wheels separated: ${r.reason} The model was saved as it is.`;
   if (r.partial) return `Only ${r.wheels.length} wheel(s) separated (${r.wheels.map(w => w.name).join(', ')}). Check the result.`;
-  return `✔ Wheels separated! ${r.wheels.map(w => `${w.name} (${w.triangles} triangles)`).join(', ')}. Tyre radius ${r.radius.toFixed(3)}, width ${r.width.toFixed(3)}; they turn around the ${r.axle.toUpperCase()} axis.`;
+  return `✔ Wheels separated! ${r.wheels.map(w => `${w.name} (${w.triangles} triangles)`).join(', ')}. Tyre radius ${r.radius.toFixed(3)}, width ${r.width.toFixed(3)}; they turn around the ${r.axle === 'tilted' ? 'tilted wheel' : r.axle.toUpperCase()} axis.${r.upright === false ? ` The car is not standing on its wheels in this file (${r.tiltDeg}° from upright), so the wheels were found by turning it; Centre on ground will use the lowest point, not the tyres.` : ''}`;
 }
 api.message = () => text(api.last);
 
@@ -37,7 +37,7 @@ function showMarkers(r) {
   const colours = { L: 0xff4040, R: 0x40c0ff, FL: 0xff4040, FR: 0x40c0ff, RL: 0xffb020, RR: 0x50e070 };
   for (const w of r.wheels) {
     const g = new T.CylinderGeometry(1, 1, 1, 32);
-    if (r.axle === 'z') g.rotateX(Math.PI / 2); else g.rotateZ(Math.PI / 2);
+    if (r.axle === 'tilted' || r.lengthAxis === 'tilted') { /* a tilted car: the disc is turned in placeMarkers */ } else if (r.axle === 'z') g.rotateX(Math.PI / 2); else g.rotateZ(Math.PI / 2);
     const m = new T.Mesh(g, new T.MeshBasicMaterial({ color: colours[w.name.slice(6)] || 0xff4040, transparent: true, opacity: 0.5 }));
     m.userData.w = w; V.scene.add(m); markers.push(m);
   }
@@ -47,8 +47,12 @@ function showMarkers(r) {
 const szOf = (a, role) => (a.size > 0 ? a.size : 1) * ((role === 'front' ? a.sizeFront : a.sizeRear) > 0 ? (role === 'front' ? a.sizeFront : a.sizeRear) : 1);
 function placeMarkers() {
   const r = api.last; if (!r?.found || !markers.length) return; const a0 = r.adj || {}, a = api.adj;
-  const lead = r.lengthAxis === 'z' ? 2 : 0;
+  const lead = r.lengthAxis === 'z' ? 2 : 0, tilted = r.axle === 'tilted' || r.lengthAxis === 'tilted' || !!r.axisVec && !['x', 'y', 'z'].includes(r.axle);
   for (const m of markers) {
+    if (tilted) {   // a car at an angle: place the disc on the found centre, turned onto the found axle; the sliders do not move it
+      const w = m.userData.w, T = window.__shrinkApp.THREE, ax = new T.Vector3(...r.axisVec).normalize();
+      m.position.set(w.centre[0], w.centre[1], w.centre[2]); m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), ax); m.scale.set(w.radius || r.radius, w.width * 1.1, w.radius || r.radius); continue;
+    }
     const w = m.userData.w, c = [...w.centre], rad = (w.radius || r.radius) / szOf(a0, w.role);
     c[lead] += r.frontSign * ((a[w.role] || 0) - (a0[w.role] || 0)) * rad; const dyk = w.role === 'front' ? 'dyFront' : 'dyRear';
     c[1] += (((a[dyk] || 0) - (a0[dyk] || 0)) + ((a.dyW?.[w.name] || 0) - (a0.dyW?.[w.name] || 0))) * rad;

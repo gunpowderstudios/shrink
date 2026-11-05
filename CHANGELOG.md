@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.204
+- Wheel detection no longer assumes the car stands on its tyres. If the file as it is gives no wheels on the ground (car lying on its side, upside down, nose down, Z-up export, any angle), `detectWheels()` looks for the orientation: axle seeds from the model's flat faces, a turn-about-the-axle scan, a fine refinement, and a re-aim at the found wheels. Upright cars take the old path and give the same answer as before.
+- Wheel result for a tilted car carries `upright:false`, `tiltDeg`, `axisVec`, `upVector`; the viewer discs sit on the found axle; the panel says the car was not upright. Racer warns that Centre on ground then uses the lowest point, not the tyres.
+- New tests: `tests/wheel-orient.test.mjs` (synthetic car at six orientations).
+
 ## v2.203
 - Racer: the "Centre on ground" step is back (it was skipped in v2.202, which left the car 0.3 m below y = 0 and sank it into the road in the game). It now runs after the vertex budget, so the tyres sit exactly on y = 0 and the car is centred on the origin, as in the earlier exports. The Racer panel says whether the step is on.
 

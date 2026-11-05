@@ -1,6 +1,6 @@
 // SHRINK 3D v2.140 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
-import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.203';
-import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.203';
+import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.204';
+import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.204';
 import { compactPrimitive, getPrimitiveVertexCount } from '@gltf-transform/functions';
 
 const $ = id => document.getElementById(id);
@@ -77,6 +77,7 @@ function render(rep, built) {
     else if (mb > FILE_TYPICAL_MB) warns.push({ level: 'info', text: `The file is ${mb.toFixed(2)} MB (typical is 1.2 to ${FILE_TYPICAL_MB} MB, ${FILE_MAX_MB} MB at most).` });
   }
   warns.push($('groundToggle')?.checked === false ? { level: 'info', text: 'Centre on ground is off: the car keeps the position it has in the source file.' } : { level: 'info', text: 'Centre on ground is on: the car is centred on the origin with its tyres on y = 0, like the earlier exports.' });
+  { const wl = window.__shrinkWheels?.last; if (wl?.found && wl.upright === false) warns.push({ level: 'warn', text: `The car is not standing on its wheels in the file (${wl.tiltDeg}° from upright). The wheels were found by turning it, but Centre on ground uses the lowest point of the model, not the tyres: stand the car on its wheels in the source if the tyres do not end on y = 0.` }); }
   if (lvl === 'fail') warns.unshift({ level: 'warn', text: 'This is over the phone memory limit. Try the merge, a smaller base colour, or fewer textures.' });
   $('racerWarn').innerHTML = warns.map(w => `<div class="racer-warn ${w.level === 'info' ? 'info' : ''}">${w.level === 'info' ? 'ℹ' : '⚠'} ${esc(w.text)}</div>`).join('');
   const rows = built
