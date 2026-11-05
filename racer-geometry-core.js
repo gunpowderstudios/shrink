@@ -8,9 +8,9 @@
 //      interior seen through a window does. The unseen triangles are crushed (`hiddenKeep`), the seen ones get what is left of `totalVerts`;
 //   3. the vertex count is measured again and the seen part is redone with a slightly larger error if the car is still over budget.
 // Meshopt's error limit is tried small first (0.01) so lights, window frames and the silhouette keep their shape when the budget allows it.
-import { reduceIndices } from './reduce-core.js?v=2.18';
+import { reduceIndices } from './reduce-core.js?v=2.209';
 
-export const GEO_DEFAULTS = { totalVerts: 80000, wheelVerts: 7000, hiddenKeep: 0.12, resolution: 1024, maxVerts: 90000 };
+export const GEO_DEFAULTS = { totalVerts: 80000, wheelVerts: 7000, hiddenKeep: 0.2, resolution: 1024, maxVerts: 90000 };
 export const WHEEL_NAME = /^Wheel_(FL|FR|RL|RR|F|L|R)$/;
 const VALID_SETS = [['FL', 'FR', 'RL', 'RR'], ['F', 'RL', 'RR'], ['L', 'R']];
 const ERRORS = [0.01, 0.025, 0.05, 0.1];
@@ -21,6 +21,13 @@ function floatPositions(acc) {
   if (a instanceof Float32Array) return a;
   const out = new Float32Array(acc.getCount() * 3), e = [0, 0, 0];
   for (let i = 0; i < acc.getCount(); i++) { acc.getElement(i, e); out.set(e, i * 3); }
+  return out;
+}
+function floatUv(acc) {
+  const a = acc.getArray();
+  if (a instanceof Float32Array) return a;
+  const out = new Float32Array(acc.getCount() * 2), e = [0, 0];
+  for (let i = 0; i < acc.getCount(); i++) { acc.getElement(i, e); out.set(e, i * 2); }
   return out;
 }
 function sequentialIndices(doc, prim) {
@@ -41,7 +48,8 @@ export function collectParts(doc) {
       if (prim.getMode() !== 4 || prim.listTargets().length || !prim.getAttribute('POSITION')) continue;
       const idxAcc = prim.getIndices() || sequentialIndices(doc, prim);
       const pos = floatPositions(prim.getAttribute('POSITION')), idx = Uint32Array.from(idxAcc.getArray());
-      parts.push({ node, mesh, prim, pos, idx, wheel: WHEEL_NAME.test(node.getName() || ''), verts: distinct(idx, pos.length / 3) });
+      const uvAcc = prim.getAttribute('TEXCOORD_0'), uv = uvAcc && uvAcc.getCount() === pos.length / 3 ? floatUv(uvAcc) : null;
+      parts.push({ node, mesh, prim, pos, uv, idx, wheel: WHEEL_NAME.test(node.getName() || ''), verts: distinct(idx, pos.length / 3) });
     }
   }
   return parts;
@@ -147,13 +155,14 @@ export async function visibleTriangles(parts, { resolution = GEO_DEFAULTS.resolu
 function concat(...lists) { let n = 0; for (const l of lists) n += l.length; const out = new Uint32Array(n); let o = 0; for (const l of lists) { out.set(l, o); o += l.length; } return out; }
 function pick(idx, flags, want) { const out = []; for (let t = 0; t < flags.length; t++) if (!!flags[t] === want) out.push(idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]); return Uint32Array.from(out); }
 const asU32 = a => (a instanceof Uint32Array ? a : Uint32Array.from(a));
-const shrinkIdx = (simplifier, pos, idx, ratio, error, lockBorder) => (idx.length < 9 || ratio >= 0.999 ? idx : asU32(reduceIndices({ simplifier, positions: pos, indices: idx, ratio: Math.max(0.001, ratio), error, lockBorder }).indices));
+const UV_WEIGHT = 1.5;   // v2.209: texture stretch counts more than a small shape error, so rims and panel creases keep their paint
+const shrinkIdx = (simplifier, pos, idx, ratio, error, lockBorder, uv = null) => (idx.length < 9 || ratio >= 0.999 ? idx : asU32(reduceIndices({ simplifier, positions: pos, indices: idx, ratio: Math.max(0.001, ratio), error, lockBorder, uv, uvWeight: UV_WEIGHT }).indices));
 
 // items: [{ pos, idx, flags|null }]  ->  { outputs: Uint32Array[] (one per item), verts }
 function fit(items, targetVerts, { simplifier, hiddenKeep, lockBorder }) {
   const n = items.length;
   // unseen triangles first: they are crushed whatever the budget (up to the error limit of 0.1)
-  const hidden = items.map(it => (it.flags ? shrinkIdx(simplifier, it.pos, pick(it.idx, it.flags, false), hiddenKeep, 0.1, true) : new Uint32Array(0)));
+  const hidden = items.map(it => (it.flags ? shrinkIdx(simplifier, it.pos, pick(it.idx, it.flags, false), hiddenKeep, 0.1, true, it.uv) : new Uint32Array(0)));
   const seenIdx = items.map(it => (it.flags ? pick(it.idx, it.flags, true) : it.idx));
   const count = outs => { let v = 0; outs.forEach((o, i) => { v += distinct(concat(o, hidden[i]), items[i].pos.length / 3); }); return v; };
   const total = items.reduce((a, it) => a + distinct(it.idx, it.pos.length / 3), 0);
@@ -162,7 +171,7 @@ function fit(items, targetVerts, { simplifier, hiddenKeep, lockBorder }) {
   let ratio = Math.min(1, targetVerts / total), best = null, over = 0;
   for (let attempt = 0; attempt < 10; attempt++) {
     const err = ERRORS[Math.min(ERRORS.length - 1, over)];
-    const outs = seenIdx.map((s, i) => shrinkIdx(simplifier, items[i].pos, s, ratio, err, items[i].flags ? true : lockBorder));
+    const outs = seenIdx.map((s, i) => shrinkIdx(simplifier, items[i].pos, s, ratio, err, items[i].flags ? true : lockBorder, items[i].uv));
     const verts = count(outs), cand = { outputs: outs.map((o, i) => concat(o, hidden[i])), seenLen: outs.map(o => o.length), verts, changed: true };
     if (verts <= targetVerts * 1.03 && (!best || best.verts > targetVerts * 1.03 || verts > best.verts)) best = cand;
     else if (!best) best = cand;
@@ -220,7 +229,7 @@ export async function applyGeometry(doc, options = {}, ops, progress = () => {})
   const byWheel = new Map(); for (const w of wheels) { const k = w.node; if (!byWheel.has(k)) byWheel.set(k, []); byWheel.get(k).push(w); }
   const done = [];
   for (const group of byWheel.values()) {
-    const items = group.map(g => ({ pos: g.pos, idx: g.idx, flags: null }));
+    const items = group.map(g => ({ pos: g.pos, uv: g.uv, idx: g.idx, flags: null }));
     const r = fit(items, o.wheelVerts, { simplifier: ops.simplifier, hiddenKeep: o.hiddenKeep, lockBorder: false });
     if (r.changed) group.forEach((g, i) => done.push({ prim: g.prim, out: r.outputs[i] }));
   }
@@ -237,7 +246,7 @@ export async function applyGeometry(doc, options = {}, ops, progress = () => {})
     const flags = (await visibleTriangles(all, { resolution: o.resolution })).slice(0, body.length);
     for (const f of flags) for (const v of f) { if (v) report.seen++; else report.hidden++; }
     progress('Reducing the car to the vertex budget…');
-    const items = body.map((b, i) => ({ pos: b.pos, idx: b.idx, flags: flags[i] }));
+    const items = body.map((b, i) => ({ pos: b.pos, uv: b.uv, idx: b.idx, flags: flags[i] }));
     const r = fit(items, bodyTarget, { simplifier: ops.simplifier, hiddenKeep: o.hiddenKeep, lockBorder: false });
     if (r.changed) install(doc, body.map((b, i) => ({ prim: b.prim, out: r.outputs[i] })));
     else report.notes.push('The car is already within its vertex budget; it was left as it is.');

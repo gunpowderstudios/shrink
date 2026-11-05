@@ -78,7 +78,7 @@ assert.ok(/expects/.test(wheelSetProblem(['Wheel_FL', 'Wheel_FR'])), 'a half set
   const bp = collectParts(doc).find(p => !p.wheel), used = new Set(bp.idx);
   const pos = bp.pos; let innerLeft = 0, outerLeft = 0; for (const v of used) { const x = Math.abs(pos[v * 3]), y = Math.abs(pos[v * 3 + 1]); if (x <= 1.21 && y <= 0.36 && Math.abs(pos[v * 3 + 2]) <= 0.61) innerLeft++; else outerLeft++; }
   console.log('inner left', innerLeft, 'of', innerVerts, '· outer left', outerLeft, 'of', outerVerts);
-  assert.ok(innerLeft < 0.2 * innerVerts, 'the inside is crushed'); assert.ok(outerLeft > 0.3 * outerVerts, 'the outside keeps its detail');
+  assert.ok(innerLeft < 0.25 * innerVerts, 'the inside is crushed'); assert.ok(outerLeft > 0.3 * outerVerts, 'the outside keeps its detail');
   assert.equal(pivotProblems(doc).length, 0, 'pivots still at the wheel centres');
 }
 

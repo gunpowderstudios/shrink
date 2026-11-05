@@ -2,6 +2,14 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.209
+- Racer: stop the car export losing detail. The cause was found in the export itself: the normal map was cut to 512 px (body creases and bonnet vents went smooth), the simplifier ignored the UVs (triangles collapsed across rim art and seams, so alloy rims stretched into plain hubs), and the unseen triangles were crushed to 12 %.
+- The simplifier is UV-aware for the Racer budget (`reduceIndices` takes `uv`/`uvWeight`; Racer uses weight 1.5), the unseen share keeps 20 %.
+- Textures are only resized and recompressed, never redrawn: normal map cap 1024 (was 512), normals are made unit length again after shrinking, and the WebP quality is the lowest step (50–90 %) whose result stays within 38 dB (36 dB for normals) of the resized original.
+- A detail check in the Racer panel after Optimise: says whether the texture layout changed (a multi-material merge re-packs the UVs), warns when a texture lost detail or went over budget, and lists each texture's size change and quality.
+- The GPU texture target is 16.5 MB (was 12): three 1024 px maps are 16 MB. FAIL stays at 46 MB.
+- Not done: a side-by-side original/optimised viewer with a wheel close-up before export (the detail check is text only for now).
+
 ## v2.208
 - Racer: the yellow warnings on scanned cars (car over the vertex budget, wheels at 9k–14k instead of 7k, "pivot off-centre") are fixed. Scans carry thousands of tiny loose pieces that the simplifier cannot merge, so it stopped at a floor (about 14k vertices per wheel, 92k for the Dodge's body). When the budget is still missed, the smallest loose pieces (hidden ones first) are now dropped until it fits. The Dodge now comes out at about 79k vertices with every wheel at about 6.9k.
 - Racer: the wheels are found on the full-detail mesh BEFORE the first reduction (`detectWheelsInDoc`, handed to `splitWheels`). The finder gave a different answer at every mesh density (Dodge tyre radius 0.185 at some, 0.104 at others), which put the wheel cut in the wrong place.

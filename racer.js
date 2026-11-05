@@ -1,6 +1,6 @@
 // SHRINK 3D v2.140 — "Racer" export preset (Game mode): the card, the panel and the export hook. The document work is racer-core.js (tested in Node).
-import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.208';
-import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.208';
+import { apply, plan, TARGET_MB, FAIL_MB, ROLE_LABEL } from './racer-core.js?v=2.209';
+import { applyGeometry, vertexReport, describeGeometry, GEO_DEFAULTS } from './racer-geometry-core.js?v=2.209';
 import { compactPrimitive, getPrimitiveVertexCount } from '@gltf-transform/functions';
 
 const $ = id => document.getElementById(id);
@@ -13,7 +13,7 @@ const px = (w, h) => (w && h ? `${w}×${h}` : '?');
 
 const geoOpts = () => ({ totalVerts: Math.max(20000, Number($('racerVerts')?.value) || GEO_DEFAULTS.totalVerts), wheelVerts: Math.max(2000, Number($('racerWheelVerts')?.value) || GEO_DEFAULTS.wheelVerts) });
 function opts() {
-  return { baseSize: 1024, mrSize: 1024, normalSize: 512, quality: Math.max(0.45, Math.min(0.95, Number($('textureQuality')?.value || 85) / 100)), merge: !!$('racerMerge')?.checked };
+  return { baseSize: 1024, mrSize: 1024, normalSize: 1024, quality: Math.max(0.45, Math.min(0.95, Number($('textureQuality')?.value || 85) / 100)), merge: !!$('racerMerge')?.checked };
 }
 
 /* ---------- browser pixel work for racer-core ---------- */
@@ -78,6 +78,14 @@ function render(rep, built) {
   }
   warns.push($('groundToggle')?.checked === false ? { level: 'info', text: 'Centre on ground is off: the car keeps the position it has in the source file.' } : { level: 'info', text: 'Centre on ground is on: the car is centred on the origin with its tyres on y = 0, like the earlier exports.' });
   { const wl = window.__shrinkWheels?.last; if (wl?.found && wl.upright === false) warns.push({ level: 'warn', text: `The car is not standing on its wheels in the file (${wl.tiltDeg}° from upright). The wheels were found by turning it, but Centre on ground uses the lowest point of the model, not the tyres: stand the car on its wheels in the source if the tyres do not end on y = 0.` }); }
+  if (built) {   // v2.209 detail check: the textures must be the original paint, only smaller
+    if (rep.merged) warns.push({ level: 'warn', text: 'Texture layout changed: several materials were re-packed into one atlas, so the UVs were rewritten. Untick "Merge into one texture set" to keep the original layout (the file then keeps more than one material).' });
+    else warns.push({ level: 'info', text: 'Texture layout unchanged: the original UVs and textures are kept, only resized and recompressed.' });
+    for (const e of rep.encodes || []) {
+      if (e.psnr != null && e.psnr < 34) warns.push({ level: 'warn', text: `The ${ROLE_LABEL[e.role] || e.role} texture lost detail (${e.psnr.toFixed(1)} dB against the resized original at quality ${Math.round(e.quality * 100)}). Raise the texture quality.` });
+      if (e.from && Math.max(e.from.w, e.from.h) / Math.max(e.w, e.h) > 2) warns.push({ level: 'info', text: `The ${ROLE_LABEL[e.role] || e.role} texture went from ${px(e.from.w, e.from.h)} to ${px(e.w, e.h)} (WebP quality ${Math.round(e.quality * 100)}${e.psnr != null ? `, ${e.psnr.toFixed(1)} dB` : ''}).` });
+    }
+  }
   if (lvl === 'fail') warns.unshift({ level: 'warn', text: 'This is over the phone memory limit. Try the merge, a smaller base colour, or fewer textures.' });
   $('racerWarn').innerHTML = warns.map(w => `<div class="racer-warn ${w.level === 'info' ? 'info' : ''}">${w.level === 'info' ? 'ℹ' : '⚠'} ${esc(w.text)}</div>`).join('');
   const rows = built

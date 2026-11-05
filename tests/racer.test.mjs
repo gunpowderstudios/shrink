@@ -47,8 +47,8 @@ assert.equal(memoryStatus(11.9), 'ok'); assert.equal(memoryStatus(20), 'warn'); 
   assert.ok(p.dropped.some(d => d.name === 'body_ao' && /ORM/.test(d.reason)), 'occlusion is packed into ORM');
   assert.equal(doc.getRoot().listTextures().length, 8, 'plan() does not touch the document');
   assert.ok(p.beforeMB > 90, 'the original is far over budget: ' + p.beforeMB.toFixed(0) + ' MB'); assert.equal(memoryStatus(p.beforeMB), 'fail');
-  // at the real sizes the merged atlas is 1024 + 1024 + 512
-  const real = plan(doc, {}); assert.ok(Math.abs(real.afterMB - (2 * 5.3203 + 1.3301)) < 0.05 && real.status === 'ok', 'merged atlas plan: ' + real.afterMB.toFixed(2));
+  // at the real sizes the merged atlas is 1024 + 1024 + 1024
+  const real = plan(doc, {}); assert.ok(Math.abs(real.afterMB - (3 * 5.3203)) < 0.05 && real.status === 'ok', 'merged atlas plan: ' + real.afterMB.toFixed(2));
 }
 
 // merge into one atlas
@@ -123,5 +123,25 @@ assert.equal(memoryStatus(11.9), 'ok'); assert.equal(memoryStatus(20), 'warn'); 
   const uv = pb.getAttribute('TEXCOORD_0'); assert.ok(uv, 'UVs were created'); const e = uv.getElement(0, [0, 0]);
   assert.ok(e[0] > 0 && e[0] < 1 && e[1] > 0 && e[1] < 1, 'inside the atlas');
   assert.equal(doc.getRoot().listMaterials()[0].getDoubleSided(), true, 'double-sided if any part needed it');
+}
+// v2.209: textures keep their layout (single material: UVs untouched), normal map to 1024 cap, quality chosen by comparison
+{
+  const { psnr, renormalise, encodeChosen, DEFAULTS } = await import('../racer-core.js?v=2.209');
+  assert.equal(DEFAULTS.normalSize, 1024);
+  const a = new Uint8ClampedArray(16).fill(100), b = new Uint8ClampedArray(16).fill(100); assert.equal(psnr(a, b), 99); b[0] = 110; assert.ok(psnr(a, b) < 99);
+  const n = new Uint8ClampedArray([200, 128, 128, 255]); renormalise(n); assert.ok(n[0] > 230 && n[1] >= 127 && n[1] <= 129, 'short normal made unit length');
+  const px = new Uint8ClampedArray(64 * 4).fill(120), tried = [];
+  const fake = { encode: async (p, w, h, q) => { tried.push(q); return { bytes: new Uint8Array([q * 100]), mime: 'image/webp' }; }, decode: async (bytes) => { const d = new Uint8ClampedArray(64 * 4).fill(120); if (bytes[0] < 70) d.fill(60); return d; } };
+  const ch = await encodeChosen(px, 8, 8, 'base', { quality: 0.9 }, fake);
+  assert.equal(ch.q, 0.7, 'lowest quality that still matches the original'); assert.deepEqual(tried, [0.5, 0.6, 0.7]);
+}
+// the single-material texture path never touches the UVs
+{
+  const doc = new Document(), buf = doc.createBuffer();
+  const a = doc.createMaterial('').setBaseColorTexture(tex(doc, 'a_base', 256, 256, 90));
+  const pr = prim(doc, buf, a, [0, 0, 1, 0, 0, 1]), before = Array.from(pr.getAttribute('TEXCOORD_0').getArray());
+  const sc = doc.createScene(); sc.addChild(doc.createNode('Car').setMesh(doc.createMesh('c').addPrimitive(pr)));
+  const r = await apply(doc, { ...O }, ops);
+  assert.deepEqual(Array.from(pr.getAttribute('TEXCOORD_0').getArray()), before, 'UVs unchanged'); assert.equal(r.merged, 0); assert.equal(doc.getRoot().listMaterials()[0].getName(), 'car');
 }
 console.log('racer tests passed');

@@ -1,11 +1,13 @@
 // Pure triangle-reduction core (no imports) so it can run in a Web Worker, on the main thread, and in Node tests.
 // Protected (locked) vertices keep their triangles; the rest of the mesh absorbs the reduction.
-export function reduceIndices({ simplifier, positions, indices, lock = null, ratio, error = 0.05, protectKeep = 1, lockBorder = false }) {
+export function reduceIndices({ simplifier, positions, indices, lock = null, ratio, error = 0.05, protectKeep = 1, lockBorder = false, uv = null, uvWeight = 1 }) {
   const vertexCount = positions.length / 3;
   const target = Math.max(3, Math.floor(ratio * indices.length / 3) * 3);
   const flags = lockBorder ? ['LockBorder'] : [];
   const dummy = new Float32Array(vertexCount);
-  const run = (idx, lk, tgt) => simplifier.simplifyWithAttributes(idx, positions, 3, dummy, 1, [0], lk, tgt, error, flags)[0];
+  // v2.209: with UVs the simplifier pays for stretching the texture (collapses across a UV seam or over rim art cost more); without them the old dummy attribute keeps the call identical
+  const useUv = uv && uv.length === vertexCount * 2;
+  const run = (idx, lk, tgt) => (useUv ? simplifier.simplifyWithAttributes(idx, positions, 3, uv, 2, [uvWeight, uvWeight], lk, tgt, error, flags)[0] : simplifier.simplifyWithAttributes(idx, positions, 3, dummy, 1, [0], lk, tgt, error, flags)[0]);
 
   let work = indices, keepUsed = 1, protectedTriangles = 0;
   if (lock) {
