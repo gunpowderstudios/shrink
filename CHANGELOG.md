@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.207
+- Game mode: new **Download master (GLB)** button beside Save project. It saves the edited model (paint, welds, removed parts, look) as a plain full-detail GLB named `<name>-master.glb`: not optimised, wheels not cut, no settings stored inside, so it can be used as a new master model. Save project is unchanged.
+
 ## v2.206
 - Wheel sliders (size, position, track, width, up/down) are reset to zero when a new model is opened. Nudges tuned on the previous car used to carry over, which made the wheels of the next car bigger, shifted and the markers wrong ("wheels not detecting"). Checked in a real browser on escort.glb: detection itself was right (radius 0.133, centres on the tyres); a settings file or project still applies its own values after opening. Layout (4/3/2 wheels) is kept.
 

@@ -75,6 +75,15 @@ ok(/not a SHRINK settings file/.test($('settingsStartNote').textContent), 'wrong
   const p = S.projectFromBytes(out);
   ok(p && p.kind === 'shrink-settings' && p.values.geometry === '55' && p.values.wheelFront === '33' && p.values.wheelLayout === '3', 'the settings are stored inside the GLB');
   ok((await io.readBinary(out)).getRoot().listScenes().length === 1, 'and it is still a normal GLB');
+  // master: the same edited model as a plain GLB, no settings inside, no optimising
+  { let mb = null, nm = ''; const rc = URL.createObjectURL; URL.createObjectURL = b => { mb = b; return 'blob:m'; };
+    window.__shrinkApp = { sourceFile: { name: 'car-SHRINK-project.glb' }, sourceBytes: out, readDoc: () => io.readBinary(out), writeDoc: d => io.writeBinary(d) };
+    await S.saveMaster(); URL.createObjectURL = rc;
+    ok(!!mb, 'Download master produced a file');
+    const mo = new Uint8Array(await mb.arrayBuffer());
+    ok(S.projectFromBytes(mo) === null && !(await io.readBinary(mo)).getRoot().getExtras().shrinkProject, 'the master carries no project settings (even from a project file)');
+    ok(/-master\.glb/.test($('settingsFileNote').textContent) && !/-project-master/.test($('settingsFileNote').textContent), 'the master is named stem-master.glb'); }
+  window.__shrinkApp = { sourceFile: { name: 'car.glb' }, sourceBytes: bytes, readDoc: () => io.readBinary(bytes), writeDoc: d => io.writeBinary(d) };
   // opening that GLB brings the settings back
   $('geometry').value = '70'; $('wheelFront').value = '0'; $('wheelLayout').value = '4';
   window.__shrinkApp = { sourceFile: { name: 'car-SHRINK-project.glb' }, sourceBytes: out };

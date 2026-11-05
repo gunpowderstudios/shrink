@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.206** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.207** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -484,7 +484,7 @@ A good Simple-mode run should:
 
 ## Settings file (v2.99)
 - `settings-file.js` saves/loads the `.control-panel` inputs by element id (so new controls and wheel sliders are included automatically; mirrors and painting tools are in its `SKIP`). Loading only sets values and fires `input`/`change`; it never builds. Target card is clicked first, `geometry` applied last. Paint edits and Look are deliberately not stored. Print-mode state (FUSE IT etc.) is not covered.
-- (v2.110) **Save project (GLB)** writes the source GLB (paint applied, Look baked, Remove cuts already in it) with the same settings object in glTF `extras.shrinkProject`. Opening such a file applies it via `projectFromBytes` + the pending path in `settings-file.js`. The wheel split is never baked into the project; `optimizeModel` strips `shrinkProject` from the game GLB.
+- (v2.110) **Save project (GLB)** writes the source GLB (paint applied, Look baked, Remove cuts already in it) with the same settings object in glTF `extras.shrinkProject`. Opening such a file applies it via `projectFromBytes` + the pending path in `settings-file.js`. (v2.207) `saveModel(withSettings)` in `settings-file.js` serves both buttons: **Save project (GLB)** (`-SHRINK-project.glb`, settings in `extras.shrinkProject`) and **Download master (GLB)** (`-master.glb`, same edited document, `shrinkProject` removed, no optimising or wheel cut). The wheel split is never baked into the project; `optimizeModel` strips `shrinkProject` from the game GLB.
 
 ## Paint tool rules (v2.100)
 - `abortStroke()` in `paint3d.js` ends whatever is running (stroke, spray timer, stamp box); `setMode` and Esc call it. Window-level pointerup/cancel/move/blur handlers exist so a lost mouse-up can never leave the brush painting. Do not gate Esc on `state.painting` again.
