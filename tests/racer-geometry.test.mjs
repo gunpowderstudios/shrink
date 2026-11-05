@@ -122,4 +122,23 @@ assert.ok(/expects/.test(wheelSetProblem(['Wheel_FL', 'Wheel_FR'])), 'a half set
   assert.ok(Math.abs((after.min[0] + after.max[0]) / 2) < 1e-5 && Math.abs((after.min[2] + after.max[2]) / 2) < 1e-5, 'centred on the origin');
   assert.equal(pivotProblems(doc).length, 0, 'pivots untouched by the move');
 }
+
+// 5. scanned meshes: thousands of tiny loose pieces the simplifier cannot merge must not leave the car over its budget
+{
+  const { doc } = car();
+  const buf = doc.getRoot().listBuffers()[0];
+  for (const nd of doc.getRoot().listNodes()) {
+    const prim = nd.getMesh().listPrimitives()[0], pos = [...prim.getAttribute('POSITION').getArray()], idx = [...prim.getIndices().getArray()];
+    const base = pos.length / 3, w = nd.getName().startsWith('Wheel_') ? 0.4 : 1.5;
+    for (let k = 0; k < 4000; k++) { const x = (k % 20) / 20 * w * 0.8, y = (Math.floor(k / 20) % 20) / 20 * w * 0.8, z = (k % 7) / 7 * 0.1; const b = pos.length / 3; pos.push(x, y, z, x + 1e-3, y, z, x, y + 1e-3, z + 1e-3); idx.push(b, b + 1, b + 2); }
+    prim.getAttribute('POSITION').setArray(Float32Array.from(pos)); prim.getIndices().setArray(Uint32Array.from(idx));
+  }
+  const before = vertexReport(doc).total;
+  const rep = await applyGeometry(doc, { resolution: 128, totalVerts: 30000, wheelVerts: 2500 }, ops);
+  assert.ok(before > 40000, 'the test car starts well over budget');
+  assert.ok(rep.after.total <= 30000 * 1.06, 'loose pieces trimmed: total ' + rep.after.total);
+  assert.ok(rep.after.wheels.every(x => x.verts <= 2500 * 1.25), 'each wheel inside its budget: ' + rep.after.wheels.map(x => x.verts).join('/'));
+  console.log('loose pieces: total', rep.after.total, 'wheels', rep.after.wheels.map(x => x.verts).join('/'));
+}
+
 console.log('racer-geometry tests passed');

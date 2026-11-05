@@ -335,10 +335,13 @@ export function unshareMeshes(doc) {
   }
 }
 const orient = det => ({ upright: det.upright !== false, ...(det.upright === false ? { tiltDeg: det.tiltDeg, axisVec: det.axisVec, upVector: det.upVector } : {}), ...(det.ungrounded ? { ungrounded: true } : {}) });
-export function splitWheels(doc, adj = {}) {
+// v2.208: finding the wheels is fragile when the mesh is thinned first (the same car gave tyre radius 0.185 at one density and 0.104 at another), so the page can
+// run the finder on the full-detail file with detectWheelsInDoc() and hand the result to splitWheels(doc, adj, det) after the first reduction.
+export function detectWheelsInDoc(doc, adj = {}) { const { P } = collectWorldPositions(doc); return detectWheels(P, adj); }
+export function splitWheels(doc, adj = {}, det0 = null) {
   unshareMeshes(doc);
   const { P, parts } = collectWorldPositions(doc);
-  const det = detectWheels(P, adj);
+  const det = det0 || detectWheels(P, adj);
   if (!det.found) return { found: false, reason: det.reason };
   const root = doc.getRoot(), buffer = root.listBuffers()[0] || doc.createBuffer(), scene = root.listScenes()[0];
   if (!scene) return { found: false, reason: 'The file has no scene.' };

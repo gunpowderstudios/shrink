@@ -1,7 +1,7 @@
 // The wheel finder on a car that does not stand upright in the file (lying on its side, upside down, nose down, tilted at any angle).
 import assert from 'node:assert/strict';
 import { Document } from '@gltf-transform/core';
-import { splitWheels } from '../wheel-split-core.js';
+import { splitWheels, detectWheelsInDoc } from '../wheel-split-core.js';
 
 function box(x0,x1,y0,y1,z0,z1,P,I){const b=P.length/3;for(const x of[x0,x1])for(const y of[y0,y1])for(const z of[z0,z1])P.push(x,y,z);
  for(const f of[[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]])I.push(b+f[0],b+f[1],b+f[2],b+f[0],b+f[2],b+f[3]);}
@@ -53,4 +53,7 @@ for(const [label,R] of cases){
     const off=Math.hypot((mn[0]+mx[0])/2,(mn[1]+mx[1])/2,(mn[2]+mx[2])/2);assert.ok(off<0.06,label+': '+w.name+' pivot '+off.toFixed(3)+' from its middle');}
   console.log('ok',label,'tilt',r.tiltDeg,'axle',r.axle,(Date.now()-t0)+' ms');
 }
+// v2.208: detection can be done first (on the full mesh) and handed to the cut
+{ const doc = car(null), det = detectWheelsInDoc(doc, {}); assert.ok(det.found, 'pre-detection finds the wheels');
+  const r = splitWheels(doc, {}, det); assert.ok(r.found && !r.partial && r.wheels.length === 4, 'the cut uses the pre-detected wheels'); console.log('ok pre-detection handed to the cut'); }
 console.log('wheel-orient tests passed');

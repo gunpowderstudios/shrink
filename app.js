@@ -820,6 +820,7 @@ async function optimizeModel() {
     // budget so the wheel finder works on a sensible mesh; the exact budget is applied after the wheels are cut out.
     const keepRatio = racerOn ? window.__shrinkRacer.preRatio(document) : Number(els.geometry.value) / 100;
 
+    if (racerOn && window.__shrinkWheels?.enabled) { setProgress(12, 'Finding the wheels…'); window.__shrinkWheels.prepare?.(document); }   // on the full-detail mesh: the finder is unreliable once the car has been thinned
     lastReduce = null;
     setProgress(15, 'Cleaning geometry…');
     await document.transform(dedup(), weld());

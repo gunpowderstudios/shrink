@@ -2,6 +2,11 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.208
+- Racer: the yellow warnings on scanned cars (car over the vertex budget, wheels at 9k–14k instead of 7k, "pivot off-centre") are fixed. Scans carry thousands of tiny loose pieces that the simplifier cannot merge, so it stopped at a floor (about 14k vertices per wheel, 92k for the Dodge's body). When the budget is still missed, the smallest loose pieces (hidden ones first) are now dropped until it fits. The Dodge now comes out at about 79k vertices with every wheel at about 6.9k.
+- Racer: the wheels are found on the full-detail mesh BEFORE the first reduction (`detectWheelsInDoc`, handed to `splitWheels`). The finder gave a different answer at every mesh density (Dodge tyre radius 0.185 at some, 0.104 at others), which put the wheel cut in the wrong place.
+- The pivot warning no longer fires for a tyre that is only partly modelled (its box is not round); a whole off-centre wheel is still reported.
+
 ## v2.207
 - Game mode: new **Download master (GLB)** button beside Save project. It saves the edited model (paint, welds, removed parts, look) as a plain full-detail GLB named `<name>-master.glb`: not optimised, wheels not cut, no settings stored inside, so it can be used as a new master model. Save project is unchanged.
 

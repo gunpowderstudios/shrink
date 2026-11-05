@@ -1,18 +1,20 @@
 // SHRINK 3D v2.90 — "Separate the wheels" panel (Game mode). The cutting is in wheel-split-core.js; this is the switch and the message. The live preview keeps showing the reduced model; the split exists in the saved GLB only.
-import { splitWheels } from './wheel-split-core.js?v=2.204';
+import { splitWheels, detectWheelsInDoc } from './wheel-split-core.js?v=2.208';
 
 const $ = id => document.getElementById(id);
 function fresh(layout) { return { layout: layout || '4', shiftFront: 0, shiftRear: 0, trackFront: 0, trackRear: 0, front: 0, rear: 0, dyFront: 0, dyRear: 0, dyW: { Wheel_FL: 0, Wheel_FR: 0, Wheel_RL: 0, Wheel_RR: 0, Wheel_F: 0, Wheel_L: 0, Wheel_R: 0 }, sizeFront: 1, sizeRear: 1, widthFront: 1, widthRear: 1 }; }
 const api = window.__shrinkWheels = { enabled: true, last: null, adj: fresh() };
 
 // Called by app.js on the document that is about to be saved. Never throws: a failure leaves the model as it was.
+// Racer: app.js calls this on the full-detail document BEFORE the first reduction; apply() then uses that result (the finder is unreliable on a thinned mesh).
+api.prepare = function (doc) { api.pre = null; try { if (!api.enabled) return; api.pre = detectWheelsInDoc(doc, JSON.parse(JSON.stringify(api.adj))); } catch (err) { console.warn('wheel pre-detection failed', err); api.pre = null; } };
 api.apply = function (doc) {
-  api.last = null;
+  const pre = api.pre; api.pre = null; api.last = null;
   try {
     // wheels already separate (named Wheel_FL … by Add part, say): leave them alone, so no name appears twice
     const have = (doc.getRoot().listScenes()[0]?.listChildren() || []).filter(n => /^Wheel_(FL|FR|RL|RR|F|L|R)$/.test(n.getName()));
     if (have.length) { api.last = { found: false, reason: `the model already has separate wheel nodes (${have.map(n => n.getName()).join(', ')}).` }; report(api.last); return api.last; }
-    const r = splitWheels(doc, JSON.parse(JSON.stringify(api.adj))); api.last = r; report(r);
+    const r = splitWheels(doc, JSON.parse(JSON.stringify(api.adj)), pre && pre.found ? pre : null); api.last = r; report(r);
     return r;
   } catch (err) { console.error(err); api.last = { found: false, reason: err.message }; report(api.last); return api.last; }
 };

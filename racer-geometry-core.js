@@ -75,7 +75,12 @@ export function pivotProblems(doc) {
     for (let i = 0; i < p.idx.length; i++) { const v = p.idx[i]; for (let k = 0; k < 3; k++) { const x = p.pos[v * 3 + k]; if (x < lo[k]) lo[k] = x; if (x > hi[k]) hi[k] = x; } }
     const size = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1;
     const off = Math.hypot((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2);
-    if (off > 0.03 * size) out.push({ name: p.node.getName(), offset: off, size });
+    if (off > 0.03 * size) {
+      // a tyre that is only partly modelled (the top is inside the arch on many scans) looks off-centre by its box alone: its box is not round in the wheel's plane. A whole tyre's box is.
+      const ext = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], ax = ext.indexOf(Math.min(...ext)), a = ext[(ax + 1) % 3], b = ext[(ax + 2) % 3];
+      if (Math.min(a, b) < 0.9 * Math.max(a, b)) continue;
+      out.push({ name: p.node.getName(), offset: off, size });
+    }
   }
   return out;
 }
@@ -158,7 +163,7 @@ function fit(items, targetVerts, { simplifier, hiddenKeep, lockBorder }) {
   for (let attempt = 0; attempt < 10; attempt++) {
     const err = ERRORS[Math.min(ERRORS.length - 1, over)];
     const outs = seenIdx.map((s, i) => shrinkIdx(simplifier, items[i].pos, s, ratio, err, items[i].flags ? true : lockBorder));
-    const verts = count(outs), cand = { outputs: outs.map((o, i) => concat(o, hidden[i])), verts, changed: true };
+    const verts = count(outs), cand = { outputs: outs.map((o, i) => concat(o, hidden[i])), seenLen: outs.map(o => o.length), verts, changed: true };
     if (verts <= targetVerts * 1.03 && (!best || best.verts > targetVerts * 1.03 || verts > best.verts)) best = cand;
     else if (!best) best = cand;
     if (verts <= targetVerts * 1.03 && verts >= targetVerts * 0.93) break;           // close enough under the budget
@@ -166,7 +171,31 @@ function fit(items, targetVerts, { simplifier, hiddenKeep, lockBorder }) {
     else if (ratio >= 0.999) break;                                                    // under budget at full detail: nothing more to give
     ratio = Math.min(1, Math.max(0.002, ratio * Math.min(1.6, Math.max(0.5, (targetVerts * 0.97) / verts))));
   }
+  // scanned meshes carry thousands of tiny loose pieces that the simplifier cannot merge, so it stops at a floor above the budget: drop the smallest loose pieces
+  if (best.verts > targetVerts * 1.03) best = trimToBudget(items, best, targetVerts);
   return best;
+}
+
+// Remove whole connected pieces, hidden-only pieces first and then the smallest, until the vertex count fits. Pieces are found by shared vertex numbers (the mesh is welded).
+function trimToBudget(items, cand, targetVerts) {
+  const pieces = []; let total = 0; const per = [];
+  items.forEach((it, i) => {
+    const idx = cand.outputs[i], nTri = idx.length / 3, seenTris = cand.seenLen ? cand.seenLen[i] / 3 : nTri, par = new Map();
+    const find = x => { let r = x; while (par.get(r) !== r) r = par.get(r); while (par.get(x) !== r) { const n = par.get(x); par.set(x, r); x = n; } return r; };
+    for (let k = 0; k < idx.length; k++) if (!par.has(idx[k])) par.set(idx[k], idx[k]);
+    for (let t = 0; t < idx.length; t += 3) { const a = find(idx[t]), b = find(idx[t + 1]), c = find(idx[t + 2]); if (b !== a) par.set(b, a); const c2 = find(c), a2 = find(a); if (c2 !== a2) par.set(c2, a2); }
+    const comp = new Map(), verts = new Map();
+    for (let t = 0; t < nTri; t++) { const r = find(idx[t * 3]); let p = comp.get(r); if (!p) { p = { item: i, tris: 0, seen: 0, verts: 0 }; comp.set(r, p); pieces.push(p); } p.tris++; if (t < seenTris) p.seen++; }
+    for (const v of par.keys()) { const p = comp.get(find(v)); if (p) p.verts++; }
+    const keep = new Uint8Array(nTri).fill(1); per.push({ idx, comp, find, keep, seenTris });
+    total += par.size;
+  });
+  pieces.sort((a, b) => ((a.seen ? 1 : 0) - (b.seen ? 1 : 0)) || a.tris - b.tris);
+  const drop = new Set(); const goal = targetVerts * 0.98;
+  for (const p of pieces) { if (total <= goal) break; drop.add(p); total -= p.verts; }
+  if (!drop.size) return cand;
+  const outputs = per.map(({ idx, comp, find }) => { const out = []; for (let t = 0; t < idx.length; t += 3) { if (!drop.has(comp.get(find(idx[t])))) out.push(idx[t], idx[t + 1], idx[t + 2]); } return Uint32Array.from(out); });
+  return { outputs, verts: total, changed: true, trimmed: drop.size };
 }
 
 function install(doc, items) {
