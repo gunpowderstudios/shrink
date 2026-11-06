@@ -298,7 +298,9 @@ async function start() {
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
-        { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) { if (!item.warn) warned++; item.warn = true; item.issues = (item.issues || []).concat(`${v.pieces} separate pieces (not fused)`); } }
+        // v2.214: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
+        { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) item.msg = `${item.msg ? item.msg + ' · ' : ''}${v.pieces} separate pieces, prints fine`; }
+        if (!item.warn && Number.isFinite(sc) && deps.verdict?.()?.healthy !== false) item.fixed = true;
       } catch (err) {
         console.warn('[SHRINK 3D] batch item failed', item.name, err);
         item.status = 'failed'; item.msg = String(err.message || err).slice(0, 80);
@@ -327,7 +329,7 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.213) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.214) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;

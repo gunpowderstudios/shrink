@@ -292,7 +292,10 @@
       const manifold = h.pinchedEdges === 0;
       const oriented = h.flippedEdges === 0;
       const cleanDegens = true;                       // informational only (v2.190): shown, never red
+      const tris = modelTriangles(model), stlBytes = 84 + 50 * tris, sizeText = stlBytes >= 1048576 ? `${(stlBytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(stlBytes / 1024))} KB`;
       $('v2HealthRows').innerHTML =
+        healthRow('File size', `≈ ${sizeText} STL`, true) +
+        healthRow('Triangles', new Intl.NumberFormat().format(tris), true) +
         healthRow('Watertight', watertight ? 'YES' : 'NO', watertight) +
         healthRow('Open edges', new Intl.NumberFormat().format(h.openEdges), h.openEdges === 0) +
         healthRow('Non-manifold', new Intl.NumberFormat().format(h.pinchedEdges), manifold, !!rating.minor) +

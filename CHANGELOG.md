@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.214
+- MODEL HEALTH box now starts with **File size** (about what the STL will be: 84 bytes + 50 per triangle) and **Triangles**, so you can judge before downloading. It updates after every tool.
+- BATCH: only genuine problems get an amber warning. Minor edges ("fine to print") and several clean separate pieces now give a green tick with a short note (e.g. `health 95/100 · 4 minor edges, fine to print · 7 separate pieces, prints fine`). The "Not fused" explanation box only appears when something is really not fixed.
+
 ## v2.213
 - Print page made clearer: the top QUICK-FIX button is now **DO EVERYTHING (shrink, fix, fuse, centre)** with a tooltip saying you never need it, and a short hint above the tools says to pick just what you need (resize = set the height and DOWNLOAD IT; every tool works alone, in any order). Only wording; ids (`#v2MagicBtn`), behaviour, BATCH and tests are unchanged.
 
