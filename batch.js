@@ -327,7 +327,19 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// BATCH on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.212) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+function ensureHomeButton() {
+  if ($('v2BatchHome')) return true;
+  const dz = $('dropZone'); if (!dz) return false;
+  const row = document.createElement('div'); row.className = 'v2-batch-home';
+  row.innerHTML = '<button id="v2BatchHome" type="button" class="v2-batch-upload">BATCH UPLOAD</button><span>Many models in one go: choose your printer first, then add the files.</span>';
+  dz.insertAdjacentElement('afterend', row);
+  $('v2BatchHome').addEventListener('click', () => {
+    if (!document.body.classList.contains('app-mode-print')) document.querySelector('.mode-card[data-mode="print"]')?.click();
+    toggle(true);
+  });
+  return true;
+}
 // (v2.180) A BATCH button in the top bar, right after RELOAD, opens the batch window.
 function ensureTopButton() {
   if ($('v2BatchTop')) return true;
@@ -341,8 +353,9 @@ function ensureTopButton() {
   rl.insertAdjacentElement('afterend', btn);
   return true;
 }
-ensureTopButton();
+ensureHomeButton(); ensureTopButton();
 let tries2 = 0; const iv2 = setInterval(() => { if (ensureTopButton() || ++tries2 > 100) clearInterval(iv2); }, 300);
+let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
 window.__shrinkBatch = { applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip, watertightRow };

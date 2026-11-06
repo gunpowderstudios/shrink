@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.212
+- BATCH UPLOAD is back under the main drop zone on a fresh load (a plainer button than the green one removed in v2.184). It switches to the print tools and opens the BATCH window, exactly like the top-bar BATCH. It disappears once a model is open.
+
 ## v2.211
 - STL page: "or download as GLB" under DOWNLOAD IT (and a hidden `#saveGlbBtn` next to Save STL/OBJ). It exports the working model (after SHRINK / FIX / FUSE / level) as one GLB in metres, Y-up, scaled to the Height box, named like the STL (`name-SHRINK-16K.glb`). Split pieces and pegs stay STL-only. Goes through `__shrinkCapture` so BATCH sees it. The GLTFExporter path was checked in a real browser in isolation; the whole page was not clicked through (the test harness failed to load the print page).
 - Today's v2.202–v2.210 car-export work was reverted (v2.201 behaviour); this release is built on v2.201.
