@@ -622,12 +622,14 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-main-controls .v2-card{margin:0;padding:10px 12px;box-shadow:none}
 .v2-main-controls .v2-card-head p,.v2-main-controls .v2-protect,.v2-main-controls .v2-advanced,.v2-main-controls .v2-result,.v2-main-controls .v2-card-progress-label{display:none}
 .v2-main-controls .v2-card-head h2{font-size:13px;margin:0 0 6px}
-.v2-main-controls .v2-mega{width:100%}
+.v2-main-actions .v2-mega{width:auto;min-height:0;padding:7px 14px;border:1px solid #3a4a60;border-radius:8px;background:#1b2635;color:#e8eef6;font-size:13px;font-weight:700;letter-spacing:0}
+.v2-main-actions .v2-mega:hover:not(:disabled){background:#243246}
+.v2-main-actions .v2-card{border-color:#2a384a}
 .v2-main-actions{display:grid;grid-template-columns:1fr;gap:8px}
 .v2-main-detail .v2-detail-control{display:flex;gap:8px;align-items:center}
 .v2-main-detail .v2-detail-control input[type=range]{flex:1}
-.v2-main-download .v2-mega{width:100%;font-size:18px;padding:14px}
-.v2-main-download .v2-glb-btn{width:100%;margin-top:6px}
+.v2-main-download .v2-mega{width:50%;min-height:31px;font-size:9px;padding:7px;border-radius:7px}
+.v2-main-download .v2-glb-btn{width:50%;margin-top:4px;font-size:9px}
 .v2-legacy-hold{display:none!important}
 .v2-health-changes{margin-top:10px}
 @media(max-width:900px){.v2-top-grid{grid-template-columns:1fr!important}}

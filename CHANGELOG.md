@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.216
+- Tidy-up: SHRINK / FIX / FUSE are now ordinary small buttons inside the health card; DOWNLOAD IT keeps its red colour but is half the size.
+
 ## v2.215
 - Print page simplified: the left column is gone. One large MODEL HEALTH card now holds the file size, triangles and health rows, the **Height** (with width and depth following), the **Detail** slider, the SHRINK / FIX / FUSE tools and the big DOWNLOAD IT (with the GLB option).
 - Splitting and pegs removed from the page (a model too big for the printer is just scaled to the Height you set). Printer type and the old controls stay hidden so BATCH keeps working.
