@@ -52,9 +52,17 @@
     const t = d.dataset.printerType || 'resin', q = d.dataset.quality || 'standard';
     return PRINTER_LIST.find(x => t === 'custom' ? x.type === 'custom' : x.type === t && x.quality === q) || PRINTER_LIST[0];
   }
-  // The chosen detail goes on the end of the file name (v2.166) so you can tell the versions apart: name-SHRINK-16K.stl
+  // The file name says what was done to the model (v2.221): name-SHRUNK-16K-FIXED-FUSED-75mm. The detail tag only shows when SHRINK ran; the height is always there because the file is always saved at it.
   function downloadStem(base) {
-    return `${cleanBaseName(base)}-SHRINK-${currentPrinter().tag}`;
+    const parts = [cleanBaseName(base)];
+    if (appliedChanges.has('shrunk')) parts.push(`SHRUNK-${currentPrinter().tag}`);
+    if (appliedChanges.has('clay')) parts.push('CLAY');
+    if (appliedChanges.has('rebuilt')) parts.push('REBUILT');
+    if (appliedChanges.has('fixed')) parts.push('FIXED');
+    if (appliedChanges.has('fused')) parts.push('FUSED');
+    const h = Number(document.getElementById('v2Height')?.value);
+    if (h > 0) parts.push(`${Number.isInteger(h) ? h : h.toFixed(1)}mm`);
+    return parts.join('-');
   }
 
   window.__shrinkDownloadStem = downloadStem;

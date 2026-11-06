@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.221
+- Saved file names now say what was done: `name-SHRUNK-16K-FIXED-FUSED-75mm.stl`. Only the steps you actually ran appear (SHRUNK with its detail level, FIXED, FUSED, REBUILT), and the height is always last. Resize only gives `name-75mm.stl`.
+
 ## v2.220
 - The Height section's button is now just **RESIZE** (no download); use the big DOWNLOAD IT at the bottom to save.
 

@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.220** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.221** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -88,7 +88,7 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 `quickState()` in `print-v2-ui.js` sets `#v2MagicBtn[data-state]` (`checking` = grey and disabled, like DOWNLOAD; `ready` = green) from `updateHealthCard()`. BATCH waits for `ready`.
 
 ### 16K ultra (v2.150, default since v2.159)
-The printer type + quality are saved in `localStorage['shrink-printer']` (`savePrinter()`/`savedPrinter()` in `print-v2-ui.js`; BATCH reads the same key) and restored when the dashboard is built; with nothing saved the default is resin + `ultra`. `setQuality('ultra')`: detail 0.018 mm for resin and `window.__shrinkStrict='p995'`; Standard/Fine/Large put it back to default. (v2.166) The visible control is one `#v2PrinterSel` dropdown built from `window.__shrinkPrinterList` (BATCH reads the same list); the old `[data-printer]`/`[data-quality]` buttons stay in a hidden block so code and tests can still click them. `downloadStem()` adds the list `tag` (`-SHRINK-16K`) to every export name.
+The printer type + quality are saved in `localStorage['shrink-printer']` (`savePrinter()`/`savedPrinter()` in `print-v2-ui.js`; BATCH reads the same key) and restored when the dashboard is built; with nothing saved the default is resin + `ultra`. `setQuality('ultra')`: detail 0.018 mm for resin and `window.__shrinkStrict='p995'`; Standard/Fine/Large put it back to default. (v2.166) The visible control is one `#v2PrinterSel` dropdown built from `window.__shrinkPrinterList` (BATCH reads the same list); the old `[data-printer]`/`[data-quality]` buttons stay in a hidden block so code and tests can still click them. `downloadStem()` builds the export name from what was done (v2.221): `-SHRUNK-<tag>` only after SHRINK, then `-CLAY/-REBUILT/-FIXED/-FUSED` from `appliedChanges`, then `-<height>mm`.
 
 ### Viewer lighting (v2.145)
 `syncViewerEnvironment()` in `app.js` sets print mode to low hemisphere/fill light plus a strong `key` lamp with `castShadow` (game mode keeps the old gentle lamps and no shadows). `fitShadows()` runs each frame: it flags the original/optimized/current model meshes `castShadow`/`receiveShadow` and, every 20 frames, refits the key lamp and its orthographic shadow camera around the shown model (bounding sphere), so a moved or replaced model keeps good shadows. New meshes added to the scene need nothing extra unless they should not cast shadows (guide/clay groups are not flagged).
