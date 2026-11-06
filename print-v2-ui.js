@@ -1006,7 +1006,7 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks, fixes and fuses your model, then centres it flat on the print bed, as far as it can.">QUICK-FIX (shrink, fix and fuse)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when QUICK-FIX has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">DO EVERYTHING (shrink, fix, fuse, centre)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when DO EVERYTHING has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
     $('v2MagicReset').addEventListener('click', () => { const f = $('fileInput'); if (f) { f.value = ''; f.click(); } });
@@ -1151,6 +1151,7 @@
     dashboard.dataset.printerType = 'resin';
     dashboard.dataset.quality = 'standard';
     dashboard.innerHTML = `
+      <p class="v2-pick-hint"><strong>Pick just what you need.</strong> To resize, set the height and press DOWNLOAD IT. Every tool below works on its own, in any order. Or press DO EVERYTHING at the top to do it all in one go.</p>
       <div class="v2-top-grid">
         <div class="v2-left-stack">
           <button type="button" id="v2LeftToggle" class="v2-left-toggle" aria-expanded="false" title="Show or hide the printer, size and advanced tools"></button>
@@ -1183,7 +1184,7 @@
           </section>
 
           <details id="v2AdvTools" class="v2-adv-tools" open>
-            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse</strong><small>QUICK-FIX (top right) does shrink, fix and fuse for you. Open this to use the tools separately </small></summary>
+            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse</strong><small>DO EVERYTHING (top) does shrink, fix and fuse for you. Open this to use the tools separately </small></summary>
           <section id="v2ClayCard" class="v2-card v2-clay-card" hidden><div id="v2ClayHost"></div></section>
 
           <div class="v2-action-grid">

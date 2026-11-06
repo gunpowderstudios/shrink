@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.213
+- Print page made clearer: the top QUICK-FIX button is now **DO EVERYTHING (shrink, fix, fuse, centre)** with a tooltip saying you never need it, and a short hint above the tools says to pick just what you need (resize = set the height and DOWNLOAD IT; every tool works alone, in any order). Only wording; ids (`#v2MagicBtn`), behaviour, BATCH and tests are unchanged.
+
 ## v2.212
 - BATCH UPLOAD is back under the main drop zone on a fresh load (a plainer button than the green one removed in v2.184). It switches to the print tools and opens the BATCH window, exactly like the top-bar BATCH. It disappears once a model is open.
 
