@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.220
+- The Height section's button is now just **RESIZE** (no download); use the big DOWNLOAD IT at the bottom to save.
+
 ## v2.219
 - Height section has a **RESIZE ONLY & DOWNLOAD** button: scales the model to the height you typed and saves the STL, without shrinking, fixing or fusing.
 

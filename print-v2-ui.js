@@ -1158,9 +1158,9 @@
     const sizeBox = document.createElement('div'); sizeBox.className = 'v2-main-size';
     const setup = dashboard.querySelector('.v2-setup-card');
     ['.v2-size-row:not(.v2-dim-row)', '.v2-uniform-row', '.v2-dim-row'].forEach(q => { const el = setup?.querySelector(q); if (el) sizeBox.appendChild(el); });
-    { const rb = document.createElement('button'); rb.type = 'button'; rb.id = 'v2ResizeBtn'; rb.className = 'v2-resize-btn'; rb.textContent = 'RESIZE ONLY & DOWNLOAD';
-      rb.title = 'Just scales the model to the height above and saves it. Nothing is shrunk, fixed or fused.';
-      rb.addEventListener('click', () => { updateHeight(); const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
+    { const rb = document.createElement('button'); rb.type = 'button'; rb.id = 'v2ResizeBtn'; rb.className = 'v2-resize-btn'; rb.textContent = 'RESIZE';
+      rb.title = 'Scales the model to the height above. Nothing is shrunk, fixed or fused. Press DOWNLOAD IT when you want the file.';
+      rb.addEventListener('click', () => { updateHeight(); refreshDims(); });
       sizeBox.appendChild(rb); }
     const detail = $('v2Detail')?.closest('label'); const detailBox = document.createElement('div'); detailBox.className = 'v2-main-detail'; if (detail) detailBox.appendChild(detail);
     const actions = document.createElement('div'); actions.className = 'v2-main-actions';
