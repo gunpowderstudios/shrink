@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.219
+- Height section has a **RESIZE ONLY & DOWNLOAD** button: scales the model to the height you typed and saves the STL, without shrinking, fixing or fusing.
+
 ## v2.218
 - With the left panel folded away, pressing DO EVERYTHING (or any tool) now drops the cascading 0/1 matrix over the 3D view while it works.
 

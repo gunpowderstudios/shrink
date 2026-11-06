@@ -636,3 +636,7 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 /* v2.218 — matrix rain over the 3D view while a tool works and the left panel is folded away */
 .v2-viewer-rain{position:absolute;inset:0;width:100%;height:100%;z-index:11;pointer-events:none;mix-blend-mode:screen;opacity:.8}
 .v2-viewer-rain[hidden]{display:none!important}
+
+/* v2.219 — RESIZE ONLY button under the size boxes */
+.v2-resize-btn{display:block;width:100%;margin-top:8px;padding:9px 12px;border:1px solid #3a4a60;border-radius:8px;background:#1b2635;color:#e8eef6;font-size:13px;font-weight:800;cursor:pointer}
+.v2-resize-btn:hover{background:#243246;border-color:#2f8cff}
