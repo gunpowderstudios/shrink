@@ -1139,6 +1139,26 @@
     $('saveStlBtn')?.click();
   }
 
+  function buildMainCard() {
+    const card = ensureHealthCard(), stack = dashboard.querySelector('.v2-left-stack'); if (!card || !stack || card.querySelector('.v2-main-controls')) return;
+    const hold = document.createElement('div'); hold.className = 'v2-legacy-hold'; hold.hidden = true;
+    const main = document.createElement('div'); main.className = 'v2-main-controls';
+    const sizeBox = document.createElement('div'); sizeBox.className = 'v2-main-size';
+    const setup = dashboard.querySelector('.v2-setup-card');
+    ['.v2-size-row:not(.v2-dim-row)', '.v2-uniform-row', '.v2-dim-row'].forEach(q => { const el = setup?.querySelector(q); if (el) sizeBox.appendChild(el); });
+    const detail = $('v2Detail')?.closest('label'); const detailBox = document.createElement('div'); detailBox.className = 'v2-main-detail'; if (detail) detailBox.appendChild(detail);
+    const actions = document.createElement('div'); actions.className = 'v2-main-actions';
+    ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
+    const dl = document.createElement('div'); dl.className = 'v2-main-download';
+    ['v2DownloadBtn', 'v2DownloadGlb'].forEach(id => { const el = $(id); if (el) dl.appendChild(el); });
+    main.append(sizeBox, detailBox, actions, dl);
+    $('v2HealthRows').after(main);
+    const hdr = document.createElement('div'); hdr.className = 'v2-main-title'; hdr.textContent = 'Pick just what you need, in any order. Or press DO EVERYTHING at the top.'; main.before(hdr);
+    while (stack.firstChild) hold.appendChild(stack.firstChild);
+    stack.appendChild(card); stack.appendChild(hold);
+    dashboard.dataset.left = 'open';
+  }
+
   function createDashboard() {
     if (dashboard || document.querySelector('.print-v2-dashboard')) return;
     const workspace = $('workspace');
@@ -1154,7 +1174,6 @@
     dashboard.dataset.printerType = 'resin';
     dashboard.dataset.quality = 'standard';
     dashboard.innerHTML = `
-      <p class="v2-pick-hint"><strong>Pick just what you need.</strong> To resize, set the height and press DOWNLOAD IT. Every tool below works on its own, in any order. Or press DO EVERYTHING at the top to do it all in one go.</p>
       <div class="v2-top-grid">
         <div class="v2-left-stack">
           <button type="button" id="v2LeftToggle" class="v2-left-toggle" aria-expanded="false" title="Show or hide the printer, size and advanced tools"></button>
@@ -1249,13 +1268,9 @@
     if (!workingModel) setWorkingModel(app()?.originalModel);
     setTimeout(updateHealthCard, 80);
 
-    // The left column (printer, size, advanced tools) starts folded away so the viewer gets the whole width; the choice is remembered (v2.170).
-    { const KEY = 'shrink-left-panel', tg = $('v2LeftToggle');
-      const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = open ? '◂ Hide panel' : '▸ Printer, size & tools'; };
-      let open = false; try { open = localStorage.getItem(KEY) === 'open'; } catch { /* no storage */ }
-      setLeft(open);
-      tg.addEventListener('click', () => { const o = dashboard.dataset.left !== 'open'; setLeft(o); try { localStorage.setItem(KEY, o ? 'open' : 'closed'); } catch { /* private mode */ } window.dispatchEvent(new Event('resize')); dimRetry = 0; refreshDims(); });
-      window.__shrinkLeftPanel = setLeft; }
+    // v2.215: the left column is gone. One big MODEL HEALTH card holds the size, detail, tools and download; the old printer, split and peg controls stay in a hidden holder because BATCH and the tests drive them.
+    buildMainCard();
+    window.__shrinkLeftPanel = () => {};
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
     $('v2PrinterSel').addEventListener('change', e => { const x = PRINTER_LIST.find(y => y.id === e.target.value); if (!x) return; choosePrinter(x.type); if (x.type !== 'custom') setQuality(x.quality); syncPrinterSel(); });

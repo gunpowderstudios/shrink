@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.215
+- Print page simplified: the left column is gone. One large MODEL HEALTH card now holds the file size, triangles and health rows, the **Height** (with width and depth following), the **Detail** slider, the SHRINK / FIX / FUSE tools and the big DOWNLOAD IT (with the GLB option).
+- Splitting and pegs removed from the page (a model too big for the printer is just scaled to the Height you set). Printer type and the old controls stay hidden so BATCH keeps working.
+
 ## v2.214
 - MODEL HEALTH box now starts with **File size** (about what the STL will be: 84 bytes + 50 per triangle) and **Triangles**, so you can judge before downloading. It updates after every tool.
 - BATCH: only genuine problems get an amber warning. Minor edges ("fine to print") and several clean separate pieces now give a green tick with a short note (e.g. `health 95/100 · 4 minor edges, fine to print · 7 separate pieces, prints fine`). The "Not fused" explanation box only appears when something is really not fixed.
