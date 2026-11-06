@@ -425,6 +425,39 @@ function exportModel(kind) {
 els.saveStl.addEventListener('click', () => exportModel('stl'));
 els.saveObj.addEventListener('click', () => exportModel('obj'));
 
+// v2.211: the working model as a GLB (metres, Y-up, so it opens in game engines and viewers). One plain mesh in world space,
+// scaled so it is as tall as the Height box says; split pieces and pegs are not part of it (that is what the STL is for).
+async function exportGlb() {
+  const model = currentModelForExport();
+  if (!model) return;
+  const a = app(), mmPerUnit = printMmPerUnit(), scale = mmPerUnit / 1000;
+  say('Building GLB…');
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const { GLTFExporter } = await import('https://esm.sh/three@0.180.0/examples/jsm/exporters/GLTFExporter.js');
+    model.updateMatrixWorld(true);
+    const scene = new THREE.Scene(), mat = new THREE.MeshStandardMaterial({ color: 0xb8bcc4, roughness: 0.6, metalness: 0 });
+    let tris = 0;
+    model.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position || o.visible === false) return;
+      const g = o.geometry.clone();
+      for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+      g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(new THREE.Matrix4().makeScale(scale, scale, scale), o.matrixWorld));
+      g.computeVertexNormals();
+      tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+      scene.add(new THREE.Mesh(g, mat));
+    });
+    if (!scene.children.length) throw new Error('there is nothing to export');
+    const buffer = await new GLTFExporter().parseAsync(scene, { binary: true });
+    const stem = window.__shrinkDownloadStem?.(a.baseName()) || `${a.baseName()}-SHRINK`;
+    saveBlob(new Blob([buffer], { type: 'model/gltf-binary' }), `${stem}.glb`);
+    say(`Saved GLB: ${fmt(Math.round(tris))} triangles, ${fmtBytes(buffer.byteLength)}, ${Number(els.height.value)} mm tall (1 unit = 1 metre).`);
+    scene.traverse(o => o.geometry?.dispose?.());
+  } catch (err) { console.error(err); say(`GLB export failed: ${err.message}`, true); }
+}
+window.__shrinkExportGlb = exportGlb;
+document.getElementById('saveGlbBtn')?.addEventListener('click', exportGlb);
+
 /* ------------------------------------------------------------------ */
 /* Lifecycle                                                            */
 /* ------------------------------------------------------------------ */
