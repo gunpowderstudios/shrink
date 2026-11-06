@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.218
+- With the left panel folded away, pressing DO EVERYTHING (or any tool) now drops the cascading 0/1 matrix over the 3D view while it works.
+
+## v2.217
+- The left panel folds away again (tab "▸ Size, tools & download", choice remembered) and DOWNLOAD IT is full size again.
+
 ## v2.216
 - Tidy-up: SHRINK / FIX / FUSE are now ordinary small buttons inside the health card; DOWNLOAD IT keeps its red colour but is half the size.
 

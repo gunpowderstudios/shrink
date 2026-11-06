@@ -63,7 +63,7 @@
   let rainTimer = null;
   // Reference-counted: nested tools (QUICK-FIX runs shrink, fix, fuse) keep the rain going until the last one ends.
   // A delay lets quick things (the health check) finish before the rain shows, so it does not flash.
-  let workCount = 0, workTimer = null, workShown = false;
+  let workCount = 0, workTimer = null, workShown = false, workOnViewer = false;
   function setWorking(on, delayMs = 0) {
     if (on) {
       workCount++;
@@ -74,19 +74,31 @@
       if (workCount === 0) { if (workTimer) { clearTimeout(workTimer); workTimer = null; } hideWork(); }
     }
   }
+  // With the left panel folded away the health card is hidden, so the rain falls over the 3D view instead (v2.218).
+  function viewerRain() {
+    const v = document.getElementById('viewer'); if (!v) return null;
+    let cv = document.getElementById('v2ViewerRain');
+    if (!cv) { cv = document.createElement('canvas'); cv.id = 'v2ViewerRain'; cv.className = 'v2-viewer-rain'; cv.setAttribute('aria-hidden', 'true'); v.appendChild(cv); }
+    return cv;
+  }
   function showWork() {
     const hc = document.getElementById('v2HealthCard'); if (!hc) return;
-    const r = hc.getBoundingClientRect(); hc.style.width = r.width + 'px'; hc.style.height = Math.max(r.height, 150) + 'px'; hc.dataset.working = '1'; workShown = true;
-    startRain(hc);
+    if (dashboard?.dataset.left === 'closed') {
+      const v = document.getElementById('viewer'), cv = viewerRain(); if (!v || !cv) return;
+      cv.hidden = false; workShown = true; workOnViewer = true; startRain(v, cv); return;
+    }
+    const r = hc.getBoundingClientRect(); hc.style.width = r.width + 'px'; hc.style.height = Math.max(r.height, 150) + 'px'; hc.dataset.working = '1'; workShown = true; workOnViewer = false;
+    startRain(hc, hc.querySelector('.v2-working-rain'));
   }
   function hideWork() {
     stopRain(); workShown = false;
+    const vr = document.getElementById('v2ViewerRain'); if (vr) vr.hidden = true;
     const hc = document.getElementById('v2HealthCard'); if (hc) { hc.dataset.working = ''; hc.style.width = ''; hc.style.height = ''; }
   }
   window.__shrinkWork = setWorking;      // other modules (Make watertight) call this around their own long jobs
-  function startRain(hc) {
+  function startRain(hc, cv) {
     stopRain();
-    const cv = hc.querySelector('.v2-working-rain'), ctx = cv?.getContext?.('2d'); if (!ctx) return;
+    const ctx = cv?.getContext?.('2d'); if (!ctx) return;
     const W = Math.max(60, Math.round(hc.clientWidth)), H = Math.max(60, Math.round(hc.clientHeight)), size = 13;
     cv.width = W; cv.height = H;
     const cols = Math.ceil(W / size), drops = Array.from({ length: cols }, () => -Math.floor(Math.random() * H / size));
@@ -1154,9 +1166,10 @@
     main.append(sizeBox, detailBox, actions, dl);
     $('v2HealthRows').after(main);
     const hdr = document.createElement('div'); hdr.className = 'v2-main-title'; hdr.textContent = 'Pick just what you need, in any order. Or press DO EVERYTHING at the top.'; main.before(hdr);
-    while (stack.firstChild) hold.appendChild(stack.firstChild);
+    const tgl = $('v2LeftToggle');
+    while (stack.firstChild) { if (stack.firstChild === tgl) { stack.removeChild(tgl); continue; } hold.appendChild(stack.firstChild); }
+    if (tgl) stack.appendChild(tgl);
     stack.appendChild(card); stack.appendChild(hold);
-    dashboard.dataset.left = 'open';
   }
 
   function createDashboard() {
@@ -1270,7 +1283,13 @@
 
     // v2.215: the left column is gone. One big MODEL HEALTH card holds the size, detail, tools and download; the old printer, split and peg controls stay in a hidden holder because BATCH and the tests drive them.
     buildMainCard();
-    window.__shrinkLeftPanel = () => {};
+    // The panel folds away again (as before v2.215); the choice is remembered.
+    { const KEY = 'shrink-left-panel', tg = $('v2LeftToggle');
+      const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = open ? '◂ Hide panel' : '▸ Size, tools & download'; };
+      let open = false; try { open = localStorage.getItem(KEY) === 'open'; } catch { /* no storage */ }
+      setLeft(open);
+      tg.addEventListener('click', () => { const o = dashboard.dataset.left !== 'open'; setLeft(o); try { localStorage.setItem(KEY, o ? 'open' : 'closed'); } catch { /* private mode */ } window.dispatchEvent(new Event('resize')); dimRetry = 0; refreshDims(); });
+      window.__shrinkLeftPanel = setLeft; }
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
     $('v2PrinterSel').addEventListener('change', e => { const x = PRINTER_LIST.find(y => y.id === e.target.value); if (!x) return; choosePrinter(x.type); if (x.type !== 'custom') setQuality(x.quality); syncPrinterSel(); });
