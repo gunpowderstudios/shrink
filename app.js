@@ -46,7 +46,7 @@ let optimizedModel = null;
 let currentModel = null;
 let wireframeEnabled = false;
 let currentWhich = 'original';
-let compareOn = false, comparePose = null;
+let compareOn = false, comparePose = null, origPosed = null;
 let compareSplit = 0.5;
 let sourceKind = 'glb';          // glb | stl | obj | ply (what the user opened)
 let lastReduce = null;
@@ -218,6 +218,19 @@ function applyWireframe(model, enabled) {
   });
 }
 
+// v2.225: the print tools level / centre / scale the WORKING model only. When the Original tab is shown, put the untouched upload in the same pose (and put it back afterwards) so it sits on the plate like the reduced one.
+function restoreOrigPose() {
+  if (!origPosed) return;
+  const c = origPosed; origPosed = null;
+  c.model.position.copy(c.p); c.model.quaternion.copy(c.q); c.model.scale.copy(c.s); c.model.updateMatrix(); c.model.updateMatrixWorld(true);
+}
+function poseOriginalLikeWorking() {
+  if (origPosed || !originalModel || originalModel === window.__shrinkWorkingModel?.()) return;
+  const pose = window.__shrinkComparePose?.(); if (!pose) return;
+  origPosed = { model: originalModel, p: originalModel.position.clone(), q: originalModel.quaternion.clone(), s: originalModel.scale.clone() };
+  originalModel.applyMatrix4(pose); originalModel.updateMatrixWorld(true);
+}
+
 function showModel(model, which, reframe = true) {
   if (!model) return;
   if (!compareOn && currentModel === model && currentWhich === which) {
@@ -228,8 +241,10 @@ function showModel(model, which, reframe = true) {
   }
   if (compareOn) leaveCompare();
   if (currentModel) scene.remove(currentModel);
+  if (which !== 'original' || model !== originalModel) restoreOrigPose();
   currentModel = model;
   currentWhich = which;
+  if (which === 'original' && model === originalModel) poseOriginalLikeWorking();
   applyWireframe(currentModel, wireframeEnabled);
   scene.add(currentModel);
   els.showOriginalBtn.classList.toggle('active', which === 'original');
@@ -239,6 +254,7 @@ function showModel(model, which, reframe = true) {
 
 function enterCompare() {
   if (!originalModel || !optimizedModel) return false;
+  restoreOrigPose();
   if (currentModel) scene.remove(currentModel);
   scene.add(originalModel); scene.add(optimizedModel);
   // the print tools may have moved / turned / stretched the working model (levelled, centred on the bed): put the original in the same pose while comparing

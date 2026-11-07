@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.225
+- The **Original** tab now shows your upload in the same position as the reduced model (levelled, centred on the plate, scaled to the Height) instead of wherever the file happened to load. It is put back untouched when you switch away. Nothing you download changes.
+
 ## v2.224
 - White note under the MODEL HEALTH box: "Reduced from X MB to Y MB" (STL size estimate of the upload versus the current model), shown once the model has fewer triangles than the upload.
 
