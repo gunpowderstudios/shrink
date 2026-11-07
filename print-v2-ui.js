@@ -282,7 +282,9 @@
   window.__shrinkRefreshSizeWarning = updateSizeWarning;
 
   // QUICK-FIX is grey and unclickable (like DOWNLOAD) while the health check runs and turns green when it has finished, so it is clear when to press it (v2.148).
-  const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; } };
+  const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; }
+    const sb = $('v2ShrinkBtn'); if (sb) { const sOff = st === 'checking' || !sourceModel(); if (sOff) { sb.dataset.checking = '1'; if (!sb.disabled) sb.disabled = true; } else if (sb.dataset.checking) { delete sb.dataset.checking; if (!shrinkRunning && sb.disabled) sb.disabled = false; } } };
+  let shrinkRunning = false;
   async function updateHealthCard(...a) { setWorking(true, 350); try { return await updateHealthCardInner(...a); } finally { setWorking(false); } }
   async function updateHealthCardInner() {
     updateSizeWarning(); ensureTurnPad();
@@ -603,7 +605,7 @@
     }
   }
 
-  async function shrinkModel(...a) { setWorking(true, 0); try { return await shrinkModelInner(...a); } finally { setWorking(false); } }
+  async function shrinkModel(...a) { if ($('v2ShrinkBtn')?.dataset.checking) return; shrinkRunning = true; setWorking(true, 0); try { return await shrinkModelInner(...a); } finally { shrinkRunning = false; setWorking(false); const sb = $('v2ShrinkBtn'); if (sb?.dataset.checking) sb.disabled = true; } }
   async function shrinkModelInner() {
     const source = $('autoBtn');
     const btn = $('v2ShrinkBtn');

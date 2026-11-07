@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.227
+- SHRINK IT is greyed out and cannot be pressed until the health check of the uploaded model has finished (same moment DO EVERYTHING turns green).
+
 ## v2.226
 - Fix: the white "Reduced from X MB to Y MB" note could sit hidden behind the health box (it measured the box before the rows were drawn). It now follows the box height.
 
