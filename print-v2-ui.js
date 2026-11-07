@@ -322,12 +322,12 @@
         if (!note && viewer) { note = document.createElement('div'); note.id = 'v2ReduceNote'; note.className = 'v2-reduce-note'; viewer.appendChild(note); }
         if (note && card) {
           const was = 84 + 50 * origTris;
-          if (origTris > 0 && tris < origTris) { note.textContent = `Reduced from ${fmt(was)} to ${fmt(stlBytes)}`; note.hidden = false; const place = () => { note.style.top = (card.offsetTop + card.offsetHeight + 8) + 'px'; }; place(); requestAnimationFrame(place); if (!card._noteRO && window.ResizeObserver) { card._noteRO = new ResizeObserver(place); card._noteRO.observe(card); } }
+          if (origTris > 0 && tris < origTris) { const kTag = appliedChanges.has('shrunk') ? ` (${currentPrinter().tag})` : ''; note.textContent = `Reduced from ${fmt(was)} to ${fmt(stlBytes)}${kTag}`; note.hidden = false; const place = () => { note.style.top = (card.offsetTop + card.offsetHeight + 8) + 'px'; }; place(); requestAnimationFrame(place); if (!card._noteRO && window.ResizeObserver) { card._noteRO = new ResizeObserver(place); card._noteRO.observe(card); } }
           else note.hidden = true;
         }
       }
       $('v2HealthRows').innerHTML =
-        healthRow('File size', `≈ ${sizeText} STL`, true) +
+        healthRow('File size', `≈ ${sizeText} STL${appliedChanges.has('shrunk') ? ' · ' + currentPrinter().tag : ''}`, true) +
         healthRow('Triangles', new Intl.NumberFormat().format(tris), true) +
         healthRow('Watertight', watertight ? 'YES' : 'NO', watertight) +
         healthRow('Open edges', new Intl.NumberFormat().format(h.openEdges), h.openEdges === 0) +
