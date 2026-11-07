@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.226
+- Fix: the white "Reduced from X MB to Y MB" note could sit hidden behind the health box (it measured the box before the rows were drawn). It now follows the box height.
+
 ## v2.225
 - The **Original** tab now shows your upload in the same position as the reduced model (levelled, centred on the plate, scaled to the Height) instead of wherever the file happened to load. It is put back untouched when you switch away. Nothing you download changes.
 
