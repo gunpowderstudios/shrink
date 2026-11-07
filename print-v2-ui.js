@@ -313,6 +313,17 @@
       const oriented = h.flippedEdges === 0;
       const cleanDegens = true;                       // informational only (v2.190): shown, never red
       const tris = modelTriangles(model), stlBytes = 84 + 50 * tris, sizeText = stlBytes >= 1048576 ? `${(stlBytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(stlBytes / 1024))} KB`;
+      {   // v2.224: white note under the health box: how much smaller the file got (STL size estimate before vs now)
+        const fmt = b => b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
+        const orig = app()?.originalModel, origTris = orig ? modelTriangles(orig) : 0, viewer = document.getElementById('viewer'), card = $('v2HealthCard');
+        let note = $('v2ReduceNote');
+        if (!note && viewer) { note = document.createElement('div'); note.id = 'v2ReduceNote'; note.className = 'v2-reduce-note'; viewer.appendChild(note); }
+        if (note && card) {
+          const was = 84 + 50 * origTris;
+          if (origTris > 0 && tris < origTris) { note.textContent = `Reduced from ${fmt(was)} to ${fmt(stlBytes)}`; note.hidden = false; note.style.top = (card.offsetTop + card.offsetHeight + 8) + 'px'; }
+          else note.hidden = true;
+        }
+      }
       $('v2HealthRows').innerHTML =
         healthRow('File size', `≈ ${sizeText} STL`, true) +
         healthRow('Triangles', new Intl.NumberFormat().format(tris), true) +
@@ -1298,11 +1309,10 @@
     // v2.215: the left column is gone. One big MODEL HEALTH card holds the size, detail, tools and download; the old printer, split and peg controls stay in a hidden holder because BATCH and the tests drive them.
     buildMainCard();
     // The panel folds away again (as before v2.215); the choice is remembered.
-    { const KEY = 'shrink-left-panel', tg = $('v2LeftToggle');
+    { const tg = $('v2LeftToggle');
       const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = open ? '◂ Hide panel' : '▸ Size, tools & download'; };
-      let open = false; try { open = localStorage.getItem(KEY) === 'open'; } catch { /* no storage */ }
-      setLeft(open);
-      tg.addEventListener('click', () => { const o = dashboard.dataset.left !== 'open'; setLeft(o); try { localStorage.setItem(KEY, o ? 'open' : 'closed'); } catch { /* private mode */ } window.dispatchEvent(new Event('resize')); dimRetry = 0; refreshDims(); });
+      setLeft(false);   // v2.223: always starts closed on load; the old remembered choice is ignored
+      tg.addEventListener('click', () => { const o = dashboard.dataset.left !== 'open'; setLeft(o); window.dispatchEvent(new Event('resize')); dimRetry = 0; refreshDims(); });
       window.__shrinkLeftPanel = setLeft; }
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));

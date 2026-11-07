@@ -648,3 +648,7 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 @media(max-width:900px){.v2-health-card{width:190px}}
 /* the red 'make watertight' box is never shown (v2.222) */
 #printDiagnosticPanel,.print-diagnostic-panel{display:none!important}
+
+/* v2.224 — white 'Reduced from … to …' note under the health box */
+.v2-reduce-note{position:absolute;right:12px;width:260px;box-sizing:border-box;z-index:11;pointer-events:none;color:#fff;font-size:13px;font-weight:700;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.v2-reduce-note[hidden]{display:none!important}

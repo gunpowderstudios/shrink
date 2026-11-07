@@ -2,6 +2,12 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.224
+- White note under the MODEL HEALTH box: "Reduced from X MB to Y MB" (STL size estimate of the upload versus the current model), shown once the model has fewer triangles than the upload.
+
+## v2.223
+- The left panel is always closed when the page loads (the remembered open/closed choice is no longer used). Press the tab to open it.
+
 ## v2.222
 - The MODEL HEALTH box is out of the side panel: it stays on the right of the 3D view and is always visible. The tools (size, detail, SHRINK/FIX/FUSE, DOWNLOAD IT) stay in the foldable left card.
 - The red make-watertight message box is hidden for good (the logic and BATCH are unchanged).
