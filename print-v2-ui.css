@@ -640,3 +640,11 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 /* v2.219 — RESIZE ONLY button under the size boxes */
 .v2-resize-btn{display:block;width:100%;margin-top:8px;padding:9px 12px;border:1px solid #3a4a60;border-radius:8px;background:#1b2635;color:#e8eef6;font-size:13px;font-weight:800;cursor:pointer}
 .v2-resize-btn:hover{background:#243246;border-color:#2f8cff}
+
+/* v2.222 — health box always on the right of the 3D view; tools card on the left */
+.v2-health-card{left:auto!important;right:12px;top:12px;bottom:auto!important;width:260px;pointer-events:auto}
+.v2-main-card{padding:16px;border:1px solid #2a384a;border-radius:14px;background:rgba(14,22,34,.96)}
+.v2-main-card .v2-main-controls{margin-top:6px}
+@media(max-width:900px){.v2-health-card{width:190px}}
+/* the red 'make watertight' box is never shown (v2.222) */
+#printDiagnosticPanel,.print-diagnostic-panel{display:none!important}

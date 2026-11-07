@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.222
+- The MODEL HEALTH box is out of the side panel: it stays on the right of the 3D view and is always visible. The tools (size, detail, SHRINK/FIX/FUSE, DOWNLOAD IT) stay in the foldable left card.
+- The red make-watertight message box is hidden for good (the logic and BATCH are unchanged).
+
 ## v2.221
 - Saved file names now say what was done: `name-SHRUNK-16K-FIXED-FUSED-75mm.stl`. Only the steps you actually ran appear (SHRUNK with its detail level, FIXED, FUSED, REBUILT), and the height is always last. Resize only gives `name-75mm.stl`.
 

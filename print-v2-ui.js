@@ -1160,7 +1160,7 @@
   }
 
   function buildMainCard() {
-    const card = ensureHealthCard(), stack = dashboard.querySelector('.v2-left-stack'); if (!card || !stack || card.querySelector('.v2-main-controls')) return;
+    const card = ensureHealthCard(), stack = dashboard.querySelector('.v2-left-stack'); if (!card || !stack || stack.querySelector('.v2-main-card')) return;
     const hold = document.createElement('div'); hold.className = 'v2-legacy-hold'; hold.hidden = true;
     const main = document.createElement('div'); main.className = 'v2-main-controls';
     const sizeBox = document.createElement('div'); sizeBox.className = 'v2-main-size';
@@ -1176,12 +1176,14 @@
     const dl = document.createElement('div'); dl.className = 'v2-main-download';
     ['v2DownloadBtn', 'v2DownloadGlb'].forEach(id => { const el = $(id); if (el) dl.appendChild(el); });
     main.append(sizeBox, detailBox, actions, dl);
-    $('v2HealthRows').after(main);
-    const hdr = document.createElement('div'); hdr.className = 'v2-main-title'; hdr.textContent = 'Pick just what you need, in any order. Or press DO EVERYTHING at the top.'; main.before(hdr);
+    // v2.222: the health box stays in the 3D view on the right, always visible; the tools live in their own foldable card on the left.
+    const mainCard = document.createElement('div'); mainCard.className = 'v2-main-card';
+    const hdr = document.createElement('div'); hdr.className = 'v2-main-title'; hdr.textContent = 'Pick just what you need, in any order. Or press DO EVERYTHING at the top.';
+    mainCard.append(hdr, main);
     const tgl = $('v2LeftToggle');
     while (stack.firstChild) { if (stack.firstChild === tgl) { stack.removeChild(tgl); continue; } hold.appendChild(stack.firstChild); }
     if (tgl) stack.appendChild(tgl);
-    stack.appendChild(card); stack.appendChild(hold);
+    stack.appendChild(mainCard); stack.appendChild(hold);
   }
 
   function createDashboard() {
