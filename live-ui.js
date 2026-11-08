@@ -22,7 +22,7 @@ const el = {
 };
 
 const GAME_TARGETS = {
-  web:  { label: 'web / mobile',   tris: 25000,  tex: 1024, quality: 80 },
+  web:  { label: 'web / mobile',   tris: null, keep: 0.30, tex: 1024, quality: 85 },   // v2.231: keeps 30% of the original triangles (was a fixed ~25k, which crinkled car panels); the Detail slider still moves it
   pc:   { label: 'PC / console',   tris: 100000, tex: 2048, quality: 85 },
   hero: { label: 'close-up / hero', tris: 300000, tex: 4096, quality: 90 },
   racer: { label: 'Racer (phones)', tris: null, tex: 1024, quality: 85 }   // no triangle target: the Racer preset is about texture memory (racer.js)
@@ -34,7 +34,7 @@ window.__shrinkLive = engine;
 
 /* ---------------- helpers ---------------- */
 const ratio = () => Math.max(0.01, Math.min(1, Number(el.geometry.value) / 100));
-// Game models open with Detail kept at 50% (10% from v2.140, 50% since v2.230); the target cards and the slider still change it.
+// Game models open with Detail kept at 50% (10% from v2.140, 50% since v2.231); the target cards and the slider still change it.
 const DEFAULT_GAME_KEEP = 0.50;
 const reduceOpts = () => ({ protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
 // Which slice of the surface must stay within the printer's detail? 95% lets the smallest, most detailed areas (faces, hands,
@@ -202,7 +202,8 @@ function chooseTarget(key, { initial = false } = {}) {
   if (el.textureSize) { el.textureSize.value = String(t.tex); el.textureSize.dispatchEvent(new Event('change', { bubbles: true })); }
   if (el.textureQuality) { el.textureQuality.value = String(t.quality); el.textureQuality.dispatchEvent(new Event('input', { bubbles: true })); }
   if (S.tris && t.tris) setRatio(Math.min(1, t.tris / S.tris));
-  if (!initial) say(t.tris ? `Set up for ${t.label}: about ${fmt(t.tris)} triangles and ${t.tex}px textures. Adjust the slider if you want more or less detail.` : `Set up for ${t.label}: WebP textures sized for phones (see the memory figure below). The triangle count is whatever Detail kept says.`);
+  else if (S.tris && t.keep) setRatio(t.keep);
+  if (!initial) say(t.keep ? `Set up for ${t.label}: ${Math.round(t.keep * 100)}% of the original triangles and ${t.tex}px WebP textures. Adjust the slider if you want more or less detail.` : t.tris ? `Set up for ${t.label}: about ${fmt(t.tris)} triangles and ${t.tex}px textures. Adjust the slider if you want more or less detail.` : `Set up for ${t.label}: WebP textures sized for phones (see the memory figure below). The triangle count is whatever Detail kept says.`);
 }
 el.cards?.addEventListener('click', e => { const b = e.target.closest('.target-card'); if (b) chooseTarget(b.dataset.target); });
 [el.textureSize, el.webp, el.meshopt].forEach(x => x?.addEventListener('change', () => updateLiveLine()));

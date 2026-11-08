@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.231
+- Web / mobile target now keeps 30% of the original triangles (was a fixed ~25,000, which crinkled car panels up close) with 1024 px WebP textures at quality 85. The Detail slider still moves it, so 50% is one drag away.
+
 ## v2.230
 - Racer preset removed from the Game targets (Web / mobile, PC / console and Close-up / hero remain). `racer.js` is no longer loaded; the racer files and tests stay in the repo, dormant.
 
