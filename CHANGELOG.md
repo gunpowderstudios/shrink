@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.234
+- The two sections are now named **Gaming** and **3D Printing** (the 3D Printing label and status line used to say just "Printing" / "Print mode").
+
 ## v2.233
 - Web / mobile now aims for a fixed ~60,000 triangles (about 100,000 vertices) instead of a percentage; a model already below that is left alone. Colour and normal maps are saved at 1024 px and data maps (metallic/roughness, AO) at 512 px (the existing half-size option, on by default), all WebP. After optimising, a status warning appears if a Web / mobile file is over 120,000 vertices or 2 MB.
 
