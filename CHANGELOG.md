@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.229
+- Car wheels panel: every adjustment slider has twice the range. Forward/back, up/down, axle width and the per-wheel up/down now go to ±200 (was ±100), left/right to ±300 (was ±150), wheel size and tyre width 25–200% (was 50–150% and 40–160%). 100 is still one tyre radius.
+
 ## v2.228
 - After SHRINK the quality level (e.g. 16K or 8K) is shown next to the size: in the white note ("Reduced from 40 MB to 6 MB (16K)") and on the File size row.
 

@@ -76,27 +76,27 @@ function inject() {
     <div class="hint">Cuts the wheels out as their own parts (Wheel_FL/FR/RL/RR, Wheel_F + Wheel_RL/RR on a three-wheeler, or Wheel_L + Wheel_R on a one-axle caravan: use the Front sliders), each pivoting on its own centre, so a game can spin and steer them. The car must sit on its wheels. The preview looks the same; the wheels are separate in the saved file.</div>
     <details id="wheelAdjust" class="fold tiny" open><summary>Adjust wheels (only if the markers look wrong)</summary><div class="fold-inner">
       <div class="wheel-group"><b>Front wheels</b></div>
-      <div class="range-heading"><label for="wheelSizeFront">Front wheel size</label><output id="wheelSizeFrontV">100%</output></div><input id="wheelSizeFront" type="range" min="50" max="150" step="1" value="100">
-      <div class="range-heading"><label for="wheelFront">Front forward / back</label><output id="wheelFrontV">0</output></div><input id="wheelFront" type="range" min="-100" max="100" step="1" value="0">
-      <div class="range-heading"><label for="wheelShiftFront">Front left / right</label><output id="wheelShiftFrontV">0</output></div><input id="wheelShiftFront" type="range" min="-150" max="150" step="1" value="0">
-      <div class="range-heading"><label for="wheelTrackFront">Front axle width (wheels in / out)</label><output id="wheelTrackFrontV">0</output></div><input id="wheelTrackFront" type="range" min="-100" max="100" step="1" value="0">
-      <div class="range-heading"><label for="wheelDyFront">Front up / down</label><output id="wheelDyFrontV">0</output></div><input id="wheelDyFront" type="range" min="-100" max="100" step="1" value="0">
-      <div class="range-heading"><label for="wheelWidthFront">Front tyre width</label><output id="wheelWidthFrontV">100%</output></div><input id="wheelWidthFront" type="range" min="40" max="160" step="1" value="100">
+      <div class="range-heading"><label for="wheelSizeFront">Front wheel size</label><output id="wheelSizeFrontV">100%</output></div><input id="wheelSizeFront" type="range" min="25" max="200" step="1" value="100">
+      <div class="range-heading"><label for="wheelFront">Front forward / back</label><output id="wheelFrontV">0</output></div><input id="wheelFront" type="range" min="-200" max="200" step="1" value="0">
+      <div class="range-heading"><label for="wheelShiftFront">Front left / right</label><output id="wheelShiftFrontV">0</output></div><input id="wheelShiftFront" type="range" min="-300" max="300" step="1" value="0">
+      <div class="range-heading"><label for="wheelTrackFront">Front axle width (wheels in / out)</label><output id="wheelTrackFrontV">0</output></div><input id="wheelTrackFront" type="range" min="-200" max="200" step="1" value="0">
+      <div class="range-heading"><label for="wheelDyFront">Front up / down</label><output id="wheelDyFrontV">0</output></div><input id="wheelDyFront" type="range" min="-200" max="200" step="1" value="0">
+      <div class="range-heading"><label for="wheelWidthFront">Front tyre width</label><output id="wheelWidthFrontV">100%</output></div><input id="wheelWidthFront" type="range" min="25" max="200" step="1" value="100">
       <div class="wheel-group"><b>Rear wheels</b></div>
-      <div class="range-heading"><label for="wheelSizeRear">Rear wheel size</label><output id="wheelSizeRearV">100%</output></div><input id="wheelSizeRear" type="range" min="50" max="150" step="1" value="100">
-      <div class="range-heading"><label for="wheelRear">Rear forward / back</label><output id="wheelRearV">0</output></div><input id="wheelRear" type="range" min="-100" max="100" step="1" value="0">
-      <div class="range-heading"><label for="wheelShiftRear">Rear left / right</label><output id="wheelShiftRearV">0</output></div><input id="wheelShiftRear" type="range" min="-150" max="150" step="1" value="0">
-      <div class="range-heading"><label for="wheelTrackRear">Rear axle width (wheels in / out)</label><output id="wheelTrackRearV">0</output></div><input id="wheelTrackRear" type="range" min="-100" max="100" step="1" value="0">
-      <div class="range-heading"><label for="wheelDyRear">Rear up / down</label><output id="wheelDyRearV">0</output></div><input id="wheelDyRear" type="range" min="-100" max="100" step="1" value="0">
-      <div class="range-heading"><label for="wheelWidthRear">Rear tyre width</label><output id="wheelWidthRearV">100%</output></div><input id="wheelWidthRear" type="range" min="40" max="160" step="1" value="100">
+      <div class="range-heading"><label for="wheelSizeRear">Rear wheel size</label><output id="wheelSizeRearV">100%</output></div><input id="wheelSizeRear" type="range" min="25" max="200" step="1" value="100">
+      <div class="range-heading"><label for="wheelRear">Rear forward / back</label><output id="wheelRearV">0</output></div><input id="wheelRear" type="range" min="-200" max="200" step="1" value="0">
+      <div class="range-heading"><label for="wheelShiftRear">Rear left / right</label><output id="wheelShiftRearV">0</output></div><input id="wheelShiftRear" type="range" min="-300" max="300" step="1" value="0">
+      <div class="range-heading"><label for="wheelTrackRear">Rear axle width (wheels in / out)</label><output id="wheelTrackRearV">0</output></div><input id="wheelTrackRear" type="range" min="-200" max="200" step="1" value="0">
+      <div class="range-heading"><label for="wheelDyRear">Rear up / down</label><output id="wheelDyRearV">0</output></div><input id="wheelDyRear" type="range" min="-200" max="200" step="1" value="0">
+      <div class="range-heading"><label for="wheelWidthRear">Rear tyre width</label><output id="wheelWidthRearV">100%</output></div><input id="wheelWidthRear" type="range" min="25" max="200" step="1" value="100">
       <details class="fold tiny"><summary>Each wheel up / down</summary><div class="fold-inner">
-        <div id="wheelDy4"><div class="range-heading"><label for="wheelDyFL">Front left</label><output id="wheelDyFLV">0</output></div><input id="wheelDyFL" type="range" min="-100" max="100" step="1" value="0">
-        <div class="range-heading"><label for="wheelDyFR">Front right</label><output id="wheelDyFRV">0</output></div><input id="wheelDyFR" type="range" min="-100" max="100" step="1" value="0"></div>
-        <div id="wheelDy2" hidden><div class="range-heading"><label for="wheelDyL">Left wheel</label><output id="wheelDyLV">0</output></div><input id="wheelDyL" type="range" min="-100" max="100" step="1" value="0">
-        <div class="range-heading"><label for="wheelDyR">Right wheel</label><output id="wheelDyRV">0</output></div><input id="wheelDyR" type="range" min="-100" max="100" step="1" value="0"></div>
-        <div id="wheelDy3" hidden><div class="range-heading"><label for="wheelDyF">Front wheel (single)</label><output id="wheelDyFV">0</output></div><input id="wheelDyF" type="range" min="-100" max="100" step="1" value="0"></div>
-        <div id="wheelDyRearPair"><div class="range-heading"><label for="wheelDyRL">Rear left</label><output id="wheelDyRLV">0</output></div><input id="wheelDyRL" type="range" min="-100" max="100" step="1" value="0">
-        <div class="range-heading"><label for="wheelDyRR">Rear right</label><output id="wheelDyRRV">0</output></div><input id="wheelDyRR" type="range" min="-100" max="100" step="1" value="0"></div>
+        <div id="wheelDy4"><div class="range-heading"><label for="wheelDyFL">Front left</label><output id="wheelDyFLV">0</output></div><input id="wheelDyFL" type="range" min="-200" max="200" step="1" value="0">
+        <div class="range-heading"><label for="wheelDyFR">Front right</label><output id="wheelDyFRV">0</output></div><input id="wheelDyFR" type="range" min="-200" max="200" step="1" value="0"></div>
+        <div id="wheelDy2" hidden><div class="range-heading"><label for="wheelDyL">Left wheel</label><output id="wheelDyLV">0</output></div><input id="wheelDyL" type="range" min="-200" max="200" step="1" value="0">
+        <div class="range-heading"><label for="wheelDyR">Right wheel</label><output id="wheelDyRV">0</output></div><input id="wheelDyR" type="range" min="-200" max="200" step="1" value="0"></div>
+        <div id="wheelDy3" hidden><div class="range-heading"><label for="wheelDyF">Front wheel (single)</label><output id="wheelDyFV">0</output></div><input id="wheelDyF" type="range" min="-200" max="200" step="1" value="0"></div>
+        <div id="wheelDyRearPair"><div class="range-heading"><label for="wheelDyRL">Rear left</label><output id="wheelDyRLV">0</output></div><input id="wheelDyRL" type="range" min="-200" max="200" step="1" value="0">
+        <div class="range-heading"><label for="wheelDyRR">Rear right</label><output id="wheelDyRRV">0</output></div><input id="wheelDyRR" type="range" min="-200" max="200" step="1" value="0"></div>
       </div></details>
       <div class="hint">Move the sliders until the markers sit on the wheels, then press Optimise again. 100 = one tyre radius. Markers hidden by the car are depth-tested, so turn the car to check the far side.</div>
       <div class="material-presets"><button id="wheelMarkers" class="button ghost small" type="button">Show wheel markers</button><button id="wheelAdjReset" class="button ghost small" type="button">Reset adjustments</button></div></div></details>
