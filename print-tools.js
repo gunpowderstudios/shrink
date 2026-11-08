@@ -425,7 +425,7 @@ function exportModel(kind) {
 els.saveStl.addEventListener('click', () => exportModel('stl'));
 els.saveObj.addEventListener('click', () => exportModel('obj'));
 
-// v2.231: the working model as a GLB (metres, Y-up, so it opens in game engines and viewers). One plain mesh in world space,
+// v2.232: the working model as a GLB (metres, Y-up, so it opens in game engines and viewers). One plain mesh in world space,
 // scaled so it is as tall as the Height box says; split pieces and pegs are not part of it (that is what the STL is for).
 async function exportGlb() {
   const model = currentModelForExport();

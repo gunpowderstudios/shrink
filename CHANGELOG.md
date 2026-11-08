@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.232
+- Game downloads now carry the settings in the file name: `bus-SHRINK-30pct-1024px.glb` (Detail kept, then largest texture size). Re-opening such a file does not stack the tags.
+
 ## v2.231
 - Web / mobile target now keeps 30% of the original triangles (was a fixed ~25,000, which crinkled car panels up close) with 1024 px WebP textures at quality 85. The Detail slider still moves it, so 50% is one drag away.
 

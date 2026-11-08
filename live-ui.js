@@ -22,7 +22,7 @@ const el = {
 };
 
 const GAME_TARGETS = {
-  web:  { label: 'web / mobile',   tris: null, keep: 0.30, tex: 1024, quality: 85 },   // v2.231: keeps 30% of the original triangles (was a fixed ~25k, which crinkled car panels); the Detail slider still moves it
+  web:  { label: 'web / mobile',   tris: null, keep: 0.30, tex: 1024, quality: 85 },   // v2.232: keeps 30% of the original triangles (was a fixed ~25k, which crinkled car panels); the Detail slider still moves it
   pc:   { label: 'PC / console',   tris: 100000, tex: 2048, quality: 85 },
   hero: { label: 'close-up / hero', tris: 300000, tex: 4096, quality: 90 },
   racer: { label: 'Racer (phones)', tris: null, tex: 1024, quality: 85 }   // no triangle target: the Racer preset is about texture memory (racer.js)
@@ -34,7 +34,7 @@ window.__shrinkLive = engine;
 
 /* ---------------- helpers ---------------- */
 const ratio = () => Math.max(0.01, Math.min(1, Number(el.geometry.value) / 100));
-// Game models open with Detail kept at 50% (10% from v2.140, 50% since v2.231); the target cards and the slider still change it.
+// Game models open with Detail kept at 50% (10% from v2.140, 50% since v2.232); the target cards and the slider still change it.
 const DEFAULT_GAME_KEEP = 0.50;
 const reduceOpts = () => ({ protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
 // Which slice of the surface must stay within the printer's detail? 95% lets the smallest, most detailed areas (faces, hands,

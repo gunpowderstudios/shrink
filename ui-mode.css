@@ -162,7 +162,7 @@
 .mode-override button{appearance:none;background:none;border:0;padding:0;color:#33c882;font-weight:800;cursor:pointer;text-decoration:underline;font-size:12px}
 body.app-mode-game.has-glb-model .mode-override{display:block}
 
-/* v2.231: BATCH UPLOAD under the load-screen drop zone (hidden once a model is open) */
+/* v2.232: BATCH UPLOAD under the load-screen drop zone (hidden once a model is open) */
 .v2-batch-home{display:flex;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap;margin:14px auto 0;max-width:720px;text-align:center}
 .v2-batch-upload{padding:12px 22px;border:1px solid rgba(255,255,255,.25);border-radius:12px;background:rgba(255,255,255,.06);color:inherit;font-size:15px;font-weight:800;letter-spacing:.3px;cursor:pointer}
 .v2-batch-upload:hover{background:rgba(255,255,255,.14)}

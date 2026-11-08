@@ -961,7 +961,7 @@ async function canvasToBlob(canvas, type, quality) {
 
 // SHRINK is always written in capitals in a file name, and a file that already carries it (re-opened output) is not tagged twice
 const capShrink = n => String(n).replace(/([-_ ]|^)shrink(?=[-_ .]|$)/gi, '$1SHRINK');
-const dropShrinkTag = n => capShrink(n).replace(/[-_ ]SHRINK(?:[-_ ]project|[-_ ]settings)?$/, '');
+const dropShrinkTag = n => capShrink(n).replace(/[-_ ]SHRINK(?:-\d+(?:\.\d+)?pct)?(?:-\d+px)?(?:[-_ ]project|[-_ ]settings)?$/, '');
 function baseName() { return dropShrinkTag((sourceFile?.name || 'model').replace(/\.[^.]+$/, '')) || 'model'; }
 
 function downloadBytes(bytes, filename) {
@@ -975,7 +975,9 @@ function downloadBytes(bytes, filename) {
 function downloadOptimized() {
   if (!optimizedBytes || !sourceFile) return;
   // Game downloads are simply <name>-SHRINK.glb; the height / FUSED / SPLIT naming belongs to the Print tools
-  const stem = window.__shrinkUI?.getMode?.() === 'print' ? (window.__shrinkDownloadStem?.(baseName()) || `${baseName()}-SHRINK`) : `${baseName()}-SHRINK`;
+  // (v2.232) a game file says how it was made: <name>-SHRINK-30pct-1024px.glb (Detail kept, then the largest texture size)
+  const gameTag = () => { const d = Number(document.getElementById('geometry')?.value), px = Number(document.getElementById('textureSize')?.value); return (d > 0 ? `-${Math.round(d * 10) / 10}pct` : '') + (px > 0 ? `-${px}px` : ''); };
+  const stem = window.__shrinkUI?.getMode?.() === 'print' ? (window.__shrinkDownloadStem?.(baseName()) || `${baseName()}-SHRINK`) : `${baseName()}-SHRINK${gameTag()}`;
   downloadBytes(optimizedBytes, `${stem}.glb`);
 }
 
