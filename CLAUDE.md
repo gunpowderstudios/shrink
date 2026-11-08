@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.229** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.230** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -501,7 +501,7 @@ A good Simple-mode run should:
 ## Centre on ground (v2.128)
 - `ground-core.js` `centreOnGround(doc, getBounds)`; `app.js` `optimizeModel` calls it when `#groundToggle` is ticked, AFTER the wheel split (wheels are scene-root nodes and move with the car) and before textures/prune. Game mode only. It only edits scene-root translations, so rotation/scale of the model are never baked: a model that arrives lying on its side or Z-up is not turned upright.
 
-## Racer preset (v2.119)
+## Racer preset (v2.119; removed from the page in v2.230: card deleted from index.html, `racer.js` no longer imported by ui-mode.js, files and tests kept dormant)
 - Target card `data-target="racer"` (no triangle target; `GAME_TARGETS.racer.tris` is null, so `live-ui.js` leaves Detail kept alone). `racer.js` owns the panel (`#racerPanel`) and `window.__shrinkRacer`; `app.js` `optimizeModel` calls `__shrinkRacer.process(document, progress)` instead of the generic WebP step when the card is active.
 - `racer-core.js` is DOM-free: `plan()` (pure estimate/report), `mergeable()`, `apply()` (merge atlas -> prune -> resize/encode each texture). Pixel work goes through the `ops` object (`decode`/`encode`/`prune`/`enableWebP`) supplied by the page, so Node tests use fakes. Budget: target 12 MB, FAIL at 46 MB of GPU memory (w*h*4*1.33).
 - Merge keeps the first used material and reassigns every primitive to it; each primitive gets a NEW `TEXCOORD_0` accessor (accessors may be shared). Plain-colour parts without UVs point at their colour tile. Do not merge transparent, KHR_materials_* or tiling-UV materials.
