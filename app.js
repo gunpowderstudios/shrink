@@ -896,6 +896,7 @@ async function optimizeModel() {
     els.optimizedSize.textContent = formatBytes(optimizedBytes.byteLength);
     els.optimizedTriangleCount.textContent = num(optimizedStats.triangles);
     els.optimizedVertexCount.textContent = num(optimizedStats.vertices);
+    if (window.__shrinkLiveUI?.state?.target === 'web' && (optimizedStats.vertices > 120000 || optimizedBytes.byteLength > 2 * 1048576)) setStatus(`Web / mobile limit passed: ${num(optimizedStats.vertices)} vertices, ${formatBytes(optimizedBytes.byteLength)}. Lower "Detail kept" and optimise again (aim for under 120,000 vertices and 2 MB).`);
     els.savingBadge.textContent = saving >= 0 ? `${saving.toFixed(0)}% smaller` : `${Math.abs(saving).toFixed(0)}% larger`;
     els.resultCard.classList.remove('hidden'); els.showOptimizedBtn.disabled = false; els.downloadBtn.disabled = false;
     if (!keepLivePreview) showModel(optimizedModel, 'optimized');
