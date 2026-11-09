@@ -655,3 +655,18 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 
 /* v2.227: SHRINK IT is grey until the health check has finished */
 #v2ShrinkBtn[data-checking]{background:#3a414c!important;color:#8a93a0;box-shadow:none;opacity:1;cursor:not-allowed;filter:none;transform:none}
+
+/* v2.235: SHRINK (all-in-one) sits under the health box, with the 'Reduced from…' note below it */
+.v2-side-stack{position:absolute;right:12px;width:260px;z-index:11;display:flex;flex-direction:column;gap:8px;box-sizing:border-box}
+.v2-side-stack .v2-magic-side{width:100%;border-radius:14px;padding:14px 16px;font-size:18px}
+.v2-side-stack .v2-reduce-note{position:static;width:100%}
+.v2-side-stack .v2-reduce-note[hidden]{display:none!important}
+.app-mode-game .v2-side-stack{display:none!important}
+
+.v2-side-stack .v2-magic-dl.v2-magic-side{margin-top:0}
+.v2-side-glb{align-self:center;background:none;border:0;padding:2px 6px;color:#9fb4d0;font-size:12px;text-decoration:underline;cursor:pointer}
+.v2-side-glb:hover{color:#fff}
+#v2MagicDownload:disabled + .v2-side-glb{opacity:.35;pointer-events:none}
+.v2-reduce-note .v2-was{color:#ff5a64}.v2-reduce-note .v2-now{color:#46d796}
+.v2-reduce-note small{display:block;margin-top:2px;font-weight:600;opacity:.85;font-size:12px}
+.v2-side-stack .v2-reduce-note{text-align:center}

@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.234** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.235** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -69,7 +69,7 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 ### FUSE IT size guard (v2.124)
 `fuseCheck()` in `print-v2-ui.js` refuses above `FUSE_MAX_TRIANGLES` (1,000,000; tests can override with `window.__shrinkFuseTriLimit`) and tells the person to SHRINK IT first. Manifold runs on the main thread, so a multi-million triangle model freezes the tab. The proper fix would be moving fuse into a worker. (v2.125) `updateSizeWarning()` shows the yellow `#v2SizeWarn` banner above the Fuse card from `updateHealthCard()` while the working model is over the limit.
 
-### SHRINK MY MODEL! (v2.140; shown to people as DO EVERYTHING since v2.213, still `#v2MagicBtn` and still called QUICK-FIX in this file)
+### SHRINK MY MODEL! (v2.140; shown to people as DO EVERYTHING since v2.213 and as plain SHRINK since v2.235, now in `#v2SideStack` under the health box; still `#v2MagicBtn` and still called QUICK-FIX in this file)
 `shrinkMyModel()` in `print-v2-ui.js` (button `#v2MagicBtn` in `.topbar`, report `#v2MagicNote`) just calls the existing `shrinkModel()`, `fixHealthModel()` (only if the health score is not 100), `fuseCheck()` (success read from `#v2FuseCard` `data-state`), then `levelModel()` (finds the best flat face within 50° of down and turns the model onto it, then turns it about Y so the long side is along X; rotates the working model root's quaternion about its centre, never its geometry; exposed as `window.__shrinkLevel`) and `centreOnBed()`. Both work in WORLD space (`moveWorld`/`rotateAboutCentre`; the root can have a scaled/rotated parent) and measure with `Box3.setFromObject(model, true)` (precise; the cached geometry box can be stale after in-place reduction). `centreOnBed()` moves the working model root's `position` (exports use `matrixWorld`, so it follows into STL/split); it never replaces the model object. `showBedGuide()`/`removeBedGuide()` (also `window.__shrinkBedGuide`) add a `shrinkBedGuide` group (grid, dark plane, XYZ arrows) to the viewer scene and hide the default grid; it is removed on `shrink:model-opened` and in Game mode. Do not copy the step logic: change the individual tools.
 
 ### CLAY (v2.141; switched off in v2.173: `CLAY_ENABLED = false` in `ui-mode.js`, card hidden, files and tests kept)

@@ -95,7 +95,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); await wait(300);
   const dl = page.$('v2MagicDownload');
-  ok(!!dl && dl.disabled && dl.nextElementSibling === page.$('v2MagicReset') && dl.previousElementSibling === page.$('v2MagicBtn'), 'C8 the DOWNLOAD button sits next to QUICK-FIX and starts greyed out');
+  ok(!!dl && dl.disabled && dl.previousElementSibling === page.$('v2MagicBtn'), 'C8 the DOWNLOAD button sits under SHRINK and starts greyed out');
   dl.disabled = false; page.w.dispatchEvent(new page.w.CustomEvent('shrink:model-opened')); await wait(50);
   ok(dl.disabled, 'C8 a newly opened model greys it out again');
   ok(!!page.$('v2AdvTools').querySelector('#v2ClayCard'), 'C8 the CLAY card is inside the ADVANCED drawer');
@@ -105,7 +105,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(300);
   const rb = page.$('v2MagicReset');
-  ok(!!rb && rb.textContent === 'RELOAD' && rb.previousElementSibling === page.$('v2MagicDownload'), 'R1 RELOAD sits beside DOWNLOAD at the top right');
+  ok(!!rb && rb.textContent === 'RELOAD' && !!rb.closest('.topbar'), 'R1 RELOAD stays in the top bar');
   let clicks = 0; const fi = page.$('fileInput'); if (fi) fi.addEventListener('click', e => { clicks++; e.preventDefault(); });
   rb.click(); await wait(50);
   ok(!fi || clicks === 1, 'R1 RELOAD opens the file chooser');

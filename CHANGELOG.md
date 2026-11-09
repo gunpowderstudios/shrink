@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.235
+- The big green all-in-one button (was DO EVERYTHING in the top bar) is now called **SHRINK** and sits under the health box on the right of the 3D view; the white "Reduced from…" note sits under it. The red DOWNLOAD button (grey until SHRINK has finished, then red) now sits under SHRINK, with a small "download GLB" link under it. The note is one message: old MB in red, new MB in green, and the triangle counts on a second line. RELOAD stays in the top bar. Same ids (`#v2MagicBtn`, `#v2MagicDownload`), so BATCH is unchanged.
+
 ## v2.234
 - The two sections are now named **Gaming** and **3D Printing** (the 3D Printing label and status line used to say just "Printing" / "Print mode").
 

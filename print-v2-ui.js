@@ -322,7 +322,8 @@
         if (!note && viewer) { note = document.createElement('div'); note.id = 'v2ReduceNote'; note.className = 'v2-reduce-note'; viewer.appendChild(note); }
         if (note && card) {
           const was = 84 + 50 * origTris;
-          if (origTris > 0 && tris < origTris) { const kTag = appliedChanges.has('shrunk') ? ` (${currentPrinter().tag})` : ''; note.textContent = `Reduced from ${fmt(was)} to ${fmt(stlBytes)}${kTag}`; note.hidden = false; const place = () => { note.style.top = (card.offsetTop + card.offsetHeight + 8) + 'px'; }; place(); requestAnimationFrame(place); if (!card._noteRO && window.ResizeObserver) { card._noteRO = new ResizeObserver(place); card._noteRO.observe(card); } }
+          const st = sideStack(); if (st && note.parentNode !== st) st.appendChild(note);
+          if (origTris > 0 && tris < origTris) { const kTag = appliedChanges.has('shrunk') ? ` (${currentPrinter().tag})` : ''; const nf = n => new Intl.NumberFormat().format(n); note.innerHTML = `Reduced from <b class="v2-was">${fmt(was)}</b> to <b class="v2-now">${fmt(stlBytes)}</b>${kTag}<br><small>${nf(origTris)} → ${nf(tris)} triangles</small>`; note.hidden = false; }
           else note.hidden = true;
         }
       }
@@ -1038,12 +1039,25 @@
     });
   }
 
+  // v2.235: the big green SHRINK button and the "Reduced from…" note sit in one stack under the health box
+  function sideStack() {
+    const viewer = $('viewer'), card = $('v2HealthCard'); if (!viewer || !card) return null;
+    let st = $('v2SideStack');
+    if (!st) { st = document.createElement('div'); st.id = 'v2SideStack'; st.className = 'v2-side-stack'; viewer.appendChild(st); }
+    const place = () => { st.style.top = (card.offsetTop + card.offsetHeight + 8) + 'px'; };
+    place(); requestAnimationFrame(place);
+    if (!st._ro && window.ResizeObserver) { st._ro = new ResizeObserver(place); st._ro.observe(card); }
+    return st;
+  }
   function ensureMagicButton() {
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">DO EVERYTHING (shrink, fix, fuse, centre)</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when DO EVERYTHING has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when DO EVERYTHING has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
+    { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
+      const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
+        const g = document.createElement('button'); g.type = 'button'; g.id = 'v2SideGlb'; g.className = 'v2-side-glb'; g.textContent = 'download GLB'; g.addEventListener('click', () => window.__shrinkExportGlb?.()); st.insertBefore(g, dl.nextSibling); } } }   // v2.235: moves out of the top bar, under the health box
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
     $('v2MagicReset').addEventListener('click', () => { const f = $('fileInput'); if (f) { f.value = ''; f.click(); } });
     $('v2MagicDownload').addEventListener('click', () => { const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
@@ -1191,7 +1205,7 @@
     main.append(sizeBox, detailBox, actions, dl);
     // v2.222: the health box stays in the 3D view on the right, always visible; the tools live in their own foldable card on the left.
     const mainCard = document.createElement('div'); mainCard.className = 'v2-main-card';
-    const hdr = document.createElement('div'); hdr.className = 'v2-main-title'; hdr.textContent = 'Pick just what you need, in any order. Or press DO EVERYTHING at the top.';
+    const hdr = document.createElement('div'); hdr.className = 'v2-main-title'; hdr.textContent = 'Pick just what you need, in any order. Or press SHRINK under the health box.';
     mainCard.append(hdr, main);
     const tgl = $('v2LeftToggle');
     while (stack.firstChild) { if (stack.firstChild === tgl) { stack.removeChild(tgl); continue; } hold.appendChild(stack.firstChild); }
@@ -1246,7 +1260,7 @@
           </section>
 
           <details id="v2AdvTools" class="v2-adv-tools" open>
-            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse</strong><small>DO EVERYTHING (top) does shrink, fix and fuse for you. Open this to use the tools separately </small></summary>
+            <summary><span>ADVANCED</span><strong>Shrink, fix and fuse</strong><small>SHRINK (under the health box) does shrink, fix and fuse for you. Open this to use the tools separately </small></summary>
           <section id="v2ClayCard" class="v2-card v2-clay-card" hidden><div id="v2ClayHost"></div></section>
 
           <div class="v2-action-grid">
