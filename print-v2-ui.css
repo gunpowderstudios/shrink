@@ -664,8 +664,15 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .app-mode-game .v2-side-stack{display:none!important}
 
 .v2-side-stack .v2-magic-dl.v2-magic-side{margin-top:0}
-.v2-side-glb{align-self:center;background:none;border:0;padding:2px 6px;color:#9fb4d0;font-size:12px;text-decoration:underline;cursor:pointer}
-.v2-side-glb:hover{color:#fff}
+.v2-side-glb{align-self:center;color:#9fb4d0;font-size:12px;text-align:center}
+.v2-side-glb summary{cursor:pointer;text-decoration:underline;padding:2px 6px;list-style:none;user-select:none}
+.v2-side-glb summary::-webkit-details-marker{display:none}
+.v2-side-glb summary::after{content:' ▾'}
+.v2-side-glb[open] summary::after{content:' ▴'}
+.v2-side-glb summary:hover{color:#fff}
+.v2-more-menu{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.v2-more-menu button{background:#182230;border:1px solid #35455a;border-radius:8px;color:#cdd6e2;font-size:12px;font-weight:700;padding:5px 10px;cursor:pointer}
+.v2-more-menu button:hover{color:#fff;border-color:#2f8cff}
 #v2MagicDownload:disabled + .v2-side-glb{opacity:.35;pointer-events:none}
 .v2-reduce-note .v2-was{color:#ff5a64}.v2-reduce-note .v2-now{color:#46d796}
 .v2-reduce-note small{display:block;margin-top:2px;font-weight:600;opacity:.85;font-size:12px}

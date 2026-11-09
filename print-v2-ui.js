@@ -1057,7 +1057,10 @@
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
-        const g = document.createElement('button'); g.type = 'button'; g.id = 'v2SideGlb'; g.className = 'v2-side-glb'; g.textContent = 'download GLB'; g.addEventListener('click', () => window.__shrinkExportGlb?.()); st.insertBefore(g, dl.nextSibling); } } }   // v2.235: moves out of the top bar, under the health box
+        const g = document.createElement('details'); g.id = 'v2SideGlb'; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)
+        g.innerHTML = '<summary>Other formats</summary><div class="v2-more-menu"><button type="button" data-fmt="glb">GLB</button><button type="button" data-fmt="obj">OBJ</button><button type="button" data-fmt="3mf">3MF</button><button type="button" data-fmt="usdz">USDZ</button></div>';
+        g.addEventListener('click', e => { const b = e.target.closest('[data-fmt]'); if (!b) return; g.open = false; window.__shrinkExportFormat?.(b.dataset.fmt); });
+        st.insertBefore(g, dl.nextSibling); } } }   // v2.235: moves out of the top bar, under the health box
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
     $('v2MagicReset').addEventListener('click', () => { const f = $('fileInput'); if (f) { f.value = ''; f.click(); } });
     $('v2MagicDownload').addEventListener('click', () => { const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
@@ -1326,7 +1329,7 @@
     buildMainCard();
     // The panel folds away again (as before v2.215); the choice is remembered.
     { const tg = $('v2LeftToggle');
-      const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = open ? '◂ Hide panel' : '▸ Size, tools & download'; };
+      const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = 'ADVANCED' /* v2.236: just the one word, open or closed */; };
       setLeft(false);   // v2.223: always starts closed on load; the old remembered choice is ignored
       tg.addEventListener('click', () => { const o = dashboard.dataset.left !== 'open'; setLeft(o); window.dispatchEvent(new Event('resize')); dimRetry = 0; refreshDims(); });
       window.__shrinkLeftPanel = setLeft; }
