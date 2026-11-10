@@ -298,7 +298,7 @@ async function start() {
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
-        // v2.236: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
+        // v2.237: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) item.msg = `${item.msg ? item.msg + ' · ' : ''}${v.pieces} separate pieces, prints fine`; }
         if (!item.warn && Number.isFinite(sc) && deps.verdict?.()?.healthy !== false) item.fixed = true;
       } catch (err) {
@@ -329,7 +329,7 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.236) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.237) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
@@ -355,6 +355,18 @@ function ensureTopButton() {
   rl.insertAdjacentElement('afterend', btn);
   return true;
 }
+// (v2.237) Several files chosen or dropped on the main upload screen go to BATCH instead of only the first one opening.
+function toBatch(list, e) {
+  if (list.length < 2) return false;
+  const print = document.body.classList.contains('app-mode-print');
+  if (!print && list.every(f => /\.glb$/i.test(f.name))) return false;      // Gaming mode keeps opening one GLB at a time
+  e.stopImmediatePropagation(); e.preventDefault();
+  if (!print) document.querySelector('.mode-card[data-mode="print"]')?.click();
+  toggle(true); add(list);
+  return true;
+}
+document.addEventListener('drop', e => { if (e.target?.closest?.('#dropZone, #printUploadHero')) toBatch([...(e.dataTransfer?.files || [])], e); }, true);
+document.addEventListener('change', e => { const t = e.target; if (t?.id === 'fileInput' && toBatch([...(t.files || [])], e)) t.value = ''; }, true);
 ensureHomeButton(); ensureTopButton();
 let tries2 = 0; const iv2 = setInterval(() => { if (ensureTopButton() || ++tries2 > 100) clearInterval(iv2); }, 300);
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);

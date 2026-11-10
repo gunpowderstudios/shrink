@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.237
+- Choosing or dropping **several files** on the main upload screen (STL, OBJ, PLY or GLB) now opens BATCH with all of them queued; before, only the first file opened and the rest were ignored. One file still opens as normal. Gaming mode still opens one GLB at a time.
+
 ## v2.236
 - The little "download GLB" link under DOWNLOAD is now an **Other formats** drop-down: GLB, OBJ, **3MF** (new: millimetres, Z-up, opens straight in slicers) and **USDZ** (new: metres, Y-up, for Apple Quick Look / AR). Like the STL they are the working model at the Height you set; no colours or textures.
 - The folding tab on the left now just says **ADVANCED**, open or closed.

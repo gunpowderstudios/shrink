@@ -146,6 +146,19 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   page.$('v2BatchHeight').value = ''; page.$('v2BatchHeight').dispatchEvent(new w.Event('input', { bubbles: true }));
   w.__shrinkPrint.state.modelHeightUnits = 32.5; B.applySettings(); await wait(60);
   ok(Number(page.$('v2Height').value) === 32.5, 'B1 with Height empty the model keeps its own height (32.5 mm)');
+  { // v2.237 several files on the main upload go to BATCH
+    const d = w.document, inp = d.createElement('input'); inp.id = 'fileInput'; inp.type = 'file'; d.body.appendChild(inp);
+    let reached = 0; inp.addEventListener('change', () => reached++);
+    const mkf = n => ({ name: n, size: 10 });
+    const before = B.state.items.length;
+    Object.defineProperty(inp, 'files', { configurable: true, value: [mkf('x1.stl'), mkf('x2.stl'), mkf('x3.stl')] });
+    inp.dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok(B.state.items.length === before + 3 && reached === 0, 'B5 choosing 3 STLs on the main upload queues all 3 in BATCH and the single-file opener never sees them');
+    Object.defineProperty(inp, 'files', { configurable: true, value: [mkf('solo.stl')] });
+    inp.dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok(B.state.items.length === before + 3 && reached === 1, 'B5 a single file still opens normally');
+    B.clear();
+  }
   const mk = (n, size) => ({ name: n, size });
   B.add([mk('a.stl', 5e6), mk('b.obj', 5e6), mk('c.txt', 10)]);
   ok(page.$('v2BatchList').querySelectorAll('.v2-batch-row').length === 2, 'B2 only STL/OBJ/PLY/GLB files are queued');
