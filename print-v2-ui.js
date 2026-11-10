@@ -141,6 +141,7 @@
   }
   window.__shrinkInstallWorkingModel = installWorkingResult;
   window.__shrinkRefreshHealth = () => updateHealthCard();
+  window.__shrinkHealthIsCurrent = () => !!(lastHealth && lastHealth.model === sourceModel());   // v2.251: BATCH waits for the health check of THIS model, not a leftover one
   let fusedPieces = 1;                          // how many pieces the last fuse left (v2.187): the chip says so when it is not one
   function renderAppliedChanges() {
     const wrap = $('v2HealthChanges');

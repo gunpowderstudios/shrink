@@ -291,6 +291,9 @@ async function start() {
         await wait(350);            // let the open settle and the health check start
         deps.applySettings();       // printer resolution and height chosen in the panel
         await wait(150);
+        // v2.251: start exactly as a person does: wait until the health check belongs to THIS model (a leftover 'ready' from the previous file used to be enough)
+        await waitFor(() => !window.__shrinkHealthIsCurrent || window.__shrinkHealthIsCurrent(), 180000, 'The health check did not finish');
+        await wait(400);
         await deps.quickFix();
         const score = deps.healthScore();
         const files = await deps.capture();

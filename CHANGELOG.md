@@ -4,6 +4,7 @@ This file records user-facing workflow and architecture changes. Git history rem
 
 ## v2.251
 - QUICK-FIX's repair step after shrinking now retries (up to two more passes) while the health score keeps improving and is still below 95. Tamara in a batch ended at health 45 (14 open edges) and was not fused, while the same file alone reached 100.
+- BATCH now starts each file like a person does: it waits until the health check belongs to the newly opened model (not a leftover "ready" from the previous file) and pauses briefly before pressing QUICK-FIX, so batch and single runs take the same path.
 
 ## v2.250
 - Honest QUICK-FIX verdict: a model that is one piece but whose FUSE IT step failed used to read "FUSED into one solid"; it now says "ONE PIECE, but the fuse step could not finish". The diagnostics also stop showing the previous file's last fuse/verdict.
