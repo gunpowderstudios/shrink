@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.252
+- The extra repair passes after shrinking now run while health is below 100 (was below 95) and keep improving. Tarak ended at 95 with 9 flipped faces and its fuse failed with "Not manifold"; flipped faces are what Manifold cannot take.
+
 ## v2.251
 - QUICK-FIX's repair step after shrinking now retries (up to two more passes) while the health score keeps improving and is still below 95. Tamara in a batch ended at health 45 (14 open edges) and was not fused, while the same file alone reached 100.
 - BATCH now starts each file like a person does: it waits until the health check belongs to the newly opened model (not a leftover "ready" from the previous file) and pauses briefly before pressing QUICK-FIX, so batch and single runs take the same path.
