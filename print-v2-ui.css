@@ -692,3 +692,12 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-split-body{padding:4px 10px 10px}
 .v2-main-controls .v2-split-body .v2-advanced{display:block}
 .v2-split-body [hidden]{display:none!important}
+/* v2.244: ADVANCED open = the tools span the whole width above the viewer (laid out in a row); the viewer takes the remaining height below */
+@media(min-width:901px){
+  .print-v2-dashboard[data-left="open"] .v2-top-grid{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto minmax(300px,1fr)}
+  .print-v2-dashboard[data-left="open"] .v2-viewer-slot{grid-row:2}
+  body.app-mode-print.print-v2-active .print-v2-dashboard[data-left="open"] .v2-left-stack{overflow-y:auto;max-height:46vh}
+  .print-v2-dashboard[data-left="open"] .v2-main-controls{flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:14px 22px}
+  .print-v2-dashboard[data-left="open"] .v2-main-controls>*{flex:1 1 280px;min-width:0}
+  .print-v2-dashboard[data-left="open"] .v2-main-actions{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+}
