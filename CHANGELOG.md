@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.254
+- Removed Make watertight (its button, the batch row button, `makeWatertightCopy` and its tests): it always cost too much detail, and the 250-edge allowance means almost nothing needs it. The voxel rebuild file `watertight-remesh.js` stays only because the switched-off CLAY tool imports it.
+- Removed the v2.248 surface-piece fuse route (`solidFromComponents`) and its test: it never fused a real model. A model that is already one watertight piece now just says "nothing to fuse" (v2.253).
+
 ## v2.253
 - QUICK-FIX no longer reports a failure when the model is already ONE watertight piece (no open edges, at most a few flipped faces) and Manifold merely refuses it: the step says "Already one solid piece: nothing to fuse" and the verdict reads "ONE SOLID PIECE (nothing to fuse)". Tarak: 53,848 triangles, 9 flipped faces, repeatable "Not manifold" on every run. The extra repair passes could not remove those 9, and slicers accept them.
 

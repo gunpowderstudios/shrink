@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.253** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.254** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -16,7 +16,7 @@ Read this file before changing the repository.
 
 ### The working model
 - `window.__shrinkWorkingModel()` returns it; `window.__shrinkSetWorkingModel(model)` sets it. `sourceModel()` in `fuse-export.js`, `split-print.js`, `split-fallback.js`, `print-export-safety.js` and `print-tools.js` all start from it. **Never read `app().originalModel` or `app().optimizedModel` directly in a print tool.**
-- **To make a tool's result the new working model, call `window.__shrinkInstallWorkingModel(root, kind)`** (defined in `print-v2-ui.js`). It does everything in the right order: `setPreview`, `setWorkingModel`, `show('optimized')`, restore the camera, `notifyReduced`, change chip, clear the red warning. FIX IT and Make watertight use it. Do not copy those steps into a new tool. Call `window.__shrinkRefreshHealth()` afterwards if the health card must update at once.
+- **To make a tool's result the new working model, call `window.__shrinkInstallWorkingModel(root, kind)`** (defined in `print-v2-ui.js`). It does everything in the right order: `setPreview`, `setWorkingModel`, `show('optimized')`, restore the camera, `notifyReduced`, change chip, clear the red warning. FIX IT uses it. Do not copy those steps into a new tool. Call `window.__shrinkRefreshHealth()` afterwards if the health card must update at once.
 - `setPreview()` disposes the previous preview's geometry. Never keep using a model after it has been passed to `setPreview` as its replacement.
 
 ### Split / Fuse rules
@@ -40,8 +40,8 @@ The left column is gone. `buildMainCard()` in `print-v2-ui.js` moves the Height/
 ### Helper cache keys and the diagnostic report (v2.188)
 `print-export-safety.js` loads fuse-export / split-print / split-fallback / preview-material-fix / watertight-remesh under `REL` (the `?v=` it was itself imported with = `PRINT_RELEASE`), NOT its old fixed `VERSION` ('2.63'): a fixed key made browsers keep stale copies after a fix. Never hard-code a cache key for a module that changes. `#v2DiagBtn` (Advanced drawer) copies `window.__shrinkDiagReport()`; `window.__shrinkFuseBuild` shows which fuse-export is really loaded and `window.__shrinkLastFuse` the last fuse result.
 
-### Make watertight in one place (v2.193)
-`makeWatertightCopy()` (print-export-safety.js, `window.__shrinkMakeWatertight`) works with or without its button and returns true when a clean model was installed. The red box `#printDiagnosticPanel` sits top-right like `#v2BatchPanel` and `placeDiagnostic()` moves it inside the batch window while that is open. BATCH's `watertightRow(id)` opens the file, waits for QUICK-FIX `ready`, calls it, then clicks `#saveStlBtn` with `S.silent` set so `fixingCapture` returns true (ZIP updated, nothing saved); the row gets `.fixed` (green). Rows that only have "separate pieces" get no such button (they need FUSE IT). Test W1 in `tests/clay.test.mjs`.
+### Make watertight (removed in v2.254)
+The button, `makeWatertightCopy`, `window.__shrinkMakeWatertight`, BATCH's `watertightRow` and tests W1/H/J are gone: Tim found it always loses detail. `watertight-remesh.js` remains only for the switched-off CLAY tool. The red box `#printDiagnosticPanel` still exists (hidden by CSS) but has no button.
 
 ### Minor edges are fine (v2.195; limit raised from 10 to 250 in v2.249 at Tim's request: Make watertight always costs too much detail)
 `deps.minor()` in batch.js reads the MODEL HEALTH rows: no open edges and 1 to `MINOR_EDGES` (250) non-manifold edges plus flipped faces together (v2.197) = fine to print (row stays green, no Make watertight button). Voxel rebuilds drop detail (104k to 21k triangles in a real run) so they are not worth it for that.
@@ -62,7 +62,7 @@ The left column is gone. `buildMainCard()` in `print-v2-ui.js` moves the Height/
 `healthScore()` in `print-v2-ui.js` no longer deducts for degenerate triangles and the row is never red; they are informational (same rule as `meshHealth`). Do not delete them to "fix" the row: a zero-area triangle can be part of a closed edge loop.
 
 ### Fuse fallback and dust (v2.189)
-(v2.248) `meshToSolid()` has a last attempt, `solidFromComponents()`: surface pieces joined only through 2-triangle edges, consistently oriented, one Manifold solid each, then `Manifold.union`. Specks (<1% of triangles) that still fail are dropped (`window.__shrinkFuseDropped`). Written for the minotaur (diagnostic: "Not manifold" after repair); not yet confirmed on the real file.
+(v2.254) The v2.248 `solidFromComponents()` surface-piece route was removed: it never fused a real model (minotaur, Tarak). When Manifold refuses a model, QUICK-FIX reports it honestly; if the model is already one watertight piece it says "nothing to fuse" (v2.253).
 The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a mesh part is rejected as non-manifold, e.g. a stacked duplicate shell) goes through `splitShells()` too. After the union, components with volume <= 1e-5 of the biggest (including negative, inside-out ones) are dust and dropped. `shrinkMyModel()`'s verdict `healthy` = `lastHealth.h.clean` (degenerates alone do not count).
 
 ### Fuse unions shells inside one mesh (v2.187)
@@ -108,9 +108,6 @@ The levelling, centring and stretch tools move the working model root, never the
 
 ### Uniform / Width / Depth (v2.140)
 Width/Depth read-outs come from `modelSize()` (precise world box of the working model; cached on uuid + `reducedTick` + matrixWorld). With `#v2Uniform` ticked they just set the Height (everything scales together via `mmPerUnit`). Unticked, they call `applyStretch(fx, fz)`: stretch lives on the working root's `scale` in WORLD axes, so `normalizeRoot()` first moves any root rotation into an inner `shrinkInner` group (root keeps identity rotation, so no shear). Factors are in `model.userData.shrinkStretch`. FIX/FUSE bake the world transform into a new root, so the stretch is then baked in and the factors read 1. `levelModel()` must run on an unstretched root (`resetStretch()` first). `window.__shrinkStretchTick` invalidates split-print's auto-cut signature.
-
-### Make watertight
-Rebuilds the **working model** (not the original), checks the result with the shared `meshHealth`, and only then installs it. On refusal or an unhealthy result nothing changes and nothing is downloaded.
 
 ### Tests
 `cd tests && npm install && npm test`. `multitool.test.mjs` clicks the real DOWNLOAD IT / FUSE IT / Make watertight buttons on a jsdom page that loads the real modules and the real Manifold library (`mt-harness.mjs`). If you change split, fuse, working-model or watertight code, run it and add a case for what you changed.

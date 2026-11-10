@@ -32,17 +32,11 @@ function ensureDiagnosticPanel(){
   panel.innerHTML=`
     <div class="print-diagnostic-title">⚠ This model isn't one clean printable solid</div>
     <div id="printDiagnosticMessage"></div>
-    <div class="repair-actions">
-      <label class="repair-quality" hidden><span>Keep detail</span><select id="remeshQuality"><option value="high" selected>High</option><option value="balanced">Balanced</option><option value="fast">Fast</option></select></label>
-      <button id="makeWatertightBtn" type="button">Make watertight</button>
-    </div>
-    <div class="repair-help">Rebuilds the current model as a new voxel-style closed outer skin and makes it your current model. Best for overlapping or troublesome parts. Tiny details may soften slightly. Your original upload is not changed.</div>
     <details class="repair-advanced"><summary>Technical details</summary><div id="printDiagnosticStats" class="print-diagnostic-stats"></div></details>`;
   viewerPanel.appendChild(panel);
   const style=document.createElement('style'); style.id='printDiagnosticStyle';
   style.textContent=`.print-diagnostic-panel{box-sizing:border-box;position:absolute;right:14px;top:14px;z-index:69;width:min(400px,calc(100vw - 32px));max-height:calc(100% - 28px);overflow:auto;padding:12px 14px;border:1px solid #ff5b62;border-radius:14px;background:#2a1216;color:#ffd3d5;font-size:12px;line-height:1.45;box-shadow:0 18px 50px rgba(0,0,0,.55)}.print-diagnostic-panel.in-batch{position:static;width:auto;max-height:none;margin:0 0 10px;box-shadow:none}.print-diagnostic-title{margin:0 0 6px;font-weight:800;color:#ff747a;font-size:14px;line-height:1.3}#printDiagnosticMessage{margin:0}.repair-actions{display:flex;gap:10px;align-items:end;margin:12px 0 0;flex-wrap:wrap}.repair-quality[hidden]{display:none}.repair-quality{display:grid;gap:5px;min-width:134px}.repair-quality span{font-size:11px;font-weight:700;color:#ffc2c5}.repair-quality select{box-sizing:border-box;width:100%;min-height:38px;background:#20242c;color:#fff;border:1px solid #4a515d;border-radius:10px;padding:8px 10px}.repair-actions button{min-height:38px;border:0;border-radius:10px;padding:9px 14px;background:#ff4f57;color:#fff;font-weight:800;cursor:pointer}.repair-actions button:disabled{opacity:.55;cursor:wait}.repair-help{margin:10px 0 0;color:#e9b9bc}.repair-advanced{margin:12px 0 0;border:1px solid rgba(255,181,185,.24);border-radius:10px;background:rgba(255,255,255,.02);overflow:hidden}.repair-advanced summary{cursor:pointer;list-style:none;padding:9px 11px;color:#ffb5b9;font-weight:700}.repair-advanced summary::-webkit-details-marker{display:none}.repair-advanced summary::after{content:'⌄';float:right}.repair-advanced[open] summary::after{content:'⌃'}.print-diagnostic-stats{margin:0;padding:0 11px 11px;color:#ffb5b9;overflow-wrap:anywhere}.print-diagnostic-panel[hidden]{display:none!important}@media(max-width:900px){.print-diagnostic-panel{right:94px}}`;
   document.head.appendChild(style);
-  $('makeWatertightBtn')?.addEventListener('click', makeWatertightCopy);
   return panel;
 }
 
@@ -63,79 +57,7 @@ function logFailure(kind,rawMessage){const topo=topologySummary(sourceModel());c
 
 function saveBlob(blob,filename){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);}
 
-async function makeWatertightCopy(opts){
-  opts=(opts&&typeof opts==='object'&&!opts.target)?opts:{};
-  const btn=$('makeWatertightBtn')||{},model=sourceModel(); if(!model)return false;
-  const quality=$('remeshQuality')?.value||'high'; const old=btn.textContent; btn.disabled=true; btn.textContent='Checking…';
-  let root=null,installed=false; window.__shrinkWork?.(true);
-  const disposeRoot=r=>r?.traverse?.(o=>{if(o.isMesh){o.geometry?.dispose?.();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m?.dispose?.());}});
-  try{
-    const mod=await import(`./watertight-remesh.js?v=${REL}`);
-    const pre=mod.remeshPreflight?.(model,quality);
-    if(pre&&!pre.safe){
-      const nf=new Intl.NumberFormat();
-      const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats'),help=ensureDiagnosticPanel()?.querySelector('.repair-help');
-      if(msg)msg.textContent=`This model is too heavy to rebuild safely in your browser. SHRINK it first, then try Make watertight again.`;
-      if(help)help.textContent='This safety limit prevents Chrome from running out of memory. Your original model is unchanged.';
-      if(stats)stats.textContent=`Voxel safety check: ${nf.format(pre.triangles)} triangles · safe limit for ${quality} mode: about ${nf.format(pre.triangleLimit)} triangles · estimated voxel grid: ${nf.format(pre.approxGridSamples)} samples.`;
-      app()?.setStatus?.('Watertight rebuild stopped safely — SHRINK the model first, then try again.',true);
-      return;
-    }
-    btn.textContent='Voxelising…';
-    app()?.setStatus?.('Rebuilding the current model as one watertight voxel skin. This can take a little while…',false);
-    // Try the chosen detail first; if the rebuilt skin is not clean (High often leaves a pinched edge), quietly try the others before giving up.
-    const names={high:'High',balanced:'Balanced',fast:'Fast'},order=[quality,...['balanced','fast','high'].filter(q=>q!==quality&&!(opts.noFast&&q==='fast'))].filter(q=>!(opts.noFast&&q==='fast')),tried=[],trisBefore=healthOfModel(THREE,model).triangles;
-    let health=null;
-    for(const q of order){
-      tried.push(names[q]||q); btn.textContent=`Rebuilding (${names[q]||q})…`;
-      const msgEl=$('printDiagnosticMessage'); if(msgEl&&tried.length>1)msgEl.textContent=`Still working: ${tried.slice(0,-1).join(', ')} left a pinched edge, trying ${names[q]||q}…`;
-      let res; try{ res=await mod.makeWatertight(model,q,msg=>app()?.setStatus?.(msg,false)); }catch(e){ if(q===order[order.length-1]||e?.code==='REMESH_TOO_HEAVY'||e?.code==='REMESH_LEAKY')throw e; continue; }
-      disposeRoot(root); root=res.root;
-      // The rebuilt skin has to pass the same health check as everything else before it replaces the current model.
-      health=healthOfModel(THREE,root); window.__shrinkLastWatertight={quality:q,tried:tried.slice(),trianglesBefore:trisBefore,trianglesAfter:health.triangles,clean:health.clean,at:new Date().toISOString()};
-      if(health.clean)break;
-    }
-    if(!health||!health.clean){
-      const err=new Error(`The rebuilt surface still has ${health?.openEdges??'?'} open, ${health?.pinchedEdges??'?'} pinched and ${health?.flippedEdges??'?'} flipped edges (tried ${tried.join(', ')}), so nothing was changed.`);
-      err.code='REMESH_UNHEALTHY'; throw err;
-    }
-    // Same road every tool takes: the rebuilt model becomes the current working model, is shown in the viewer
-    // (camera kept, orientation and scale are those of the model it replaces) and the health card is refreshed.
-    if(window.__shrinkInstallWorkingModel) window.__shrinkInstallWorkingModel(root,'rebuild');
-    else{
-      const view=app()?.getViewState?.();
-      app()?.setPreview?.(root); window.__shrinkSetWorkingModel?.(root); app()?.show?.('optimized');
-      if(view)app()?.restoreViewState?.(view);
-      app()?.notifyReduced?.({kind:'rebuild'}); clearDiagnostic();
-    }
-    installed=true; root=null;
-    window.__shrinkRefreshHealth?.();
-    app()?.setStatus?.('Rebuilt as one watertight solid. It is now your current model — SHRINK it, FUSE it or DOWNLOAD it as normal.',false);
-  }catch(err){
-    console.error(`[SHRINK 3D ${VERSION}] Watertight voxel rebuild failed`,err);
-    const msg=$('printDiagnosticMessage'),stats=$('printDiagnosticStats'),help=ensureDiagnosticPanel()?.querySelector('.repair-help');
-    if(err?.code==='REMESH_TOO_HEAVY'){
-      if(msg)msg.textContent='This model is too heavy to rebuild safely in your browser. SHRINK it first, then try Make watertight again.';
-      if(help)help.textContent='SHRINK stopped before the heavy voxel stage so your browser should stay responsive.';
-      if(stats&&err.preflight){const nf=new Intl.NumberFormat();stats.textContent=`Voxel safety check: ${nf.format(err.preflight.triangles)} triangles · safe limit: about ${nf.format(err.preflight.triangleLimit)} triangles.`;}
-      app()?.setStatus?.('Watertight rebuild stopped safely — reduce the model first.',true);
-    } else if(err?.code==='REMESH_MESSY'||err?.code==='REMESH_LEAKY'){
-      app()?.setStatus?.('Watertight rebuild stopped: this model has gaps that are too big to close, so nothing was changed.',true);
-      if(msg)msg.textContent=err.message;
-      if(help)help.textContent='Big gaps cannot be closed this way. Use your slicer\'s repair, or close the holes in your modelling software.';
-    } else if(err?.code==='REMESH_UNHEALTHY'){
-      app()?.setStatus?.('Watertight rebuild did not pass the mesh check, so your current model was left as it is.',true);
-      if(msg)msg.textContent=err.message;
-    } else {
-      app()?.setStatus?.(`Watertight repair failed: ${err.message}`,true);
-      if(msg)msg.textContent='SHRINK could not rebuild this model automatically. Try Fast detail, or repair/remesh it in your modelling software.';
-    }
-  }
-  finally{ window.__shrinkWork?.(false); if(!installed)disposeRoot(root); btn.disabled=false; btn.textContent=old; }
-  return installed;
-}
-// v2.193: the batch list calls this too (it opens the file first), so a row can be made watertight without the red box.
-window.__shrinkMakeWatertight=makeWatertightCopy;
+
 
 function normalExport(kind,message){if(fallbackBusy)return;fallbackBusy=true;const fuse=$('fuseSolidToggle'),split=$('splitMode'),prevFuse=fuse?.checked,prevSplit=split?.value;if(fuse)fuse.checked=false;if(split)split.value='off';setTimeout(()=>{const btn=kind==='obj'?$('saveObjBtn'):$('saveStlBtn');btn?.click();setTimeout(()=>{app()?.setStatus?.(message,false);if(fuse&&prevFuse!=null)fuse.checked=prevFuse;if(split&&prevSplit!=null){split.value=prevSplit;split.dispatchEvent(new Event('change',{bubbles:true}));}fallbackBusy=false;},60);},0);}
 function wrapStatus(){const a=app();if(!a?.setStatus||a.__safeExportWrapped)return false;const native=a.setStatus.bind(a);a.setStatus=(msg,error=false)=>{const text=String(msg||'');if(!fallbackBusy&&text.startsWith('Fuse failed:')){const reason=text.slice('Fuse failed:'.length).trim();logFailure('Fuse',reason);const kind=lastAttempt?.kind==='obj'?'obj':'stl',noun=kind.toUpperCase();native(`Couldn't merge this model into one solid. Saving the normal ${noun} instead…`,false);normalExport(kind,`Couldn't merge this model into one solid. Saved the normal ${noun} instead.`);return;}if(!fallbackBusy&&text.startsWith('Split failed:')){const reason=text.slice('Split failed:'.length).trim();logFailure('Split',reason);native("Couldn't split this model safely. Trying the fallback route…",false);return native(msg,error);}if(text.startsWith('Saved fused ')||/Saved \d+ watertight STL sections/i.test(text))clearDiagnostic();return native(msg,error);};a.__safeExportWrapped=true;return true;}

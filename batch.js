@@ -95,7 +95,7 @@ function buildPanel() {
 function dock() {
   const p = $('v2BatchPanel'); if (!p) return;
   let card = $('v2HealthCard')?.parentElement;      // the viewer panel: the health box is bottom-left, this window is bottom-right
-  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.253: the viewer is hidden until a model is open, so float on the page meanwhile
+  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.254: the viewer is hidden until a model is open, so float on the page meanwhile
   if (card && p.parentElement !== card) { card.appendChild(p); p.classList.remove('floating'); }
   else if (!card && p.parentElement !== document.body) { document.body.appendChild(p); p.classList.add('floating'); }
   else if (!card) p.classList.add('floating');
@@ -125,31 +125,7 @@ function fixingCapture(blob, name) {
   it.msg = Number.isFinite(sc) ? `fixed · health ${sc}/100` : 'fixed'; if (!it.warn) it.fixed = true;
   render(); note(`${it.name}: the downloaded file has replaced the old one in the ZIP.`);
   setTimeout(() => { S.fixingFresh = true; }, 1500);      // a split export hands over several files at once; a later download replaces them again
-  if (S.silent) { it.fixed = !it.warn; return true; }     // v2.193: Make watertight on a row only replaces the file in the ZIP, nothing is saved
   return false;                                           // false = the file is also saved normally
-}
-// v2.193: the small "Make watertight" button on a flagged row. Opens the file in the main window, rebuilds it, and (if the result is clean)
-// puts the fixed STL in the ZIP in place of the old one. The row turns green.
-async function watertightRow(id) {
-  if (S.running || S.busyRow) return; const it = S.items.find(x => x.id === id); if (!it) return;
-  S.busyRow = id; S.fixing = id; S.fixingFresh = true; window.__shrinkCapture = fixingCapture;
-  it.msg = 'making watertight…'; render();
-  try {
-    // open the processed (shrunk, levelled) STL when there is one, not the raw upload, so Make watertight works on what is in the ZIP
-    const res = S.results.filter(r => r.source === it.name && /\.(stl|obj|ply)$/i.test(r.name))[0];
-    await window.__shrinkApp?.openFile?.(res ? new File([res.blob], res.name, { type: res.blob.type || 'model/stl' }) : it.file);
-    for (let k = 0; k < 120 && $('v2MagicBtn')?.dataset.state !== 'ready'; k++) await wait(500);
-    const ok = await window.__shrinkMakeWatertight?.({ noFast: true });      // never the coarse Fast rebuild from a list: it would quietly ruin the detail
-    const lw = window.__shrinkLastWatertight, nf = new Intl.NumberFormat();
-    if (!ok) { it.msg = 'could not make watertight'; note(`${it.name}: ${$('printDiagnosticMessage')?.textContent || 'Make watertight did not work.'} It stays in the ZIP as it was.`, true); return; }
-    window.__shrinkRefreshHealth?.(); await wait(800);
-    try { window.__shrinkLevel?.(); window.__shrinkCentre?.(); } catch { /* the rebuilt skin keeps its own pose */ }      // the rebuilt model must sit on the plate again
-    S.silent = true;
-    try { $('saveStlBtn')?.click(); await wait(1500); } finally { S.silent = false; }
-    if (it.fixed) { it.warn = false; it.issues = []; if (lw) it.msg = `watertight · ${lw.quality} · ${nf.format(lw.trianglesAfter)} tris (was ${nf.format(lw.trianglesBefore)})`; note(`${it.name}: now watertight (${lw ? lw.quality + ' detail, ' + nf.format(lw.trianglesBefore) + ' → ' + nf.format(lw.trianglesAfter) + ' triangles' : 'rebuilt'}). The fixed file has replaced the old one in the ZIP.`); }
-    else { it.msg = 'rebuilt, still not 100'; note(`${it.name}: rebuilt, but the health check is still below 100.`, true); }
-  } catch (e) { it.msg = 'could not make watertight'; note(`${it.name}: ${e?.message || e}`, true); }
-  finally { S.busyRow = null; S.silent = false; render(); }
 }
 // Click a row to look at it in the main window: the processed file if there is one (STL/OBJ/PLY), otherwise the original.
 async function viewItem(id) {
@@ -164,7 +140,7 @@ async function viewItem(id) {
 function openToFix(id) {
   if (S.running) return; const it = S.items.find(x => x.id === id); if (!it) return;
   S.fixing = id; S.fixingFresh = true; window.__shrinkCapture = fixingCapture;
-  note(`Opened ${it.name} on its own. Fix it in the left panel (FIX IT or Make watertight), then press DOWNLOAD: the fixed file also replaces this one in the ZIP.`);
+  note(`Opened ${it.name} on its own. Fix it in the left panel (FIX IT), then press DOWNLOAD: the fixed file also replaces this one in the ZIP.`);
   window.__shrinkApp?.openFile?.(it.file);
   window.__shrinkLeftPanel?.(true);
   setTimeout(() => { const d = $('v2AdvTools'); if (d) d.open = true; }, 600);
@@ -184,16 +160,15 @@ function whyLine(i) {
   const what = (i.issues && i.issues.length ? i.issues.join(', ') : 'health is below 100');
   const onlyPieces = !!(i.issues && i.issues.length && i.issues.every(x => /separate pieces/.test(x)));
   if (onlyPieces) return `<div class="v2-batch-why">Not fused: ${what.replace(/</g, '&lt;')}. It is clean and prints fine as separate pieces. To join them: <b>OPEN</b> it, press <b>FUSE IT</b>, then <b>DOWNLOAD</b>. Or ignore it: the ZIP already holds this file.</div>`;
-  const going = S.fixing === i.id ? 'Now fix it in the main window: <b>FIX IT</b> (or <b>Make watertight</b>), then <b>DOWNLOAD</b>.' : 'To fix: <b>OPEN</b> it, press <b>FIX IT</b> (or <b>Make watertight</b>), then <b>DOWNLOAD</b>.';
+  const going = S.fixing === i.id ? 'Now fix it in the main window: <b>FIX IT</b>, then <b>DOWNLOAD</b>.' : 'To fix: <b>OPEN</b> it, press <b>FIX IT</b>, then <b>DOWNLOAD</b>.';
   return `<div class="v2-batch-why">Not fixed: ${what.replace(/</g, '&lt;')}. ${going} Or ignore it: the ZIP already holds this file.</div>`;
 }
 function render() {
   const panel = $('v2BatchPanel'); if (!panel) return;
   dock();
   const list = $('v2BatchList');
-  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}${i.fixed && !i.warn ? ' fixed' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : (i.fixed ? '✓' : ICON[i.status])}</i><span class="n${S.running ? '' : ' view'}" title="${i.name.replace(/"/g, '&quot;')}${S.running ? '' : ' (click to view it in the main window)'}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m"${i.warn ? ' title="Still not fully clean after QUICK-FIX. It is in the ZIP as it is. Click OPEN, expand the left panel and try FIX IT or Make watertight on it by itself."' : ''}>${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn && !(i.issues && i.issues.length && i.issues.every(x => /separate pieces/.test(x))) ? '<button type="button" class="wt" title="Rebuild this model as one watertight skin and put the fixed file in the ZIP.">Make watertight</button>' : '') + (i.warn ? '<button type="button" class="open" title="Opens this model on its own with the left panel open. Try FIX IT or Make watertight, then DOWNLOAD IT: the fixed file replaces this one in the ZIP.">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>${i.warn ? whyLine(i) : ''}`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
+  list.innerHTML = S.items.length ? S.items.map(i => `<div class="v2-batch-row ${i.status}${i.warn ? ' warn' : ''}${i.fixed && !i.warn ? ' fixed' : ''}" data-id="${i.id}"><i>${i.warn ? '⚠' : (i.fixed ? '✓' : ICON[i.status])}</i><span class="n${S.running ? '' : ' view'}" title="${i.name.replace(/"/g, '&quot;')}${S.running ? '' : ' (click to view it in the main window)'}">${i.name.replace(/</g, '&lt;')}</span><span class="s">${fmtBytes(i.size)}</span><span class="m"${i.warn ? ' title="Still not fully clean after QUICK-FIX. It is in the ZIP as it is. Click OPEN, expand the left panel and try FIX IT on it by itself."' : ''}>${(i.msg || '').replace(/</g, '&lt;')}</span>${S.running ? '' : (i.warn ? '<button type="button" class="open" title="Opens this model on its own with the left panel open. Try FIX IT, then DOWNLOAD IT: the fixed file replaces this one in the ZIP.">OPEN</button>' : '') + '<button type="button" class="x" title="Remove">×</button>'}</div>${i.warn ? whyLine(i) : ''}`).join('') : '<div class="v2-batch-empty">No models yet.</div>';
   list.querySelectorAll('.n.view').forEach(n => n.addEventListener('click', () => viewItem(Number(n.closest('.v2-batch-row').dataset.id))));
-  list.querySelectorAll('.wt').forEach(b => b.addEventListener('click', () => watertightRow(Number(b.closest('.v2-batch-row').dataset.id))));
   list.querySelectorAll('.open').forEach(b => b.addEventListener('click', () => openToFix(Number(b.closest('.v2-batch-row').dataset.id))));
   list.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => remove(Number(b.closest('.v2-batch-row').dataset.id))));
   // memory bar: what is still to be processed, plus what is already finished
@@ -291,7 +266,7 @@ async function start() {
         await wait(350);            // let the open settle and the health check start
         deps.applySettings();       // printer resolution and height chosen in the panel
         await wait(150);
-        // v2.253: start exactly as a person does: wait until the health check belongs to THIS model (a leftover 'ready' from the previous file used to be enough)
+        // v2.254: start exactly as a person does: wait until the health check belongs to THIS model (a leftover 'ready' from the previous file used to be enough)
         await waitFor(() => !window.__shrinkHealthIsCurrent || window.__shrinkHealthIsCurrent(), 180000, 'The health check did not finish');
         await wait(400);
         await deps.quickFix();
@@ -303,7 +278,7 @@ async function start() {
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
-        // v2.253: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
+        // v2.254: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) item.msg = `${item.msg ? item.msg + ' · ' : ''}${v.pieces} separate pieces, prints fine`; }
         if (!item.warn && Number.isFinite(sc) && deps.verdict?.()?.healthy !== false) item.fixed = true;
       } catch (err) {
@@ -334,7 +309,7 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.253) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.254) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
@@ -363,7 +338,7 @@ ensureHomeButton();
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
-/* v2.253: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
+/* v2.254: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
 function report() {
   return JSON.stringify({ release: document.querySelector('.version-badge')?.textContent, when: new Date().toISOString(), browser: navigator.userAgent, panel: { printer: $('v2BatchPrinter')?.value, height: $('v2BatchHeight')?.value }, files: S.items.map(i => i.diag || { file: i.name, status: i.status, inputBytes: i.size }) }, null, 1);
 }
@@ -371,4 +346,4 @@ function showReport() {
   let box = $('v2BatchDiag'); if (!box) { box = document.createElement('textarea'); box.id = 'v2BatchDiag'; box.readOnly = true; box.style.cssText = 'width:100%;height:220px;margin-top:8px;font:11px/1.3 monospace;background:#0e141c;color:#cfe;border:1px solid #35455a;border-radius:8px;padding:6px;box-sizing:border-box'; $('v2BatchPanel').appendChild(box); }
   box.value = report(); box.hidden = false; box.focus(); box.select(); try { navigator.clipboard?.writeText(box.value); } catch {}
 }
-window.__shrinkBatch = { report, showReport, applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip, watertightRow };
+window.__shrinkBatch = { report, showReport, applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip };

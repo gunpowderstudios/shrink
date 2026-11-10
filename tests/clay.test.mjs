@@ -207,19 +207,6 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
     card.querySelectorAll('strong')[1].textContent = '400'; ok(B.deps.minor() === null, 'W2 four hundred bad edges is not minor');
     card.querySelectorAll('strong')[1].textContent = '0'; card.querySelectorAll('strong')[2].textContent = '9'; ok(B.deps.minor() === 9, 'W2 nine flipped faces and nothing else is minor too (v2.197)');
     card.remove(); B.deps.minor = keep; }
-  // W1: the small Make watertight button on a flagged row (v2.193)
-  { B.state.items[0].issues = ['3 open edges']; B.state.items[0].warn = true; B.render();
-    ok(!!page.$('v2BatchList').querySelector('.wt'), 'W1 a flagged row has a small Make watertight button');
-    let made = 0; w.__shrinkMakeWatertight = async () => { made++; return true; };
-    w.__shrinkRefreshHealth = () => {}; page.$('v2HealthScore').textContent = '100';
-    const stl = w.document.getElementById('saveStlBtn'); const oldB = B.state.results[0].blob;
-    if (stl) stl.addEventListener('click', () => { w.__shrinkCapture?.(new w.Blob([new Uint8Array(30)]), 'tarak-SHRINK-16K.stl'); });
-    const mb = w.document.getElementById('v2MagicBtn'); if (mb) mb.dataset.state = 'ready';
-    w.__shrinkApp.sourceFile = B.state.items[0].file;
-    await B.watertightRow(B.state.items[0].id);
-    ok(made === 1 && B.state.items[0].warn === false && B.state.items[0].fixed === true, 'W1 Make watertight ran and the row is fixed');
-    ok(!!page.$('v2BatchList').querySelector('.v2-batch-row.fixed') && !page.$('v2BatchList').querySelector('.wt'), 'W1 the row turns green and loses the button');
-    ok(B.state.results.some(r => r.blob.size === 30), 'W1 the fixed file replaced the old one in the ZIP'); }
 }
 
 /* ---- the printer and quality are remembered ---- */
@@ -245,16 +232,6 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   w.document.querySelector('.print-v2-dashboard [data-quality="standard"]').click(); w.__shrinkRefreshSizeWarning(); await wait(30);
   ok(!page.$('v2SizeWarn'), 'W1 and none at a lower quality either');
   w.__shrinkFuseTriLimit = undefined;
-}
-
-/* ---- v2.248: shells touching along a shared edge (non-manifold) no longer stop FUSE IT ---- */
-{
-  const page = await makePage({ model: models.edgeTouch(), heightMm: 20 }); await wait(900);
-  page.$('v2FuseBtn').click();
-  for (let i = 0; i < 80 && !/Fused|Needs repair/.test(page.$('v2FuseResult')?.textContent || ''); i++) await wait(250);
-  await wait(800);
-  const txt = page.$('v2FuseResult').textContent;
-  ok(/fused/i.test(txt) && !/Needs repair/.test(txt), 'N1 two boxes touching along one edge: FUSE IT works instead of "Needs repair": ' + txt.slice(0, 90));
 }
 
 /* ---- manual TURN pad ---- */

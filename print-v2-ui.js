@@ -976,7 +976,7 @@
         const sc = Number($('v2HealthScore')?.textContent);
         done(sc === 100 ? 'ok' : 'warn', sc === 100 ? '✓' : '⚠', sc === 100 ? 'Fixed: the model is watertight' : `Fixed what could be fixed (health ${Number.isFinite(sc) ? sc + '/100' : 'unknown'})`);
       }
-      if (!(Number($('v2HealthScore')?.textContent) >= 95)) done('warn', '⚠', 'Still not watertight. Detail was kept, nothing was wrapped. If you need it sealed, open Advanced and try Make watertight (Balanced); it can soften fine detail.');
+      if (!(Number($('v2HealthScore')?.textContent) >= 95)) done('warn', '⚠', 'Still not fully sealed. Detail was kept, nothing was rebuilt.');
       // 3. FUSE
       btn.textContent = '3/4 Fusing…'; show('Fusing…'); await paintNow();
       const fc = $('v2FuseCard'); if (fc) fc.dataset.state = '';

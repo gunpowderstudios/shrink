@@ -1,4 +1,4 @@
-// Regression tests for the 3D-print multitool: split into sections and Make watertight.
+// Regression tests for the 3D-print multitool: split into sections and fuse.
 // They click the VISIBLE buttons (DOWNLOAD IT, FUSE IT, Make watertight) on a jsdom page that loads the real
 // print-v2-ui / fuse-export / split-print / split-fallback / raw-split / print-export-safety modules and the real Manifold library.
 import path from 'path';
@@ -186,38 +186,6 @@ await block(16, async () => {
   const r = await readParts(page); ok(r.parts.length === 2 && (await Promise.all(r.parts.map(p => stlHealth(p.stl)))).every(h => h.clean), 'G both sections are watertight');
 });
 
-/* ============ H. Make watertight replaces the working model ============ */
-await block(17, async () => {
-  const original = (() => { const m = models.single(); m.scale.setScalar(1.5); m.updateMatrixWorld(true); return m; })();   // a different, healthy 60 mm sphere
-  const holey = models.holey(15);                                                                                         // the CURRENT working model: broken, 30 mm
-  const page = await makePage({ model: original, heightMm: 30 });
-  page.w.__shrinkSetWorkingModel(holey);
-  const centreBefore = bbox(holey).getCenter(new THREE.Vector3()), sizeBefore = bbox(holey).getSize(new THREE.Vector3());
-  page.w.__shrinkPrintSafety.showDiagnostic('Fuse', 'non-manifold');
-  ok(!page.$('printDiagnosticPanel').hidden, 'H the red warning panel is showing');
-  page.$('remeshQuality').value = 'fast';
-  page.$('makeWatertightBtn').click();
-  ok(await waitFor(() => window.__shrinkWorkingModel() !== holey, 60000), 'H Make watertight replaced the working model');
-  const now = window.__shrinkWorkingModel();
-  ok(page.calls.setPreview === 1 && page.app.optimizedModel === now && page.calls.show.includes('optimized'), 'H the rebuilt model was installed in the viewer');
-  ok(page.calls.restore === 1, 'H the camera view was restored');
-  ok(page.downloads.length === 0, 'H nothing was downloaded');
-  const sizeAfter = bbox(now).getSize(new THREE.Vector3()), centreAfter = bbox(now).getCenter(new THREE.Vector3());
-  ok(Math.abs(sizeAfter.y - sizeBefore.y) < 1.2 && Math.abs(sizeAfter.x - sizeBefore.x) < 1.2, `H it rebuilt the WORKING model (30 mm), not the 60 mm original (height ${sizeAfter.y.toFixed(1)} mm)`);
-  ok(centreAfter.distanceTo(centreBefore) < 0.6, 'H position, orientation and scale are preserved (' + centreAfter.distanceTo(centreBefore).toFixed(2) + ' units drift)');
-  const core = await import('../repair-core.js'); const h = core.healthOfModel(THREE, now);
-  ok(h.clean && h.triangles > 0, `H the rebuilt model is healthy (open ${h.openEdges}, pinched ${h.pinchedEdges}, flipped ${h.flippedEdges})`);
-  ok(page.$('printDiagnosticPanel').hidden === true, 'H the red warning panel was cleared');
-  ok(await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 4000), 'H the MODEL HEALTH card refreshed to 100');
-  ok(/REBUILT/.test(page.$('v2HealthChanges').textContent), 'H the CHANGES list shows REBUILT');
-  ok(page.statuses.slice(-1)[0].msg.startsWith('Rebuilt as one watertight solid') && !page.statuses.slice(-1)[0].error, 'H success message');
-  // and the tools keep chaining: split the rebuilt model
-  await joint(page, 'flat'); await pick(page, '2'); page.$('v2DownloadBtn').click();
-  ok(await waitFor(() => zipOf(page)), 'H the rebuilt model can be split straight away');
-  const r = await readParts(page); ok(r.parts.length === 2 && Math.abs(r.parts[0].stl.maxZ - sizeAfter.y / 2) < 0.8 + 0, 'H split halves of the rebuilt model');
-});
-
-
 /* ============ I. pegs are a bonus: a peg that cannot be built never fails the split ============ */
 await block(18, async () => {
   const page = await makePage({ model: models.single(), heightMm: 40 });
@@ -229,32 +197,6 @@ await block(18, async () => {
   const r = await readParts(page);
   ok(r.parts.length === 2 && (await Promise.all(r.parts.map(p => stlHealth(p.stl)))).every(h => h.clean), 'I sections are watertight (flat cut)');
   ok(page.statuses.some(s => /flat cuts \(no safe peg position was found\)/.test(s.msg)) && !page.statuses.some(s => /keyed alignment pegs/.test(s.msg)), 'I the message does not claim pegs that were not added');
-});
-
-/* ============ J. Make watertight: transforms, refusals and the unchanged working model ============ */
-await block(19, async () => {
-  // a model that sits inside a transformed parent (scaled, rotated about Y, moved): the rebuild must land in the same place
-  const inner = models.holey(10);
-  const holder = new THREE.Group(); holder.add(inner); holder.scale.setScalar(2); holder.rotation.y = 0.7; holder.position.set(15, 3, -8); holder.updateMatrixWorld(true);
-  const page = await makePage({ model: models.single(), heightMm: 40 });
-  page.w.__shrinkSetWorkingModel(holder);
-  const box = bbox(holder), c0 = box.getCenter(new THREE.Vector3()), s0 = box.getSize(new THREE.Vector3());
-  page.$('remeshQuality').value = 'fast'; page.$('makeWatertightBtn').click();
-  ok(await waitFor(() => window.__shrinkWorkingModel() !== holder, 60000), 'J rebuild of a transformed model finished');
-  const now = window.__shrinkWorkingModel(), b = bbox(now);
-  ok(b.getCenter(new THREE.Vector3()).distanceTo(c0) < 1.0 && Math.abs(b.getSize(new THREE.Vector3()).y - s0.y) < 1.2, `J position and scale match the transformed source (drift ${b.getCenter(new THREE.Vector3()).distanceTo(c0).toFixed(2)})`);
-});
-await block(20, async () => {
-  // too open to rebuild: refused, and the working model plus the warning stay as they were
-  const bowl = models.bowl();
-  const page = await makePage({ model: models.single(), heightMm: 40 });
-  page.w.__shrinkSetWorkingModel(bowl);
-  page.w.__shrinkPrintSafety.showDiagnostic('Fuse', 'non-manifold');
-  page.$('remeshQuality').value = 'fast'; page.$('makeWatertightBtn').click();
-  ok(await waitFor(() => page.statuses.some(s => s.error && /gaps that are too big|Watertight/.test(s.msg)), 60000), 'J a bowl that is far too open is refused with an error message');
-  ok(window.__shrinkWorkingModel() === bowl && page.calls.setPreview === 0, 'J the working model was left exactly as it was');
-  ok(page.$('printDiagnosticPanel').hidden === false && page.downloads.length === 0, 'J the warning stays and nothing was downloaded');
-  ok(page.$('makeWatertightBtn').disabled === false, 'J the button is usable again');
 });
 
 /* ============ K. SHRINK IT with the REAL live reducer: a clean model must not come back "Needs attention", and the slider must keep working ============ */
