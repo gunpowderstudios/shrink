@@ -94,7 +94,8 @@ function buildPanel() {
 // Docked at the bottom-right of the viewer once the MODEL HEALTH box (bottom-left) exists (it is created when a model is opened); floating at the top right until then (v2.153).
 function dock() {
   const p = $('v2BatchPanel'); if (!p) return;
-  const card = $('v2HealthCard')?.parentElement;      // the viewer panel: the health box is bottom-left, this window is bottom-right
+  let card = $('v2HealthCard')?.parentElement;      // the viewer panel: the health box is bottom-left, this window is bottom-right
+  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.238: the viewer is hidden until a model is open, so float on the page meanwhile
   if (card && p.parentElement !== card) { card.appendChild(p); p.classList.remove('floating'); }
   else if (!card && p.parentElement !== document.body) { document.body.appendChild(p); p.classList.add('floating'); }
   else if (!card) p.classList.add('floating');
@@ -298,7 +299,7 @@ async function start() {
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
-        // v2.237: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
+        // v2.238: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) item.msg = `${item.msg ? item.msg + ' · ' : ''}${v.pieces} separate pieces, prints fine`; }
         if (!item.warn && Number.isFinite(sc) && deps.verdict?.()?.healthy !== false) item.fixed = true;
       } catch (err) {
@@ -329,30 +330,17 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.237) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.238) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
   const row = document.createElement('div'); row.className = 'v2-batch-home';
-  row.innerHTML = '<button id="v2BatchHome" type="button" class="v2-batch-upload">BATCH UPLOAD</button><span>Many models in one go: choose your printer first, then add the files.</span>';
+  row.innerHTML = '<button id="v2BatchHome" type="button" class="v2-batch-upload">BATCH UPLOAD</button><span>Many models in one go: add the files, then pick your printer in the window.</span>';
   dz.insertAdjacentElement('afterend', row);
   $('v2BatchHome').addEventListener('click', () => {
     if (!document.body.classList.contains('app-mode-print')) document.querySelector('.mode-card[data-mode="print"]')?.click();
     toggle(true);
   });
-  return true;
-}
-// (v2.180) A BATCH button in the top bar, right after RELOAD, opens the batch window.
-function ensureTopButton() {
-  if ($('v2BatchTop')) return true;
-  const rl = $('v2MagicReset'); if (!rl) return false;
-  const btn = document.createElement('button'); btn.id = 'v2BatchTop'; btn.type = 'button'; btn.className = 'v2-magic v2-magic-reset'; btn.textContent = 'BATCH';
-  btn.title = 'Shrink many models in one go';
-  btn.addEventListener('click', () => {
-    if (!document.body.classList.contains('app-mode-print')) document.querySelector('.mode-card[data-mode="print"]')?.click();
-    toggle(true);
-  });
-  rl.insertAdjacentElement('afterend', btn);
   return true;
 }
 // (v2.237) Several files chosen or dropped on the main upload screen go to BATCH instead of only the first one opening.
@@ -367,8 +355,7 @@ function toBatch(list, e) {
 }
 document.addEventListener('drop', e => { if (e.target?.closest?.('#dropZone, #printUploadHero')) toBatch([...(e.dataTransfer?.files || [])], e); }, true);
 document.addEventListener('change', e => { const t = e.target; if (t?.id === 'fileInput' && toBatch([...(t.files || [])], e)) t.value = ''; }, true);
-ensureHomeButton(); ensureTopButton();
-let tries2 = 0; const iv2 = setInterval(() => { if (ensureTopButton() || ++tries2 > 100) clearInterval(iv2); }, 300);
+ensureHomeButton();
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 

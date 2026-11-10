@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.238
+- Fixed: on the start screen the BATCH window was built inside the (hidden) 3D viewer, so it never appeared and queued files went nowhere. It now floats on the page until a model is open.
+- The BATCH button in the top bar is gone; **BATCH UPLOAD** under the drop zone opens the window.
+
 ## v2.237
 - Choosing or dropping **several files** on the main upload screen (STL, OBJ, PLY or GLB) now opens BATCH with all of them queued; before, only the first file opened and the rest were ignored. One file still opens as normal. Gaming mode still opens one GLB at a time.
 
