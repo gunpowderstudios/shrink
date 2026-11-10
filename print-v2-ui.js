@@ -966,6 +966,12 @@
       if ($('v2HealthScore')?.textContent === '100' && !window.__shrinkClay?.hasClay?.()) done('ok', '✓', 'Already clean: nothing to fix');
       else {
         await fixHealthModel(); await wait(60);
+        // v2.251: one repair pass can leave a few open edges (Tamara in a batch: health 45, 14 open edges, yet 100 as a single model). Try again while it keeps improving, at most twice more.
+        for (let extra = 0; extra < 2 && Number($('v2HealthScore')?.textContent) < 95; extra++) {
+          const before = Number($('v2HealthScore')?.textContent); show('Still some open edges: repairing again…'); await paintNow();
+          try { await fixHealthModel(); await wait(60); } catch (e) { console.warn('extra repair pass', e); break; }
+          if (!(Number($('v2HealthScore')?.textContent) > before)) break;
+        }
         const sc = Number($('v2HealthScore')?.textContent);
         done(sc === 100 ? 'ok' : 'warn', sc === 100 ? '✓' : '⚠', sc === 100 ? 'Fixed: the model is watertight' : `Fixed what could be fixed (health ${Number.isFinite(sc) ? sc + '/100' : 'unknown'})`);
       }
