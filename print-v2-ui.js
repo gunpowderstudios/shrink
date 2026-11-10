@@ -596,7 +596,15 @@
     }
   }
 
-  async function shrinkModel(...a) { if ($('v2ShrinkBtn')?.dataset.checking) return; shrinkRunning = true; setWorking(true, 0); try { return await shrinkModelInner(...a); } finally { shrinkRunning = false; setWorking(false); const sb = $('v2ShrinkBtn'); if (sb?.dataset.checking) sb.disabled = true; } }
+  // v2.245: a batch run showed SHRINK silently doing nothing on some models (the engine's button was still disabled, so shrinkModelInner just returned and the file went out unreduced).
+  // Now we wait for the engine to be ready and say so if it never is; window.__shrinkShrinkNote keeps the reason for the diagnostic.
+  async function shrinkModel(...a) {
+    window.__shrinkShrinkNote = null;
+    for (let i = 0; i < 600 && $('v2ShrinkBtn')?.dataset.checking; i++) await wait(100);
+    if ($('v2ShrinkBtn')?.dataset.checking) { window.__shrinkShrinkNote = 'skipped: health check still running after 60 s'; throw new Error('the health check did not finish'); }
+    const src = $('autoBtn'); for (let i = 0; i < 900 && src?.disabled; i++) await wait(100);
+    if (src?.disabled) { window.__shrinkShrinkNote = 'skipped: the SHRINK engine button stayed disabled for 90 s'; throw new Error('the shrink engine was not ready'); }
+    shrinkRunning = true; setWorking(true, 0); try { return await shrinkModelInner(...a); } finally { shrinkRunning = false; setWorking(false); const sb = $('v2ShrinkBtn'); if (sb?.dataset.checking) sb.disabled = true; } }
   async function shrinkModelInner() {
     const source = $('autoBtn');
     const btn = $('v2ShrinkBtn');
@@ -1025,7 +1033,7 @@
       o.heightInputMm = $('v2Height')?.value; o.widthMm = $('v2Width')?.value; o.depthMm = $('v2Depth')?.value; o.uniform = $('v2Uniform')?.checked;
       o.detailSlider = $('v2Detail')?.value; o.shrinkApplied = !!shrinkReady; o.chips = [...appliedChanges].join(',');
       o.health = $('v2HealthScore')?.textContent; o.healthRows = [...document.querySelectorAll('#v2HealthRows .v2-health-row')].map(r => r.textContent.replace(/\s+/g, ' ').trim());
-      o.pieces = $('v2HealthRows')?.dataset.pieces || null; o.pieceTris = (window.__shrinkPieceInfo || []).slice(0, 8);
+      o.pieces = $('v2HealthRows')?.dataset.pieces || null; if (o.pieces) o.pieceTris = (window.__shrinkPieceInfo || []).slice(0, 8); o.shrinkNote = window.__shrinkShrinkNote || null;
       if (m) { const b = new (THREE_().Box3)().setFromObject(m, true), v = b.getSize(new (THREE_().Vector3)()); o.sizeUnits = [v.x, v.y, v.z].map(x => +x.toFixed(3)); }
       if (orig) { const b = new (THREE_().Box3)().setFromObject(orig, true), v = b.getSize(new (THREE_().Vector3)()); o.originalSizeUnits = [v.x, v.y, v.z].map(x => +x.toFixed(3)); o.originalMeshes = (() => { let n = 0; orig.traverse(x => { if (x.isMesh) n++; }); return n; })(); }
       o.liveLine = ($('liveLine')?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 200); o.verdictText = ($('verdictText')?.textContent || '').slice(0, 200);
