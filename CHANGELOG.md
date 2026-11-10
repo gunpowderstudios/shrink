@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.245
+- Secret batch diagnostic: Shift-click the BATCH title for a text box (also copied to the clipboard) with one JSON entry per file: triangles before/after, size in units and mm, quality and detail used, pieces, fuse result, file bytes in/out, seconds, health.
+
 ## v2.244
 - Splitting is back: a folded "Split into parts" section above DOWNLOAD IT (2 parts, 3 parts, auto by height; flat cut or pegs; cut height; peg settings). Default is still one STL.
 - The 3D view always fills the whole width of the window: the page is no longer capped at 1500 px wide once a model is open, ADVANCED stays a side column of its normal width and the view takes everything else; closed, it takes the lot.

@@ -1016,6 +1016,23 @@
   }
   const THREE_ = () => app()?.THREE;
   window.__shrinkDiagReport = diagReport;
+  // v2.245: a small synchronous snapshot for the batch's secret diagnostic (one per file)
+  window.__shrinkSnap = () => {
+    const o = {}; try {
+      const m = sourceModel(), orig = app()?.originalModel;
+      o.trisNow = m ? modelTriangles(m) : null; o.trisOriginal = orig ? modelTriangles(orig) : null;
+      o.printer = currentPrinter()?.tag; o.type = dashboard?.dataset.printerType; o.quality = dashboard?.dataset.quality;
+      o.heightInputMm = $('v2Height')?.value; o.widthMm = $('v2Width')?.value; o.depthMm = $('v2Depth')?.value; o.uniform = $('v2Uniform')?.checked;
+      o.detailSlider = $('v2Detail')?.value; o.shrinkApplied = !!shrinkReady; o.chips = [...appliedChanges].join(',');
+      o.health = $('v2HealthScore')?.textContent; o.healthRows = [...document.querySelectorAll('#v2HealthRows .v2-health-row')].map(r => r.textContent.replace(/\s+/g, ' ').trim());
+      o.pieces = $('v2HealthRows')?.dataset.pieces || null; o.pieceTris = (window.__shrinkPieceInfo || []).slice(0, 8);
+      if (m) { const b = new (THREE_().Box3)().setFromObject(m, true), v = b.getSize(new (THREE_().Vector3)()); o.sizeUnits = [v.x, v.y, v.z].map(x => +x.toFixed(3)); }
+      if (orig) { const b = new (THREE_().Box3)().setFromObject(orig, true), v = b.getSize(new (THREE_().Vector3)()); o.originalSizeUnits = [v.x, v.y, v.z].map(x => +x.toFixed(3)); o.originalMeshes = (() => { let n = 0; orig.traverse(x => { if (x.isMesh) n++; }); return n; })(); }
+      o.liveLine = ($('liveLine')?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 200); o.verdictText = ($('verdictText')?.textContent || '').slice(0, 200);
+      o.verdict = window.__shrinkLastVerdict || null; o.fuse = window.__shrinkLastFuse || null;
+    } catch (e) { o.error = String(e?.message || e); }
+    return o;
+  };
   function ensureDiagButton() {
     const host = document.querySelector('#v2AdvTools'); if (!host || $('v2DiagRow')) return;
     const row = document.createElement('div'); row.id = 'v2DiagRow'; row.className = 'v2-diag-row';

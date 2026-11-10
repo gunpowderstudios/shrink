@@ -74,7 +74,7 @@ function buildPanel() {
   document.body.appendChild(p); dock();
   const fold = () => { const f = p.classList.toggle('folded'); $('v2BatchFold').textContent = f ? '▸' : '▾'; $('v2BatchFold').setAttribute('aria-expanded', String(!f)); };
   $('v2BatchFold').addEventListener('click', fold);
-  p.querySelector('.v2-batch-head').addEventListener('click', e => { if (e.target.id !== 'v2BatchFold') fold(); });      // the whole title bar folds it
+  p.querySelector('.v2-batch-head').addEventListener('click', e => { if (e.shiftKey) { showReport(); return; } if (e.target.id !== 'v2BatchFold') fold(); });      // the whole title bar folds it
   $('v2BatchAdd').addEventListener('click', () => $('v2BatchFiles').click());
   $('v2BatchFiles').addEventListener('change', e => { add([...e.target.files]); e.target.value = ''; });
   const drop = $('v2BatchDrop');
@@ -95,7 +95,7 @@ function buildPanel() {
 function dock() {
   const p = $('v2BatchPanel'); if (!p) return;
   let card = $('v2HealthCard')?.parentElement;      // the viewer panel: the health box is bottom-left, this window is bottom-right
-  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.244: the viewer is hidden until a model is open, so float on the page meanwhile
+  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.245: the viewer is hidden until a model is open, so float on the page meanwhile
   if (card && p.parentElement !== card) { card.appendChild(p); p.classList.remove('floating'); }
   else if (!card && p.parentElement !== document.body) { document.body.appendChild(p); p.classList.add('floating'); }
   else if (!card) p.classList.add('floating');
@@ -285,7 +285,7 @@ async function start() {
       if (memoryTight()) { note(`Stopped: the browser is nearly out of memory (${ok} of ${total} done). Download the ZIP, reload the page and run the rest.`, true); break; }
       n++; item.status = 'working'; item.msg = `${n}/${total}`; render();
       try {
-        await deps.openFile(item.file);
+        const t0 = Date.now(); await deps.openFile(item.file);
         const a = deps.app();
         if (a && a.sourceFile && a.sourceFile !== item.file) throw new Error('Could not open this file');
         await wait(350);            // let the open settle and the health check start
@@ -294,17 +294,18 @@ async function start() {
         await deps.quickFix();
         const score = deps.healthScore();
         const files = await deps.capture();
+        try { item.diag = { file: item.name, inputBytes: item.size, outputs: files.map(f => ({ name: f.name, bytes: f.blob.size })), seconds: Math.round((Date.now() - t0) / 100) / 10, ...(window.__shrinkSnap?.() || {}) }; } catch {}
         for (const f of files) S.results.push({ name: f.name, blob: f.blob, source: item.name });
         item.status = 'done'; item.msg = score ? `health ${score}/100` : 'done'; ok++;
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
-        // v2.244: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
+        // v2.245: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) item.msg = `${item.msg ? item.msg + ' · ' : ''}${v.pieces} separate pieces, prints fine`; }
         if (!item.warn && Number.isFinite(sc) && deps.verdict?.()?.healthy !== false) item.fixed = true;
       } catch (err) {
         console.warn('[SHRINK 3D] batch item failed', item.name, err);
-        item.status = 'failed'; item.msg = String(err.message || err).slice(0, 80);
+        item.status = 'failed'; item.msg = String(err.message || err).slice(0, 80); item.diag = { file: item.name, inputBytes: item.size, failed: String(err.message || err) };
       }
       render(); await wait(300);    // a moment for the browser to let go of the last model
     }
@@ -330,7 +331,7 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.244) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.245) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
@@ -359,4 +360,12 @@ ensureHomeButton();
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
-window.__shrinkBatch = { applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip, watertightRow };
+/* v2.245: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
+function report() {
+  return JSON.stringify({ release: document.querySelector('.version-badge')?.textContent, when: new Date().toISOString(), browser: navigator.userAgent, panel: { printer: $('v2BatchPrinter')?.value, height: $('v2BatchHeight')?.value }, files: S.items.map(i => i.diag || { file: i.name, status: i.status, inputBytes: i.size }) }, null, 1);
+}
+function showReport() {
+  let box = $('v2BatchDiag'); if (!box) { box = document.createElement('textarea'); box.id = 'v2BatchDiag'; box.readOnly = true; box.style.cssText = 'width:100%;height:220px;margin-top:8px;font:11px/1.3 monospace;background:#0e141c;color:#cfe;border:1px solid #35455a;border-radius:8px;padding:6px;box-sizing:border-box'; $('v2BatchPanel').appendChild(box); }
+  box.value = report(); box.hidden = false; box.focus(); box.select(); try { navigator.clipboard?.writeText(box.value); } catch {}
+}
+window.__shrinkBatch = { report, showReport, applySettings, add, start, clear, toggle, render, estimate, memoryBudget, state: S, deps, downloadZip, watertightRow };
