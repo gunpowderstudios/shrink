@@ -858,10 +858,7 @@ async function optimizeModel() {
       const g = centreOnGround(document, getBounds);
       if (g.moved) setProgress(50, 'Centring the model on the origin…');
     }
-    if (!printMode && window.__shrinkRacer?.active?.()) {        // Racer preset: per-map sizes, dropped maps, one texture set (racer.js)
-      setProgress(52, 'Preparing the textures for the Racer…');
-      await window.__shrinkRacer.process(document, text => setProgress(62, text));
-    } else if (els.webpToggle.checked && !printMode) {
+    if (els.webpToggle.checked && !printMode) {
       setProgress(52, 'Resizing and compressing textures…');
       await convertTexturesToWebP(document, Number(els.textureSize.value), Number(els.textureQuality.value) / 100, 52, 72);
     }

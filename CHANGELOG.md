@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.239
+- **Start screen**: opening SHRINK now asks *What are you making?* with two big cards, **Gaming** and **3D Printing**. The choice is remembered on that browser; a small "Gaming · switch" / "3D Printing · switch" link in the top bar (before a model is open) brings the choice back. BATCH UPLOAD now only shows under 3D Printing.
+- Clear-out: deleted the old Simple wizard (`simple-*.js/css`, not loaded since v2.38), the Racer preset (`racer.js`, `racer-core.js`, its target and its hook in `app.js`) and their tests (preflight, post-reduce, normals, racer). Old notes moved from CLAUDE.md to `ARCHIVE.md`; CLAUDE.md is about a fifth shorter. CLAY and the split/peg engine are still in the repo on purpose.
+
 ## v2.238
 - Fixed: on the start screen the BATCH window was built inside the (hidden) 3D viewer, so it never appeared and queued files went nowhere. It now floats on the page until a model is open.
 - The BATCH button in the top bar is gone; **BATCH UPLOAD** under the drop zone opens the window.

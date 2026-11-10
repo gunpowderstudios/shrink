@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.238** (see CHANGELOG.md; the multitool core dates from v2.57) (the multitool; see "3D Print multitool" below). Older sections that mention the Simple wizard describe code that still exists in the repo but is **not loaded** by the page since v2.38.
+- Current user-facing release: **v2.239** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -45,8 +45,8 @@ The left column is gone. `buildMainCard()` in `print-v2-ui.js` moves the Height/
 ### Minor edges are fine (v2.195)
 `deps.minor()` in batch.js reads the MODEL HEALTH rows: no open edges and 1 to `MINOR_EDGES` (10) non-manifold edges plus flipped faces together (v2.197) = fine to print (row stays green, no Make watertight button). Voxel rebuilds drop detail (104k to 21k triangles in a real run) so they are not worth it for that.
 
-### Mode follows the file (v2.200)
-`ui-mode.js` picks Game or Print from `sourceKind` on `shrink:model-opened` (glb = game, anything else = print); nothing is saved. `.mode-chooser` is hidden by CSS but stays in the DOM (batch/tests click `.mode-card`). `.mode-override` ("Use as a print model") shows for a GLB in game mode. The green side tab is `.v2-left-toggle`.
+### Start screen and mode (v2.239; the file type still picks the mode since v2.200)
+`ui-mode.js` shows the two big cards (`.mode-chooser`, Gaming / 3D Printing) as a start screen while `body.start-screen` is set. A click on a card calls `setMode(mode, true)`, removes the class and saves the choice in `localStorage['shrink-mode']` (try/catch); on the next visit the saved mode opens straight to its upload area. The small `.mode-switch` link in the top bar ("Gaming · switch" / "3D Printing · switch", hidden once a model is open) clears the saved choice and brings the start screen back. While `start-screen` is set CSS hides the drop zone, the print upload hero, BATCH UPLOAD and the settings-file row. Opening a file still sets the mode from `sourceKind` on `shrink:model-opened` (glb = game, anything else = print) without saving it. `.mode-override` ("Use as a print model") shows for a GLB in game mode. Batch and tests click `.mode-card` even though it is hidden after the start screen. BATCH UPLOAD (`.v2-batch-home`) is hidden in Gaming mode: BATCH runs the print pipeline. The green side tab is `.v2-left-toggle`.
 
 ### Minor score (v2.199)
 `healthScore()` in `print-v2-ui.js` returns 95 / 'Good' / `minor` for no open edges and 1 to `MINOR_MAX` (10) non-manifold edges plus flipped faces. Anything that tests `score === 100` still treats it as not perfectly clean (QUICK-FIX still tries to fix); BATCH decides warnings with `deps.minor()`.
@@ -111,81 +111,21 @@ Rebuilds the **working model** (not the original), checks the result with the sh
 ### Tests
 `cd tests && npm install && npm test`. `multitool.test.mjs` clicks the real DOWNLOAD IT / FUSE IT / Make watertight buttons on a jsdom page that loads the real modules and the real Manifold library (`mt-harness.mjs`). If you change split, fuse, working-model or watertight code, run it and add a case for what you changed.
 
-## v2.36 historical layout baseline
-The current Simple desktop layout is intentionally restored from the final Oct 3 v2.25 commit `67ce3c`.
+## Still-true rules from the Simple-wizard era
+### Mesh health: one definition
+`repair-core.js` owns it via `meshHealth`. Preflight, post-reduction guard and repair results must all use that definition.
 
-- `simple-wizard.css` comes from that historical commit.
-- `simple-preflight.css` comes from that historical commit.
-- Do not add new viewport/dock/equal-height layout systems on top without an explicit new decision.
-- The only post-Oct-3 CSS retained in the Simple wizard layer is the amber visual state for **Continue anyway**.
-- `simple-mode.css`, `print-v2-ui.css`, and `style.css` already matched the Oct 3 state and were not rewritten.
-- Engine/workflow logic remains current; this was layout-only.
-- Keep v2.33 camera/orientation/stable-preview fixes independent of the historical layout CSS.
+Clean = no open edges, no tangled (3+) edges, no flipped edges. Empty/degenerate triangles are reported but do not block the Simple workflow.
 
-## v2.35 layout target
-The desired desktop Simple layout is the cleaner pre-dock visual composition:
+Do not reintroduce a second topology check with a different weld tolerance. Heavy repair/health work runs in `repair-worker.js` where supported. The repair graph (`repair-core.js`, `repair-worker.js`, `solid-rebuild.js`) uses cache key **2.196** (bumped in v2.196 with the extra untangle round), independently of the v2.18 engine graph.
 
-- fixed columns: Controls / Check-Repair left, Viewer right
-- approximately 32% / 68% width
-- left card uses natural content height and must **not** stretch to viewer depth
-- right viewer is intentionally much taller than the left card
-- normal page/document scrolling is allowed
-- no JavaScript viewport sizing or equal-height module forcing
-- do not reintroduce draggable/dockable panels
-- keep v2.33 orientation/camera/viewer-stability fixes independent of layout
-
-## v2.34 fixed layout rules
-The draggable/dockable panel experiment from v2.28–v2.33 has been removed.
-
-- `panel-layout.js` and `panel-layout.css` no longer exist.
-- Do not reintroduce drag bars, panel-side localStorage, body-wide layout observers or JavaScript viewport-height managers without a new explicit design decision.
-- Desktop Simple mode is fixed two-column: Controls/Check-Repair left, Viewer right.
-- `simple-wizard.css` owns desktop workspace sizing using CSS only.
-- Controls/preflight use natural height; the page remains ordinary document flow.
-- Keep v2.33 camera/view preservation and orientation fixes independent of layout.
-
-## v2.33 viewer stability rules
-The Duric browser video exposed three UI/viewer problems and v2.33 fixes them without changing geometry algorithms.
 
 - Internal STL reopen rule: SHRINK stores print geometry Y-up internally but STL import assumes Z-up. Any repaired/rebuilt model exported only for SHRINK to reopen must use `buildBinaryStl(... zUp:true)`.
 - Preserve view state across internal model replacement/reopen: camera position, OrbitControls target, up/zoom/near/far.
-- Simple reduction must keep the live reduced preview visible while stage === `working`; do not switch Original/Reduced back and forth on live events.
 - Model display should be idempotent when the requested model is already shown.
-- Loaded Simple desktop mode owns the viewport. Page scrolling is locked; the Controls module scrolls internally.
-- Workspace-height calculation must clamp the measured top to the visible viewport so negative values from scroll cannot create an oversized viewer.
-- Do not restore a permanent body-wide MutationObserver in `panel-layout.js`. UI text/result mutations must not trigger layout resize.
-- `panel-layout.js` uses short startup retries plus explicit workflow events and exposes `resize()`.
-- `app.js?v=2.33` is a viewer/app-shell cache key only; reducer/core algorithm modules are still v2.18.
+- The Duric dwarf sculpt (~1M triangles) is the stress test for repair, shrink, shading and responsiveness.
 
-## v2.32 P1 state
-The follow-up tidy-up after the v2.31 reliability work is complete.
-
-- Simple quality presets are triangle-target presets, not millimetre guarantees.
-- Compare/Tools may run the real surface-loss measurement; ordinary Simple does not.
-- `simple-mode.js` owns Simple reduction. Do not recreate click interception or fake saved-percentage state.
-- `simple-focus.js` was deleted.
-- Fine-tune must perform only one awaited reduction per settled change.
-- Clean models may exit immediately via **Download as it is**.
-- Failed automatic repair is a warning, not a prison: offer stronger repair, continue anyway, download as-is and Tools as appropriate.
-- A bypass must remain visibly warned; never relabel it as a passed health check.
-- Simple must not auto-Fuse on download.
-- `viewer-auto-button.js` is loaded only once from the page.
-
-The next architectural change should be the recipe/job-state flow behind a feature flag, not another Simple overlay. Browser-test Duric before switching the default flow.
-
-## v2.31 P0 state
-The v2.30 review P0 cleanup is complete. Before adding a new workflow:
-- run the real Duric browser acceptance test
-- do not add another Simple override layer
-- keep ordinary Simple reduction free of BVH quality measurement
-- Compare may opt into the visual-loss measurement
-- Simple/preflight/post-reduction/export diagnostics must use the shared v2.27 `meshHealth` definition
-- Manifold belongs to explicit Fuse/Split operations, not ordinary Simple validation
-- Simple must await reducer promises/events, never poll status labels
-- `index.html` alone owns the visible release badge
-- user-facing navigation says **Tools**, not Advanced
-
-The next architectural step, only after Tim approves the browser test, is to prototype the recipe/job-state workflow beside the old Simple layers rather than adding another overlay.
+(Everything else from the old Simple wizard, the v2.31–v2.36 layout notes and the Racer preset is in `ARCHIVE.md`. Those files were deleted in v2.239 and live on in git history.)
 
 ## Product direction
 
@@ -195,115 +135,11 @@ SHRINK 3D has two distinct jobs:
 Optimise GLB game assets: geometry, textures and file size.
 
 ### 3D print / modelling
-The Simple workflow is intentionally:
-
-**Upload → Check/Repair → Printer & size → Reduce → Prepare/Download**
-
-The product message is:
+The flow is the multitool described above (check/repair, shrink, fuse, download, in any order). The product message is:
 
 **Repair it. Reduce it. Print it.**
 
-Do not force home users to understand Boolean union, manifold status, voxel grids, peg tolerances or Meshopt unless they open **Tools**.
-
-## Simple vs Tools
-
-- **Simple** is the normal home-user workflow.
-- The old **Advanced** label is presented to the user as **Tools**.
-- Simple should stay short, progressive and conditional.
-- Power-user controls belong in Tools rather than being deleted.
-
-Tools may contain:
-- Fuse / Boolean union
-- stronger voxel rebuild
-- manual reduction percentages
-- exhaustive smallest-mesh search
-- protect-detail painting
-- topology diagnostics
-- split/peg details
-- OBJ and other technical export controls
-
-## Print workflow rules
-
-### 1. Check / Repair first
-Every uploaded print model is checked before reduction.
-
-If clean:
-- show that it passed
-- allow Continue
-
-If normal repair is required:
-- try conservative repair first
-- keep original surface/detail wherever possible
-- after success, use the repaired geometry as the new working source
-
-If conservative repair fails:
-- offer stronger watertight/voxel rebuild
-- warn that very fine detail can soften
-- do not silently rebuild
-
-If stronger rebuild fails:
-- warn clearly
-- offer **Continue anyway**, **Download as it is**, Tools and re-upload
-- if the user continues, keep the warning visible through the next stage
-
-Separate closed printable pieces are allowed. They do not have to be fused simply to continue.
-
-### Mesh health: one definition
-`repair-core.js` owns it via `meshHealth`. Preflight, post-reduction guard and repair results must all use that definition.
-
-Clean = no open edges, no tangled (3+) edges, no flipped edges. Empty/degenerate triangles are reported but do not block the Simple workflow.
-
-Do not reintroduce a second topology check with a different weld tolerance. Heavy repair/health work runs in `repair-worker.js` where supported. The repair graph (`repair-core.js`, `repair-worker.js`, `solid-rebuild.js`) uses cache key **2.196** (bumped in v2.196 with the extra untangle round), independently of the v2.18 engine graph.
-
-### 2. Repair is also a standalone feature
-After a check/repair/rebuild completes, pause and allow:
-
-- **Download as it is** for an unchanged clean source
-- **Download repaired/rebuilt STL** after a fix
-- **Continue to printer & size**
-
-Someone should be able to use SHRINK only as a repair tool.
-
-### 3. Reduce conservatively
-Simple mode should aim for:
-
-**small enough + visually good + responsive**
-
-—not the mathematically smallest possible mesh.
-
-v2.25 deliberately stopped using the old exhaustive visual search as the normal Simple path.
-
-Typical v2.25 starting targets:
-
-- Maximum detail: about 450k triangles / minimum ~42% kept
-- Best detail: about 320k / minimum ~30%
-- Balanced: about 240k / minimum ~22%
-- Smallest file: about 170k / minimum ~16%
-
-Small models that are already sensible should be left alone.
-
-The exhaustive search remains available in Tools.
-
-### 4. Avoid repair loops after reduction
-A model that passed Stage 1 should not be sent through repeated repair/remesh loops after reduction.
-
-If a reduced candidate damages topology:
-- make one safer reduction/backoff attempt
-- if that still fails, prefer the full repaired mesh over a broken reduced mesh
-- do not repeatedly Manifold-check / repair / rebuild in Simple mode
-
-### 5. Fuse is not a headline Simple feature
-Fuse is a preparation tool, not something every home user must choose.
-
-Do not Boolean-fuse every Simple download by default.
-
-Use Fuse when a user deliberately wants touching/overlapping pieces unioned into one shell, or when a specific preparation path requires it.
-
-### 6. Split only when needed
-If the selected print size exceeds the user's printer size:
-- offer split/scale choices
-- keep peg/joint details simple in Simple mode
-- detailed peg settings stay in Tools
+Do not force home users to understand Boolean union, manifold status, voxel grids, peg tolerances or Meshopt unless they open **ADVANCED**.
 
 ## Performance philosophy
 
@@ -326,19 +162,6 @@ Prefer:
 
 A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. Do not spend 40 seconds proving that 160,000 might also work.
 
-## Repair/preflight module sizing
-- Repair/preflight cards must fill the same module height as the viewer on desktop.
-- Do not use `align-self:start` on `.simple-preflight-card`.
-- The outer card stretches to 100% height; content stays top-aligned and scrolls internally when needed.
-- This rule is separate from mobile behaviour.
-
-## Desktop layout
-- Fixed desktop two-column layout only.
-- Controls / Check-Repair are on the left; Viewer is on the right.
-- `simple-wizard.css` keeps the controls natural-height and gives only the viewer a tall browser-relative height.
-- No JavaScript should continuously calculate workspace height.
-- No user-reorderable dock system is currently supported.
-
 ## Game viewer layout
 - The navigation hint (**Drag to rotate · Scroll to zoom · Right-drag to pan**) belongs inside the 3D viewer canvas.
 - (v2.80) The big red **Find the smallest…** button under the viewer was removed on purpose; the button in the left panel was the only one. (v2.118) That left-panel button (`#autoBtn`) is now hidden in Game mode too (CSS `:has`); it stays in the DOM because print mode's SHRINK IT clicks it (`print-v2-ui.js` `shrinkModel`). Do not remove the element.
@@ -351,20 +174,10 @@ A reduction from 1,000,000 triangles to 300,000 that stays clean is a success. D
 - After a real reduction completes, Original/Reduced and Compare can appear.
 - Reduced print preview normals must be recomputed after connectivity changes so the model does not appear artificially dark.
 - Once a model is loaded on desktop, the header/branding should collapse to reclaim height.
-- Viewer stays in the fixed right-hand desktop column in Simple Print mode.
-- Simple control/preflight cards use natural height in the fixed left-hand column.
 - Avoid large dead vertical gaps.
 - (v2.158) Phones and tablets are blocked by a full-screen message from `mobile-warning.js` (no dismiss). It is a deliberate product decision by Tim; do not make it dismissible without asking.
 
 ## Important files
-
-### Current Simple workflow layer
-- `simple-wizard.js`
-- `simple-wizard.css`
-- `simple-preflight.js`
-- `simple-postreduce.js`
-- `simple-mode.js`
-- `simple-mode.css`
 
 ### Print multitool (loaded by `ui-mode.js`)
 - `print-v2-ui.js` + `print-v2-ui.css` (the visible tools, working model, health card)
@@ -435,24 +248,6 @@ Longer term, it may be worth testing a topology/manifold-preserving reducer spec
 
 Do **not** replace the current reducer casually. First prove that the v2.25 conservative Simple workflow is still insufficient, then prototype a print-specific reducer in isolation.
 
-## Current acceptance test
-
-The troublesome Duric dwarf sculpt is a useful stress test because it is around one million triangles and has exposed:
-- repair/remesh problems
-- post-reduction topology failures
-- stale-normal dark shading
-- browser responsiveness issues
-- layout overflow
-
-A good Simple-mode run should:
-1. check/repair once
-2. pause after repair
-3. reduce conservatively
-4. remain responsive
-5. keep the reduced mesh clean or fall back safely
-6. fit within the viewport with the right panel independently scrollable
-7. download without forcing the user through repeated technical decisions
-
 ## Split pegs (v2.71)
 - `split-print.js` owns the preview AND the export's peg choice: the file uses the pegs the preview shows (`previewPegsFor`), minus any marked `bad`. Do not add a second placement algorithm.
 - A peg is judged by the worst cross-section down its whole depth (`worstClearance`), not by the cut face alone. Statuses: ok / warn / bad (`assessPeg`).
@@ -503,11 +298,6 @@ A good Simple-mode run should:
 
 ## Centre on ground (v2.128)
 - `ground-core.js` `centreOnGround(doc, getBounds)`; `app.js` `optimizeModel` calls it when `#groundToggle` is ticked, AFTER the wheel split (wheels are scene-root nodes and move with the car) and before textures/prune. Game mode only. It only edits scene-root translations, so rotation/scale of the model are never baked: a model that arrives lying on its side or Z-up is not turned upright.
-
-## Racer preset (v2.119; removed from the page in v2.230: card deleted from index.html, `racer.js` no longer imported by ui-mode.js, files and tests kept dormant)
-- Target card `data-target="racer"` (no triangle target; `GAME_TARGETS.racer.tris` is null, so `live-ui.js` leaves Detail kept alone). `racer.js` owns the panel (`#racerPanel`) and `window.__shrinkRacer`; `app.js` `optimizeModel` calls `__shrinkRacer.process(document, progress)` instead of the generic WebP step when the card is active.
-- `racer-core.js` is DOM-free: `plan()` (pure estimate/report), `mergeable()`, `apply()` (merge atlas -> prune -> resize/encode each texture). Pixel work goes through the `ops` object (`decode`/`encode`/`prune`/`enableWebP`) supplied by the page, so Node tests use fakes. Budget: target 12 MB, FAIL at 46 MB of GPU memory (w*h*4*1.33).
-- Merge keeps the first used material and reassigns every primitive to it; each primitive gets a NEW `TEXCOORD_0` accessor (accessors may be shared). Plain-colour parts without UVs point at their colour tile. Do not merge transparent, KHR_materials_* or tiling-UV materials.
 
 ## Add part (v2.112)
 - `add-part.js` (UI, TransformControls gizmo on `__shrinkViewer`) + `add-part-core.js` (`mergePart`, no DOM, tested by `add-part.test.mjs`). Commit goes through the source GLB like Remove/Weld: `readDoc` -> `mergePart` (uses `mergeDocuments` from `@gltf-transform/functions`; `Document.merge` is disabled in 4.x) -> prune -> write -> `replaceSource`. Undo uses the Remove undo stack (`__shrinkRemove.noteChange`).

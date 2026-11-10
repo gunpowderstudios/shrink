@@ -95,7 +95,7 @@ function buildPanel() {
 function dock() {
   const p = $('v2BatchPanel'); if (!p) return;
   let card = $('v2HealthCard')?.parentElement;      // the viewer panel: the health box is bottom-left, this window is bottom-right
-  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.238: the viewer is hidden until a model is open, so float on the page meanwhile
+  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.239: the viewer is hidden until a model is open, so float on the page meanwhile
   if (card && p.parentElement !== card) { card.appendChild(p); p.classList.remove('floating'); }
   else if (!card && p.parentElement !== document.body) { document.body.appendChild(p); p.classList.add('floating'); }
   else if (!card) p.classList.add('floating');
@@ -299,7 +299,7 @@ async function start() {
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
-        // v2.238: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
+        // v2.239: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) item.msg = `${item.msg ? item.msg + ' · ' : ''}${v.pieces} separate pieces, prints fine`; }
         if (!item.warn && Number.isFinite(sc) && deps.verdict?.()?.healthy !== false) item.fixed = true;
       } catch (err) {
@@ -330,7 +330,7 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.238) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.239) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
