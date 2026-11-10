@@ -92,6 +92,8 @@ export const models = {
   multi: () => toModel([welded(merged([welded(sphereGeo(10, 0, 10, 0)), welded(sphereGeo(10, 30, 10, 0)), welded(sphereGeo(10, 0, 40, 0))]))]),
   // two spheres that overlap, inside ONE mesh (like every STL): a real fuse must union them into one solid
   overlap: () => toModel([welded(merged([welded(sphereGeo(10, 0, 10, 0)), welded(sphereGeo(10, 12, 10, 0))]))]),
+  // two closed boxes that touch ONLY along one edge, in one welded mesh: that edge has 4 triangles (non-manifold), which Manifold rejects as it is (v2.248)
+  edgeTouch: () => toModel([welded(merged([boxGeo(0, 10, 0, 10, 0, 10), boxGeo(10, 20, 10, 20, 0, 10)]))]),
   // a sphere with holes and flipped faces: not printable as it is
   // half a sphere is missing: a bowl, far too open for the voxel rebuild to close
   bowl: () => { const g = welded(sphereGeo(20, 0, 20, 0, 48, 32)); const idx = []; for (let t = 0; t < g.idx.length; t += 3) { const y = (g.pos[g.idx[t] * 3 + 1] + g.pos[g.idx[t+1] * 3 + 1] + g.pos[g.idx[t+2] * 3 + 1]) / 3; if (y > 20) continue; idx.push(g.idx[t], g.idx[t+1], g.idx[t+2]); } return toModel([{ pos: g.pos, idx }]); },

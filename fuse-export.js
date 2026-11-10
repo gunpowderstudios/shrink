@@ -153,7 +153,46 @@ function meshToSolid(mesh, wasm) {
     }
     try { solid?.delete?.(); } catch {}
   }
+  try { const s2 = solidFromComponents(raw, wasm); if (s2 && !s2.isEmpty?.()) return s2; } catch (err) { lastStatus = (lastStatus ? lastStatus + ' · ' : '') + 'by surface pieces: ' + (err?.message || err); }
   throw new Error(lastStatus ? `Manifold rejected a mesh part after repair: ${lastStatus}` : 'Manifold rejected a mesh part after repair as non-manifold.');
+}
+
+// v2.248: last resort for a mesh Manifold rejects as "Not manifold" (a few edges shared by 3+ triangles, a few flipped faces). Shells that only touch along
+// such an edge are separate closed surfaces. Cut the triangles into pieces that are joined ONLY through edges shared by exactly two triangles, turn each
+// piece the same way round, give each its own solid and let Manifold's union merge them. A piece that still fails is dropped only when it is a speck
+// (under 1% of the triangles in total); otherwise this throws and the caller reports it as before.
+function solidFromComponents(raw, wasm, factor = 1) {
+  const data = repairMeshData(raw, factor), T = data.tris.length / 3, V = data.verts;
+  const parent = new Int32Array(T); for (let i = 0; i < T; i++) parent[i] = i;
+  const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const edges = new Map();      // "lo,hi" -> [triangle, direction] list
+  for (let t = 0; t < T; t++) for (let k = 0; k < 3; k++) {
+    const a = data.tris[t * 3 + k], b = data.tris[t * 3 + (k + 1) % 3], lo = Math.min(a, b), hi = Math.max(a, b), key = lo * 4294967296 + hi;
+    let l = edges.get(key); if (!l) edges.set(key, l = []); l.push(t, a < b ? 1 : -1);
+  }
+  // orientation: BFS over exactly-two-triangle edges, flipping a neighbour whose edge runs the same way
+  const adj = Array.from({ length: T }, () => []);
+  for (const l of edges.values()) if (l.length === 4) { const [t1, d1, t2, d2] = l; adj[t1].push(t2, d1 === d2 ? 1 : 0); adj[t2].push(t1, d1 === d2 ? 1 : 0); const r1 = find(t1), r2 = find(t2); if (r1 !== r2) parent[r1] = r2; }
+  const flip = new Int8Array(T).fill(-1), order = [];
+  for (let s0 = 0; s0 < T; s0++) {
+    if (flip[s0] >= 0) continue; flip[s0] = 0; const q = [s0];
+    while (q.length) { const t = q.pop(); order.push(t); const a = adj[t]; for (let i = 0; i < a.length; i += 2) { const n = a[i]; if (flip[n] >= 0) continue; flip[n] = flip[t] ^ a[i + 1]; q.push(n); } }
+  }
+  const groups = new Map(); for (let t = 0; t < T; t++) { const r = find(t); let g = groups.get(r); if (!g) groups.set(r, g = []); g.push(t); }
+  const solids = []; let dropped = 0, failed = 0, firstErr = '';
+  for (const tl of groups.values()) {
+    const vmap = new Map(), verts = [], tris = new Uint32Array(tl.length * 3);
+    tl.forEach((t, i) => { for (let k = 0; k < 3; k++) { const v = data.tris[t * 3 + k]; let n = vmap.get(v); if (n === undefined) { n = verts.length / 3; vmap.set(v, n); verts.push(V[v * 3], V[v * 3 + 1], V[v * 3 + 2]); } tris[i * 3 + k] = n; }
+      if (flip[t]) { const x = tris[i * 3 + 1]; tris[i * 3 + 1] = tris[i * 3 + 2]; tris[i * 3 + 2] = x; } });
+    const part = { verts: new Float32Array(verts), tris };
+    let solid = null;
+    try { solid = solidFromData(part, wasm); if (solid?.isEmpty?.()) { try { solid.delete?.(); } catch {} solid = null; } } catch (err) { firstErr = firstErr || (err?.message || String(err)); solid = null; }
+    if (solid) solids.push(orientOutward(solid, part, wasm)); else { failed++; dropped += tl.length; console.warn('[SHRINK 3D v2.248] a surface piece was not a closed manifold', { triangles: tl.length, vertices: verts.length / 3, status: statusText(solid) }); }
+  }
+  if (failed && (!solids.length || dropped > T * 0.01)) { for (const q of solids) try { q.delete?.(); } catch {} throw new Error(`${failed} surface piece${failed === 1 ? '' : 's'} could not be made solid${firstErr ? ': ' + firstErr : ''}`); }
+  window.__shrinkFuseDropped = failed ? { pieces: failed, triangles: dropped } : null;
+  console.info('[SHRINK 3D v2.248] Fuse by surface pieces', { pieces: groups.size, solids: solids.length, droppedPieces: failed, droppedTriangles: dropped });
+  return solids.length === 1 ? solids[0] : wasm.Manifold.union(solids);
 }
 
 function repairWholeModelSolid(model, wasm) {

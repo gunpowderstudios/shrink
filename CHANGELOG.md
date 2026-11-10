@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.248
+- FUSE IT has a new last-resort route for meshes Manifold rejects as "Not manifold" (the minotaur: 15 non-manifold edges, 5 flipped faces, 81 pieces): the triangles are cut into surface pieces joined only through edges shared by exactly two triangles, each piece is turned the same way round and made into its own solid, and the pieces are unioned. A piece that still fails is dropped only if it is a speck (under 1% of the triangles); otherwise the old message is shown, now with the reason. Untested on the real minotaur (not available here).
+
 ## v2.247
 - A small "Diagnostics" link in the footer (single model and batch): opens one text box with the full report (copied to the clipboard). The Shift-click on the BATCH title still works.
 

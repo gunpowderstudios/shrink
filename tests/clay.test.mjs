@@ -246,6 +246,16 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   w.__shrinkFuseTriLimit = undefined;
 }
 
+/* ---- v2.248: shells touching along a shared edge (non-manifold) no longer stop FUSE IT ---- */
+{
+  const page = await makePage({ model: models.edgeTouch(), heightMm: 20 }); await wait(900);
+  page.$('v2FuseBtn').click();
+  for (let i = 0; i < 80 && !/Fused|Needs repair/.test(page.$('v2FuseResult')?.textContent || ''); i++) await wait(250);
+  await wait(800);
+  const txt = page.$('v2FuseResult').textContent;
+  ok(/fused/i.test(txt) && !/Needs repair/.test(txt), 'N1 two boxes touching along one edge: FUSE IT works instead of "Needs repair": ' + txt.slice(0, 90));
+}
+
 /* ---- manual TURN pad ---- */
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);

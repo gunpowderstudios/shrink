@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.247** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.248** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -62,6 +62,7 @@ The left column is gone. `buildMainCard()` in `print-v2-ui.js` moves the Height/
 `healthScore()` in `print-v2-ui.js` no longer deducts for degenerate triangles and the row is never red; they are informational (same rule as `meshHealth`). Do not delete them to "fix" the row: a zero-area triangle can be part of a closed edge loop.
 
 ### Fuse fallback and dust (v2.189)
+(v2.248) `meshToSolid()` has a last attempt, `solidFromComponents()`: surface pieces joined only through 2-triangle edges, consistently oriented, one Manifold solid each, then `Manifold.union`. Specks (<1% of triangles) that still fail are dropped (`window.__shrinkFuseDropped`). Written for the minotaur (diagnostic: "Not manifold" after repair); not yet confirmed on the real file.
 The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a mesh part is rejected as non-manifold, e.g. a stacked duplicate shell) goes through `splitShells()` too. After the union, components with volume <= 1e-5 of the biggest (including negative, inside-out ones) are dust and dropped. `shrinkMyModel()`'s verdict `healthy` = `lastHealth.h.clean` (degenerates alone do not count).
 
 ### Fuse unions shells inside one mesh (v2.187)
