@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.246** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.247** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -86,7 +86,7 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 `shrinkMyModel()` step 1b: if the shrunk model is still over `FUSE_MAX_TRIANGLES` it calls `setQuality()` down the ladder ultra, fine, standard, large (only levels that exist in `PRINTER_LIST` for the printer type) and `shrinkModel()` again until it fits; the dropdown/tag keep the level really used and `localStorage['shrink-printer']` is put back to the person's own choice. `countPieces()` (welded world positions, union-find, skipped above 1.5M triangles) fills a **Pieces** row in the health box (`#v2HealthRows[data-pieces]`, `strong.note` amber, never `.issue`, so score and BATCH issue lists ignore it). The final verdict is in `window.__shrinkLastVerdict` `{healthy, pieces, fused, text}`; BATCH reads it and flags N>1 pieces.
 
 ### BATCH (v2.151)
-(v2.245) Secret diagnostic: Shift-click the BATCH title (`showReport()`, `__shrinkBatch.report()`); each finished item stores `item.diag` built from `window.__shrinkSnap()` (print-v2-ui.js) plus file bytes and seconds.
+(v2.247) Footer link `#shrinkDiagLink` (ui-mode.js) shows `__shrinkDiagReport()` + `__shrinkSnap()` + the batch report in one overlay (`#shrinkDiagBox`). (v2.245) Secret diagnostic: Shift-click the BATCH title (`showReport()`, `__shrinkBatch.report()`); each finished item stores `item.diag` built from `window.__shrinkSnap()` (print-v2-ui.js) plus file bytes and seconds.
 `batch.js` (ES module, loaded by `ui-mode.js`; the only button is BATCH UPLOAD on the start screen (the v2.180 top-bar `#v2BatchTop` was removed in v2.238; the load-screen button `#v2BatchHome` was removed in v2.184 and came back in v2.212 as the plainer BATCH UPLOAD under the drop zone), panel `#v2BatchPanel`, `window.__shrinkBatch`). For each queued file it calls `__shrinkApp.openFile`, waits for the QUICK-FIX button (`data-state="ready"`), clicks it, waits until `data-busy` clears, then clicks DOWNLOAD with `window.__shrinkCapture` set. **Every `saveBlob` must call `window.__shrinkCapture?.(blob, filename)` first** (print-tools, fuse-export, split-print, split-fallback do); a new exporter that saves on its own would bypass the batch. Memory bar = `estimate()`: biggest file x12 plus finished results, against `performance.memory.jsHeapSizeLimit` (Chrome) or deviceMemory x 0.5. (v2.154) The panel has its own Printer + Height; `applySettings()` clicks the print dashboard's `[data-printer]`/`[data-quality]` buttons and sets `#v2Height` for every file (always scope to `.print-v2-dashboard`: another `data-quality` element appears after a second open). These factors are rough guesses, tune them with real runs. Tests: `tests/clay.test.mjs` (B1-B4, with the real work stubbed through `__shrinkBatch.deps`).
 
 ### QUICK-FIX button state (v2.149)

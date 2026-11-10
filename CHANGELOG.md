@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.247
+- A small "Diagnostics" link in the footer (single model and batch): opens one text box with the full report (copied to the clipboard). The Shift-click on the BATCH title still works.
+
 ## v2.246
 - Batch diagnostic showed SHRINK silently doing nothing on some models (zombie, mud monster, monk, reacher, skeleton went out unreduced: file bytes identical to the input). `shrinkModel()` now waits (up to 90 s) for the SHRINK engine button and the health check, and fails loudly ("Could not shrink (...)") instead of returning quietly. The reason is in the diagnostic as `shrinkNote`; stale piece info no longer leaks between files.
 
