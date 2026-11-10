@@ -181,7 +181,7 @@
   }
 
   // v2.199: a handful of stray edges (no holes) is "minor": slicers repair it on their own, so it costs 5 points and shows green/amber, not red.
-  const MINOR_MAX = 10;
+  const MINOR_MAX = 250;   // v2.249: was 10; slicers cope with a few hundred stray edges, and Make watertight costs far more detail than that is worth
   function minorCount(h) {
     if (!h || h.openEdges > 0) return 0;
     const n = (h.pinchedEdges || 0) + (h.flippedEdges || 0);
@@ -969,7 +969,7 @@
         const sc = Number($('v2HealthScore')?.textContent);
         done(sc === 100 ? 'ok' : 'warn', sc === 100 ? '✓' : '⚠', sc === 100 ? 'Fixed: the model is watertight' : `Fixed what could be fixed (health ${Number.isFinite(sc) ? sc + '/100' : 'unknown'})`);
       }
-      if ($('v2HealthScore')?.textContent !== '100') done('warn', '⚠', 'Still not watertight. Detail was kept, nothing was wrapped. If you need it sealed, open Advanced and try Make watertight (Balanced); it can soften fine detail.');
+      if (!(Number($('v2HealthScore')?.textContent) >= 95)) done('warn', '⚠', 'Still not watertight. Detail was kept, nothing was wrapped. If you need it sealed, open Advanced and try Make watertight (Balanced); it can soften fine detail.');
       // 3. FUSE
       btn.textContent = '3/4 Fusing…'; show('Fusing…'); await paintNow();
       const fc = $('v2FuseCard'); if (fc) fc.dataset.state = '';
@@ -979,7 +979,7 @@
       // The verdict (v2.185): said plainly, and kept in the health box (Separate pieces row) because the step list above is hidden.
       await updateHealthCard(); await wait(80);
       let pieces = null; for (let i = 0; i < 40 && !pieces; i++) { pieces = Number($('v2HealthRows')?.dataset.pieces) || null; if (!pieces) await wait(50); }
-      const healthy = lastHealth?.h ? lastHealth.h.clean === true : $('v2HealthScore')?.textContent === '100', oneSolid = pieces === 1;   // degenerate triangles alone do not make a model unfixed (v2.189)
+      const healthy = lastHealth?.h ? (lastHealth.h.clean === true || minorCount(lastHealth.h) > 0) : Number($('v2HealthScore')?.textContent) >= 95, oneSolid = pieces === 1;   // degenerate triangles alone do not make a model unfixed (v2.189)
       const why = modelTriangles(sourceModel()) > fuseLimit ? 'it still has too many triangles to fuse' : fs === 'good' ? 'the pieces do not all touch' : 'the fuse step could not finish (see the Fuse box)';
       verdict = { healthy, pieces, fused: oneSolid, text: (healthy ? 'FIXED' : 'NOT FULLY FIXED') + ' · ' + (oneSolid ? 'FUSED into one solid' : pieces ? `NOT FUSED: ${pieces} separate pieces (${why})` : `fuse not confirmed (${why})`) };
       // 4. CENTRE

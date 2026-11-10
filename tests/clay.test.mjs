@@ -203,7 +203,8 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
     card.innerHTML = '<div class="v2-health-row"><span>Open edges</span><strong>0</strong></div><div class="v2-health-row"><span>Non-manifold</span><strong>1</strong></div><div class="v2-health-row"><span>Flipped faces</span><strong>0</strong></div>'; w.document.body.appendChild(card);
     ok(B.deps.minor() === 1, 'W2 one non-manifold edge and nothing else counts as minor');
     card.querySelectorAll('strong')[0].textContent = '3'; ok(B.deps.minor() === null, 'W2 any open edge is a real problem');
-    card.querySelectorAll('strong')[0].textContent = '0'; card.querySelectorAll('strong')[1].textContent = '40'; ok(B.deps.minor() === null, 'W2 forty bad edges is not minor');
+    card.querySelectorAll('strong')[0].textContent = '0'; card.querySelectorAll('strong')[1].textContent = '40'; ok(B.deps.minor() === 40, 'W2 forty stray edges are minor now (limit 250 since v2.249)');
+    card.querySelectorAll('strong')[1].textContent = '400'; ok(B.deps.minor() === null, 'W2 four hundred bad edges is not minor');
     card.querySelectorAll('strong')[1].textContent = '0'; card.querySelectorAll('strong')[2].textContent = '9'; ok(B.deps.minor() === 9, 'W2 nine flipped faces and nothing else is minor too (v2.197)');
     card.remove(); B.deps.minor = keep; }
   // W1: the small Make watertight button on a flagged row (v2.193)

@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.248** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.249** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -43,17 +43,17 @@ The left column is gone. `buildMainCard()` in `print-v2-ui.js` moves the Height/
 ### Make watertight in one place (v2.193)
 `makeWatertightCopy()` (print-export-safety.js, `window.__shrinkMakeWatertight`) works with or without its button and returns true when a clean model was installed. The red box `#printDiagnosticPanel` sits top-right like `#v2BatchPanel` and `placeDiagnostic()` moves it inside the batch window while that is open. BATCH's `watertightRow(id)` opens the file, waits for QUICK-FIX `ready`, calls it, then clicks `#saveStlBtn` with `S.silent` set so `fixingCapture` returns true (ZIP updated, nothing saved); the row gets `.fixed` (green). Rows that only have "separate pieces" get no such button (they need FUSE IT). Test W1 in `tests/clay.test.mjs`.
 
-### Minor edges are fine (v2.195)
-`deps.minor()` in batch.js reads the MODEL HEALTH rows: no open edges and 1 to `MINOR_EDGES` (10) non-manifold edges plus flipped faces together (v2.197) = fine to print (row stays green, no Make watertight button). Voxel rebuilds drop detail (104k to 21k triangles in a real run) so they are not worth it for that.
+### Minor edges are fine (v2.195; limit raised from 10 to 250 in v2.249 at Tim's request: Make watertight always costs too much detail)
+`deps.minor()` in batch.js reads the MODEL HEALTH rows: no open edges and 1 to `MINOR_EDGES` (250) non-manifold edges plus flipped faces together (v2.197) = fine to print (row stays green, no Make watertight button). Voxel rebuilds drop detail (104k to 21k triangles in a real run) so they are not worth it for that.
 
 ### Start screen and mode (v2.239; the file type still picks the mode since v2.200)
 `ui-mode.js` shows the two big cards (`.mode-chooser`, Gaming / 3D Printing) as a start screen while `body.start-screen` is set. A click on a card calls `setMode(mode, true)`, removes the class. (v2.243) Nothing is remembered any more: a reload always opens Home (`performance` navigation type `reload`, hash rewritten to `#home`); a fresh visit opens the tab named by its `#hash`, else Home. Only our own switch-with-a-model-open reload carries the target, in `sessionStorage['shrink-go']` (read once, then removed). The SHRINK 3D logo (`.title-row h1.logo-home`) is a Home link through the same `goTab('home')` path as the Home tab. (v2.240) The top bar has tabs `.mode-tabs` (Home / 3D Printing / Gaming) in place of the old `.mode-switch` link; Home just shows the cards again. (v2.242) The tabs are always visible; with a model open (`#workspace` not `.hidden`) a click on another tab asks `confirm()`, stores the target in `sessionStorage['shrink-go']`, sets the hash and reloads the page, because a loaded model cannot change mode safely. `#v2BatchPanel` is on the left (`left:14px`; floating top 96px). The tabs follow the address: `#home`, `#3d-printing`, `#gaming` (`syncTabs()` writes it with `replaceState`, a tab click `pushState`s, `hashchange` calls `applyHash()`, which is ignored once a model is open; a hash on load is read BEFORE `setMode()` rewrites it and is what a fresh visit opens). While `start-screen` is set CSS hides the drop zone, the print upload hero, BATCH UPLOAD and the settings-file row. Opening a file still sets the mode from `sourceKind` on `shrink:model-opened` (glb = game, anything else = print) without saving it. `.mode-override` ("Use as a print model") shows for a GLB in game mode. Batch and tests click `.mode-card` even though it is hidden after the start screen. BATCH UPLOAD (`.v2-batch-home`) is hidden in Gaming mode: BATCH runs the print pipeline. The green side tab is `.v2-left-toggle`.
 
 ### Minor score (v2.199)
-`healthScore()` in `print-v2-ui.js` returns 95 / 'Good' / `minor` for no open edges and 1 to `MINOR_MAX` (10) non-manifold edges plus flipped faces. Anything that tests `score === 100` still treats it as not perfectly clean (QUICK-FIX still tries to fix); BATCH decides warnings with `deps.minor()`.
+`healthScore()` in `print-v2-ui.js` returns 95 / 'Good' / `minor` for no open edges and 1 to `MINOR_MAX` (250) non-manifold edges plus flipped faces. Anything that tests `score === 100` still treats it as not perfectly clean (QUICK-FIX still tries to fix); BATCH decides warnings with `deps.minor()`.
 
 ### Red box rules (v2.198)
-`showDiagnostic()` (print-export-safety.js) does nothing while `window.__shrinkBatchRunning` is set (batch.js) or when the model has no open edges and 1 to 10 non-manifold edges plus flipped faces; the batch also hides the box when it finishes.
+`showDiagnostic()` (print-export-safety.js) does nothing while `window.__shrinkBatchRunning` is set (batch.js) or when the model has no open edges and 1 to 250 non-manifold edges plus flipped faces; the batch also hides the box when it finishes.
 
 ### Big-task note (v2.191, centred since v2.192)
 `#v2BigTask` (still built inside `.v2-magic-wrap`, but `position:fixed` in the middle of the screen with `pointer-events:none`) is shown by `shrinkMyModel()` when the model starts above `BIG_TASK_TRIANGLES` (1,000,000; tests override with `window.__shrinkBigTaskTris`) and hidden in its `finally`. Tests: M1 in `tests/clay.test.mjs`.
