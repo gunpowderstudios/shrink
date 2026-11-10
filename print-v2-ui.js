@@ -988,7 +988,10 @@
       let pieces = null; for (let i = 0; i < 40 && !pieces; i++) { pieces = Number($('v2HealthRows')?.dataset.pieces) || null; if (!pieces) await wait(50); }
       const healthy = lastHealth?.h ? (lastHealth.h.clean === true || minorCount(lastHealth.h) > 0) : Number($('v2HealthScore')?.textContent) >= 95, oneSolid = pieces === 1;   // degenerate triangles alone do not make a model unfixed (v2.189)
       const why = modelTriangles(sourceModel()) > fuseLimit ? 'it still has too many triangles to fuse' : fs === 'good' ? 'the pieces do not all touch' : 'the fuse step could not finish (see the Fuse box)';
-      verdict = { healthy, pieces, fused: oneSolid && fs === 'good', text: (healthy ? 'FIXED' : 'NOT FULLY FIXED') + ' · ' + (oneSolid && fs === 'good' ? 'FUSED into one solid' : oneSolid ? 'ONE PIECE, but the fuse step could not finish (see the Fuse box)' : pieces ? `NOT FUSED: ${pieces} separate pieces (${why})` : `fuse not confirmed (${why})`) };
+      // v2.253: already ONE watertight piece but Manifold refuses it (a few flipped faces, Tarak): there is nothing to fuse, and slicers take it. Not a failure.
+      const alreadyOne = oneSolid && fs !== 'good' && healthy && lastHealth?.h && !(lastHealth.h.openEdges > 0) && modelTriangles(sourceModel()) <= fuseLimit;
+      if (alreadyOne) { const i = rows.findIndex(r => /Could not fuse/.test(r.text)); if (i >= 0) rows[i] = { cls: 'ok', icon: '✓', text: 'Already one solid piece: nothing to fuse' }; }
+      verdict = { healthy, pieces, fused: oneSolid && (fs === 'good' || alreadyOne), text: (healthy ? 'FIXED' : 'NOT FULLY FIXED') + ' · ' + (oneSolid && fs === 'good' ? 'FUSED into one solid' : alreadyOne ? 'ONE SOLID PIECE (nothing to fuse)' : oneSolid ? 'ONE PIECE, but the fuse step could not finish (see the Fuse box)' : pieces ? `NOT FUSED: ${pieces} separate pieces (${why})` : `fuse not confirmed (${why})`) };
       // 4. CENTRE
       btn.textContent = '4/4 Levelling…'; show('Levelling and centring…'); await paintNow();
       try { if (resetStretch()) done('ok', '✓', 'Width and depth set back to the original proportions'); } catch (e) { console.warn('stretch reset', e); }

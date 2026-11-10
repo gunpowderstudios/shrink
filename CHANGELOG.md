@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.253
+- QUICK-FIX no longer reports a failure when the model is already ONE watertight piece (no open edges, at most a few flipped faces) and Manifold merely refuses it: the step says "Already one solid piece: nothing to fuse" and the verdict reads "ONE SOLID PIECE (nothing to fuse)". Tarak: 53,848 triangles, 9 flipped faces, repeatable "Not manifold" on every run. The extra repair passes could not remove those 9, and slicers accept them.
+
 ## v2.252
 - The extra repair passes after shrinking now run while health is below 100 (was below 95) and keep improving. Tarak ended at 95 with 9 flipped faces and its fuse failed with "Not manifold"; flipped faces are what Manifold cannot take.
 

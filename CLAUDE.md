@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.252** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.253** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -84,6 +84,7 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 `shrinkMyModel()` repairs FIRST when the model has at most `FIX_FIRST_MAX` (600,000) triangles (repair runs on the main thread), then shrinks, then repairs again only if still unhealthy, then fuses, levels and centres. Reason: shrinking a leaky mesh bakes the leaks into a coarse mesh that repair cannot close. `repairMesh` step 5 is now `fillHoles(false)` (boundary followed in triangle direction) and, if edges are still open, `fillHoles(true)` (undirected tracing, cap turned to match the neighbouring triangle), kept only if `open+tangled+flipped` goes down. (v2.149) The top-right button `#v2MagicReset` is now **RELOAD**: it just opens `#fileInput` to load a different model; the old revert-to-original code (`resetModel`, `initialBytes`) was removed. The repair graph cache key is **2.196** now (v2.196).
 
 ### QUICK-FIX verdict and fuse step-down (v2.186)
+(v2.253) `alreadyOne` in `shrinkMyModel()`: one piece, healthy (minor), no open edges and Manifold refused the fuse = "ONE SOLID PIECE (nothing to fuse)", `verdict.fused` true, the step row is green. The Fuse card itself still shows the refusal; the chip stays unfused. (v2.251/v2.252) The fix step after shrinking retries up to two more passes while health < 100 and improving; BATCH waits for `__shrinkHealthIsCurrent()` before pressing QUICK-FIX.
 `shrinkMyModel()` step 1b: if the shrunk model is still over `FUSE_MAX_TRIANGLES` it calls `setQuality()` down the ladder ultra, fine, standard, large (only levels that exist in `PRINTER_LIST` for the printer type) and `shrinkModel()` again until it fits; the dropdown/tag keep the level really used and `localStorage['shrink-printer']` is put back to the person's own choice. `countPieces()` (welded world positions, union-find, skipped above 1.5M triangles) fills a **Pieces** row in the health box (`#v2HealthRows[data-pieces]`, `strong.note` amber, never `.issue`, so score and BATCH issue lists ignore it). The final verdict is in `window.__shrinkLastVerdict` `{healthy, pieces, fused, text}`; BATCH reads it and flags N>1 pieces.
 
 ### BATCH (v2.151)
