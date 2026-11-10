@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.242
+- The BATCH window (the list of models) now sits on the **left**, on the start screen and beside a loaded model.
+- The Home / 3D Printing / Gaming tabs are now **always at the top**, also while a model is open. Clicking another tab with a model open asks first, because switching closes the model; the tab you are on does nothing.
+
 ## v2.241
 - The 3D Printing card now shows a little green resin printer (an inline drawing, no image file) instead of the printer emoji.
 

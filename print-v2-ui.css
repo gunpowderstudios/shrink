@@ -677,3 +677,8 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-reduce-note .v2-was{color:#ff5a64}.v2-reduce-note .v2-now{color:#46d796}
 .v2-reduce-note small{display:block;margin-top:2px;font-weight:600;opacity:.85;font-size:12px}
 .v2-side-stack .v2-reduce-note{text-align:center}
+
+/* v2.242: the BATCH window sits on the left, on the start screen and next to a loaded model */
+.v2-batch,.v2-batch.floating{right:auto;left:14px}
+.v2-batch.floating{top:96px}
+@media(max-width:900px){.v2-batch,.v2-batch.floating{right:auto;left:14px}}
