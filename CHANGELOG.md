@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.243
+- The SHRINK 3D logo (top left) now always goes to the Home screen (asks first if a model is open).
+- Reloading the page always opens Home. A shared `#gaming` / `#3d-printing` link still opens that tab on a fresh visit. The saved start-screen choice is gone.
+
 ## v2.242
 - The BATCH window (the list of models) now sits on the **left**, on the start screen and beside a loaded model.
 - The Home / 3D Printing / Gaming tabs are now **always at the top**, also while a model is open. Clicking another tab with a model open asks first, because switching closes the model; the tab you are on does nothing.

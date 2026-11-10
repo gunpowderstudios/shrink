@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.242';
+  const PRINT_RELEASE = '2.243';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -50,12 +50,12 @@
   header?.insertAdjacentElement('afterend', chooser);
   const steps = document.createElement('div'); steps.className = 'workflow-strip'; chooser.insertAdjacentElement('afterend', steps);
 
-  /* v2.242: tabs in the top bar (Home / 3D Printing / Gaming) replace the small "switch" link; hidden once a model is open */
+  /* v2.243: tabs in the top bar (Home / 3D Printing / Gaming) replace the small "switch" link; hidden once a model is open */
   const tabs = document.createElement('nav'); tabs.className = 'mode-tabs'; tabs.setAttribute('aria-label', 'Mode');
   tabs.innerHTML = '<button type="button" data-tab="home">Home</button><button type="button" data-tab="print">3D Printing</button><button type="button" data-tab="game">Gaming</button>';
   header?.appendChild(tabs);
   const syncTabs = () => { const cur = body.classList.contains('start-screen') ? 'home' : (body.classList.contains('app-mode-print') ? 'print' : 'game'); tabs.querySelectorAll('button').forEach(b => { const on = b.dataset.tab === cur; b.classList.toggle('active', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
-    const h = '#' + HASH[cur]; if (location.hash !== h) { try { history.replaceState(null, '', h); } catch {} } };   /* v2.242: the address bar follows the tab, so a tab can be shared as a link */
+    const h = '#' + HASH[cur]; if (location.hash !== h) { try { history.replaceState(null, '', h); } catch {} } };   /* v2.243: the address bar follows the tab, so a tab can be shared as a link */
   const HASH = { home: 'home', print: '3d-printing', game: 'gaming' }, FROM_HASH = { '#home': 'home', '#3d-printing': 'print', '#gaming': 'game' };
   const TEXT = {
     game: { subtitle:'Make a model light enough for a game — and see exactly what you gave up.', steps:'<b>Gaming</b><span>1&nbsp; Target</span><i>→</i><span>2&nbsp; Detail</span><i>→</i><span>3&nbsp; Touch up</span><i>→</i><span>4&nbsp; Save</span>', setupTitle:'Where will it be used?', setupSub:'Pick one — it sets sensible limits for you.', detailSub:'Drag the slider — the model on the right updates live.', extraNum:'3', extraTitle:'Touch up (optional)', extraSub:'Paint out stickers, plates or marks on the textures.', saveNum:'4', saveTitle:'Save', saveSub:'Builds the final GLB (resized textures, compressed mesh) and downloads it.', btn:'Save game GLB', drop:['Drop a model here','GLB for games · STL, OBJ or PLY for 3D printing'], accept:'.glb,.stl,.obj,.ply,model/gltf-binary' },
@@ -76,20 +76,25 @@
     window.dispatchEvent(new CustomEvent('shrink:ui-mode',{detail:{mode}}));
     if(announce) window.__shrinkApp?.setStatus?.(mode==='print'?'3D Printing — load a sculpt, choose your printer and size, then use Fuse, SHRINK or Download in any combination.':'Gaming mode — pick where it will be used, then drag the detail slider.');
   }
-  const MODE_KEY='shrink-mode';   /* v2.242: the start screen's choice is remembered on this browser */
-  const savedMode=()=>{try{const v=localStorage.getItem(MODE_KEY);return v==='game'||v==='print'?v:null;}catch{return null;}};
-  chooser.addEventListener('click',e=>{const b=e.target.closest('.mode-card');if(!b)return;setMode(b.dataset.mode,true);try{localStorage.setItem(MODE_KEY,b.dataset.mode);}catch{}});
-  tabs.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;
-    const t=b.dataset.tab, h='#'+HASH[t];
-    if(!$('workspace')?.classList.contains('hidden')){   /* v2.242: tabs stay at the top with a model open; another tab starts afresh, so ask first */
+  const GO_KEY='shrink-go';   /* v2.243: set only so a tab/logo switch with a model open survives its own reload; a plain reload always lands on Home */
+  chooser.addEventListener('click',e=>{const b=e.target.closest('.mode-card');if(!b)return;setMode(b.dataset.mode,true);});
+  const goTab=t=>{
+    const h='#'+HASH[t];
+    if(!$('workspace')?.classList.contains('hidden')){   /* v2.243: tabs stay at the top with a model open; another tab starts afresh, so ask first */
       const cur=body.classList.contains('app-mode-print')?'print':'game'; if(t===cur)return;
       if(!window.confirm('Switch tab? The model that is open now will be closed (anything not downloaded is lost).'))return;
-      try{if(t==='home')localStorage.removeItem(MODE_KEY);else localStorage.setItem(MODE_KEY,t);}catch{}
+      try{sessionStorage.setItem(GO_KEY,t);}catch{}
       location.hash=h; location.reload(); return;
     }
     if(location.hash!==h){try{history.pushState(null,'',h);}catch{}}
-    if(t==='home'){body.classList.add('start-screen');syncTabs();} else chooser.querySelector(`.mode-card[data-mode="${t}"]`)?.click();});
-  /* v2.242: #home, #3d-printing and #gaming open that tab (a shared link, or Back / Forward). Ignored once a model is open. */
+    if(t==='home'){body.classList.add('start-screen');syncTabs();} else chooser.querySelector(`.mode-card[data-mode="${t}"]`)?.click();};
+  tabs.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)goTab(b.dataset.tab);});
+  /* v2.243: the SHRINK 3D logo is a Home link */
+  const logo=document.querySelector('.title-row h1');
+  if(logo){logo.classList.add('logo-home');logo.setAttribute('role','link');logo.tabIndex=0;logo.title='Home';
+    logo.addEventListener('click',()=>goTab('home'));
+    logo.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goTab('home');}});}
+  /* v2.243: #home, #3d-printing and #gaming open that tab (a shared link, or Back / Forward). Ignored once a model is open. */
   const applyHash=(hash=location.hash)=>{const t=FROM_HASH[hash]; if(!t||!$('workspace')?.classList.contains('hidden'))return;
     if(t==='home'){body.classList.add('start-screen');syncTabs();}
     else if(body.classList.contains('start-screen')||currentMode()!==t)setMode(t);};
@@ -107,8 +112,11 @@
     else if(k==='glb'){body.classList.add('has-glb-model');setMode('game');}});
   window.__shrinkUI={setMode,getMode:currentMode};
   const startHash=location.hash;   /* read before setMode() rewrites the address */
-  const first=savedMode();   /* v2.242: no saved choice = show the start screen first */
-  setMode(first||'game');
-  if(!first) body.classList.add('start-screen');
-  applyHash(startHash); syncTabs();
+  /* v2.243: a reload (or any visit without a #tab link) opens Home; only a shared #tab link on a fresh visit, or our own switch-with-model reload, opens a tab */
+  let go=null; try{go=sessionStorage.getItem(GO_KEY);sessionStorage.removeItem(GO_KEY);}catch{}
+  const reloaded=performance.getEntriesByType?.('navigation')?.[0]?.type==='reload';
+  const want=(go==='home'||go==='game'||go==='print')?go:(reloaded?'home':(FROM_HASH[startHash]||'home'));
+  setMode(want==='home'?'game':want);
+  if(want==='home') body.classList.add('start-screen');
+  syncTabs();
 })();
