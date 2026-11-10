@@ -343,7 +343,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const note = page.$('v2MagicNote').textContent; if (0) console.log('NOTE:', note.replace(/×$/,''), '| tris', w.__shrinkWorkingModel() && (()=>{let n=0;w.__shrinkWorkingModel().traverse(o=>{if(o.isMesh)n+=(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3});return n})());
   ok(/Shrunk further for fusing/.test(note) && /from 16K to/.test(note), 'L1 over the fuse limit: QUICK-FIX shrinks again at a lower detail level and says so');
   ok(w.__shrinkDownloadStem('x') !== tag0, 'L1 the file name tag follows the level really used (' + tag0 + ' -> ' + w.__shrinkDownloadStem('x') + ')');
-  ok(/NOT FUSED|FUSED/.test(w.__shrinkLastVerdict?.text || ''), 'L1 and still ends with a verdict: ' + w.__shrinkLastVerdict?.text);
+  ok(/NOT FUSED|FUSED|ONE PIECE/.test(w.__shrinkLastVerdict?.text || ''), 'L1 and still ends with a verdict: ' + w.__shrinkLastVerdict?.text);
   let saved = ''; try { saved = w.localStorage.getItem('shrink-printer'); } catch {} ok(/ultra/.test(saved || 'ultra'), 'L1 your own saved printer choice is put back for the next model');
 }
 

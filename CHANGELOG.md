@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.250
+- Honest QUICK-FIX verdict: a model that is one piece but whose FUSE IT step failed used to read "FUSED into one solid"; it now says "ONE PIECE, but the fuse step could not finish". The diagnostics also stop showing the previous file's last fuse/verdict.
+
 ## v2.249
 - Fewer warnings: a watertight model (no open edges) with up to 250 stray non-manifold edges / flipped faces together (was 10) now counts as fine to print: green in the health box and BATCH, no red box, no "NOT FULLY FIXED" verdict and no "Make watertight" nudge. Real holes (open edges) and bigger tangles still warn.
 
