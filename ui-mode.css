@@ -194,3 +194,6 @@ body.start-screen .mode-icon-svg svg{width:100%;height:100%}
 /* v2.244: the logo is a Home link */
 .title-row h1.logo-home{cursor:pointer}
 .title-row h1.logo-home:focus-visible{outline:2px solid #5cd68a;outline-offset:3px;border-radius:4px}
+/* v2.244: as much model area as possible - once a model is open the working area uses the whole window width (it was capped at 1500px) */
+body.app-mode-print.print-v2-active .app-shell,
+body:not(.start-screen) .app-shell:has(#workspace:not(.hidden)){width:calc(100% - 24px);max-width:none}

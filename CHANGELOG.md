@@ -4,7 +4,7 @@ This file records user-facing workflow and architecture changes. Git history rem
 
 ## v2.244
 - Splitting is back: a folded "Split into parts" section above DOWNLOAD IT (2 parts, 3 parts, auto by height; flat cut or pegs; cut height; peg settings). Default is still one STL.
-- ADVANCED now opens across the full width of the screen (tools laid out in a row) with the 3D view below it, instead of a narrow column.
+- The 3D view always fills the whole width of the window: the page is no longer capped at 1500 px wide once a model is open, ADVANCED stays a side column of its normal width and the view takes everything else; closed, it takes the lot.
 - Removed the yellow "Too many triangles to fuse" banner (too confusing). FUSE IT still declines very large models in its own card.
 
 ## v2.243
