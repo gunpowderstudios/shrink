@@ -240,10 +240,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(300);
   w.__shrinkFuseTriLimit = 10;
   w.document.querySelector('.print-v2-dashboard [data-quality="ultra"]').click(); w.__shrinkRefreshSizeWarning(); await wait(30);
-  const el = page.$('v2SizeWarn');
-  ok(el && !el.hidden && /Too many triangles to fuse/.test(el.textContent) && /Fine detail/.test(el.textContent) && /16K ultra/.test(el.textContent), 'W1 at 16K over the fuse limit the banner explains why and what to do');
+  ok(!page.$('v2SizeWarn'), 'W1 (v2.244) no yellow "too many triangles" banner at 16K over the fuse limit');
   w.document.querySelector('.print-v2-dashboard [data-quality="standard"]').click(); w.__shrinkRefreshSizeWarning(); await wait(30);
-  ok(/Press SHRINK IT first|SHRINK IT/.test(el.textContent) && !/Too many triangles to fuse/.test(el.textContent), 'W1 before shrinking at a lower quality it still says to press SHRINK IT first');
+  ok(!page.$('v2SizeWarn'), 'W1 and none at a lower quality either');
   w.__shrinkFuseTriLimit = undefined;
 }
 

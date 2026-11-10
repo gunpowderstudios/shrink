@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.244
+- Splitting is back: a folded "Split into parts" section above DOWNLOAD IT (2 parts, 3 parts, auto by height; flat cut or pegs; cut height; peg settings). Default is still one STL.
+- Removed the yellow "Too many triangles to fuse" banner (too confusing). FUSE IT still declines very large models in its own card.
+
 ## v2.243
 - The SHRINK 3D logo (top left) now always goes to the Home screen (asks first if a model is open).
 - Reloading the page always opens Home. A shared `#gaming` / `#3d-printing` link still opens that tab on a fresh visit. The saved start-screen choice is gone.

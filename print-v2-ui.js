@@ -267,18 +267,8 @@
   let healthRun = 0;
   let rebasing = null;                          // a re-base of the live reducer that is in flight (the slider waits for it)
   let lastHealth = null;                         // { model, h }: the newest health result and the model it belongs to
-  // A yellow triangle above the tools while the working model is too detailed to fuse or fix without freezing the tab.
-  function updateSizeWarning() {
-    const anchor = $('v2ShrinkCard'); if (!anchor) return;
-    let el = $('v2SizeWarn');
-    if (!el) { el = document.createElement('div'); el.id = 'v2SizeWarn'; el.className = 'v2-size-warn'; el.hidden = true; el.setAttribute('role', 'status'); anchor.before(el); }
-    const model = sourceModel(), tris = model ? modelTriangles(model) : 0, limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
-    const big = tris > limit;
-    const ultra = (dashboard?.dataset.quality) === 'ultra', shrunk = !!shrinkReady;
-    if (big && (shrunk || ultra)) el.innerHTML = `<span class="v2-size-warn-icon" aria-hidden="true">⚠</span><div><strong>Too many triangles to fuse (${tris.toLocaleString()})</strong><span>${ultra ? '16K ultra keeps a huge amount of detail, ' : ''}so FUSE IT and QUICK-FIX\'s fuse step are skipped above ${limit.toLocaleString()} triangles to stop the page freezing. What you can do: <b>1)</b> choose <b>Fine detail</b> or <b>Standard</b> under Quality and press <b>SHRINK IT</b> again; <b>2)</b> or carry on as it is: separate closed pieces print fine, and your slicer can merge touching parts; DOWNLOAD still works, the file is just large.</span></div>`;
-    else if (big) el.innerHTML = `<span class="v2-size-warn-icon" aria-hidden="true">⚠</span><div><strong>This model is very detailed (${tris.toLocaleString()} triangles)</strong><span>Press <b>SHRINK IT</b> first, then <b>FIX IT</b> or <b>FUSE IT</b>. Fusing or fixing this many triangles can freeze the page.</span></div>`;
-    if (el.hidden === big) el.hidden = !big;
-  }
+  // v2.244: the yellow "Too many triangles to fuse" banner is gone (too confusing). FUSE IT still refuses above the limit (fuseCheck) and says so in its own card.
+  function updateSizeWarning() { $('v2SizeWarn')?.remove(); }
   window.__shrinkRefreshSizeWarning = updateSizeWarning;
 
   // QUICK-FIX is grey and unclickable (like DOWNLOAD) while the health check runs and turns green when it has finished, so it is clear when to press it (v2.148).
@@ -1149,6 +1139,7 @@
     // This runs from a MutationObserver on the whole page, so it must only write when something actually changed:
     // rewriting the same text re-triggers the observer and would loop forever.
     const set = (el, prop, value) => { if (el && el[prop] !== value) el[prop] = value; };
+    { const badge = $('v2SplitBadge'), txt = select.value === 'off' ? '' : '· ' + (select.value === 'max' ? 'AUTO' : select.value + ' PARTS'); set(badge, 'textContent', txt); }
     const showCut = select.value === '2';
     set($('v2CutWrap'), 'hidden', !showCut);
     if (showCut && $('splitCutHeight')) {
@@ -1205,6 +1196,13 @@
     ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
     const dl = document.createElement('div'); dl.className = 'v2-main-download';
     ['v2DownloadBtn', 'v2DownloadGlb'].forEach(id => { const el = $(id); if (el) dl.appendChild(el); });
+    /* v2.244: splitting is back as an optional, folded-away section above DOWNLOAD IT (the controls already exist in the Download card; they are moved, not rebuilt) */
+    { const sm = document.createElement('details'); sm.className = 'v2-split-menu'; sm.id = 'v2SplitMenu';
+      sm.innerHTML = '<summary>Split into parts <span id="v2SplitBadge"></span></summary><div class="v2-split-body"></div>';
+      const body = sm.querySelector('.v2-split-body');
+      ['.v2-download-options', '#v2MaxWrap', '#v2CutWrap', '#v2BestCutRow', '#v2PegStatus'].forEach(q => { const el = dashboard.querySelector(q); if (el) body.appendChild(el); });
+      { const adv = $('v2PegPosition')?.closest('details'); if (adv) body.appendChild(adv); }   /* the peg settings fold, found through its own control: other .v2-advanced blocks exist */
+      dl.insertBefore(sm, dl.firstChild); }
     main.append(sizeBox, detailBox, actions, dl);
     // v2.222: the health box stays in the 3D view on the right, always visible; the tools live in their own foldable card on the left.
     const mainCard = document.createElement('div'); mainCard.className = 'v2-main-card';

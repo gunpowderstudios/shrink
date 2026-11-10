@@ -682,3 +682,13 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-batch,.v2-batch.floating{right:auto;left:14px}
 .v2-batch.floating{top:96px}
 @media(max-width:900px){.v2-batch,.v2-batch.floating{right:auto;left:14px}}
+/* v2.244: Split into parts (folded away; the peg settings stay inside the same fold) */
+.v2-split-menu{margin:0 0 8px;border:1px solid #2f3a48;border-radius:10px;background:rgba(255,255,255,.02)}
+.v2-split-menu>summary{cursor:pointer;padding:8px 11px;color:#cbd5e1;font-size:12px;font-weight:700;list-style:none}
+.v2-split-menu>summary::-webkit-details-marker{display:none}
+.v2-split-menu>summary::before{content:"▸ ";color:#8fa0b4}
+.v2-split-menu[open]>summary::before{content:"▾ "}
+.v2-split-menu #v2SplitBadge{color:#5cd68a;margin-left:4px}
+.v2-split-body{padding:4px 10px 10px}
+.v2-main-controls .v2-split-body .v2-advanced{display:block}
+.v2-split-body [hidden]{display:none!important}

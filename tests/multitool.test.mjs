@@ -24,7 +24,10 @@ async function readParts(page) {
 /* ============ A. split a clean single solid (the "simple flat split first" case) ============ */
 await block(1, async () => {
   const page = await makePage({ model: models.single(), heightMm: 40 });
+  const sm = page.$('v2SplitMenu');
+  ok(sm && !sm.closest('.v2-legacy-hold') && sm.contains(page.$('v2SplitMode')) && sm.contains(page.$('v2Joint')) && sm.contains(page.$('v2PegPosition')), 'A0 (v2.244) the Split into parts section is visible (not in the hidden hold) and holds the split, joint and peg controls');
   await joint(page, 'flat'); await pick(page, '2');
+  ok(page.$('v2SplitBadge').textContent.includes('2 PARTS'), 'A0 the fold shows a 2 PARTS badge once a split is chosen');
   ok(page.$('splitMode').value === '2' && page.$('splitJoint').value === 'flat', 'A: v2 controls drive the native split mode and joint');
   page.$('v2DownloadBtn').click();
   ok(await waitFor(() => zipOf(page)), 'A1 flat 2 parts: DOWNLOAD IT produced a ZIP');
