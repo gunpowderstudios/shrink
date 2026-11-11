@@ -431,6 +431,7 @@
 
   // ---- Width / Depth read-outs: the print is always scaled uniformly from the height, so width and depth follow it ----
   let sizeCache = { key: '', size: null }, reducedTick = 0;
+  let manualHeight = false; // Automatic 30 mm floor never overrides an intentional resize.
   function modelSize() {
     const THREE = app()?.THREE, model = sourceModel();
     if (!THREE || !model) return null;
@@ -455,6 +456,7 @@
     set(w, sz.x * k); set(d, sz.z * k);
   }
   function setHeightMm(h) {
+    manualHeight = true; // Width/Depth adjustments and +/- scaling are deliberate resizes.
     const v = Math.max(1, Math.min(500, Math.round(h * 100) / 100));
     $('v2Height').value = String(v); updateHeight();
   }
@@ -668,6 +670,7 @@
       const verdict = $('verdictText')?.textContent || '';
       const reducedRoot = window.__shrinkLive?.root || app()?.optimizedModel;
       if (reducedRoot) setWorkingModel(reducedRoot);
+      enforceMinHeight(); // An automatic height must survive model replacement during SHRINK.
       markApplied('shrunk');
       shrinkReady = true;
       // The simplifier does not promise to keep a mesh manifold: on a model made of many small pieces it can leave a few
@@ -1040,7 +1043,7 @@
   const logRing = []; for (const k of ['warn', 'error']) { const orig = console[k].bind(console); console[k] = (...a) => { try { logRing.push(k + ': ' + a.map(x => (x && x.message) || (typeof x === 'object' ? JSON.stringify(x).slice(0, 200) : String(x))).join(' ').slice(0, 300)); if (logRing.length > 40) logRing.shift(); } catch {} orig(...a); }; }
   async function diagReport() {
     const L = []; const add = (k, v) => L.push(`${k}: ${v}`);
-    const model = sourceModel(); add('SHRINK release', document.querySelector('.version-badge')?.textContent || '?'); add('When', new Date().toISOString());
+    const model = sourceModel(); add('Height input (mm)', $('v2Height')?.value); add('Native export height (mm)', nativeValue('figureHeightMm', '?')); add('Height sizing', manualHeight ? 'manual' : 'automatic'); add('SHRINK release', document.querySelector('.version-badge')?.textContent || '?'); add('When', new Date().toISOString());
     add('Browser', navigator.userAgent); add('Printer', `${currentPrinter().tag} (${dashboard?.dataset.printerType}/${dashboard?.dataset.quality})`);
     add('fuse-export build', window.__shrinkFuseBuild || 'OLD (the shell-splitting fuse is NOT loaded: hard-refresh the page)');
     add('Fuse triangle limit', window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES);
@@ -1061,7 +1064,7 @@
       const m = sourceModel(), orig = app()?.originalModel;
       o.trisNow = m ? modelTriangles(m) : null; o.trisOriginal = orig ? modelTriangles(orig) : null;
       o.printer = currentPrinter()?.tag; o.type = dashboard?.dataset.printerType; o.quality = dashboard?.dataset.quality;
-      o.heightInputMm = $('v2Height')?.value; o.widthMm = $('v2Width')?.value; o.depthMm = $('v2Depth')?.value; o.uniform = $('v2Uniform')?.checked;
+      o.nativeExportHeightMm = nativeValue('figureHeightMm', null); o.heightSizing = manualHeight ? 'manual' : 'automatic'; o.heightInputMm = $('v2Height')?.value; o.widthMm = $('v2Width')?.value; o.depthMm = $('v2Depth')?.value; o.uniform = $('v2Uniform')?.checked;
       o.detailSlider = $('v2Detail')?.value; o.shrinkApplied = !!shrinkReady; o.chips = [...appliedChanges].join(',');
       o.health = $('v2HealthScore')?.textContent; o.healthRows = [...document.querySelectorAll('#v2HealthRows .v2-health-row')].map(r => r.textContent.replace(/\s+/g, ' ').trim());
       o.pieces = $('v2HealthRows')?.dataset.pieces || null; if (o.pieces) o.pieceTris = (window.__shrinkPieceInfo || []).slice(0, 8); o.shrinkNote = window.__shrinkShrinkNote || null;
@@ -1227,6 +1230,7 @@
   }
 
   function download() {
+    enforceMinHeight(); // Synchronise the native STL exporter before saving.
     syncAdvancedToNative();
     chooseSplit();
     // Fuse is an explicit tool (FUSE IT) that already advanced the working model. Download exports the current
@@ -1394,7 +1398,7 @@
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
     $('v2PrinterSel').addEventListener('change', e => { const x = PRINTER_LIST.find(y => y.id === e.target.value); if (!x) return; choosePrinter(x.type); if (x.type !== 'custom') setQuality(x.quality); syncPrinterSel(); });
-    $('v2Height').addEventListener('input', updateHeight);
+    $('v2Height').addEventListener('input', () => { manualHeight = true; updateHeight(); });
     // Width / Depth apply when you stop typing (about 0.7 s), on Enter and when you leave the box, so the model follows without having to press Tab (v2.182)
     [['v2Width', 'x'], ['v2Depth', 'z']].forEach(([id, axis]) => {
       const el = $(id); let t = null, last = '';
@@ -1410,6 +1414,7 @@
     window.addEventListener('shrink:reduced', () => { reducedTick++; refreshDims(); });
     // v2.256: a newly opened model starts at ITS OWN height (STL/OBJ units are mm, a GLB is metres), not at a fixed 75 mm. BATCH sets its own height after this.
     function fitHeightToModel() {
+      if (manualHeight) return; // Do not overwrite a height entered before the delayed model-open fit.
       const units = window.__shrinkPrint?.state?.modelHeightUnits || 0; if (!(units > 0)) return;
       const glb = window.__shrinkApp?.sourceKind === 'glb', raw = Math.round((glb && units < 10 ? units * 1000 : units) * 10) / 10;
       // v2.274: under 30 mm (including a model in cm/inches/metres that reads as a few units) is brought up to 30 mm; 30 mm and taller keep their own height; over 500 keeps the normal default.
@@ -1420,12 +1425,22 @@
       updateHeight();
     }
     // v2.280: safety net: whatever else wrote the Height on open (BATCH, the file's own units, a restored value), nothing under 30 mm is left on a freshly opened model
-    function enforceMinHeight() { const n = $('v2Height'); if (!n) return; const v = Number(n.value); if (Number.isFinite(v) && v > 0 && v < 30) { n.value = '30'; const r = $('v2HeightRange'); if (r) r.value = '30'; updateHeight(); refreshDims(); } }
+    function enforceMinHeight() {
+      const n = $('v2Height'); if (!n || manualHeight || !sourceModel()) return;
+      const v = Number(n.value);
+      if (!Number.isFinite(v) || v <= 0 || v < 30) {
+        n.value = '30'; updateHeight();
+      } else if (Math.abs(Number(nativeValue('figureHeightMm', v)) - v) > 0.001) {
+        updateHeight(); // A visible 30 mm is useless if the native export is still 2.8 mm.
+      }
+      refreshDims();
+    }
     window.__shrinkEnforceMinHeight = enforceMinHeight;
+    window.__shrinkMarkAutoHeight = () => { manualHeight = false; enforceMinHeight(); };
     window.__shrinkFitHeight = fitHeightToModel;
-    window.addEventListener('shrink:model-opened', () => { const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); [600, 1500].forEach(ms => setTimeout(() => { try { enforceMinHeight(); } catch {} }, ms)); });
+    window.addEventListener('shrink:model-opened', () => { manualHeight = false; const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); [600, 1500].forEach(ms => setTimeout(() => { try { enforceMinHeight(); } catch {} }, ms)); });
     setTimeout(refreshDims, 300);
-    $('v2HeightRange').addEventListener('input', () => { $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
+    $('v2HeightRange').addEventListener('input', () => { manualHeight = true; $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });
     $('v2FuseBtn').addEventListener('click', fuseCheck);
     $('v2FixBigBtn').addEventListener('click', fixHealthModel);
