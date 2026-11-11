@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.286
+- Moved the ADVANCED toggle into the upper-left of the 3D viewer, beneath the Original/Reduced controls, as a small horizontal green button. It no longer sits above the workspace or appears as a vertical sidebar tab.
+- Kept the existing advanced panel expand/collapse behaviour and full-width viewer when collapsed.
+
 ## v2.285
 - Repositioned the ADVANCED open/close toggle as a compact horizontal green button at the top-left of the main 3D Printing workspace, no sideways writing.
 - When ADVANCED is collapsed the old 38 px left-hand sidebar column disappears, allowing the viewer to span the full available width. The toggle continues to expand and collapse the existing tools panel.
