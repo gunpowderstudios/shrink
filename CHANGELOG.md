@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.264
+- The BATCH window opens centred horizontally instead of at the left edge.
+
 ## v2.263
 - BATCH: new **Set name (optional)** box at the top of the BATCH window. The name becomes the ZIP's name and a prefix on every file inside it, so "BOD set of 9" gives `BOD set of 9.zip` containing `BOD set of 9 - Tarak-SHRUNK-16K-FIXED-FUSED-71mm.stl` and so on (each model keeps its own name and the usual details). Empty = the old `shrink-batch-N-files.zip`. Applied when the ZIP is made, so it can be changed after the batch has run.
 
