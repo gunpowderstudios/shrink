@@ -1419,8 +1419,11 @@
       n.value = String(mm); const r = $('v2HeightRange'); if (r) r.value = String(Math.max(10, Math.min(300, mm)));
       updateHeight();
     }
+    // v2.280: safety net: whatever else wrote the Height on open (BATCH, the file's own units, a restored value), nothing under 30 mm is left on a freshly opened model
+    function enforceMinHeight() { const n = $('v2Height'); if (!n) return; const v = Number(n.value); if (Number.isFinite(v) && v > 0 && v < 30) { n.value = '30'; const r = $('v2HeightRange'); if (r) r.value = '30'; updateHeight(); refreshDims(); } }
+    window.__shrinkEnforceMinHeight = enforceMinHeight;
     window.__shrinkFitHeight = fitHeightToModel;
-    window.addEventListener('shrink:model-opened', () => { const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); });
+    window.addEventListener('shrink:model-opened', () => { const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); [600, 1500].forEach(ms => setTimeout(() => { try { enforceMinHeight(); } catch {} }, ms)); });
     setTimeout(refreshDims, 300);
     $('v2HeightRange').addEventListener('input', () => { $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });

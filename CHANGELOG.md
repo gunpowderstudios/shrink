@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.280
+- Safety net for the 30 mm minimum: 0.6 s and 1.5 s after a model opens, a Height under 30 mm is raised to 30. BATCH's "keep each model's own size" now also raises under-30 mm models to 30 (it used to write 2.8).
+
 ## v2.279
 - Detail kept at 100% now always restores the untouched upload even after a first slider move (the reducer used to be re-based on the fixed/fused model, so 100% meant 100% of the processed one: 231k of 1.47M triangles). The slider also shows the processed model's real share. Compare lines the original up with the working model (bottom and centre) so the split cuts through the same place.
 - The RESIZE button glows when you change the Height, until you press it.

@@ -49,7 +49,7 @@ function applySettings() {
   if (!mm) {                      // "as uploaded": the model's own height in file units, taken as mm (a GLB is in metres: small numbers are scaled up)
     const units = window.__shrinkPrint?.state?.modelHeightUnits || 0, glb = window.__shrinkApp?.sourceKind === 'glb';
     mm = units > 0 ? (glb && units < 10 ? units * 1000 : units) : 0;
-    mm = mm > 0 ? Math.max(1, Math.min(500, Math.round(mm * 10) / 10)) : 0;     // the Height box allows 1 to 500 mm
+    mm = mm > 0 ? Math.max(30, Math.min(500, Math.round(mm * 10) / 10)) : 0;     // the Height box allows 1 to 500 mm; v2.280: a model under 30 mm is brought up to 30 mm, like a single model
   }
   if (h && mm > 0) { h.value = String(mm); h.dispatchEvent(new Event('input', { bubbles: true })); }
 }
@@ -314,7 +314,7 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.279) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.280) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
@@ -343,7 +343,7 @@ ensureHomeButton();
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
-/* v2.279: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
+/* v2.280: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
 function report() {
   return JSON.stringify({ release: document.querySelector('.version-badge')?.textContent, when: new Date().toISOString(), browser: navigator.userAgent, panel: { printer: $('v2BatchPrinter')?.value, height: $('v2BatchHeight')?.value }, files: S.items.map(i => i.diag || { file: i.name, status: i.status, inputBytes: i.size }) }, null, 1);
 }
