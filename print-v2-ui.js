@@ -645,6 +645,14 @@
       wasClean = known ? known.clean === true : null;
     } catch { wasClean = null; }
     try {
+      // v2.282: if the user previously slid below 70%, start automatic SHRINK from
+      // the original upload: a reducer cannot recover triangles from a 5% working mesh.
+      const original = app()?.originalModel;
+      if (original && sourceModel() && modelTriangles(sourceModel()) < modelTriangles(original) * 0.70) {
+        setWorkingModel(original);
+        clearApplied();
+        wasClean = null; // The original may have different topology from the former working result.
+      }
       if (window.__shrinkLiveUI?.rebaseWorking) await window.__shrinkLiveUI.rebaseWorking(sourceModel());
       window.__shrinkLive?.setTidy?.(wasClean === true);
     } catch (err) {
