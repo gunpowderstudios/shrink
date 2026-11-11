@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.257
+- MODEL HEALTH box: new first row "Height" (mm, from the Finished height box, updates as you change it).
+
 ## v2.256
 - A newly opened model now starts at its own height in the Finished height box (STL/OBJ units are mm, a GLB is metres, clamped to 1 to 500 mm) instead of a fixed 75 mm. BATCH already did this when its Height field is blank, and still sets its own value afterwards. `window.__shrinkFitHeight()`.
 

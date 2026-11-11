@@ -252,6 +252,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
   w.__shrinkPrint = { state: { modelHeightUnits: 37.2 } }; w.__shrinkApp.sourceKind = 'stl'; w.__shrinkFitHeight();
   ok(page.$('v2Height').value === '37.2', 'HT1 an STL opens at its own height (' + page.$('v2Height').value + ')');
+  ok(page.$('v2HealthHeight')?.textContent === '37.2 mm', 'HT1 the health box shows the height (' + page.$('v2HealthHeight')?.textContent + ')');
+  page.$('v2Height').value = '45'; page.$('v2Height').dispatchEvent(new w.Event('input', { bubbles: true }));
+  ok(page.$('v2HealthHeight')?.textContent === '45 mm', 'HT1 and follows the Height box (' + page.$('v2HealthHeight')?.textContent + ')');
   w.__shrinkPrint = { state: { modelHeightUnits: 0.12 } }; w.__shrinkApp.sourceKind = 'glb'; w.__shrinkFitHeight();
   ok(page.$('v2Height').value === '120', 'HT1 a GLB in metres becomes mm (' + page.$('v2Height').value + ')');
   w.__shrinkPrint = { state: { modelHeightUnits: 900 } }; w.__shrinkApp.sourceKind = 'stl'; w.__shrinkFitHeight();

@@ -320,6 +320,7 @@
         }
       }
       $('v2HealthRows').innerHTML =
+        heightRowHtml() +
         healthRow('File size', `≈ ${sizeText} STL${appliedChanges.has('shrunk') ? ' · ' + currentPrinter().tag : ''}`, true) +
         healthRow('Triangles', new Intl.NumberFormat().format(tris), true) +
         healthRow('Watertight', watertight ? 'YES' : 'NO', watertight) +
@@ -398,6 +399,10 @@
     }
   }
 
+  // v2.257: the print height in mm, first row of the health box; kept in step with the Finished height box
+  function heightText() { const v = Number($('v2Height')?.value); return v > 0 ? `${Number.isInteger(v) ? v : v.toFixed(1)} mm` : '–'; }
+  function heightRowHtml() { return `<div class="v2-health-row"><span>Height</span><strong id="v2HealthHeight">${heightText()}</strong></div>`; }
+  function syncHealthHeight() { const el = $('v2HealthHeight'); if (el && el.textContent !== heightText()) el.textContent = heightText(); }
   function updateHeight() {
     const number = $('v2Height');
     const range = $('v2HeightRange');
@@ -408,6 +413,7 @@
     setNative('figureHeightMm', v, 'input');
     updateStep1Summary();
     refreshDims();
+    syncHealthHeight();
   }
 
 
