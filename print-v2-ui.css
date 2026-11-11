@@ -774,3 +774,10 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2LeftTog
 #v2WorkflowStatus.v2-workflow-status{display:block;margin:6px 0 8px;max-width:100%;font-size:12px;line-height:1.4;color:#b8c7d8;text-align:center}
 #v2MagicBtn{white-space:normal;line-height:1.25}
 #v2MagicDownload:disabled{opacity:.45;filter:grayscale(.7);cursor:not-allowed}
+
+/* v2.290 — one visible DOWNLOAD, always beneath MODEL HEALTH.
+   Keep the original button in the DOM: BATCH and export integrations call it. */
+body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadBtn,
+body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:none!important}
+/* Other formats must respect the same readiness as the main DOWNLOAD. */
+#v2SideGlb[data-available="no"]{opacity:.35;pointer-events:none}
