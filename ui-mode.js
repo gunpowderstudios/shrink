@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.282';
+  const PRINT_RELEASE = '2.283';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -140,8 +140,13 @@
         try{L.push('',JSON.stringify(window.__shrinkSnap?.()||null,null,1));}catch{}
         try{const b=window.__shrinkBatch; if(b?.state?.items?.some(i=>i.diag)) L.push('','=== BATCH ===',b.report());}catch{}
         let ov=$('shrinkDiagBox'); if(!ov){ov=document.createElement('div');ov.id='shrinkDiagBox';ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
-          ov.innerHTML='<div style="width:min(900px,92vw);background:#121a24;border:1px solid #35455a;border-radius:12px;padding:14px;color:#cfe"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong>Diagnostics <small style="font-weight:400;opacity:.7">(already copied: paste it to Claude)</small></strong><button type="button" id="shrinkDiagClose" style="cursor:pointer">Close</button></div><textarea readonly style="width:100%;height:60vh;box-sizing:border-box;font:11px/1.3 monospace;background:#0e141c;color:#cfe;border:1px solid #35455a;border-radius:8px;padding:8px"></textarea></div>';
-          document.body.appendChild(ov); ov.addEventListener('click',ev=>{if(ev.target===ov||ev.target.id==='shrinkDiagClose')ov.hidden=true;});}
-        const ta=ov.querySelector('textarea'); ta.value=L.join('\n'); ov.hidden=false; ta.focus(); ta.select(); try{await navigator.clipboard?.writeText(ta.value);}catch{}
+          ov.innerHTML='<div role="dialog" aria-modal="true" aria-label="Diagnostics" style="width:min(900px,92vw);background:#121a24;border:1px solid #35455a;border-radius:12px;padding:14px;color:#cfe"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong>Diagnostics <small style="font-weight:400;opacity:.7">(already copied to clipboard)</small></strong><button type="button" id="shrinkDiagClose" aria-label="Close Diagnostics" style="cursor:pointer;font-size:20px;min-width:36px;min-height:36px">×</button></div><textarea readonly style="width:100%;height:60vh;box-sizing:border-box;font:11px/1.3 monospace;background:#0e141c;color:#cfe;border:1px solid #35455a;border-radius:8px;padding:8px"></textarea></div>';
+          document.body.appendChild(ov);
+          const closeDiag=()=>{ov.style.display='none';ov.hidden=true;a.focus();};
+          ov.addEventListener('click',ev=>{if(ev.target===ov||ev.target.closest?.('#shrinkDiagClose'))closeDiag();});
+          ov.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();closeDiag();}});
+          // An inline display:flex declaration overrides the native [hidden] rule.
+          ov.style.display='none';ov.hidden=true;}
+        const ta=ov.querySelector('textarea'); ta.value=L.join('\n'); ov.hidden=false; ov.style.display='flex'; ta.focus(); ta.select(); try{await navigator.clipboard?.writeText(ta.value);}catch{}
       });}}
 })();
