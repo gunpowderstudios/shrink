@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.275
+- The start screen is one button again: "Choose a model file" (or drop a file anywhere on it). The file type picks the tools: GLB opens the game tools, STL/OBJ/PLY open 3D Print. The Home / 3D Printing / Gaming tabs still switch by hand, and BATCH UPLOAD shows on Home.
+
 ## v2.274
 - A model that reads under 30 mm tall is brought up to 30 mm; 30 mm and taller keep their own height.
 - Went back to the full SHRINK: the big button shrinks, fixes, fuses, levels and centres again (the v2.271 shrink-only change is undone). FIX IT and FUSE IT stay as their own buttons. The v2.270 Detail kept behaviour is kept.

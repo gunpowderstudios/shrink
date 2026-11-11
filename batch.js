@@ -314,7 +314,7 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.274) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.275) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
@@ -343,7 +343,7 @@ ensureHomeButton();
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
-/* v2.274: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
+/* v2.275: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
 function report() {
   return JSON.stringify({ release: document.querySelector('.version-badge')?.textContent, when: new Date().toISOString(), browser: navigator.userAgent, panel: { printer: $('v2BatchPrinter')?.value, height: $('v2BatchHeight')?.value }, files: S.items.map(i => i.diag || { file: i.name, status: i.status, inputBytes: i.size }) }, null, 1);
 }
