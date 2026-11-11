@@ -305,9 +305,19 @@
     if (run !== healthRun) return;
     try {
       for (let i = 0; i < 40 && !window.__shrinkPrintSafety?.topologySummary; i++) await wait(50);
-      const h = window.__shrinkPrintSafety?.topologySummary?.(model);
+      // Very dense GLBs may contain many independent meshes. An exact edge-by-edge
+      // topology check can monopolise the UI; don't block conversion or AUTO-SHRINK.
+      const largeGlb = app()?.sourceKind === 'glb' && modelTriangles(model) > 400000;
+      const h = largeGlb ? null : window.__shrinkPrintSafety?.topologySummary?.(model);
       if (run !== healthRun) return;
-      if (!h) { quickState('ready'); return; }
+      if (!h) {
+        card.className = 'v2-health-card';
+        $('v2HealthLabel').textContent = largeGlb ? 'Large GLB loaded' : 'Health check unavailable';
+        $('v2HealthScore').textContent = '—';
+        $('v2HealthRows').innerHTML = heightRowHtml() + '<div class="v2-health-row"><span>Triangles</span><strong>' + modelTriangles(model).toLocaleString() + '</strong></div><div class="v2-health-minor">' + (largeGlb ? 'Detailed mesh checks skipped for this large GLB so the interface stays responsive. AUTO-SHRINK can still run; OBJ conversion does not require it.' : 'The health analyser did not load. You can still convert this model using Other formats.') + '</div>';
+        quickState('ready');
+        return;
+      }
       lastHealth = { model, h };
       const rating = healthScore(h);
       card.className = `v2-health-card ${rating.level}`;
@@ -442,7 +452,10 @@
     if (magic && !working) magic.textContent = settingsDirty ? 'AUTO-SHRINK AGAIN — Changes made' : autoReady ? 'AUTO-SHRINK AGAIN' : 'AUTO-SHRINK';
     if (dl) { dl.disabled = !ready; dl.title = settingsDirty ? 'Settings changed: press SHRINK again.' : detailUpdating ? 'Waiting for the manual detail preview.' : ready ? 'Download the current model.' : 'Press SHRINK first.'; }
     if (other) other.disabled = !ready;
-    const otherFormats = $('v2SideGlb'); if (otherFormats) otherFormats.dataset.available = ready ? 'yes' : 'no';
+    const otherFormats = $('v2SideGlb');
+    // Direct format conversion (GLB -> OBJ etc.) does not require AUTO-SHRINK.
+    // It is separate from the protected, print-ready DOWNLOAD workflow.
+    if (otherFormats) otherFormats.dataset.available = sourceModel() && !working && !detailUpdating ? 'yes' : 'no';
     const note = $('v2WorkflowStatus');
     if (note) note.textContent = settingsDirty ? 'Settings changed — press SHRINK again.' : detailUpdating ? 'Updating manual detail…' : ready ? (detailManual ? 'Manual detail ready — download when happy.' : 'Optimised — ready to download.') : working ? 'SHRINK is working…' : 'Press SHRINK for automatic optimisation.';
   }
@@ -1146,7 +1159,12 @@
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
         const g = document.createElement('details'); g.id = 'v2SideGlb'; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)
         g.innerHTML = '<summary>Other formats</summary><div class="v2-more-menu"><button type="button" data-fmt="glb">GLB</button><button type="button" data-fmt="obj">OBJ</button><button type="button" data-fmt="3mf">3MF</button><button type="button" data-fmt="usdz">USDZ</button></div>';
-        g.addEventListener('click', e => { const b = e.target.closest('[data-fmt]'); if (!b) return; g.open = false; window.__shrinkExportFormat?.(b.dataset.fmt); });
+        g.addEventListener('click', e => {
+          const b = e.target.closest('[data-fmt]'); if (!b) return;
+          g.open = false;
+          if (g.dataset.available !== 'yes' || !sourceModel()) return;
+          window.__shrinkExportFormat?.(b.dataset.fmt);
+        });
         st.insertBefore(g, dl.nextSibling); } } }   // v2.235: moves out of the top bar, under the health box
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
     { const status = document.createElement('small'); status.id = 'v2WorkflowStatus'; status.className = 'v2-workflow-status'; $('v2MagicDownload')?.insertAdjacentElement('afterend', status); updateWorkflowButtons(); }
