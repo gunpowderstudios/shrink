@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.290
+- Removed the confusing second DOWNLOAD IT and GLB buttons from the ADVANCED panel in 3D Printing. The existing hidden export controls remain in the DOM so BATCH, split export and other integrations still work.
+- The visible DOWNLOAD below MODEL HEALTH is the only main download button, greyed out until initial automatic SHRINK completes or a manual detail update settles; printer/size changes require SHRINK AGAIN first.
+- After a completed run the main action reads SHRINK AGAIN (or SHRINK AGAIN — Changes made when settings require another automatic pass). Optional other formats also follow DOWNLOAD readiness.
+
 ## v2.289
 - Clear all-in-one workflow: open a model, press SHRINK (automatically optimises, repairs and attempts fuse), then DOWNLOAD. The DOWNLOAD button stays disabled until a completed run.
 - Changing finished size, printer or custom printer detail after optimisation disables DOWNLOAD and changes the main button to “SHRINK AGAIN — Changes made”. Previous automatic re-SHRINK after a height change has been removed so the user chooses when to start again.
