@@ -1,5 +1,11 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.282
+- 3D Printing SHRINK now retains at least 70% of the original model's triangles during automatic optimisation, instead of searching as low as 1%. Gaming mode retains its existing behaviour.
+- Repeated SHRINK presses use the original upload as the reference for the automatic 70% limit; if the working model has already dropped below that level, automatic SHRINK first restarts from the original.
+- The Detail kept slider remains manually adjustable over its full range, including below 70%; after manual adjustment, DOWNLOAD saves the chosen result without running automatic SHRINK again.
+- BATCH uses the same automatic print SHRINK limit because its QUICK-FIX invokes the shared SHRINK operation. Automatic reduction may retain more than 70% if quality checks require it.
+
 ## v2.281
 - Fixed the automatic 30 mm minimum through SHRINK and DOWNLOAD: the guard now runs after the working mesh is replaced and immediately before STL export, and resynchronises the hidden native export height with the visible Finished height.
 - Automatic sizing is tracked separately from deliberate Height, Width, Depth, or scale edits, so a manually selected size under 30 mm is preserved. BATCH's default “as uploaded” sizing remains automatic; a specified BATCH height remains manual.
