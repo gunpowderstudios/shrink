@@ -745,3 +745,13 @@ body:has(#v2MagicBtn[data-busy]) :is(#v2MagicBtn,#v2MagicDownload,#v2ShrinkBtn,#
 @media(max-width:900px){
   .print-v2-dashboard .v2-viewer-slot > #v2LeftToggle {top:45px;left:10px;width:auto;height:auto;writing-mode:horizontal-tb}
 }
+
+/* v2.287 — Compare replaces the redundant Original/Reduced switch in 3D Printing.
+   Keep the buttons in the DOM for viewer logic and show them in Gaming. */
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-toolbar .segmented {display:none!important}
+.print-v2-dashboard .v2-viewer-slot > #v2LeftToggle {
+  top:8px;left:12px;z-index:90;
+}
+@media(max-width:900px){
+  .print-v2-dashboard .v2-viewer-slot > #v2LeftToggle {top:8px;left:10px}
+}
