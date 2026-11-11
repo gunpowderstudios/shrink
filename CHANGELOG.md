@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.261
+- The Printer detail dropdown (Resin 16K / 8K fine / 8K / 4K, FDM, Custom) is visible again, directly above Detail kept. It had been moved into the hidden legacy block when the one big card was built, so the printer could not be changed from the screen.
+
 ## v2.260
 - Under Detail kept: two buttons, **16K** and **8K** ("Smallest safe for"). A click selects that printer detail and runs the automatic search, so the slider jumps to the smallest level that still prints safely for it.
 - Dragging Detail kept by hand: after each measurement the result says what it still prints safely at ("30% kept · 8K" or "below 8K"). On a 16K/8K printer the printer label switches between 16K and 8K to match (16K needs 99.5% of the surface within 0.018 mm, 8K 99% within 0.05 mm). live-ui.js fires `shrink:measured` with the p99/p99.5 movement in mm.

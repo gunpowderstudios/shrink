@@ -95,7 +95,7 @@ function buildPanel() {
 function dock() {
   const p = $('v2BatchPanel'); if (!p) return;
   let card = $('v2HealthCard')?.parentElement;      // the viewer panel: the health box is bottom-left, this window is bottom-right
-  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.260: the viewer is hidden until a model is open, so float on the page meanwhile
+  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.261: the viewer is hidden until a model is open, so float on the page meanwhile
   if (card && p.parentElement !== card) { card.appendChild(p); p.classList.remove('floating'); }
   else if (!card && p.parentElement !== document.body) { document.body.appendChild(p); p.classList.add('floating'); }
   else if (!card) p.classList.add('floating');
@@ -266,7 +266,7 @@ async function start() {
         await wait(350);            // let the open settle and the health check start
         deps.applySettings();       // printer resolution and height chosen in the panel
         await wait(150);
-        // v2.260: start exactly as a person does: wait until the health check belongs to THIS model (a leftover 'ready' from the previous file used to be enough)
+        // v2.261: start exactly as a person does: wait until the health check belongs to THIS model (a leftover 'ready' from the previous file used to be enough)
         await waitFor(() => !window.__shrinkHealthIsCurrent || window.__shrinkHealthIsCurrent(), 180000, 'The health check did not finish');
         await wait(400);
         await deps.quickFix();
@@ -278,7 +278,7 @@ async function start() {
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
-        // v2.260: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
+        // v2.261: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) item.msg = `${item.msg ? item.msg + ' · ' : ''}${v.pieces} separate pieces, prints fine`; }
         if (!item.warn && Number.isFinite(sc) && deps.verdict?.()?.healthy !== false) item.fixed = true;
       } catch (err) {
@@ -309,7 +309,7 @@ async function downloadZip() {
   finally { render(); }
 }
 
-// (v2.260) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.261) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
@@ -338,7 +338,7 @@ ensureHomeButton();
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
-/* v2.260: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
+/* v2.261: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
 function report() {
   return JSON.stringify({ release: document.querySelector('.version-badge')?.textContent, when: new Date().toISOString(), browser: navigator.userAgent, panel: { printer: $('v2BatchPrinter')?.value, height: $('v2BatchHeight')?.value }, files: S.items.map(i => i.diag || { file: i.name, status: i.status, inputBytes: i.size }) }, null, 1);
 }

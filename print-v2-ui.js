@@ -1237,7 +1237,8 @@
       rb.title = 'Scales the model to the height above. Nothing is shrunk, fixed or fused. Press DOWNLOAD IT when you want the file.';
       rb.addEventListener('click', () => { updateHeight(); refreshDims(); });
       sizeBox.appendChild(rb); }
-    const detail = $('v2Detail')?.closest('label'); const detailBox = document.createElement('div'); detailBox.className = 'v2-main-detail'; if (detail) detailBox.appendChild(detail);
+    const detail = $('v2Detail')?.closest('label'); const detailBox = document.createElement('div'); detailBox.className = 'v2-main-detail'; { const pick = setup?.querySelector('.v2-printer-pick') || dashboard.querySelector('.v2-printer-pick'); if (pick) detailBox.appendChild(pick); }   /* v2.261: the printer dropdown (resin 16K/8K/4K, FDM, custom) sits above Detail kept again; it had been swept into the hidden legacy block */
+    if (detail) detailBox.appendChild(detail);
     const actions = document.createElement('div'); actions.className = 'v2-main-actions';
     ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
     const dl = document.createElement('div'); dl.className = 'v2-main-download';
