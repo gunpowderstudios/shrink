@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.288
+- Aligned the horizontal ADVANCED button with Compare, Detail loss, Wireframe and Reset view in the viewer's normal toolbar flex row, instead of positioning it over the other buttons.
+- Controls now align neatly, with wrapping available on smaller windows; the advanced panel toggle keeps its existing behaviour.
+
 ## v2.287
 - Hid the redundant Original/Reduced segmented switch in 3D Printing (the Compare control remains visible, and the viewer's underlying controls are preserved for functionality). Gaming mode is unchanged.
 - Moved the horizontal green ADVANCED toggle higher into the cleared upper-left viewer toolbar position, aligned neatly with the Compare controls.
