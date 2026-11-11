@@ -706,7 +706,6 @@
       window.__shrinkEnforceMinHeight?.(); // An automatic height must survive model replacement during SHRINK.
       markApplied('shrunk');
       shrinkReady = true;
-      lastAutoShrinkHeight = Number($('v2Height')?.value) || null;
       $('v2ResizeBtn')?.classList.remove('glow');
       // The simplifier does not promise to keep a mesh manifold: on a model made of many small pieces it can leave a few
       // edges shared by three triangles. If the model was clean before SHRINK, put that right with the same gentle repair as FIX IT.
