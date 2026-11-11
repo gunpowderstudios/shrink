@@ -645,13 +645,13 @@
       wasClean = known ? known.clean === true : null;
     } catch { wasClean = null; }
     try {
-      // v2.282: if the user previously slid below 70%, start automatic SHRINK from
-      // the original upload: a reducer cannot recover triangles from a 5% working mesh.
+      // v2.283: A second automatic SHRINK must not progressively shrink an already
+      // reduced mesh. Rebase on the original so printer-based quality remains meaningful.
       const original = app()?.originalModel;
-      if (original && sourceModel() && modelTriangles(sourceModel()) < modelTriangles(original) * 0.70) {
+      if (original && appliedChanges.has('shrunk') && sourceModel() !== original) {
         setWorkingModel(original);
         clearApplied();
-        wasClean = null; // The original may have different topology from the former working result.
+        wasClean = null;
       }
       if (window.__shrinkLiveUI?.rebaseWorking) await window.__shrinkLiveUI.rebaseWorking(sourceModel());
       window.__shrinkLive?.setTidy?.(wasClean === true);
@@ -1558,7 +1558,7 @@
       let reverted = false;
       { const live = window.__shrinkLive;
         // v2.279: no "is the reducer's own root on screen" test here: after a first slider move the reducer is re-based ON the fixed/fused model (live.root === working model), and 100% must still mean the untouched upload
-        const processed = ['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k)) || detailScale < 0.999;
+        const processed = ['shrunk', 'fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k)) || detailScale < 0.999;
         if (live?.root && sourceModel() && app()?.originalModel && sourceModel() !== app().originalModel && processed) {
           const cur = Math.min(1, modelTriangles(sourceModel()) / origTrisOf());
           if (value >= 99.95 || value / 100 > cur * 1.05) {            // asking for more detail than the processed model has: go back to the upload
