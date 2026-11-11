@@ -439,9 +439,10 @@
     const magic = $('v2MagicBtn'), dl = $('v2MagicDownload'), other = $('v2DownloadBtn');
     const working = !!magic?.dataset.busy;
     const ready = autoReady && !settingsDirty && !detailUpdating && !working;
-    if (magic && !working) magic.textContent = settingsDirty ? 'SHRINK AGAIN — Changes made' : 'SHRINK';
+    if (magic && !working) magic.textContent = settingsDirty ? 'SHRINK AGAIN — Changes made' : autoReady ? 'SHRINK AGAIN' : 'SHRINK';
     if (dl) { dl.disabled = !ready; dl.title = settingsDirty ? 'Settings changed: press SHRINK again.' : detailUpdating ? 'Waiting for the manual detail preview.' : ready ? 'Download the current model.' : 'Press SHRINK first.'; }
     if (other) other.disabled = !ready;
+    const otherFormats = $('v2SideGlb'); if (otherFormats) otherFormats.dataset.available = ready ? 'yes' : 'no';
     const note = $('v2WorkflowStatus');
     if (note) note.textContent = settingsDirty ? 'Settings changed — press SHRINK again.' : detailUpdating ? 'Updating manual detail…' : ready ? (detailManual ? 'Manual detail ready — download when happy.' : 'Optimised — ready to download.') : working ? 'SHRINK is working…' : 'Press SHRINK for automatic optimisation.';
   }
@@ -1139,7 +1140,7 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when DO EVERYTHING has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
@@ -1286,7 +1287,7 @@
     const setup = dashboard.querySelector('.v2-setup-card');
     ['.v2-size-row:not(.v2-dim-row)', '.v2-uniform-row', '.v2-dim-row'].forEach(q => { const el = setup?.querySelector(q); if (el) sizeBox.appendChild(el); });
     { const rb = document.createElement('button'); rb.type = 'button'; rb.id = 'v2ResizeBtn'; rb.className = 'v2-resize-btn'; rb.textContent = 'RESIZE';
-      rb.title = 'Apply the new size. If SHRINK has already run, optimisation updates automatically for the new height.';
+      rb.title = 'Apply the new size, then press SHRINK AGAIN to re-optimise before downloading.';
       rb.addEventListener('click', () => { rb.classList.remove('glow'); updateHeight(); refreshDims(); });
       // v2.279: typing or dragging the Height makes RESIZE glow until it is pressed (programmatic fits on open do not fire input events)
       ['v2Height', 'v2HeightRange'].forEach(id => $(id)?.addEventListener('input', () => rb.classList.add('glow')));
@@ -1296,6 +1297,8 @@
     if (detail) detailBox.appendChild(detail);
     const actions = document.createElement('div'); actions.className = 'v2-main-actions';
     ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
+    // Keep the native export controls available to BATCH, but show only the
+    // one DOWNLOAD beneath MODEL HEALTH to users.
     const dl = document.createElement('div'); dl.className = 'v2-main-download';
     ['v2DownloadBtn', 'v2DownloadGlb'].forEach(id => { const el = $(id); if (el) dl.appendChild(el); });
     /* v2.244: splitting is back as an optional, folded-away section above DOWNLOAD IT (the controls already exist in the Download card; they are moved, not rebuilt) */
