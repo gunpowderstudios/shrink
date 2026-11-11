@@ -426,34 +426,33 @@
     updateStep1Summary();
     refreshDims();
     syncHealthHeight();
-    scheduleResizeOptimisation();
+    markSettingsChanged();
   }
 
   // ---- Width / Depth read-outs: the print is always scaled uniformly from the height, so width and depth follow it ----
   let sizeCache = { key: '', size: null }, reducedTick = 0;
   let manualHeight = false; // Automatic 30 mm floor never overrides an intentional resize.
-  let resizeOptimiseTimer = null;
-  let lastAutoShrinkHeight = null;
-  // A new printable height changes the printer's effective tolerance. Restart the
-  // automatic search from the uploaded original, not from the reduced mesh.
-  function scheduleResizeOptimisation() {
-    if (!shrinkReady || !app()?.originalModel || window.__shrinkBatchRunning) return;
-    const mm = Number($('v2Height')?.value);
-    if (!(mm > 0) || (lastAutoShrinkHeight !== null && Math.abs(mm - lastAutoShrinkHeight) < 0.001)) {
-      clearTimeout(resizeOptimiseTimer); resizeOptimiseTimer = null; return;
-    }
-    clearTimeout(resizeOptimiseTimer);
-    resizeOptimiseTimer = setTimeout(async () => {
-      resizeOptimiseTimer = null;
-      if (shrinkRunning || window.__shrinkBatchRunning || !shrinkReady) return;
-      const current = Number($('v2Height')?.value);
-      if (!(current > 0) || Math.abs(current - mm) > 0.001) return;
-      try {
-        const note = $('v2ShrinkResult');
-        if (note) note.textContent = 'Re-optimising from the original for the new finished height…';
-        await shrinkModel();
-      } catch (err) { console.warn('[SHRINK] Resize optimisation failed', err); }
-    }, 1000); // One run after dragging/typing stops, never on every slider tick.
+  // v2.289: printer/size changes require the all-in-one SHRINK again.
+  // Manual Detail kept is different: it can be downloaded once the live preview settles.
+  let autoReady = false, settingsDirty = false, detailUpdating = false;
+  function updateWorkflowButtons() {
+    const magic = $('v2MagicBtn'), dl = $('v2MagicDownload'), other = $('v2DownloadBtn');
+    const working = !!magic?.dataset.busy;
+    const ready = autoReady && !settingsDirty && !detailUpdating && !working;
+    if (magic && !working) magic.textContent = settingsDirty ? 'SHRINK AGAIN — Changes made' : 'SHRINK';
+    if (dl) { dl.disabled = !ready; dl.title = settingsDirty ? 'Settings changed: press SHRINK again.' : detailUpdating ? 'Waiting for the manual detail preview.' : ready ? 'Download the current model.' : 'Press SHRINK first.'; }
+    if (other) other.disabled = !ready;
+    const note = $('v2WorkflowStatus');
+    if (note) note.textContent = settingsDirty ? 'Settings changed — press SHRINK again.' : detailUpdating ? 'Updating manual detail…' : ready ? (detailManual ? 'Manual detail ready — download when happy.' : 'Optimised — ready to download.') : working ? 'SHRINK is working…' : 'Press SHRINK for automatic optimisation.';
+  }
+  function markSettingsChanged() {
+    if (!autoReady || $('v2MagicBtn')?.dataset.busy || restoringPrinter || window.__shrinkBatchRunning) return;
+    settingsDirty = true; detailUpdating = false; updateWorkflowButtons();
+  }
+  function markWorkflowReady() { autoReady = true; settingsDirty = false; detailUpdating = false; updateWorkflowButtons(); }
+  function markManualPending() {
+    if (!autoReady || settingsDirty) return;
+    detailUpdating = true; updateWorkflowButtons();
   }
   function modelSize() {
     const THREE = app()?.THREE, model = sourceModel();
@@ -520,6 +519,7 @@
     const baseW = sz[axis] / (axis === 'x' ? st.x : st.z);                                       // unstretched size in units
     const f = val / (baseW * k);
     axis === 'x' ? applyStretch(f, st.z) : applyStretch(st.x, f);
+    markSettingsChanged();
   }
   function scaleBy(f) { setHeightMm((Number($('v2Height').value) || 75) * f); }
   function updateStep1Summary() {
@@ -547,6 +547,7 @@
     updateStep1Summary();
     markStep(1, 'done');
     savePrinter();
+    markSettingsChanged();
   }
 
   function setQuality(kind) {
@@ -562,6 +563,7 @@
     setNative('printerDetailMm', detail, 'input');
     const adv = $('v2PrinterDetail'); if (adv) adv.value = String(detail);
     savePrinter();
+    markSettingsChanged();
   }
 
   function markStep(n, state = 'active') {
@@ -979,7 +981,9 @@
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
-    btn.disabled = true; btn.dataset.busy = '1'; setWorking(true); const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
+    btn.disabled = true; btn.dataset.busy = '1'; setWorking(true);
+    autoReady = false; settingsDirty = false; detailUpdating = false; updateWorkflowButtons();
+    const label = 'SHRINK'; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
     window.__shrinkLastVerdict = null; let verdict = null; const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
@@ -1059,7 +1063,7 @@
       if (verdict) { rows.push({ cls: verdict.healthy && verdict.fused ? 'ok' : 'warn', icon: verdict.healthy && verdict.fused ? '✓' : '⚠', text: verdict.text }); note.dataset.verdict = verdict.healthy && verdict.fused ? 'ok' : 'warn'; }
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
       markStep?.(4, 'active');
-      { const dl = $('v2MagicDownload'); if (dl) dl.disabled = false; }
+      markWorkflowReady();
     } catch (err) {
       console.error('[SHRINK 3D] SHRINK MY MODEL failed', err);
       done('warn', '⚠', `Stopped: ${err.message || err}`);
@@ -1067,6 +1071,7 @@
       try { await updateHealthCard(); } catch (e) { console.warn('health refresh', e); }      // show the final result in one go, not the in-between checks
       setWorking(false);
       delete btn.dataset.busy; btn.disabled = false; btn.textContent = label;
+      updateWorkflowButtons();
       { const big = $('v2BigTask'); if (big) big.hidden = true; }
     }
   }
@@ -1144,6 +1149,7 @@
         g.addEventListener('click', e => { const b = e.target.closest('[data-fmt]'); if (!b) return; g.open = false; window.__shrinkExportFormat?.(b.dataset.fmt); });
         st.insertBefore(g, dl.nextSibling); } } }   // v2.235: moves out of the top bar, under the health box
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
+    { const status = document.createElement('small'); status.id = 'v2WorkflowStatus'; status.className = 'v2-workflow-status'; $('v2MagicDownload')?.insertAdjacentElement('afterend', status); updateWorkflowButtons(); }
     $('v2MagicReset').addEventListener('click', () => { const f = $('fileInput'); if (f) { f.value = ''; f.click(); } });
     $('v2MagicDownload').addEventListener('click', () => { const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
   }
@@ -1445,7 +1451,7 @@
       el.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
       el.addEventListener('focus', () => { last = ''; });
     });
-    $('v2Uniform').addEventListener('change', () => { if ($('v2Uniform').checked) resetStretch(); dimRetry = 0; refreshDims(); });
+    $('v2Uniform').addEventListener('change', () => { if ($('v2Uniform').checked) resetStretch(); dimRetry = 0; refreshDims(); markSettingsChanged(); });
     $('v2ScaleUp').addEventListener('click', () => scaleBy(1.1));
     $('v2ScaleDown').addEventListener('click', () => scaleBy(0.9));
     window.addEventListener('shrink:reduced', () => { reducedTick++; refreshDims(); });
@@ -1475,10 +1481,10 @@
     window.__shrinkEnforceMinHeight = enforceMinHeight;
     window.__shrinkMarkAutoHeight = () => { manualHeight = false; enforceMinHeight(); };
     window.__shrinkFitHeight = fitHeightToModel;
-    window.addEventListener('shrink:model-opened', () => { clearTimeout(resizeOptimiseTimer); resizeOptimiseTimer = null; lastAutoShrinkHeight = null; manualHeight = false; const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); [600, 1500].forEach(ms => setTimeout(() => { try { enforceMinHeight(); } catch {} }, ms)); });
+    window.addEventListener('shrink:model-opened', () => { autoReady = false; settingsDirty = false; detailUpdating = false; updateWorkflowButtons(); manualHeight = false; const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); [600, 1500].forEach(ms => setTimeout(() => { try { enforceMinHeight(); } catch {} }, ms)); });
     setTimeout(refreshDims, 300);
     $('v2HeightRange').addEventListener('input', () => { manualHeight = true; $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
-    $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });
+    $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); markSettingsChanged(); });
     $('v2FuseBtn').addEventListener('click', fuseCheck);
     $('v2FixBigBtn').addEventListener('click', fixHealthModel);
     $('v2ProtectBtn').addEventListener('click', () => {
@@ -1531,6 +1537,7 @@
     ['v2PegDiameter','v2PegDepth','v2PegClearance'].forEach(id => $(id).addEventListener('input', syncAdvancedToNative));
     $('v2Zup').addEventListener('change', syncAdvancedToNative);
     $('v2DownloadBtn').addEventListener('click', download);
+    window.addEventListener('shrink:live-updated', () => { if (detailUpdating && !settingsDirty) { detailUpdating = false; updateWorkflowButtons(); } });
     // v2.277: the button says what it will export right now (detail kept + height), so it is clear it is ready again after the slider settles
     function updateDownloadInfo() {
       const b = $('v2DownloadBtn'); if (!b) return;
@@ -1581,6 +1588,7 @@
       value = Math.max(1, Math.min(100, value));
       const text = String(Math.round(value * 10) / 10);
       detailManual = true; manualLevel = '';
+      markManualPending();
       $('v2Detail').value = text;
       $('v2DetailNumber').value = text;
 
@@ -1632,7 +1640,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', e => { poseD = null; { const cur = currentPrinter(); if (cur.type === 'resin' && cur.id !== 'r16') { try { restoringPrinter = true; const sel = $('v2PrinterSel'); if (sel) { sel.value = 'r16'; sel.dispatchEvent(new Event('change', { bubbles: true })); } } finally { restoringPrinter = false; } } } window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; detailScale = 1; { const d = $('v2Detail'), n = $('v2DetailNumber'); if (d) d.value = '70'; if (n) n.value = '70'; } { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { autoReady = false; settingsDirty = false; detailUpdating = false; updateWorkflowButtons(); poseD = null; { const cur = currentPrinter(); if (cur.type === 'resin' && cur.id !== 'r16') { try { restoringPrinter = true; const sel = $('v2PrinterSel'); if (sel) { sel.value = 'r16'; sel.dispatchEvent(new Event('change', { bubbles: true })); } } finally { restoringPrinter = false; } } } window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; detailScale = 1; { const d = $('v2Detail'), n = $('v2DetailNumber'); if (d) d.value = '70'; if (n) n.value = '70'; } { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
@@ -1661,7 +1669,7 @@
 
   function onMode() {
     ensureMagicButton(); ensureDiagButton();
-    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel() || mb.dataset.state === 'checking'; }
+    { const mb = $('v2MagicBtn'); if (mb && !mb.dataset.busy) mb.disabled = !sourceModel() || mb.dataset.state === 'checking'; } updateWorkflowButtons();
     const print = document.body.classList.contains('app-mode-print');
     if (!print) removeBedGuide();
     if (print) activate(); else deactivate();
