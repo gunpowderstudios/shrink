@@ -38,7 +38,7 @@ function savedPrinterId() {     // the printer last chosen in the main panel (or
   try { const v = JSON.parse(localStorage.getItem('shrink-printer') || 'null'); const p = v && PRINTERS.find(x => x.type === v.type && x.quality === v.quality); if (p) return p.id; } catch { /* nothing saved */ }
   return 'r16';          // nothing saved yet: the highest resolution
 }
-const S = { fixing: null, fixingFresh: true, items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: savedPrinterId(), height: 0 };     // height 0 = keep each model's own size
+const S = { fixing: null, fixingFresh: true, items: [], running: false, stop: false, results: [], seq: 0, tryAnyway: false, open: false, printer: savedPrinterId(), height: 0, setName: '' };     // height 0 = keep each model's own size
 function applySettings() {
   const p = PRINTERS.find(x => x.id === S.printer) || PRINTERS[2];
   // scoped to the print dashboard: other parts of the page also use data-quality / data-printer attributes
@@ -60,6 +60,7 @@ function buildPanel() {
   p.innerHTML = `
     <div class="v2-batch-head"><strong>BATCH</strong><span>QUICK-FIX many models, get one ZIP</span><button id="v2BatchFold" type="button" class="v2-batch-fold" aria-expanded="true" title="Fold the batch window up or open it again">▾</button></div>
     <div id="v2BatchDrop" class="v2-batch-drop">Drop STL, OBJ, PLY or GLB files here, or <button id="v2BatchAdd" type="button">choose files…</button></div>
+ <div class="v2-batch-setname"><label>Set name (optional)<input id="v2BatchName" type="text" maxlength="80" placeholder="e.g. BOD set of 9" autocomplete="off"></label></div>
  <div class="v2-batch-set">
       <label>Printer<select id="v2BatchPrinter">${PRINTERS.map(x => `<option value="${x.id}">${x.label}</option>`).join('')}</select></label>
       <label>Height (optional)<span class="v2-batch-h"><input id="v2BatchHeight" type="number" min="1" max="500" step="1" value="" placeholder="as uploaded"><em>mm</em></span></label>
@@ -83,6 +84,7 @@ function buildPanel() {
   p.addEventListener('drop', e => add([...(e.dataTransfer?.files || [])]));
   $('v2BatchPrinter').value = S.printer;
   $('v2BatchPrinter').addEventListener('change', e => { S.printer = e.target.value; const p = PRINTERS.find(x => x.id === S.printer); try { if (p) localStorage.setItem('shrink-printer', JSON.stringify({ type: p.type, quality: p.quality })); } catch { /* private mode */ } });
+  $('v2BatchName').addEventListener('input', e => { S.setName = e.target.value; });
   $('v2BatchHeight').addEventListener('input', e => { S.height = Number(e.target.value) || 0; });
   $('v2BatchTry').addEventListener('change', e => { S.tryAnyway = e.target.checked; render(); });
   $('v2BatchStart').addEventListener('click', start);
@@ -95,7 +97,7 @@ function buildPanel() {
 function dock() {
   const p = $('v2BatchPanel'); if (!p) return;
   let card = $('v2HealthCard')?.parentElement;      // the viewer panel: the health box is bottom-left, this window is bottom-right
-  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.262: the viewer is hidden until a model is open, so float on the page meanwhile
+  if (card && card.closest('.hidden, [hidden]')) card = null;      // v2.263: the viewer is hidden until a model is open, so float on the page meanwhile
   if (card && p.parentElement !== card) { card.appendChild(p); p.classList.remove('floating'); }
   else if (!card && p.parentElement !== document.body) { document.body.appendChild(p); p.classList.add('floating'); }
   else if (!card) p.classList.add('floating');
@@ -266,7 +268,7 @@ async function start() {
         await wait(350);            // let the open settle and the health check start
         deps.applySettings();       // printer resolution and height chosen in the panel
         await wait(150);
-        // v2.262: start exactly as a person does: wait until the health check belongs to THIS model (a leftover 'ready' from the previous file used to be enough)
+        // v2.263: start exactly as a person does: wait until the health check belongs to THIS model (a leftover 'ready' from the previous file used to be enough)
         await waitFor(() => !window.__shrinkHealthIsCurrent || window.__shrinkHealthIsCurrent(), 180000, 'The health check did not finish');
         await wait(400);
         await deps.quickFix();
@@ -278,7 +280,7 @@ async function start() {
         const sc = Number(score); item.warn = Number.isFinite(sc) && sc < 100 && !(deps.verdict?.()?.healthy === true);      // still not perfectly healthy after QUICK-FIX: highlighted in the list, but its file is still in the ZIP
         if (item.warn) { const mi = deps.minor?.(); if (mi) { item.warn = false; item.msg = `${item.msg ? item.msg + ' · ' : ''}${mi} minor edge${mi === 1 ? '' : 's'}, fine to print`; } }
         if (item.warn) { item.issues = (deps.healthIssues?.() || []); warned++; }
-        // v2.262: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
+        // v2.263: several clean separate pieces print fine, so it is a green tick with a short note, not a warning
         { const v = deps.verdict?.(); if (v && !v.fused && v.pieces > 1) item.msg = `${item.msg ? item.msg + ' · ' : ''}${v.pieces} separate pieces, prints fine`; }
         if (!item.warn && Number.isFinite(sc) && deps.verdict?.()?.healthy !== false) item.fixed = true;
       } catch (err) {
@@ -291,25 +293,28 @@ async function start() {
   } finally { S.running = false; window.__shrinkBatchRunning = false; S.stop = false; document.getElementById('printDiagnosticPanel')?.setAttribute('hidden', ''); render(); }
 }
 
+// (v2.263) The set name becomes the ZIP name and a prefix on every file in it; characters Windows/macOS refuse in file names are dropped.
+const cleanSetName = t => String(t || '').replace(/[\\/:*?"<>|\x00-\x1f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
 async function downloadZip() {
   if (!S.results.length) return;
   const btn = $('v2BatchZip'); btn.disabled = true; note('Making the ZIP…');
   try {
     const { zipSync } = await import('https://esm.sh/fflate@0.8.2');
     const files = {}, used = new Set();
+    const pre = cleanSetName(S.setName);
     for (const r of S.results) {
-      let name = r.name, k = 1; while (used.has(name)) name = r.name.replace(/(\.[^.]*)?$/, `-${++k}$1`);
+      let name = pre ? `${pre} - ${r.name}` : r.name, k = 1; while (used.has(name)) name = r.name.replace(/(\.[^.]*)?$/, `-${++k}$1`);
       used.add(name); files[name] = new Uint8Array(await r.blob.arrayBuffer());
     }
     const blob = new Blob([zipSync(files, { level: 0 })], { type: 'application/zip' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `shrink-batch-${S.results.length}-files.zip`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    a.download = pre ? `${pre}.zip` : `shrink-batch-${S.results.length}-files.zip`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     note(`ZIP saved: ${S.results.length} file${S.results.length === 1 ? '' : 's'}, ${fmtBytes(blob.size)}.`);
   } catch (err) { console.error(err); note(`Could not make the ZIP: ${err.message || err}`, true); }
   finally { render(); }
 }
 
-// (v2.262) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
+// (v2.263) BATCH UPLOAD on the load screen, under the main drop zone: opens the panel (and the print tools it needs) before any model is loaded.
 function ensureHomeButton() {
   if ($('v2BatchHome')) return true;
   const dz = $('dropZone'); if (!dz) return false;
@@ -338,7 +343,7 @@ ensureHomeButton();
 let tries = 0; const iv = setInterval(() => { if (ensureHomeButton() || ++tries > 100) clearInterval(iv); }, 300);
 setInterval(() => { if (S.open) render(); }, 2000);     // keeps the live memory reading fresh
 
-/* v2.262: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
+/* v2.263: secret diagnostic. Shift-click the BATCH title (or call __shrinkBatch.report()) to get a text box with one JSON entry per file. */
 function report() {
   return JSON.stringify({ release: document.querySelector('.version-badge')?.textContent, when: new Date().toISOString(), browser: navigator.userAgent, panel: { printer: $('v2BatchPrinter')?.value, height: $('v2BatchHeight')?.value }, files: S.items.map(i => i.diag || { file: i.name, status: i.status, inputBytes: i.size }) }, null, 1);
 }

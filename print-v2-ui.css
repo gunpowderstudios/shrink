@@ -702,3 +702,6 @@ body:has(#v2MagicBtn[data-busy]) :is(#v2MagicBtn,#v2MagicDownload,#v2ShrinkBtn,#
 .v2-detail-quick button{padding:3px 12px;border-radius:6px;border:1px solid #3a414c;background:#1b2027;color:#dfe5ee;font-weight:700;cursor:pointer}
 .v2-detail-quick button.active{background:#1f7a46;border-color:#2fa862;color:#fff}
 .v2-detail-quick button:disabled{opacity:.5;cursor:default}
+
+.v2-batch-setname{margin:0 0 8px}.v2-batch-setname label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#9fb4d0}
+.v2-batch-setname input{padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:#0b1118;color:#e7edf5;font:inherit;font-size:13px;width:100%;box-sizing:border-box}
