@@ -1471,6 +1471,16 @@
     ['v2PegDiameter','v2PegDepth','v2PegClearance'].forEach(id => $(id).addEventListener('input', syncAdvancedToNative));
     $('v2Zup').addEventListener('change', syncAdvancedToNative);
     $('v2DownloadBtn').addEventListener('click', download);
+    // v2.277: the button says what it will export right now (detail kept + height), so it is clear it is ready again after the slider settles
+    function updateDownloadInfo() {
+      const b = $('v2DownloadBtn'); if (!b) return;
+      const d = Number($('v2Detail')?.value), h = Number($('v2Height')?.value);
+      const bits = []; if (Number.isFinite(d) && d > 0) bits.push(`${Math.round(d * 10) / 10}% detail`); if (Number.isFinite(h) && h > 0) bits.push(`${h} mm`);
+      const t = bits.join(' · '); if (b.dataset.info !== t) b.dataset.info = t;
+    }
+    ['input', 'change'].forEach(ev => { $('v2Detail')?.addEventListener(ev, () => setTimeout(updateDownloadInfo, 0)); $('v2DetailNumber')?.addEventListener(ev, () => setTimeout(updateDownloadInfo, 0)); $('v2Height')?.addEventListener(ev, () => setTimeout(updateDownloadInfo, 0)); });
+    ['shrink:reduced', 'shrink:auto-found', 'shrink:model-opened'].forEach(ev => window.addEventListener(ev, () => setTimeout(updateDownloadInfo, 200)));
+    setTimeout(updateDownloadInfo, 400);
     $('v2DownloadGlb').addEventListener('click', () => window.__shrinkExportGlb?.());
     async function ensureLiveRebased() {
       const live = window.__shrinkLive;

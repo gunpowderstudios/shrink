@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.277
+- DOWNLOAD IT shows what it will export right now under its name (e.g. "70% detail · 42 mm"), updating as the slider or height changes.
+
 ## v2.276
 - Detail kept at 100% now always shows the untouched upload. Before, if FIX/FUSE had barely changed the triangle count, 100% kept the fixed/fused model, whose shading (crease normals) and welded surface look different from the original.
 
