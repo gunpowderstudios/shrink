@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.268
+- A newly opened model always starts at the recommended Detail kept of 70%, and the 3D view is reduced to match (it used to preview 50% while the slider read 70, and after a reload the browser put back whatever value you had left, such as 100%). The two Detail inputs in index.html now have `autocomplete="off"` so the browser cannot restore them.
+
 ## v2.267
 - A model that reads under 10 mm or over 500 mm no longer fills the Height box with that number (it is almost certainly not in mm; a 2.8 mm dog made SHRINK keep only 1% of the triangles). The normal finished height stays instead.
 - After FIX IT / FUSE IT / QUICK-FIX has made a new working model, Detail kept shows 100% with a note ("100% now means this processed model") instead of a leftover value such as 1%; dragging it used to count from the already-reduced model without saying so.
