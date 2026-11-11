@@ -938,21 +938,18 @@
   // The same finishing view QUICK-FIX ends with, for a model that was just opened (BATCH row click): centred on the plate, XYZ arrows, front view.
   window.__shrinkPlatePreview = () => { try { const cr = centreOnBed(); if (cr.ok) showBedGuide(); faceFront(); return true; } catch (e) { console.warn('plate preview', e); return false; } };
   const FIX_FIRST_MAX = 600000;
-  // v2.271: the big SHRINK button only shrinks (then levels and centres). Fixing and fusing are their own buttons in ADVANCED, or tick "also fix" / "also fuse" there. BATCH always does both.
-  const quickWants = () => ({ fix: !!$('v2OptFix')?.checked || !!window.__shrinkBatchRunning, fuse: !!$('v2OptFuse')?.checked || !!window.__shrinkBatchRunning });
   async function shrinkMyModel() {
     ensureHealthCard(); const btn = $('v2MagicBtn'), note = $('v2MagicNote');
     if (!btn || btn.disabled || !sourceModel()) return;
     btn.disabled = true; btn.dataset.busy = '1'; setWorking(true); const label = btn.textContent; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
     window.__shrinkLastVerdict = null; let verdict = null; const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
-    const want = quickWants();
     try {
       const startTris = modelTriangles(sourceModel());
       { const big = $('v2BigTask'); if (big && startTris > (window.__shrinkBigTaskTris || BIG_TASK_TRIANGLES)) big.hidden = false; }      // a very detailed model takes a while: say so (v2.191)
       // 0. REPAIR FIRST, at full detail (v2.147). Shrinking a model that still has holes bakes the holes into a coarse mesh that is much harder to
       //    close, so a model under FIX_FIRST_MAX triangles is repaired before it is reduced. Bigger ones are shrunk first (repair runs on the main thread).
-      if (want.fix && startTris <= FIX_FIRST_MAX) {
+      if (startTris <= FIX_FIRST_MAX) {
         btn.textContent = '1/4 Fixing…'; show('Checking and repairing at full detail…'); await updateHealthCard(); await paintNow();
         if ($('v2HealthScore')?.textContent !== '100' || window.__shrinkClay?.hasClay?.()) {
           try {
@@ -969,7 +966,7 @@
       // 1b. Too detailed to fuse (v2.185). 16K ultra can leave millions of triangles, and FUSE is refused above the limit. Step down one detail level at a time
       //     (16K, 8K fine, 8K, 4K) and shrink again until it fits, and say so. The file name tag then shows the level that was really used.
       const fuseLimit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES; let loweredFrom = null;
-      if (want.fuse && modelTriangles(sourceModel()) > fuseLimit && dashboard) {
+      if (modelTriangles(sourceModel()) > fuseLimit && dashboard) {
         const type0 = dashboard.dataset.printerType || 'resin', ladder = ['ultra', 'fine', 'standard', 'large'].filter(k => PRINTER_LIST.some(x => x.type === type0 && x.quality === k)), q0 = dashboard.dataset.quality || 'standard'; 
         const from = currentPrinter(); let at = ladder.indexOf(q0);
         while (at >= 0 && at < ladder.length - 1 && modelTriangles(sourceModel()) > fuseLimit && type0 !== 'custom') {
@@ -985,9 +982,8 @@
         }
       }
       // 2. FIX (only if the health check says something is wrong)
-      if (want.fix) { btn.textContent = '2/4 Fixing…'; show('Checking and fixing…'); await updateHealthCard(); await paintNow(); }
-      if (!want.fix) { /* shrink only */ }
-      else if ($('v2HealthScore')?.textContent === '100' && !window.__shrinkClay?.hasClay?.()) done('ok', '✓', 'Already clean: nothing to fix');
+      btn.textContent = '2/4 Fixing…'; show('Checking and fixing…'); await updateHealthCard(); await paintNow();
+      if ($('v2HealthScore')?.textContent === '100' && !window.__shrinkClay?.hasClay?.()) done('ok', '✓', 'Already clean: nothing to fix');
       else {
         await fixHealthModel(); await wait(60);
         // v2.251: one repair pass can leave a few open edges (Tamara in a batch: health 45, 14 open edges; Tarak: 95 with 9 flipped faces and then fuse failed). Try again while it keeps improving and is below 100, at most twice more.
@@ -999,12 +995,13 @@
         const sc = Number($('v2HealthScore')?.textContent);
         done(sc === 100 ? 'ok' : 'warn', sc === 100 ? '✓' : '⚠', sc === 100 ? 'Fixed: the model is watertight' : `Fixed what could be fixed (health ${Number.isFinite(sc) ? sc + '/100' : 'unknown'})`);
       }
-      if (want.fix && !(Number($('v2HealthScore')?.textContent) >= 95)) done('warn', '⚠', 'Still not fully sealed. Detail was kept, nothing was rebuilt.');
+      if (!(Number($('v2HealthScore')?.textContent) >= 95)) done('warn', '⚠', 'Still not fully sealed. Detail was kept, nothing was rebuilt.');
       // 3. FUSE
-      const fc = $('v2FuseCard');
-      if (want.fuse) { btn.textContent = '3/4 Fusing…'; show('Fusing…'); await paintNow(); if (fc) fc.dataset.state = ''; await fuseCheck(); await wait(60); }
-      const fs = want.fuse ? fc?.dataset.state : 'skipped';
-      if (want.fuse) done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
+      btn.textContent = '3/4 Fusing…'; show('Fusing…'); await paintNow();
+      const fc = $('v2FuseCard'); if (fc) fc.dataset.state = '';
+      await fuseCheck(); await wait(60);
+      const fs = fc?.dataset.state;
+      done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
       // The verdict (v2.185): said plainly, and kept in the health box (Separate pieces row) because the step list above is hidden.
       await updateHealthCard(); await wait(80);
       let pieces = null; for (let i = 0; i < 40 && !pieces; i++) { pieces = Number($('v2HealthRows')?.dataset.pieces) || null; if (!pieces) await wait(50); }
@@ -1014,7 +1011,6 @@
       const alreadyOne = oneSolid && fs !== 'good' && healthy && lastHealth?.h && !(lastHealth.h.openEdges > 0) && modelTriangles(sourceModel()) <= fuseLimit;
       if (alreadyOne) { const i = rows.findIndex(r => /Could not fuse/.test(r.text)); if (i >= 0) rows[i] = { cls: 'ok', icon: '✓', text: 'Already one solid piece: nothing to fuse' }; }
       verdict = { healthy, pieces, fused: oneSolid && (fs === 'good' || alreadyOne), text: (healthy ? 'FIXED' : 'NOT FULLY FIXED') + ' · ' + (oneSolid && fs === 'good' ? 'FUSED into one solid' : alreadyOne ? 'ONE SOLID PIECE (nothing to fuse)' : oneSolid ? 'ONE PIECE, but the fuse step could not finish (see the Fuse box)' : pieces ? `NOT FUSED: ${pieces} separate pieces (${why})` : `fuse not confirmed (${why})`) };
-      if (!want.fix && !want.fuse) verdict = { healthy, pieces, fused: false, shrinkOnly: true, text: 'SHRUNK · ' + (healthy ? 'the model is clean' : 'not fully clean: use FIX IT in ADVANCED') + (pieces > 1 ? ` · ${pieces} separate pieces (FUSE IT in ADVANCED joins them)` : '') };
       // 4. CENTRE
       btn.textContent = '4/4 Levelling…'; show('Levelling and centring…'); await paintNow();
       try { if (resetStretch()) done('ok', '✓', 'Width and depth set back to the original proportions'); } catch (e) { console.warn('stretch reset', e); }
@@ -1022,7 +1018,7 @@
       if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);
       reducedTick++; const cr = centreOnBed(); setTimeout(refreshDims, 50); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } try { faceFront(); } catch (e) { console.warn('front view', e); } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
       window.__shrinkLastVerdict = verdict;
-      if (verdict) { rows.push({ cls: ((verdict.healthy && verdict.fused) || verdict.shrinkOnly) ? 'ok' : 'warn', icon: ((verdict.healthy && verdict.fused) || verdict.shrinkOnly) ? '✓' : '⚠', text: verdict.text }); note.dataset.verdict = ((verdict.healthy && verdict.fused) || verdict.shrinkOnly) ? 'ok' : 'warn'; }
+      if (verdict) { rows.push({ cls: verdict.healthy && verdict.fused ? 'ok' : 'warn', icon: verdict.healthy && verdict.fused ? '✓' : '⚠', text: verdict.text }); note.dataset.verdict = verdict.healthy && verdict.fused ? 'ok' : 'warn'; }
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
       markStep?.(4, 'active');
       { const dl = $('v2MagicDownload'); if (dl) dl.disabled = false; }
@@ -1101,7 +1097,7 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="Shrinks the model (keeping the detail your printer can show), turns it flat and centres it on the bed. Fixing and fusing are in ADVANCED. You do not need it: any tool on the left works on its own, in any order.">SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when DO EVERYTHING has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Switches on when DO EVERYTHING has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
@@ -1266,9 +1262,7 @@
     // v2.222: the health box stays in the 3D view on the right, always visible; the tools live in their own foldable card on the left.
     const mainCard = document.createElement('div'); mainCard.className = 'v2-main-card';
     const hdr = document.createElement('div'); hdr.className = 'v2-main-title'; hdr.textContent = 'Pick just what you need, in any order. Or press SHRINK under the health box.';
-    const opts = document.createElement('div'); opts.className = 'v2-main-opts';
-    opts.innerHTML = '<label><input type="checkbox" id="v2OptFix"> Also fix after shrinking</label><label><input type="checkbox" id="v2OptFuse"> Also fuse after shrinking</label>';
-    mainCard.append(hdr, opts, main);
+    mainCard.append(hdr, main);
     const tgl = $('v2LeftToggle');
     while (stack.firstChild) { if (stack.firstChild === tgl) { stack.removeChild(tgl); continue; } hold.appendChild(stack.firstChild); }
     if (tgl) stack.appendChild(tgl);
@@ -1413,9 +1407,9 @@
     function fitHeightToModel() {
       const units = window.__shrinkPrint?.state?.modelHeightUnits || 0; if (!(units > 0)) return;
       const glb = window.__shrinkApp?.sourceKind === 'glb', raw = Math.round((glb && units < 10 ? units * 1000 : units) * 10) / 10;
-      // v2.267: a model that reads under 10 mm (or over 500) is almost certainly not in mm (cm, inches, metres...). Guessing it would print a 2.8 mm dog and make SHRINK far too aggressive, so keep the normal finished height instead.
-      if (!(raw >= 10 && raw <= 500)) return;
-      const mm = raw;
+      // v2.274: under 30 mm (including a model in cm/inches/metres that reads as a few units) is brought up to 30 mm; 30 mm and taller keep their own height; over 500 keeps the normal default.
+      if (raw > 500) return;
+      const mm = raw < 30 ? 30 : raw;
       const n = $('v2Height'); if (!n) return;
       n.value = String(mm); const r = $('v2HeightRange'); if (r) r.value = String(Math.max(10, Math.min(300, mm)));
       updateHeight();

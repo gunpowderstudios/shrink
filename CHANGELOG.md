@@ -2,8 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
-## v2.271
-- The big SHRINK button now only shrinks (then levels and centres), so nothing else can touch the detail. FIX IT and FUSE IT stay as their own buttons in ADVANCED, and ADVANCED has two new ticks, "Also fix after shrinking" and "Also fuse after shrinking" (off by default). BATCH still shrinks, fixes and fuses every file, as before. The health box verdict for a shrink-only run reads "SHRUNK · the model is clean" (or says to use FIX IT).
+## v2.274
+- A model that reads under 30 mm tall is brought up to 30 mm; 30 mm and taller keep their own height.
+- Went back to the full SHRINK: the big button shrinks, fixes, fuses, levels and centres again (the v2.271 shrink-only change is undone). FIX IT and FUSE IT stay as their own buttons. The v2.270 Detail kept behaviour is kept.
 
 ## v2.270
 - Detail kept is always a percentage of the ORIGINAL upload. After FIX IT / FUSE IT / QUICK-FIX it shows what the processed model holds (e.g. 1.1% for 15,958 of 1,469,542 triangles) instead of 100% of an already-reduced model. Dragging it above that goes back to the original model (FIX IT and FUSE IT are undone, the note says so), so 100% really is the full original detail; below it still reduces the processed model. Internals: `detailScale` in print-v2-ui.js maps the shown value to the reducer's own % of its (rebased) model.
