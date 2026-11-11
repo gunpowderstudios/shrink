@@ -1,5 +1,11 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.289
+- Clear all-in-one workflow: open a model, press SHRINK (automatically optimises, repairs and attempts fuse), then DOWNLOAD. The DOWNLOAD button stays disabled until a completed run.
+- Changing finished size, printer or custom printer detail after optimisation disables DOWNLOAD and changes the main button to “SHRINK AGAIN — Changes made”. Previous automatic re-SHRINK after a height change has been removed so the user chooses when to start again.
+- Manual Detail kept adjustments are different: DOWNLOAD is temporarily disabled while the live preview updates, then becomes available for the chosen detail without requiring automatic SHRINK again.
+- BATCH still uses the same automatic SHRINK and downloadable result; a status message by the buttons explains the current action.
+
 ## v2.288
 - Aligned the horizontal ADVANCED button with Compare, Detail loss, Wireframe and Reset view in the viewer's normal toolbar flex row, instead of positioning it over the other buttons.
 - Controls now align neatly, with wrapping available on smaller windows; the advanced panel toggle keeps its existing behaviour.
