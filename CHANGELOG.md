@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.292
+- Fixed GLB uploads forcing the app into Gaming when 3D Printing was selected. The chosen tab is now respected, including uploads from the start screen; STL/OBJ/PLY still default to printing.
+- Fixed MODEL HEALTH remaining stuck on “Checking…” when no health summary is available. For very large GLB files (over 400,000 triangles), expensive exact topology checks are deferred/skipped in the initial UI so conversion controls and AUTO-SHRINK remain responsive; the card says this explicitly rather than claiming health is 100/100.
+- “Other formats / Convert” is now available for a loaded model before running AUTO-SHRINK, offering OBJ (Cinema 4D R25), GLB, 3MF and USDZ. The main DOWNLOAD button still requires a finished print workflow. OBJ is geometry-only; materials/textures are not exported.
+
 ## v2.291
 - Renamed the main automatic action beneath MODEL HEALTH from SHRINK to AUTO-SHRINK. After an optimisation it reads AUTO-SHRINK AGAIN, or AUTO-SHRINK AGAIN — Changes made when printer or size settings have changed.
 
