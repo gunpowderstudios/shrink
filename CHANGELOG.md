@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.260
+- Under Detail kept: two buttons, **16K** and **8K** ("Smallest safe for"). A click selects that printer detail and runs the automatic search, so the slider jumps to the smallest level that still prints safely for it.
+- Dragging Detail kept by hand: after each measurement the result says what it still prints safely at ("30% kept · 8K" or "below 8K"). On a 16K/8K printer the printer label switches between 16K and 8K to match (16K needs 99.5% of the surface within 0.018 mm, 8K 99% within 0.05 mm). live-ui.js fires `shrink:measured` with the p99/p99.5 movement in mm.
+
 ## v2.259
 - Moving Detail kept by hand after SHRINK no longer leaves "16K" on the File size row, the "Reduced from" note or the download name (the tag described the automatic result). They now say e.g. "30% kept" until the next SHRINK finds its own level.
 

@@ -268,7 +268,8 @@
 
   let healthRun = 0;
   let detailManual = false;                     // the Detail kept value was set by hand after SHRINK, so the printer tag no longer describes the result
-  const shrinkTag = () => detailManual ? `${$('v2Detail')?.value || ''}% kept` : currentPrinter().tag;
+  let manualLevel = '';                         // '16K' | '8K' | 'below 8K': what the hand-set Detail kept still prints safely at (from the last measurement)
+  const shrinkTag = () => detailManual ? `${$('v2Detail')?.value || ''}% kept${manualLevel ? ' · ' + manualLevel : ''}` : currentPrinter().tag;
   let rebasing = null;                          // a re-base of the live reducer that is in flight (the slider waits for it)
   let lastHealth = null;                         // { model, h }: the newest health result and the model it belongs to
   // v2.244: the yellow "Too many triangles to fuse" banner is gone (too confusing). FUSE IT still refuses above the limit (fuseCheck) and says so in its own card.
@@ -1325,7 +1326,7 @@
               <button id="v2ShrinkBtn" class="v2-mega v2-green" type="button">SHRINK IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
               <div id="v2ShrinkResult" class="v2-result">SHRINK compares the reduced model with the original and stops before the difference should be visible.</div>
-              <details class="v2-advanced" open><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<div class="v2-detail-control"><input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"><div class="v2-detail-number"><input id="v2DetailNumber" type="number" min="1" max="100" step="0.1" value="70" inputmode="decimal" aria-label="Detail kept percentage"><span>%</span></div></div></label><p>Drag the slider or type the percentage you want to keep.</p><p id="v2DetailNote" class="v2-detail-note"></p></div></details>
+              <details class="v2-advanced" open><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<div class="v2-detail-control"><input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"><div class="v2-detail-number"><input id="v2DetailNumber" type="number" min="1" max="100" step="0.1" value="70" inputmode="decimal" aria-label="Detail kept percentage"><span>%</span></div></div></label><p>Drag the slider or type the percentage you want to keep.</p><p id="v2DetailNote" class="v2-detail-note"></p><div class="v2-detail-quick"><span>Smallest safe for</span><button type="button" id="v2Q16" data-pid="r16">16K</button><button type="button" id="v2Q8" data-pid="r8">8K</button></div></div></details>
             </section>
 
             <section id="v2FixCard" class="v2-card v2-action-card v2-fix-card">
@@ -1459,17 +1460,7 @@
     $('v2Zup').addEventListener('change', syncAdvancedToNative);
     $('v2DownloadBtn').addEventListener('click', download);
     $('v2DownloadGlb').addEventListener('click', () => window.__shrinkExportGlb?.());
-    async function applyDetailValue(raw, source = 'slider') {
-      let value = Number(raw);
-      if (!Number.isFinite(value)) value = Number($('v2Detail')?.value || 70);
-      value = Math.max(1, Math.min(100, value));
-      const text = String(Math.round(value * 10) / 10);
-      detailManual = true;
-      $('v2Detail').value = text;
-      $('v2DetailNumber').value = text;
-
-      // The control drives the live reducer's own preview. If another tool (FIX IT, FUSE IT, Make watertight) has since replaced the
-      // working model, that preview is no longer on screen, so re-base the reducer on the current model before moving it.
+    async function ensureLiveRebased() {
       const live = window.__shrinkLive;
       if (live?.root && sourceModel() && sourceModel() !== live.root && window.__shrinkLiveUI?.rebaseWorking) {
         rebasing = rebasing || (async () => {
@@ -1482,6 +1473,35 @@
         })();
         await rebasing;
       }
+    }
+    const pickPrinter = id => { const sel = $('v2PrinterSel'); if (!sel || sel.value === id) return; sel.value = id; sel.dispatchEvent(new Event('change', { bubbles: true })); };
+    const markQuick = () => { const id = currentPrinter().id; ['v2Q16', 'v2Q8'].forEach(b => $(b)?.classList.toggle('active', $(b)?.dataset.pid === id)); };
+    ['v2Q16', 'v2Q8'].forEach(bid => $(bid)?.addEventListener('click', async () => {
+      const btns = ['v2Q16', 'v2Q8'].map($); if (btns.some(b => b?.disabled) || !window.__shrinkLiveUI?.autoFind) return;
+      btns.forEach(b => { if (b) b.disabled = true; });
+      try { detailManual = false; manualLevel = ''; pickPrinter($(bid).dataset.pid); markQuick(); await ensureLiveRebased(); await window.__shrinkLiveUI.autoFind(); }
+      catch (e) { console.warn('quick detail', e); } finally { btns.forEach(b => { if (b) b.disabled = false; }); markQuick(); try { updateHealthCard(); } catch {} }
+    }));
+    // Hand-set Detail kept: after each measurement say what it still prints safely at and switch the 16K/8K printer label to match.
+    window.addEventListener('shrink:measured', e => {
+      if (!detailManual) return; const d = e.detail || {}; if (d.mode !== 'print') return;
+      const lvl = d.p995mm <= 0.018 ? '16K' : d.p99mm <= 0.05 ? '8K' : 'below 8K';
+      const cur = currentPrinter().id;
+      if ((cur === 'r16' || cur === 'r8') && lvl !== 'below 8K') pickPrinter(lvl === '16K' ? 'r16' : 'r8');
+      if (manualLevel !== lvl) { manualLevel = lvl; try { updateHealthCard(); } catch {} }
+      markQuick();
+    });
+    window.addEventListener('shrink:auto-found', () => setTimeout(markQuick, 0));
+    async function applyDetailValue(raw, source = 'slider') {
+      let value = Number(raw);
+      if (!Number.isFinite(value)) value = Number($('v2Detail')?.value || 70);
+      value = Math.max(1, Math.min(100, value));
+      const text = String(Math.round(value * 10) / 10);
+      detailManual = true; manualLevel = '';
+      $('v2Detail').value = text;
+      $('v2DetailNumber').value = text;
+
+      await ensureLiveRebased();
       setNative('geometry', text, 'input');
     }
 
@@ -1515,7 +1535,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', e => { poseD = null; window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { poseD = null; window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
