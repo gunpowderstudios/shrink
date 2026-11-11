@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.284
+- After automatic SHRINK, changing the finished Height (including uniform scaling) triggers a fresh printer-based optimisation after a 1-second pause, using the original model rather than cumulatively simplifying the reduced mesh.
+- Initial model size fitting and BATCH setup do not trigger redundant optimisation; changing height before the first SHRINK remains a normal setup action. The RESIZE tooltip now describes the automatic follow-up.
+
 ## v2.283
 - Returned 3D Printing SHRINK to automatic optimisation using the selected printer's detail tolerance and finished height; removed the fixed 70% minimum. BATCH uses the same algorithm via QUICK-FIX.
 - A second automatic SHRINK starts from the original upload rather than repeatedly simplifying an already reduced mesh. Manual Detail kept adjustments can restore additional triangles from the original; DOWNLOAD does not re-run automatic optimisation.
