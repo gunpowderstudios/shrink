@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.276
+- Detail kept at 100% now always shows the untouched upload. Before, if FIX/FUSE had barely changed the triangle count, 100% kept the fixed/fused model, whose shading (crease normals) and welded surface look different from the original.
+
 ## v2.275
 - The start screen is one button again: "Choose a model file" (or drop a file anywhere on it). The file type picks the tools: GLB opens the game tools, STL/OBJ/PLY open 3D Print. The Home / 3D Printing / Gaming tabs still switch by hand, and BATCH UPLOAD shows on Home.
 

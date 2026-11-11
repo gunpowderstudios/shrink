@@ -1518,7 +1518,7 @@
       { const live = window.__shrinkLive;
         if (live?.root && sourceModel() && sourceModel() !== live.root && ['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k))) {
           const cur = Math.min(1, modelTriangles(sourceModel()) / origTrisOf());
-          if (value / 100 > cur * 1.05) {            // asking for more detail than the processed model has: go back to the upload
+          if (value >= 99.95 || value / 100 > cur * 1.05) {            // asking for more detail than the processed model has: go back to the upload
             window.__shrinkSetWorkingModel?.(app().originalModel); clearApplied(); fuseReady = false; shrinkReady = false; reverted = true;
             const note = $('v2DetailNote'); if (note) note.textContent = 'Back to the original model. FIX IT and FUSE IT were undone: run them again if you still need them.';
           }
