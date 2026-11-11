@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.287
+- Hid the redundant Original/Reduced segmented switch in 3D Printing (the Compare control remains visible, and the viewer's underlying controls are preserved for functionality). Gaming mode is unchanged.
+- Moved the horizontal green ADVANCED toggle higher into the cleared upper-left viewer toolbar position, aligned neatly with the Compare controls.
+
 ## v2.286
 - Moved the ADVANCED toggle into the upper-left of the 3D viewer, beneath the Original/Reduced controls, as a small horizontal green button. It no longer sits above the workspace or appears as a vertical sidebar tab.
 - Kept the existing advanced panel expand/collapse behaviour and full-width viewer when collapsed.
