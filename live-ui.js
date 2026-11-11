@@ -33,7 +33,7 @@ window.__shrinkLive = engine;
 
 /* ---------------- helpers ---------------- */
 const ratio = () => Math.max(0.01, Math.min(1, Number(el.geometry.value) / 100));
-// Game models open with Detail kept at 50% (10% from v2.140, 50% since v2.278); the target cards and the slider still change it.
+// Game models open with Detail kept at 50% (10% from v2.140, 50% since v2.279); the target cards and the slider still change it.
 const DEFAULT_GAME_KEEP = 0.50;
 const reduceOpts = () => ({ protectKeep: window.__shrinkPrint?.getReduceOptions?.().protectKeep ?? 1 });
 // Which slice of the surface must stay within the printer's detail? 95% lets the smallest, most detailed areas (faces, hands,

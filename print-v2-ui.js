@@ -282,7 +282,7 @@
   // v2.267/v2.270: once FIX IT / FUSE IT / QUICK-FIX has installed a new working model, Detail kept shows how much of the ORIGINAL it holds (e.g. 1.1%), not the stale value from before. Dragging it back up restores the original (see applyDetailValue).
   const origTrisOf = () => Math.max(1, modelTriangles(app()?.originalModel));
   function syncDetailToBase() {
-    const live = window.__shrinkLive, d = $('v2Detail'), n = $('v2DetailNumber'), note = $('v2DetailNote'); if (!live?.root || !d || !sourceModel() || sourceModel() === live.root) return;
+    const live = window.__shrinkLive, d = $('v2Detail'), n = $('v2DetailNumber'), note = $('v2DetailNote'); if (!live?.root || !d || !sourceModel() || sourceModel() === app()?.originalModel) return;
     if (!['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k))) return;   // a freshly opened model also differs from the live preview root: only a tool that really replaced the model counts
     const pct = Math.max(1, Math.min(100, Math.round(Math.min(1, modelTriangles(sourceModel()) / origTrisOf()) * 1000) / 10)), t = String(pct);
     if (d.value !== t) d.value = t; if (n && n.value !== t) n.value = t;
@@ -1245,7 +1245,10 @@
     ['.v2-size-row:not(.v2-dim-row)', '.v2-uniform-row', '.v2-dim-row'].forEach(q => { const el = setup?.querySelector(q); if (el) sizeBox.appendChild(el); });
     { const rb = document.createElement('button'); rb.type = 'button'; rb.id = 'v2ResizeBtn'; rb.className = 'v2-resize-btn'; rb.textContent = 'RESIZE';
       rb.title = 'Scales the model to the height above. Nothing is shrunk, fixed or fused. Press DOWNLOAD IT when you want the file.';
-      rb.addEventListener('click', () => { updateHeight(); refreshDims(); });
+      rb.addEventListener('click', () => { rb.classList.remove('glow'); updateHeight(); refreshDims(); });
+      // v2.279: typing or dragging the Height makes RESIZE glow until it is pressed (programmatic fits on open do not fire input events)
+      ['v2Height', 'v2HeightRange'].forEach(id => $(id)?.addEventListener('input', () => rb.classList.add('glow')));
+      window.addEventListener('shrink:model-opened', () => rb.classList.remove('glow'));
       sizeBox.appendChild(rb); }
     const detail = $('v2Detail')?.closest('label'); const detailBox = document.createElement('div'); detailBox.className = 'v2-main-detail'; { const pick = setup?.querySelector('.v2-printer-pick') || dashboard.querySelector('.v2-printer-pick'); if (pick) detailBox.appendChild(pick); }   /* v2.261: the printer dropdown (resin 16K/8K/4K, FDM, custom) sits above Detail kept again; it had been swept into the hidden legacy block */
     if (detail) detailBox.appendChild(detail);
@@ -1528,7 +1531,9 @@
 
       let reverted = false;
       { const live = window.__shrinkLive;
-        if (live?.root && sourceModel() && sourceModel() !== live.root && ['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k))) {
+        // v2.279: no "is the reducer's own root on screen" test here: after a first slider move the reducer is re-based ON the fixed/fused model (live.root === working model), and 100% must still mean the untouched upload
+        const processed = ['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k)) || detailScale < 0.999;
+        if (live?.root && sourceModel() && app()?.originalModel && sourceModel() !== app().originalModel && processed) {
           const cur = Math.min(1, modelTriangles(sourceModel()) / origTrisOf());
           if (value >= 99.95 || value / 100 > cur * 1.05) {            // asking for more detail than the processed model has: go back to the upload
             window.__shrinkSetWorkingModel?.(app().originalModel); clearApplied(); fuseReady = false; shrinkReady = false; reverted = true;

@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.279
+- Detail kept at 100% now always restores the untouched upload even after a first slider move (the reducer used to be re-based on the fixed/fused model, so 100% meant 100% of the processed one: 231k of 1.47M triangles). The slider also shows the processed model's real share. Compare lines the original up with the working model (bottom and centre) so the split cuts through the same place.
+- The RESIZE button glows when you change the Height, until you press it.
+
 ## v2.278
 - A green tick appears on the SHRINK IT, FIX IT and FUSE IT buttons in ADVANCED once that step has been done on the model (it follows the CHANGES chips, so it clears if 100% detail restores the original).
 

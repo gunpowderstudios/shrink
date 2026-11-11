@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.278** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.279** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -109,6 +109,7 @@ The printer type + quality are saved in `localStorage['shrink-printer']` (`saveP
 The levelling, centring and stretch tools move the working model root, never the original. `notePose()` in `print-v2-ui.js` records each change in `poseD`; `window.__shrinkComparePose()` returns it (null when nothing moved); `app.js` `enterCompare()` applies it to `originalModel` and `leaveCompare()` restores the saved position/quaternion/scale. Any new tool that moves or turns the working root must go through `moveWorld`/`rotateAboutCentre`/`notePose`. `poseD` resets on `shrink:model-opened`.
 
 ### Uniform / Width / Depth (v2.140)
+(v2.274, Tim: remember this) A model that reads under 30 mm tall is set to 30 mm on open (`fitHeightToModel()`); 30 mm and taller keep their own height; over 500 keeps the default. (v2.279) Typing or dragging the Height makes `#v2ResizeBtn` glow (`.glow`) until it is pressed.
 Width/Depth read-outs come from `modelSize()` (precise world box of the working model; cached on uuid + `reducedTick` + matrixWorld). With `#v2Uniform` ticked they just set the Height (everything scales together via `mmPerUnit`). Unticked, they call `applyStretch(fx, fz)`: stretch lives on the working root's `scale` in WORLD axes, so `normalizeRoot()` first moves any root rotation into an inner `shrinkInner` group (root keeps identity rotation, so no shear). Factors are in `model.userData.shrinkStretch`. FIX/FUSE bake the world transform into a new root, so the stretch is then baked in and the factors read 1. `levelModel()` must run on an unstretched root (`resetStretch()` first). `window.__shrinkStretchTick` invalidates split-print's auto-cut signature.
 
 ### Hidden tabs and busy buttons (v2.255)

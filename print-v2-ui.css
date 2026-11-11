@@ -712,3 +712,6 @@ body:has(#v2MagicBtn[data-busy]) :is(#v2MagicBtn,#v2MagicDownload,#v2ShrinkBtn,#
 #v2DownloadBtn[data-info]:not([data-info=""])::after{content:attr(data-info);display:block;font-size:12px;font-weight:500;letter-spacing:0;opacity:.85;margin-top:2px}
 
 #v2ShrinkBtn[data-done]::before,#v2FixBigBtn[data-done]::before,#v2FuseBtn[data-done]::before{content:"✓";display:inline-flex;align-items:center;justify-content:center;width:1.25em;height:1.25em;margin-right:8px;border-radius:50%;background:#22c55e;color:#fff;font-size:.8em;font-weight:800;vertical-align:middle}
+
+@keyframes v2ResizeGlow{0%,100%{box-shadow:0 0 4px 1px rgba(72,167,255,.5)}50%{box-shadow:0 0 16px 5px rgba(72,167,255,.95)}}
+#v2ResizeBtn.glow{animation:v2ResizeGlow 1.1s ease-in-out infinite;border-color:#48a7ff}

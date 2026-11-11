@@ -253,6 +253,9 @@ await block(22, async () => {
   const now = triOf(window.__shrinkLive.root);
   // asked for 30%; the simplifier stops earlier when its error limit binds on an already-reduced mesh, which is correct
   ok(now < base * 0.5 && now > base * 0.2, `K2 the picture changed: ${now} triangles on screen (${(100 * now / base).toFixed(1)}% of the current model's ${base})`);
+  // v2.279: the reducer is now re-based ON the fixed model (live.root === working model); 100% must still bring the upload back
+  page.$('v2Detail').value = '100'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
+  ok(await waitFor(() => triOf(window.__shrinkLive.root) > origTris * 0.9, 30000), `K2c 100% after a re-base still restores the original (${triOf(window.__shrinkLive.root)} of ${origTris} triangles)`);
   // v2.270: 100% means the ORIGINAL again (FIX IT / FUSE IT undone), not 100% of the already-reduced model
   page.w.__shrinkInstallWorkingModel(page.w.__shrinkFuse.repairModel(window.__shrinkWorkingModel()).root, 'repair');
   page.$('v2Detail').value = '100'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));

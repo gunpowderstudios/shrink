@@ -411,7 +411,7 @@ function exportModel(kind) {
     try {
       const stem = window.__shrinkDownloadStem?.(a.baseName()) || `${a.baseName()}-SHRINK`;
       if (kind === '3mf' || kind === 'usdz') {   // v2.270: Other formats
-        const { build3mf, buildUsdz } = await import('./export-formats.js?v=2.278');
+        const { build3mf, buildUsdz } = await import('./export-formats.js?v=2.279');
         const { blob, triangles } = (kind === '3mf' ? build3mf : buildUsdz)(opts);
         saveBlob(blob, `${stem}.${kind}`);
         say(`Saved ${kind.toUpperCase()}: ${fmt(triangles)} triangles, ${fmtBytes(blob.size)}, ${heightMM} mm tall${kind === '3mf' ? ' (millimetres, Z-up)' : ' (1 unit = 1 metre, Y-up)'}.`);

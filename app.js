@@ -226,9 +226,19 @@ function restoreOrigPose() {
 }
 function poseOriginalLikeWorking() {
   if (origPosed || !originalModel || originalModel === window.__shrinkWorkingModel?.()) return;
-  const pose = window.__shrinkComparePose?.(); if (!pose) return;
+  const pose = window.__shrinkComparePose?.();
   origPosed = { model: originalModel, p: originalModel.position.clone(), q: originalModel.quaternion.clone(), s: originalModel.scale.clone() };
-  originalModel.applyMatrix4(pose); originalModel.updateMatrixWorld(true);
+  if (pose) { originalModel.applyMatrix4(pose); originalModel.updateMatrixWorld(true); }
+  // v2.279: FIX / FUSE / levelling can leave the processed model a little off the original's recorded pose. Line the two bounding boxes up (bottom and centre) so the compare slider cuts through the same spot.
+  try {
+    const work = window.__shrinkWorkingModel?.(); if (!work) return;
+    const b1 = new THREE.Box3().setFromObject(work, true), b2 = new THREE.Box3().setFromObject(originalModel, true);
+    if (b1.isEmpty() || b2.isEmpty()) return;
+    const c1 = b1.getCenter(new THREE.Vector3()), c2 = b2.getCenter(new THREE.Vector3());
+    const d = new THREE.Vector3(c1.x - c2.x, b1.min.y - b2.min.y, c1.z - c2.z);
+    const size = b1.getSize(new THREE.Vector3()).length();
+    if (d.length() > 1e-6 * size && d.length() < size) { const w = originalModel.getWorldPosition(new THREE.Vector3()).add(d); originalModel.position.copy(originalModel.parent ? originalModel.parent.worldToLocal(w) : w); originalModel.updateMatrixWorld(true); }
+  } catch (e) { console.warn('compare align', e); }
 }
 
 function showModel(model, which, reframe = true) {
