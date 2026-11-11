@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.281
+- Fixed the automatic 30 mm minimum through SHRINK and DOWNLOAD: the guard now runs after the working mesh is replaced and immediately before STL export, and resynchronises the hidden native export height with the visible Finished height.
+- Automatic sizing is tracked separately from deliberate Height, Width, Depth, or scale edits, so a manually selected size under 30 mm is preserved. BATCH's default “as uploaded” sizing remains automatic; a specified BATCH height remains manual.
+- Diagnostics now include displayed height, native export height and automatic/manual sizing status to help identify unit mismatches.
+
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
 ## v2.280
