@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.259
+- Moving Detail kept by hand after SHRINK no longer leaves "16K" on the File size row, the "Reduced from" note or the download name (the tag described the automatic result). They now say e.g. "30% kept" until the next SHRINK finds its own level.
+
 ## v2.258
 - After SHRINK finds its level, the Detail kept slider and number now show the real kept percentage (they stayed at the default 70). A note under them says why: "Limited by the printer detail…" when 50% or more was kept, otherwise "Smallest size that keeps 99.5% of the surface within 0.018 mm". live-ui.js fires `shrink:auto-found`; print-v2-ui.js listens (sets values without an input event, so the reducer is not re-run).
 

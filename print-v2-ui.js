@@ -55,7 +55,7 @@
   // The file name says what was done to the model (v2.221): name-SHRUNK-16K-FIXED-FUSED-75mm. The detail tag only shows when SHRINK ran; the height is always there because the file is always saved at it.
   function downloadStem(base) {
     const parts = [cleanBaseName(base)];
-    if (appliedChanges.has('shrunk')) parts.push(`SHRUNK-${currentPrinter().tag}`);
+    if (appliedChanges.has('shrunk')) parts.push(`SHRUNK-${shrinkTag()}`);
     if (appliedChanges.has('clay')) parts.push('CLAY');
     if (appliedChanges.has('rebuilt')) parts.push('REBUILT');
     if (appliedChanges.has('fixed')) parts.push('FIXED');
@@ -267,6 +267,8 @@
   }
 
   let healthRun = 0;
+  let detailManual = false;                     // the Detail kept value was set by hand after SHRINK, so the printer tag no longer describes the result
+  const shrinkTag = () => detailManual ? `${$('v2Detail')?.value || ''}% kept` : currentPrinter().tag;
   let rebasing = null;                          // a re-base of the live reducer that is in flight (the slider waits for it)
   let lastHealth = null;                         // { model, h }: the newest health result and the model it belongs to
   // v2.244: the yellow "Too many triangles to fuse" banner is gone (too confusing). FUSE IT still refuses above the limit (fuseCheck) and says so in its own card.
@@ -315,13 +317,13 @@
         if (note && card) {
           const was = 84 + 50 * origTris;
           const st = sideStack(); if (st && note.parentNode !== st) st.appendChild(note);
-          if (origTris > 0 && tris < origTris) { const kTag = appliedChanges.has('shrunk') ? ` (${currentPrinter().tag})` : ''; const nf = n => new Intl.NumberFormat().format(n); note.innerHTML = `Reduced from <b class="v2-was">${fmt(was)}</b> to <b class="v2-now">${fmt(stlBytes)}</b>${kTag}<br><small>${nf(origTris)} → ${nf(tris)} triangles</small>`; note.hidden = false; }
+          if (origTris > 0 && tris < origTris) { const kTag = appliedChanges.has('shrunk') ? ` (${shrinkTag()})` : ''; const nf = n => new Intl.NumberFormat().format(n); note.innerHTML = `Reduced from <b class="v2-was">${fmt(was)}</b> to <b class="v2-now">${fmt(stlBytes)}</b>${kTag}<br><small>${nf(origTris)} → ${nf(tris)} triangles</small>`; note.hidden = false; }
           else note.hidden = true;
         }
       }
       $('v2HealthRows').innerHTML =
         heightRowHtml() +
-        healthRow('File size', `≈ ${sizeText} STL${appliedChanges.has('shrunk') ? ' · ' + currentPrinter().tag : ''}`, true) +
+        healthRow('File size', `≈ ${sizeText} STL${appliedChanges.has('shrunk') ? ' · ' + shrinkTag() : ''}`, true) +
         healthRow('Triangles', new Intl.NumberFormat().format(tris), true) +
         healthRow('Watertight', watertight ? 'YES' : 'NO', watertight) +
         healthRow('Open edges', new Intl.NumberFormat().format(h.openEdges), h.openEdges === 0) +
@@ -1462,6 +1464,7 @@
       if (!Number.isFinite(value)) value = Number($('v2Detail')?.value || 70);
       value = Math.max(1, Math.min(100, value));
       const text = String(Math.round(value * 10) / 10);
+      detailManual = true;
       $('v2Detail').value = text;
       $('v2DetailNumber').value = text;
 
@@ -1485,6 +1488,7 @@
     // SHRINK found its own level: show it in the slider (no input event, the reducer is already there) and say what limited it.
     window.addEventListener('shrink:auto-found', e => {
       const d = e.detail || {}; if (!(d.ratio > 0)) return;
+      detailManual = false;
       const text = String(Math.round(Math.max(1, Math.min(100, d.ratio * 100)) * 10) / 10);
       if ($('v2Detail').value !== text) $('v2Detail').value = text;
       if ($('v2DetailNumber').value !== text) $('v2DetailNumber').value = text;
@@ -1511,7 +1515,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', e => { poseD = null; window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { poseD = null; window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
