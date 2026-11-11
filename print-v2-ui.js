@@ -279,6 +279,7 @@
   // v2.267: once FIX IT / FUSE IT / QUICK-FIX has installed a new working model, the Detail kept slider counts from THAT model (100% = the processed model), not from the upload. Show that instead of the stale value (a leftover 1% would reduce the processed model to 1% on the next touch).
   function syncDetailToBase() {
     const live = window.__shrinkLive, d = $('v2Detail'), n = $('v2DetailNumber'), note = $('v2DetailNote'); if (!live?.root || !d || !sourceModel() || sourceModel() === live.root) return;
+    if (!['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k))) return;   // a freshly opened model also differs from the live preview root: only a tool that really replaced the model counts
     if (d.value !== '100') d.value = '100'; if (n && n.value !== '100') n.value = '100';
     detailManual = false; manualLevel = '';
     if (note) note.textContent = `The model has been processed (${modelTriangles(sourceModel()).toLocaleString()} triangles). 100% now means this processed model; detail from the original can't be brought back here.`;

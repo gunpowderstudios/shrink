@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.269
+- Fix: Detail kept showed 100% right after opening a model. The v2.267 "100% = the processed model" reset also fired on a freshly opened model; it now only applies after FIX IT / FUSE IT / CLAY / rebuild has really replaced the model.
+
 ## v2.268
 - A newly opened model always starts at the recommended Detail kept of 70%, and the 3D view is reduced to match (it used to preview 50% while the slider read 70, and after a reload the browser put back whatever value you had left, such as 100%). The two Detail inputs in index.html now have `autocomplete="off"` so the browser cannot restore them.
 
