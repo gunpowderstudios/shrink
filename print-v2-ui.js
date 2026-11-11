@@ -455,7 +455,7 @@
     const otherFormats = $('v2SideGlb');
     // Direct format conversion (GLB -> OBJ etc.) does not require AUTO-SHRINK.
     // It is separate from the protected, print-ready DOWNLOAD workflow.
-    if (otherFormats) otherFormats.dataset.available = sourceModel() && !working && !detailUpdating ? 'yes' : 'no';
+    if (otherFormats) { otherFormats.dataset.available = sourceModel() && !working && !detailUpdating ? 'yes' : 'no'; otherFormats.title = 'Convert the loaded model to OBJ (Cinema 4D R25), GLB, 3MF or USDZ. AUTO-SHRINK is optional.'; }
     const note = $('v2WorkflowStatus');
     if (note) note.textContent = settingsDirty ? 'Settings changed — press SHRINK again.' : detailUpdating ? 'Updating manual detail…' : ready ? (detailManual ? 'Manual detail ready — download when happy.' : 'Optimised — ready to download.') : working ? 'SHRINK is working…' : 'Press SHRINK for automatic optimisation.';
   }
@@ -1158,7 +1158,7 @@
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
         const g = document.createElement('details'); g.id = 'v2SideGlb'; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)
-        g.innerHTML = '<summary>Other formats</summary><div class="v2-more-menu"><button type="button" data-fmt="glb">GLB</button><button type="button" data-fmt="obj">OBJ</button><button type="button" data-fmt="3mf">3MF</button><button type="button" data-fmt="usdz">USDZ</button></div>';
+        g.innerHTML = '<summary title="Convert the loaded model without AUTO-SHRINK (geometry only)">Other formats / Convert</summary><div class="v2-more-menu"><button type="button" data-fmt="glb">GLB</button><button type="button" data-fmt="obj">OBJ</button><button type="button" data-fmt="3mf">3MF</button><button type="button" data-fmt="usdz">USDZ</button></div>';
         g.addEventListener('click', e => {
           const b = e.target.closest('[data-fmt]'); if (!b) return;
           g.open = false;
