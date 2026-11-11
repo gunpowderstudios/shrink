@@ -74,11 +74,12 @@
   let workCount = 0, workTimer = null, workShown = false, workOnViewer = false;
   function setWorking(on, delayMs = 0) {
     if (on) {
-      workCount++;
+      workCount++; document.body.setAttribute('data-v2-work', '1');
       if (workShown || workTimer) return;
       if (delayMs > 0) workTimer = setTimeout(() => { workTimer = null; if (workCount > 0) showWork(); }, delayMs); else showWork();
     } else {
       workCount = Math.max(0, workCount - 1);
+      if (workCount === 0) document.body.removeAttribute('data-v2-work');
       if (workCount === 0) { if (workTimer) { clearTimeout(workTimer); workTimer = null; } hideWork(); }
     }
   }
@@ -345,7 +346,8 @@
 
   // Little progress bar in the health card while FIX IT works. The repair itself is one blocking step, so the bar is staged (it is painted before each step)
   // and carries a sliding stripe (a CSS transform animation keeps moving while the page is busy).
-  const paintNow = () => new Promise(res => requestAnimationFrame(() => setTimeout(res, 0)));
+  // v2.255: never wait on requestAnimationFrame alone: it stops while the tab is hidden or covered, which froze QUICK-FIX and BATCH until you looked again
+  const paintNow = () => new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};requestAnimationFrame(()=>setTimeout(f,0));setTimeout(f,60);});
   async function fixStep(pct, text) {
     const box = $('v2FixProgress'); if (!box) return;
     box.hidden = false; box.dataset.busy = pct < 100 ? '1' : '';

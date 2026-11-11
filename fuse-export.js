@@ -343,7 +343,7 @@ async function fusedExport(kind, evt) {
   (kind === 'stl' ? stlBtn : objBtn).textContent = 'Repairing + fusing…';
   try {
     say('Repairing seams, removing bad triangles and fusing overlapping parts…');
-    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+    await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};requestAnimationFrame(()=>setTimeout(f,0));setTimeout(f,60);});
     const { root, components } = await fuseModel(model);
     // Several separate closed pieces are a valid, printable result. Only say so; do not fail the export.
     const shape = components === 1 ? 'one connected manifold solid' : `${components} separate watertight pieces`;

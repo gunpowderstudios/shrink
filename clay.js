@@ -93,7 +93,7 @@ const hasClay = () => st.strokes.some(s => s.dabs.length);
 // Keep the number of balls (and so triangles) sensible: a long stroke is thinned, and a big pile gets coarser balls.
 const dabsOf = mode => thin(st.strokes.filter(s => s.mode === mode).flatMap(s => s.dabs), 0.5);
 const ballLevel = n => n > 1500 ? 0 : n > 400 ? 1 : 2;
-const tick = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+const tick = () => new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};requestAnimationFrame(()=>setTimeout(f,0));setTimeout(f,60);});
 const disposeRoot = r => r?.traverse?.(o => { if (o.isMesh) { o.geometry?.dispose?.(); const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => m?.dispose?.()); } });
 const triCount = m => { let n = 0; m.traverse(o => { if (o.isMesh) n += Math.floor((o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3); }); return n; };
 

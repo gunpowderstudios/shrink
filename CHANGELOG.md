@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.255
+- The big SHRINK and DOWNLOAD buttons (and SHRINK IT / FUSE IT / FIX IT / DOWNLOAD IT) stay grey for the whole run instead of flashing green between steps, in single and BATCH. `setWorking()` marks `<body data-v2-work>`; one CSS rule at the end of print-v2-ui.css does the rest.
+- Processing no longer waits on `requestAnimationFrame` alone (it stops in a hidden or covered tab, which froze QUICK-FIX and BATCH until the window was looked at again). Every such wait now also ends on a 60 ms timer: print-v2-ui, fuse-export, split-print, split-fallback, bvh-support, clay, app.
+
 ## v2.254
 - Removed Make watertight (its button, the batch row button, `makeWatertightCopy` and its tests): it always cost too much detail, and the 250-edge allowance means almost nothing needs it. The voxel rebuild file `watertight-remesh.js` stays only because the switched-off CLAY tool imports it.
 - Removed the v2.248 surface-piece fuse route (`solidFromComponents`) and its test: it never fused a real model. A model that is already one watertight piece now just says "nothing to fuse" (v2.253).

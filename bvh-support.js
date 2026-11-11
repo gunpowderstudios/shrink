@@ -23,7 +23,7 @@ export function loadBVH() {
   return loading;
 }
 
-const nextFrame = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+const nextFrame = () => new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};requestAnimationFrame(()=>setTimeout(f,0));setTimeout(f,60);});
 
 // Build a bounds tree for every mesh under `root` that does not have one yet.
 export async function ensureBVH(root, onStatus) {

@@ -234,6 +234,19 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   w.__shrinkFuseTriLimit = undefined;
 }
 
+/* ---- v2.255: the big buttons are held grey for the whole run ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
+  const doc = w.document; w.__shrinkWork(true); w.__shrinkWork(true);
+  ok(doc.body.hasAttribute('data-v2-work'), 'V1 body is marked busy while a tool works');
+  w.__shrinkWork(false); ok(doc.body.hasAttribute('data-v2-work'), 'V1 still busy while a second job runs');
+  w.__shrinkWork(false); ok(!doc.body.hasAttribute('data-v2-work'), 'V1 marker is cleared when the last job ends');
+  const t0 = Date.now(); await w.__shrinkApp; // nothing to wait for; paint waits must also finish with no animation frames:
+  const noRaf = w.requestAnimationFrame; w.requestAnimationFrame = () => 0;
+  const t1 = Date.now(); await new Promise(r => { let d = false; const f = () => { if (!d) { d = true; r(); } }; w.requestAnimationFrame(() => setTimeout(f, 0)); setTimeout(f, 60); });
+  ok(Date.now() - t1 < 1000, 'V1 a frame wait still ends when the browser stops sending frames (hidden tab)'); w.requestAnimationFrame = noRaf;
+}
+
 /* ---- manual TURN pad ---- */
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);

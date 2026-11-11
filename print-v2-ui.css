@@ -692,3 +692,8 @@ body:not(.app-mode-print) .v2-clay-card{display:none}
 .v2-split-body{padding:4px 10px 10px}
 .v2-main-controls .v2-split-body .v2-advanced{display:block}
 .v2-split-body [hidden]{display:none!important}
+
+/* v2.255: while SHRINK / FIX / FUSE / QUICK-FIX is working, the big buttons stay grey and unclickable. Between its steps the page re-checks the model and used to
+   flip them green for a moment; the grey is now held by this one rule for the whole run (single model and BATCH alike). Scripts can still .click() them. */
+body[data-v2-work] :is(#v2MagicBtn,#v2MagicDownload,#v2ShrinkBtn,#v2FuseBtn,#v2FixBigBtn,#v2DownloadBtn),
+body:has(#v2MagicBtn[data-busy]) :is(#v2MagicBtn,#v2MagicDownload,#v2ShrinkBtn,#v2FuseBtn,#v2FixBigBtn,#v2DownloadBtn){background:#3a414c!important;color:#8a93a0!important;box-shadow:none!important;opacity:1!important;filter:none!important;cursor:progress!important;pointer-events:none!important;animation:none!important}

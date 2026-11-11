@@ -943,7 +943,7 @@ async function convertTexturesToWebP(document, maxSize, quality, progressStart =
     texture.setImage(bytes).setMimeType('image/webp');
     const step = progressStart + ((i + 1) / textures.length) * (progressEnd - progressStart);
     setProgress(step, `Compressing texture ${i + 1} of ${textures.length}…`);
-    await new Promise(requestAnimationFrame);
+    await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};requestAnimationFrame(()=>setTimeout(f,0));setTimeout(f,60);});
   }
 }
 

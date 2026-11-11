@@ -754,7 +754,7 @@ async function exportSplitSTL(evt) {
     const model = sourceModel(); if (!model) return;
     if (!window.__shrinkFuse?.modelToSolid) throw new Error('Fuse engine is not ready yet. Reload SHRINK 3D and try again.');
     say('Cutting the current model into sections' + ($('splitJoint')?.value !== 'flat' ? ' and adding alignment pegs…' : '…'));
-    await new Promise(r => requestAnimationFrame(() => setTimeout(r,0)));
+    await new Promise(r=>{let d=false;const f=()=>{if(!d){d=true;r();}};requestAnimationFrame(()=>setTimeout(f,0));setTimeout(f,60);});
     const built = await window.__shrinkFuse.modelToSolid(model);
     solid = built.solid; const wasm = built.wasm;
     // Separate closed pieces are fine: the cut planes slice every piece, so a single connected solid is not needed here.
