@@ -426,12 +426,35 @@
     updateStep1Summary();
     refreshDims();
     syncHealthHeight();
+    scheduleResizeOptimisation();
   }
-
 
   // ---- Width / Depth read-outs: the print is always scaled uniformly from the height, so width and depth follow it ----
   let sizeCache = { key: '', size: null }, reducedTick = 0;
   let manualHeight = false; // Automatic 30 mm floor never overrides an intentional resize.
+  let resizeOptimiseTimer = null;
+  let lastAutoShrinkHeight = null;
+  // A new printable height changes the printer's effective tolerance. Restart the
+  // automatic search from the uploaded original, not from the reduced mesh.
+  function scheduleResizeOptimisation() {
+    if (!shrinkReady || !app()?.originalModel || window.__shrinkBatchRunning) return;
+    const mm = Number($('v2Height')?.value);
+    if (!(mm > 0) || (lastAutoShrinkHeight !== null && Math.abs(mm - lastAutoShrinkHeight) < 0.001)) {
+      clearTimeout(resizeOptimiseTimer); resizeOptimiseTimer = null; return;
+    }
+    clearTimeout(resizeOptimiseTimer);
+    resizeOptimiseTimer = setTimeout(async () => {
+      resizeOptimiseTimer = null;
+      if (shrinkRunning || window.__shrinkBatchRunning || !shrinkReady) return;
+      const current = Number($('v2Height')?.value);
+      if (!(current > 0) || Math.abs(current - mm) > 0.001) return;
+      try {
+        const note = $('v2ShrinkResult');
+        if (note) note.textContent = 'Re-optimising from the original for the new finished height…';
+        await shrinkModel();
+      } catch (err) { console.warn('[SHRINK] Resize optimisation failed', err); }
+    }, 1000); // One run after dragging/typing stops, never on every slider tick.
+  }
   function modelSize() {
     const THREE = app()?.THREE, model = sourceModel();
     if (!THREE || !model) return null;
@@ -681,6 +704,7 @@
       window.__shrinkEnforceMinHeight?.(); // An automatic height must survive model replacement during SHRINK.
       markApplied('shrunk');
       shrinkReady = true;
+      lastAutoShrinkHeight = Number($('v2Height')?.value) || null;
       // The simplifier does not promise to keep a mesh manifold: on a model made of many small pieces it can leave a few
       // edges shared by three triangles. If the model was clean before SHRINK, put that right with the same gentle repair as FIX IT.
       const tidied = window.__shrinkLive?.last?.tidied || 0;
@@ -1256,7 +1280,7 @@
     const setup = dashboard.querySelector('.v2-setup-card');
     ['.v2-size-row:not(.v2-dim-row)', '.v2-uniform-row', '.v2-dim-row'].forEach(q => { const el = setup?.querySelector(q); if (el) sizeBox.appendChild(el); });
     { const rb = document.createElement('button'); rb.type = 'button'; rb.id = 'v2ResizeBtn'; rb.className = 'v2-resize-btn'; rb.textContent = 'RESIZE';
-      rb.title = 'Scales the model to the height above. Nothing is shrunk, fixed or fused. Press DOWNLOAD IT when you want the file.';
+      rb.title = 'Apply the new size. If SHRINK has already run, optimisation updates automatically for the new height.';
       rb.addEventListener('click', () => { rb.classList.remove('glow'); updateHeight(); refreshDims(); });
       // v2.279: typing or dragging the Height makes RESIZE glow until it is pressed (programmatic fits on open do not fire input events)
       ['v2Height', 'v2HeightRange'].forEach(id => $(id)?.addEventListener('input', () => rb.classList.add('glow')));
@@ -1446,7 +1470,7 @@
     window.__shrinkEnforceMinHeight = enforceMinHeight;
     window.__shrinkMarkAutoHeight = () => { manualHeight = false; enforceMinHeight(); };
     window.__shrinkFitHeight = fitHeightToModel;
-    window.addEventListener('shrink:model-opened', () => { manualHeight = false; const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); [600, 1500].forEach(ms => setTimeout(() => { try { enforceMinHeight(); } catch {} }, ms)); });
+    window.addEventListener('shrink:model-opened', () => { clearTimeout(resizeOptimiseTimer); resizeOptimiseTimer = null; lastAutoShrinkHeight = null; manualHeight = false; const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); [600, 1500].forEach(ms => setTimeout(() => { try { enforceMinHeight(); } catch {} }, ms)); });
     setTimeout(refreshDims, 300);
     $('v2HeightRange').addEventListener('input', () => { manualHeight = true; $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });
