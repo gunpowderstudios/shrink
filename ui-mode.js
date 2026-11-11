@@ -81,7 +81,7 @@
   const GO_KEY='shrink-go';   /* v2.280: set only so a tab/logo switch with a model open survives its own reload; a plain reload always lands on Home */
   /* v2.280: one button on the start screen. The file type picks the tools (GLB = game, anything else = print), then the file opens as if dropped in the normal zone. */
   { const inp=chooser.querySelector('#startOpenInput'), btn=chooser.querySelector('#startOpenBtn');
-    const openIt=f=>{ if(!f) return; setMode(/\.(glb|gltf)$/i.test(f.name)?'game':'print',true); window.__shrinkApp?.openFile?.(f); };
+    const openIt=f=>{ if(!f) return; const chosen=location.hash==='#3d-printing'?'print':location.hash==='#gaming'?'game':currentMode(); setMode(/\.(stl|obj|ply)$/i.test(f.name)?'print':chosen,true); window.__shrinkApp?.openFile?.(f); };
     btn.addEventListener('click',()=>inp.click());
     inp.addEventListener('change',()=>{ const f=inp.files[0]; inp.value=''; openIt(f); });
     chooser.addEventListener('dragover',e=>{ e.preventDefault(); btn.classList.add('drag'); });
@@ -112,14 +112,14 @@
   const sniff=name=>{if(/\.(stl|obj|ply)$/i.test(name||''))setMode('print');};
   fileInput?.addEventListener('change',()=>sniff(fileInput.files?.[0]?.name));
   dropZone?.addEventListener('drop',e=>sniff(e.dataTransfer?.files?.[0]?.name),true);
-  /* v2.200: the file type picks the tools. STL/OBJ/PLY = print, GLB = game; a small link lets a GLB be treated as a print model. */
+  /* v2.292: a GLB is valid in 3D Printing. Keep the user's chosen mode on upload; other mesh formats default to print. */
   const override=document.createElement('p');override.className='mode-override';
   override.innerHTML='Gaming tools. <button type="button" id="modeUsePrint">Use as a print model</button>';
   steps.insertAdjacentElement('afterend',override);
   override.querySelector('button').addEventListener('click',()=>{setMode('print',true);body.classList.remove('has-glb-model');});
   window.addEventListener('shrink:model-opened',()=>{const k=window.__shrinkApp?.sourceKind;
     if(k&&k!=='glb'){body.classList.remove('has-glb-model');setMode('print');}
-    else if(k==='glb'){body.classList.add('has-glb-model');setMode('game');}});
+    else if(k==='glb'){body.classList.add('has-glb-model'); /* Do not override the current 3D Printing / Gaming selection. */ }});
   window.__shrinkUI={setMode,getMode:currentMode};
   const startHash=location.hash;   /* read before setMode() rewrites the address */
   /* v2.280: a reload (or any visit without a #tab link) opens Home; only a shared #tab link on a fresh visit, or our own switch-with-model reload, opens a tab */
