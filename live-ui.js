@@ -242,14 +242,9 @@ async function autoFind() {
   const opts = reduceOpts();
   try {
     const { perUnit, detail } = scale();
-    // v2.282: In 3D Printing, automatic SHRINK never goes under 70% of the current source mesh.
-    // Manual Detail kept remains unrestricted (1–100%), and BATCH uses this same auto finder.
-    const original = app()?.originalModel;
-    let originalTris = 0;
-    original?.traverse?.(o => { if (o.isMesh && o.geometry?.attributes?.position) originalTris += o.geometry.index ? Math.floor(o.geometry.index.count / 3) : Math.floor(o.geometry.attributes.position.count / 3); });
-    // The limit is relative to the ORIGINAL upload, not 70% of an already shrunk working model.
-    const minAutoKeep = mode() === 'print' ? Math.min(1, 0.70 * Math.max(S.tris, originalTris) / S.tris) : 0.01;
-    let lo = Math.min(1, Math.max(minAutoKeep, 1500 / S.tris)), hi = 1, best = 1, lastApplied = 1, steps = 0;
+    // v2.283: Let the selected printer tolerance and finished physical height determine
+    // the automatic reduction. The manual Detail kept slider is independent.
+    let lo = Math.max(0.01, 1500 / S.tris), hi = 1, best = 1, lastApplied = 1, steps = 0;
     for (let i = 0; i < 8 && hi / lo > 1.04; i++) {
       const mid = Math.sqrt(lo * hi); steps++;
       say(`Looking for the smallest version that still looks the same… step ${steps}`);
