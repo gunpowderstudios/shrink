@@ -755,3 +755,17 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-toolbar .segmented {
 @media(max-width:900px){
   .print-v2-dashboard .v2-viewer-slot > #v2LeftToggle {top:8px;left:10px}
 }
+
+/* v2.288 — all viewer controls share one flex row. No absolute overlays. */
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-toolbar {justify-content:flex-start}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions {
+  width:100%;display:flex;align-items:center;justify-content:flex-start;
+  flex-wrap:wrap;gap:8px;
+}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2LeftToggle {
+  position:static;display:inline-flex;align-items:center;justify-content:center;
+  writing-mode:horizontal-tb;transform:none;flex:0 0 auto;
+  width:auto;min-width:0;height:auto;margin:0;padding:9px 14px;
+  font-size:12px;font-weight:800;line-height:1.2;white-space:nowrap;
+  border-radius:9px;
+}
