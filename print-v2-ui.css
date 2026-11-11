@@ -706,6 +706,5 @@ body:has(#v2MagicBtn[data-busy]) :is(#v2MagicBtn,#v2MagicDownload,#v2ShrinkBtn,#
 .v2-batch-setname{margin:0 0 8px}.v2-batch-setname label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#9fb4d0}
 .v2-batch-setname input{padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:#0b1118;color:#e7edf5;font:inherit;font-size:13px;width:100%;box-sizing:border-box}
 
-/* v2.264: the BATCH window opens in the middle of the screen, not at the left edge */
-.v2-batch,.v2-batch.floating,.v2-batch.folded{left:50%!important;right:auto!important;transform:translateX(-50%)}
-.v2-batch.floating{top:96px}
+/* v2.265: the BATCH window stays at the left edge (v2.264 centred it by mistake); the BATCH UPLOAD button row under the drop zone is what sits in the middle */
+.v2-batch-home{justify-content:center!important;margin-left:auto!important;margin-right:auto!important;text-align:center}

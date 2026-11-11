@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.265
+- Undid v2.264: the BATCH window is back at the left edge. The BATCH UPLOAD button row under the drop zone is centred instead (that was the thing sitting off to the left).
+
 ## v2.264
 - The BATCH window opens centred horizontally instead of at the left edge.
 
