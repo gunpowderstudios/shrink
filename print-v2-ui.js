@@ -670,7 +670,7 @@
       const verdict = $('verdictText')?.textContent || '';
       const reducedRoot = window.__shrinkLive?.root || app()?.optimizedModel;
       if (reducedRoot) setWorkingModel(reducedRoot);
-      enforceMinHeight(); // An automatic height must survive model replacement during SHRINK.
+      window.__shrinkEnforceMinHeight?.(); // An automatic height must survive model replacement during SHRINK.
       markApplied('shrunk');
       shrinkReady = true;
       // The simplifier does not promise to keep a mesh manifold: on a model made of many small pieces it can leave a few
@@ -1230,7 +1230,7 @@
   }
 
   function download() {
-    enforceMinHeight(); // Synchronise the native STL exporter before saving.
+    window.__shrinkEnforceMinHeight?.(); // Synchronise the native STL exporter before saving.
     syncAdvancedToNative();
     chooseSplit();
     // Fuse is an explicit tool (FUSE IT) that already advanced the working model. Download exports the current
