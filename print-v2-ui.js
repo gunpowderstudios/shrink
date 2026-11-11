@@ -263,6 +263,7 @@
   }
 
   let healthRun = 0;
+  let detailScale = 1;                          // v2.270: the live reducer's base as a fraction of the upload. The Detail kept number is always % of the ORIGINAL, so native = shown / detailScale
   let detailManual = false;                     // the Detail kept value was set by hand after SHRINK, so the printer tag no longer describes the result
   let manualLevel = '';                         // '16K' | '8K' | 'below 8K': what the hand-set Detail kept still prints safely at (from the last measurement)
   const shrinkTag = () => detailManual ? `${$('v2Detail')?.value || ''}% kept${manualLevel ? ' · ' + manualLevel : ''}` : currentPrinter().tag;
@@ -276,13 +277,15 @@
   const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; }
     const sb = $('v2ShrinkBtn'); if (sb) { const sOff = st === 'checking' || !sourceModel(); if (sOff) { sb.dataset.checking = '1'; if (!sb.disabled) sb.disabled = true; } else if (sb.dataset.checking) { delete sb.dataset.checking; if (!shrinkRunning && sb.disabled) sb.disabled = false; } } };
   let shrinkRunning = false;
-  // v2.267: once FIX IT / FUSE IT / QUICK-FIX has installed a new working model, the Detail kept slider counts from THAT model (100% = the processed model), not from the upload. Show that instead of the stale value (a leftover 1% would reduce the processed model to 1% on the next touch).
+  // v2.267/v2.270: once FIX IT / FUSE IT / QUICK-FIX has installed a new working model, Detail kept shows how much of the ORIGINAL it holds (e.g. 1.1%), not the stale value from before. Dragging it back up restores the original (see applyDetailValue).
+  const origTrisOf = () => Math.max(1, modelTriangles(app()?.originalModel));
   function syncDetailToBase() {
     const live = window.__shrinkLive, d = $('v2Detail'), n = $('v2DetailNumber'), note = $('v2DetailNote'); if (!live?.root || !d || !sourceModel() || sourceModel() === live.root) return;
     if (!['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k))) return;   // a freshly opened model also differs from the live preview root: only a tool that really replaced the model counts
-    if (d.value !== '100') d.value = '100'; if (n && n.value !== '100') n.value = '100';
+    const pct = Math.max(1, Math.min(100, Math.round(Math.min(1, modelTriangles(sourceModel()) / origTrisOf()) * 1000) / 10)), t = String(pct);
+    if (d.value !== t) d.value = t; if (n && n.value !== t) n.value = t;
     detailManual = false; manualLevel = '';
-    if (note) note.textContent = `The model has been processed (${modelTriangles(sourceModel()).toLocaleString()} triangles). 100% now means this processed model; detail from the original can't be brought back here.`;
+    if (note) note.textContent = `This model keeps ${pct}% of the original triangles (${modelTriangles(sourceModel()).toLocaleString()}). Drag the slider up to go back to the original; FIX IT and FUSE IT are then undone.`;
   }
   async function updateHealthCard(...a) { setWorking(true, 350); try { return await updateHealthCardInner(...a); } finally { setWorking(false); try { syncDetailToBase(); } catch {} } }
   async function updateHealthCardInner() {
@@ -1477,6 +1480,7 @@
             const model = sourceModel();
             const known = lastHealth && lastHealth.model === model ? lastHealth.h : window.__shrinkPrintSafety?.topologySummary?.(model);
             await window.__shrinkLiveUI.rebaseWorking(model);
+            detailScale = Math.max(0.0001, Math.min(1, modelTriangles(model) / origTrisOf()));
             window.__shrinkLive?.setTidy?.(known ? known.clean === true : false);
           } finally { rebasing = null; }
         })();
@@ -1510,15 +1514,27 @@
       $('v2Detail').value = text;
       $('v2DetailNumber').value = text;
 
+      let reverted = false;
+      { const live = window.__shrinkLive;
+        if (live?.root && sourceModel() && sourceModel() !== live.root && ['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k))) {
+          const cur = Math.min(1, modelTriangles(sourceModel()) / origTrisOf());
+          if (value / 100 > cur * 1.05) {            // asking for more detail than the processed model has: go back to the upload
+            window.__shrinkSetWorkingModel?.(app().originalModel); clearApplied(); fuseReady = false; shrinkReady = false; reverted = true;
+            const note = $('v2DetailNote'); if (note) note.textContent = 'Back to the original model. FIX IT and FUSE IT were undone: run them again if you still need them.';
+          }
+        } }
       await ensureLiveRebased();
-      setNative('geometry', text, 'input');
+      if (reverted) detailScale = 1;
+      const nativeVal = detailScale < 1 ? Math.min(100, value / detailScale) : value;
+      setNative('geometry', String(Math.round(nativeVal * 10) / 10), 'input');
+      if (reverted && value < 100) { appliedChanges.add('shrunk'); renderAppliedChanges(); }
     }
 
     // SHRINK found its own level: show it in the slider (no input event, the reducer is already there) and say what limited it.
     window.addEventListener('shrink:auto-found', e => {
       const d = e.detail || {}; if (!(d.ratio > 0)) return;
       detailManual = false;
-      const text = String(Math.round(Math.max(1, Math.min(100, d.ratio * 100)) * 10) / 10);
+      const text = String(Math.round(Math.max(1, Math.min(100, d.ratio * 100 * detailScale)) * 10) / 10);
       if ($('v2Detail').value !== text) $('v2Detail').value = text;
       if ($('v2DetailNumber').value !== text) $('v2DetailNumber').value = text;
       const note = $('v2DetailNote'); if (!note) return;
@@ -1544,7 +1560,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', e => { poseD = null; { const cur = currentPrinter(); if (cur.type === 'resin' && cur.id !== 'r16') { try { restoringPrinter = true; const sel = $('v2PrinterSel'); if (sel) { sel.value = 'r16'; sel.dispatchEvent(new Event('change', { bubbles: true })); } } finally { restoringPrinter = false; } } } window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; { const d = $('v2Detail'), n = $('v2DetailNumber'); if (d) d.value = '70'; if (n) n.value = '70'; } { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { poseD = null; { const cur = currentPrinter(); if (cur.type === 'resin' && cur.id !== 'r16') { try { restoringPrinter = true; const sel = $('v2PrinterSel'); if (sel) { sel.value = 'r16'; sel.dispatchEvent(new Event('change', { bubbles: true })); } } finally { restoringPrinter = false; } } } window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; detailScale = 1; { const d = $('v2Detail'), n = $('v2DetailNumber'); if (d) d.value = '70'; if (n) n.value = '70'; } { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 

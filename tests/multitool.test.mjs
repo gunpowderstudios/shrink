@@ -247,11 +247,17 @@ await block(22, async () => {
   page.w.__shrinkInstallWorkingModel(fixed, 'repair');
   ok(window.__shrinkWorkingModel() === fixed && window.__shrinkLive.root === oldRoot, 'K2 setup: FIX IT replaced the working model; the reducer\'s own preview is no longer on screen');
   const base = triOf(fixed);
-  page.$('v2Detail').value = '30'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
-  ok(await waitFor(() => window.__shrinkLive.root === window.__shrinkWorkingModel() && Math.abs((window.__shrinkLive.last?.ratio ?? 0) - 0.3) < 0.011 && page.app.optimizedModel === window.__shrinkLive.root, 30000), 'K2 the slider re-based on the current model and the preview on screen follows it');
+  const origTris = triOf(figure), shownFor = pctOfCurrent => String(Math.max(1, Math.round(pctOfCurrent * (base / origTris) * 1000) / 10));
+  page.$('v2Detail').value = shownFor(0.3); page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
+  ok(await waitFor(() => window.__shrinkLive.root === window.__shrinkWorkingModel() && Math.abs((window.__shrinkLive.last?.ratio ?? 0) - 0.3) < 0.02 && page.app.optimizedModel === window.__shrinkLive.root, 30000), 'K2 the slider re-based on the current model and the preview on screen follows it');
   const now = triOf(window.__shrinkLive.root);
   // asked for 30%; the simplifier stops earlier when its error limit binds on an already-reduced mesh, which is correct
   ok(now < base * 0.5 && now > base * 0.2, `K2 the picture changed: ${now} triangles on screen (${(100 * now / base).toFixed(1)}% of the current model's ${base})`);
+  // v2.270: 100% means the ORIGINAL again (FIX IT / FUSE IT undone), not 100% of the already-reduced model
+  page.w.__shrinkInstallWorkingModel(page.w.__shrinkFuse.repairModel(window.__shrinkWorkingModel()).root, 'repair');
+  page.$('v2Detail').value = '100'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
+  ok(await waitFor(() => triOf(window.__shrinkLive.root) > origTris * 0.9, 30000), `K2b 100% brings the original detail back (${triOf(window.__shrinkLive.root)} of ${origTris} triangles)`);
+  ok(!/FIXED/.test(page.$('v2HealthChanges')?.textContent || ''), 'K2b and the FIXED chip is gone, because FIX IT was undone');
 });
 await block(23, async () => {
   // a reduction that happens to stay clean is left alone

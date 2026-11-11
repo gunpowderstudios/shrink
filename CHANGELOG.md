@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.270
+- Detail kept is always a percentage of the ORIGINAL upload. After FIX IT / FUSE IT / QUICK-FIX it shows what the processed model holds (e.g. 1.1% for 15,958 of 1,469,542 triangles) instead of 100% of an already-reduced model. Dragging it above that goes back to the original model (FIX IT and FUSE IT are undone, the note says so), so 100% really is the full original detail; below it still reduces the processed model. Internals: `detailScale` in print-v2-ui.js maps the shown value to the reducer's own % of its (rebased) model.
+
 ## v2.269
 - Fix: Detail kept showed 100% right after opening a model. The v2.267 "100% = the processed model" reset also fired on a freshly opened model; it now only applies after FIX IT / FUSE IT / CLAY / rebuild has really replaced the model.
 

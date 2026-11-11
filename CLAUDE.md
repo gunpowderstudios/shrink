@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.269** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.270** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -30,6 +30,8 @@ Read this file before changing the repository.
 ### SHRINK keeps a clean model clean (v2.57)
 (v2.246) `shrinkModel()` must never return silently: it waits for `#v2ShrinkBtn[data-checking]` to clear and for `#autoBtn` to be enabled, else it throws and sets `window.__shrinkShrinkNote`. A 12-file batch had five models leave unshrunk because it used to just return.
 The simplifier can leave a few non-manifold edges on a model of many small pieces. `shrinkModel()` notes whether the working model was clean before it ran (reusing `lastHealth`) and tells the reducer with `window.__shrinkLive.setTidy(wasClean)`. **The repair happens inside `live-reduce.js` `apply()`**, on the reduced indices, before the display geometry is built; it is not a separate model installed afterwards. **Never replace `app().optimizedModel`/the working model with a different object while the Detail kept slider is meant to drive it**: the slider modifies `engine.root` in place, so the model on screen must stay `engine.root` (v2.56 broke exactly this). If another tool (FIX IT, FUSE IT, Make watertight) installs a new working model, the next slider move re-bases the reducer on it (`__shrinkLiveUI.rebaseWorking`) first. A model that was already unhealthy is never repaired behind the person's back. Do not "fix" non-manifold output by changing simplifier flags: `LockBorder`, `Prune` and `Sparse` make no difference. The in-place repair is skipped above 300,000 triangles (`TIDY_MAX_TRIANGLES`).
+
+(v2.270) The Detail kept number is always % of the ORIGINAL upload (`detailScale` = the rebased model's triangles / the upload's). After FIX/FUSE it shows e.g. 1.1; dragging above that reverts the working model to `app().originalModel` (FIX/FUSE undone, `clearApplied()`), then the usual rebase. `applyDetailValue` converts shown value to the reducer's native % with `value / detailScale`.
 
 ### Display shading (v2.56, unchanged in v2.57)
 Reduced previews and FIX/FUSE results get their shading normals from `crease-normals.js` (`creaseSplit`), not `computeVertexNormals()`. Plain smooth normals smear shading over big flat triangles across hard edges and look like dark patches; the geometry is fine and the STL never contains them. `creaseSplit` only appends duplicate vertices and never changes positions or triangles; the original vertex numbers stay valid, which `live-reduce.js` relies on (worker indices refer to the original numbering). Keep `src.baseAttrs` (pristine attributes) in `live-reduce.js` and rebuild the display geometry from `s.positions` on every reduction.
