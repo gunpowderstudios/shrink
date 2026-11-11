@@ -2,6 +2,7 @@
 import { makePage, models, THREE, ok, failures, wait, healthOf } from './mt-harness.mjs';
 import { icosphere, dabSoup, dabsAlong, thin, joinSoups } from '../clay-core.js';
 
+const tickAll = pg => { for (const id of ['v2OptFix', 'v2OptFuse']) { const e = pg.$(id); if (e) e.checked = true; } };   // v2.271: the big SHRINK button only shrinks unless these are ticked
 const waitFor = async (fn, ms = 90000, step = 100) => { for (let t = 0; t < ms; t += step) { if (await fn()) return true; await wait(step); } return !!(await fn()); };
 const vol = soup => { let v = 0; const p = soup.positions, i = soup.indices; for (let t = 0; t < i.length; t += 3) { const a = i[t] * 3, b = i[t+1] * 3, c = i[t+2] * 3; v += (p[a]*(p[b+1]*p[c+2]-p[b+2]*p[c+1]) - p[a+1]*(p[b]*p[c+2]-p[b+2]*p[c]) + p[a+2]*(p[b]*p[c+1]-p[b+1]*p[c])) / 6; } return v; };
 const bbox = m => new THREE.Box3().setFromObject(m, true);
@@ -321,6 +322,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(seen || card.dataset.working !== '1', 'H1 the disk shows while QUICK-FIX works');
   for (let i = 0; i < 80 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250);
   ok(card.dataset.working !== '1' && !page.$('v2MagicBtn').dataset.busy, 'H1 and goes away when QUICK-FIX has finished');
+  ok(/^SHRUNK/.test(window.__shrinkLastVerdict?.text || ''), 'S1b with nothing ticked the big SHRINK button only shrinks (' + (window.__shrinkLastVerdict?.text || '') + ')');
 }
 
 
@@ -332,7 +334,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const page2 = await makePage({ model: models.multi(), heightMm: 40 }); await wait(900);
   const rows2 = page2.$('v2HealthRows');
   ok(rows2.dataset.pieces === '3' && /3 \(not fused\)/.test(rows2.textContent) && !!rows2.querySelector('strong.note'), 'P2 three separate spheres: "3 (not fused)" in amber, and it is not counted as a health fault');
-  page2.$('v2MagicBtn').click(); await wait(2000);
+  (tickAll(page2), page2.$('v2MagicBtn').click()); await wait(2000);
   for (let i = 0; i < 120 && page2.$('v2MagicBtn').dataset.busy; i++) await wait(250);
   const v = page2.w.__shrinkLastVerdict;
   ok(!!v && v.pieces >= 1 && typeof v.text === 'string' && /FIXED|NOT FULLY FIXED/.test(v.text), 'P3 QUICK-FIX ends with a verdict: ' + (v && v.text));
@@ -344,7 +346,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(900);
   { const sel = page.$('v2PrinterSel'); sel.value = 'r16'; sel.dispatchEvent(new w.Event('change', { bubbles: true })); } await wait(600); const tag0 = w.__shrinkDownloadStem('x'); w.__shrinkFuseTriLimit = 10;
-  page.$('v2MagicBtn').click(); await wait(2000);
+  (tickAll(page), page.$('v2MagicBtn').click()); await wait(2000);
   for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250);
   const note = page.$('v2MagicNote').textContent; if (0) console.log('NOTE:', note.replace(/×$/,''), '| tris', w.__shrinkWorkingModel() && (()=>{let n=0;w.__shrinkWorkingModel().traverse(o=>{if(o.isMesh)n+=(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3});return n})());
   ok(/Shrunk further for fusing/.test(note) && /from 16K to/.test(note), 'L1 over the fuse limit: QUICK-FIX shrinks again at a lower detail level and says so');
@@ -383,7 +385,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 /* ---- v2.189: a model that needs repair first (stacked duplicate shell) still fuses into one solid; degenerate triangles alone do not make it "not fixed" ---- */
 {
   const page = await makePage({ model: models.overlap(), heightMm: 40 }); const w = page.w; await wait(900);
-  page.$('v2MagicBtn').click(); await wait(2000);
+  (tickAll(page), page.$('v2MagicBtn').click()); await wait(2000);
   for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250);
   const v = w.__shrinkLastVerdict;
   ok(!!v && v.fused === true && v.pieces === 1 && /FIXED/.test(v.text) && /FUSED into one solid/.test(v.text), 'V1 two overlapping spheres: QUICK-FIX says FIXED and FUSED into one solid: ' + (v && v.text));
@@ -407,7 +409,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const big = page.$('v2BigTask');
   ok(!!big && big.hidden && /complex one/.test(big.textContent) && /Hold tight/.test(big.textContent), 'M1 the note exists, hidden, with the wording');
   let shown = false; const mo = new w.MutationObserver(() => { if (!big.hidden) shown = true; }); mo.observe(big, { attributes: true });
-  const run = async () => { shown = false; page.$('v2MagicBtn').click(); await wait(500); for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250); await wait(300); return shown; };
+  const run = async () => { shown = false; (tickAll(page), page.$('v2MagicBtn').click()); await wait(500); for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250); await wait(300); return shown; };
   ok(!(await run()), 'M1 a normal model never shows it');
   w.__shrinkBigTaskTris = 100;
   ok(await run(), 'M1 a model over the limit shows it while QUICK-FIX works');

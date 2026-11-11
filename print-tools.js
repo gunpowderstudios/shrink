@@ -410,8 +410,8 @@ function exportModel(kind) {
   setTimeout(async () => {
     try {
       const stem = window.__shrinkDownloadStem?.(a.baseName()) || `${a.baseName()}-SHRINK`;
-      if (kind === '3mf' || kind === 'usdz') {   // v2.270: Other formats
-        const { build3mf, buildUsdz } = await import('./export-formats.js?v=2.270');
+      if (kind === '3mf' || kind === 'usdz') {   // v2.271: Other formats
+        const { build3mf, buildUsdz } = await import('./export-formats.js?v=2.271');
         const { blob, triangles } = (kind === '3mf' ? build3mf : buildUsdz)(opts);
         saveBlob(blob, `${stem}.${kind}`);
         say(`Saved ${kind.toUpperCase()}: ${fmt(triangles)} triangles, ${fmtBytes(blob.size)}, ${heightMM} mm tall${kind === '3mf' ? ' (millimetres, Z-up)' : ' (1 unit = 1 metre, Y-up)'}.`);
@@ -430,7 +430,7 @@ function exportModel(kind) {
 els.saveStl.addEventListener('click', () => exportModel('stl'));
 els.saveObj.addEventListener('click', () => exportModel('obj'));
 
-// v2.270: the working model as a GLB (metres, Y-up, so it opens in game engines and viewers). One plain mesh in world space,
+// v2.271: the working model as a GLB (metres, Y-up, so it opens in game engines and viewers). One plain mesh in world space,
 // scaled so it is as tall as the Height box says; split pieces and pegs are not part of it (that is what the STL is for).
 async function exportGlb() {
   const model = currentModelForExport();
@@ -461,7 +461,7 @@ async function exportGlb() {
   } catch (err) { console.error(err); say(`GLB export failed: ${err.message}`, true); }
 }
 window.__shrinkExportGlb = exportGlb;
-window.__shrinkExportFormat = kind => kind === 'glb' ? exportGlb() : exportModel(kind);   // v2.270: used by the Other formats menu
+window.__shrinkExportFormat = kind => kind === 'glb' ? exportGlb() : exportModel(kind);   // v2.271: used by the Other formats menu
 document.getElementById('saveGlbBtn')?.addEventListener('click', exportGlb);
 
 /* ------------------------------------------------------------------ */

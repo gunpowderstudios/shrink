@@ -708,3 +708,5 @@ body:has(#v2MagicBtn[data-busy]) :is(#v2MagicBtn,#v2MagicDownload,#v2ShrinkBtn,#
 
 /* v2.265: the BATCH window stays at the left edge (v2.264 centred it by mistake); the BATCH UPLOAD button row under the drop zone is what sits in the middle */
 .v2-batch-home{justify-content:center!important;margin-left:auto!important;margin-right:auto!important;text-align:center}
+
+.v2-main-opts{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 0 10px;font-size:12px;color:#c5d0de}.v2-main-opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
