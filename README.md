@@ -1,9 +1,9 @@
-# SHRINK 3D v2.283
+# SHRINK 3D v2.284
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 
 Inputs: GLB, STL, OBJ, PLY. Outputs: GLB (game), STL / OBJ (print, in mm), GLB (print, uncompressed).
-Automatic 3D-print SHRINK chooses its reduction from the selected printer's detail tolerance and the finished model height (including BATCH), without a fixed 70% triangle floor. Raise or lower Detail kept manually, then DOWNLOAD without re-running automatic SHRINK.
+Automatic 3D-print SHRINK chooses its reduction from the selected printer's detail tolerance and the finished model height (including BATCH), without a fixed 70% triangle floor. Raise or lower Detail kept manually, then DOWNLOAD without re-running automatic SHRINK. After an automatic SHRINK, changing the finished height automatically re-optimises from the original upload for the new size.
 After deploying, hard-refresh (Cmd+Shift+R).
 
 ## v2.111 — Weld tool
