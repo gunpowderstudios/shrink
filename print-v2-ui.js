@@ -439,7 +439,7 @@
     const magic = $('v2MagicBtn'), dl = $('v2MagicDownload'), other = $('v2DownloadBtn');
     const working = !!magic?.dataset.busy;
     const ready = autoReady && !settingsDirty && !detailUpdating && !working;
-    if (magic && !working) magic.textContent = settingsDirty ? 'SHRINK AGAIN — Changes made' : autoReady ? 'SHRINK AGAIN' : 'SHRINK';
+    if (magic && !working) magic.textContent = settingsDirty ? 'AUTO-SHRINK AGAIN — Changes made' : autoReady ? 'AUTO-SHRINK AGAIN' : 'AUTO-SHRINK';
     if (dl) { dl.disabled = !ready; dl.title = settingsDirty ? 'Settings changed: press SHRINK again.' : detailUpdating ? 'Waiting for the manual detail preview.' : ready ? 'Download the current model.' : 'Press SHRINK first.'; }
     if (other) other.disabled = !ready;
     const otherFormats = $('v2SideGlb'); if (otherFormats) otherFormats.dataset.available = ready ? 'yes' : 'no';
@@ -983,7 +983,7 @@
     if (!btn || btn.disabled || !sourceModel()) return;
     btn.disabled = true; btn.dataset.busy = '1'; setWorking(true);
     autoReady = false; settingsDirty = false; detailUpdating = false; updateWorkflowButtons();
-    const label = 'SHRINK'; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
+    const label = 'AUTO-SHRINK'; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; }
     window.__shrinkLastVerdict = null; let verdict = null; const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
@@ -1140,7 +1140,7 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">AUTO-SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
