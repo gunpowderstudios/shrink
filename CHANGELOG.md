@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.283
+- Returned 3D Printing SHRINK to automatic optimisation using the selected printer's detail tolerance and finished height; removed the fixed 70% minimum. BATCH uses the same algorithm via QUICK-FIX.
+- A second automatic SHRINK starts from the original upload rather than repeatedly simplifying an already reduced mesh. Manual Detail kept adjustments can restore additional triangles from the original; DOWNLOAD does not re-run automatic optimisation.
+- Fixed footer Diagnostics overlay closing: ×, Escape and clicking outside now hide the overlay correctly, including its blocking backdrop (inline display:flex had overridden the hidden attribute).
+
 ## v2.282
 - 3D Printing SHRINK now retains at least 70% of the original model's triangles during automatic optimisation, instead of searching as low as 1%. Gaming mode retains its existing behaviour.
 - Repeated SHRINK presses use the original upload as the reference for the automatic 70% limit; if the working model has already dropped below that level, automatic SHRINK first restarts from the original.
