@@ -52,14 +52,10 @@
     const t = d.dataset.printerType || 'resin', q = d.dataset.quality || 'standard';
     return PRINTER_LIST.find(x => t === 'custom' ? x.type === 'custom' : x.type === t && x.quality === q) || PRINTER_LIST[0];
   }
-  // The file name says what was done to the model (v2.221): name-SHRUNK-16K-FIXED-FUSED-75mm. The detail tag only shows when SHRINK ran; the height is always there because the file is always saved at it.
+  // v2.266: the file name is just name-SHRINK-75mm (the SHRINK part only when SHRINK ran; the height is always there). The CLAY/REBUILT/FIXED/FUSED and printer-tag parts of v2.221 are gone.
   function downloadStem(base) {
     const parts = [cleanBaseName(base)];
-    if (appliedChanges.has('shrunk')) parts.push(`SHRUNK-${shrinkTag()}`);
-    if (appliedChanges.has('clay')) parts.push('CLAY');
-    if (appliedChanges.has('rebuilt')) parts.push('REBUILT');
-    if (appliedChanges.has('fixed')) parts.push('FIXED');
-    if (appliedChanges.has('fused')) parts.push('FUSED');
+    if (appliedChanges.has('shrunk')) parts.push('SHRINK');
     const h = Number(document.getElementById('v2Height')?.value);
     if (h > 0) parts.push(`${Number.isInteger(h) ? h : h.toFixed(1)}mm`);
     return parts.join('-');

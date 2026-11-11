@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.266
+- Download file names are now just `name-SHRINK-71mm.stl` (SHRINK only if SHRINK ran, then the height). The `-16K`, `-FIXED`, `-FUSED`, `-CLAY`, `-REBUILT` parts are gone. In BATCH the optional set name still goes in front: `BOD set of 9 - Tarak-SHRINK-71mm.stl`.
+
 ## v2.265
 - Undid v2.264: the BATCH window is back at the left edge. The BATCH UPLOAD button row under the drop zone is centred instead (that was the thing sitting off to the left).
 
