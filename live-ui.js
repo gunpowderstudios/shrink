@@ -242,7 +242,10 @@ async function autoFind() {
   const opts = reduceOpts();
   try {
     const { perUnit, detail } = scale();
-    let lo = Math.max(0.01, 1500 / S.tris), hi = 1, best = 1, lastApplied = 1, steps = 0;
+    // v2.282: In 3D Printing, automatic SHRINK never goes under 70% of the current source mesh.
+    // Manual Detail kept remains unrestricted (1–100%), and BATCH uses this same auto finder.
+    const minAutoKeep = mode() === 'print' ? 0.70 : 0.01;
+    let lo = Math.min(1, Math.max(minAutoKeep, 1500 / S.tris)), hi = 1, best = 1, lastApplied = 1, steps = 0;
     for (let i = 0; i < 8 && hi / lo > 1.04; i++) {
       const mid = Math.sqrt(lo * hi); steps++;
       say(`Looking for the smallest version that still looks the same… step ${steps}`);
