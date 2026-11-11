@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.285
+- Repositioned the ADVANCED open/close toggle as a compact horizontal green button at the top-left of the main 3D Printing workspace, no sideways writing.
+- When ADVANCED is collapsed the old 38 px left-hand sidebar column disappears, allowing the viewer to span the full available width. The toggle continues to expand and collapse the existing tools panel.
+
 ## v2.284
 - After automatic SHRINK, changing the finished Height (including uniform scaling) triggers a fresh printer-based optimisation after a 1-second pause, using the original model rather than cumulatively simplifying the reduced mesh.
 - Initial model size fitting and BATCH setup do not trigger redundant optimisation; changing height before the first SHRINK remains a normal setup action. The RESIZE tooltip now describes the automatic follow-up.
