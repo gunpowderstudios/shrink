@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.278
+- A green tick appears on the SHRINK IT, FIX IT and FUSE IT buttons in ADVANCED once that step has been done on the model (it follows the CHANGES chips, so it clears if 100% detail restores the original).
+
 ## v2.277
 - DOWNLOAD IT shows what it will export right now under its name (e.g. "70% detail · 42 mm"), updating as the slider or height changes.
 

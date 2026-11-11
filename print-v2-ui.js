@@ -148,6 +148,8 @@
     const chips = order.filter(k => appliedChanges.has(k))
       .map(k => `<span class="v2-change-chip ${k}"><i></i>${k === 'fused' && fusedPieces > 1 ? `FUSED · ${fusedPieces} PIECES` : labels[k]}</span>`)
       .join('');
+    // v2.278: a green tick on the SHRINK / FIX / FUSE buttons in ADVANCED once that step has been done on the working model
+    [['v2ShrinkBtn', 'shrunk'], ['v2FixBigBtn', 'fixed'], ['v2FuseBtn', 'fused']].forEach(([id, k]) => { const b = $(id); if (!b) return; const on = appliedChanges.has(k) || (k === 'fixed' && appliedChanges.has('rebuilt')); if (on) { if (b.dataset.done !== '1') b.dataset.done = '1'; } else if (b.dataset.done) delete b.dataset.done; });
     wrap.innerHTML = chips
       ? `<small>CHANGES</small><div>${chips}</div>`
       : '<small>CHANGES</small><div class="v2-change-none">None yet</div>';
