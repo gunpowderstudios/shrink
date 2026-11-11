@@ -1422,9 +1422,10 @@
 
     // v2.215: the left column is gone. One big MODEL HEALTH card holds the size, detail, tools and download; the old printer, split and peg controls stay in a hidden holder because BATCH and the tests drive them.
     buildMainCard();
-    // v2.286: small horizontal ADVANCED button inside the viewer, beneath the view controls.
+    // v2.288: ADVANCED shares the viewer toolbar's flex row instead of overlaying Compare.
     const advancedToggle = $('v2LeftToggle');
-    if (advancedToggle) dashboard.querySelector('.v2-viewer-slot')?.appendChild(advancedToggle);
+    const viewerActions = viewerPanel?.querySelector('.viewer-toolbar .viewer-actions');
+    if (advancedToggle && viewerActions) viewerActions.insertBefore(advancedToggle, viewerActions.firstChild);
     // The panel folds away again (as before v2.215); the choice is remembered.
     { const tg = $('v2LeftToggle');
       const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = 'ADVANCED' /* v2.236: just the one word, open or closed */; };
