@@ -276,7 +276,14 @@
   const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; }
     const sb = $('v2ShrinkBtn'); if (sb) { const sOff = st === 'checking' || !sourceModel(); if (sOff) { sb.dataset.checking = '1'; if (!sb.disabled) sb.disabled = true; } else if (sb.dataset.checking) { delete sb.dataset.checking; if (!shrinkRunning && sb.disabled) sb.disabled = false; } } };
   let shrinkRunning = false;
-  async function updateHealthCard(...a) { setWorking(true, 350); try { return await updateHealthCardInner(...a); } finally { setWorking(false); } }
+  // v2.267: once FIX IT / FUSE IT / QUICK-FIX has installed a new working model, the Detail kept slider counts from THAT model (100% = the processed model), not from the upload. Show that instead of the stale value (a leftover 1% would reduce the processed model to 1% on the next touch).
+  function syncDetailToBase() {
+    const live = window.__shrinkLive, d = $('v2Detail'), n = $('v2DetailNumber'), note = $('v2DetailNote'); if (!live?.root || !d || !sourceModel() || sourceModel() === live.root) return;
+    if (d.value !== '100') d.value = '100'; if (n && n.value !== '100') n.value = '100';
+    detailManual = false; manualLevel = '';
+    if (note) note.textContent = `The model has been processed (${modelTriangles(sourceModel()).toLocaleString()} triangles). 100% now means this processed model; detail from the original can't be brought back here.`;
+  }
+  async function updateHealthCard(...a) { setWorking(true, 350); try { return await updateHealthCardInner(...a); } finally { setWorking(false); try { syncDetailToBase(); } catch {} } }
   async function updateHealthCardInner() {
     updateSizeWarning(); ensureTurnPad();
     const card = ensureHealthCard();
@@ -1395,7 +1402,10 @@
     // v2.256: a newly opened model starts at ITS OWN height (STL/OBJ units are mm, a GLB is metres), not at a fixed 75 mm. BATCH sets its own height after this.
     function fitHeightToModel() {
       const units = window.__shrinkPrint?.state?.modelHeightUnits || 0; if (!(units > 0)) return;
-      const glb = window.__shrinkApp?.sourceKind === 'glb', mm = Math.max(1, Math.min(500, Math.round((glb && units < 10 ? units * 1000 : units) * 10) / 10));
+      const glb = window.__shrinkApp?.sourceKind === 'glb', raw = Math.round((glb && units < 10 ? units * 1000 : units) * 10) / 10;
+      // v2.267: a model that reads under 10 mm (or over 500) is almost certainly not in mm (cm, inches, metres...). Guessing it would print a 2.8 mm dog and make SHRINK far too aggressive, so keep the normal finished height instead.
+      if (!(raw >= 10 && raw <= 500)) return;
+      const mm = raw;
       const n = $('v2Height'); if (!n) return;
       n.value = String(mm); const r = $('v2HeightRange'); if (r) r.value = String(Math.max(10, Math.min(300, mm)));
       updateHeight();

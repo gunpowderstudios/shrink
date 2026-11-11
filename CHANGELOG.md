@@ -2,6 +2,10 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.267
+- A model that reads under 10 mm or over 500 mm no longer fills the Height box with that number (it is almost certainly not in mm; a 2.8 mm dog made SHRINK keep only 1% of the triangles). The normal finished height stays instead.
+- After FIX IT / FUSE IT / QUICK-FIX has made a new working model, Detail kept shows 100% with a note ("100% now means this processed model") instead of a leftover value such as 1%; dragging it used to count from the already-reduced model without saying so.
+
 ## v2.266
 - Download file names are now just `name-SHRINK-71mm.stl` (SHRINK only if SHRINK ran, then the height). The `-16K`, `-FIXED`, `-FUSED`, `-CLAY`, `-REBUILT` parts are gone. In BATCH the optional set name still goes in front: `BOD set of 9 - Tarak-SHRINK-71mm.stl`.
 

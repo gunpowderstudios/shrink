@@ -258,7 +258,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   w.__shrinkPrint = { state: { modelHeightUnits: 0.12 } }; w.__shrinkApp.sourceKind = 'glb'; w.__shrinkFitHeight();
   ok(page.$('v2Height').value === '120', 'HT1 a GLB in metres becomes mm (' + page.$('v2Height').value + ')');
   w.__shrinkPrint = { state: { modelHeightUnits: 900 } }; w.__shrinkApp.sourceKind = 'stl'; w.__shrinkFitHeight();
-  ok(page.$('v2Height').value === '500', 'HT1 the Height box stays within 1 to 500 mm');
+  ok(page.$('v2Height').value === '120', 'HT1 an out-of-range model height (900) leaves the Height box alone (' + page.$('v2Height').value + ')');
+  w.__shrinkPrint = { state: { modelHeightUnits: 2.8 } }; w.__shrinkApp.sourceKind = 'stl'; w.__shrinkFitHeight();
+  ok(page.$('v2Height').value === '120', 'HT1 a 2.8 unit STL (not mm) leaves the Height box alone (' + page.$('v2Height').value + ')');
 }
 
 /* ---- manual TURN pad ---- */
