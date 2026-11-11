@@ -51,7 +51,11 @@ function applySettings() {
     mm = units > 0 ? (glb && units < 10 ? units * 1000 : units) : 0;
     mm = mm > 0 ? Math.max(30, Math.min(500, Math.round(mm * 10) / 10)) : 0;     // the Height box allows 1 to 500 mm; v2.280: a model under 30 mm is brought up to 30 mm, like a single model
   }
-  if (h && mm > 0) { h.value = String(mm); h.dispatchEvent(new Event('input', { bubbles: true })); }
+  if (h && mm > 0) {
+    h.value = String(mm);
+    h.dispatchEvent(new Event('input', { bubbles: true }));
+    if (!S.height) window.__shrinkMarkAutoHeight?.(); // Default BATCH sizing gets the automatic 30 mm floor; explicit height stays manual.
+  }
 }
 
 function buildPanel() {
