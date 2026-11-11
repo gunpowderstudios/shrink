@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.258
+- After SHRINK finds its level, the Detail kept slider and number now show the real kept percentage (they stayed at the default 70). A note under them says why: "Limited by the printer detail…" when 50% or more was kept, otherwise "Smallest size that keeps 99.5% of the surface within 0.018 mm". live-ui.js fires `shrink:auto-found`; print-v2-ui.js listens (sets values without an input event, so the reducer is not re-run).
+
 ## v2.257
 - MODEL HEALTH box: new first row "Height" (mm, from the Finished height box, updates as you change it).
 

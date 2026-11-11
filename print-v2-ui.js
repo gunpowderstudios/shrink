@@ -1323,7 +1323,7 @@
               <button id="v2ShrinkBtn" class="v2-mega v2-green" type="button">SHRINK IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
               <div id="v2ShrinkResult" class="v2-result">SHRINK compares the reduced model with the original and stops before the difference should be visible.</div>
-              <details class="v2-advanced" open><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<div class="v2-detail-control"><input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"><div class="v2-detail-number"><input id="v2DetailNumber" type="number" min="1" max="100" step="0.1" value="70" inputmode="decimal" aria-label="Detail kept percentage"><span>%</span></div></div></label><p>Drag the slider or type the percentage you want to keep.</p></div></details>
+              <details class="v2-advanced" open><summary>Advanced optimisation settings</summary><div class="v2-advanced-body"><label>Detail kept<div class="v2-detail-control"><input id="v2Detail" type="range" min="1" max="100" step="0.1" value="70"><div class="v2-detail-number"><input id="v2DetailNumber" type="number" min="1" max="100" step="0.1" value="70" inputmode="decimal" aria-label="Detail kept percentage"><span>%</span></div></div></label><p>Drag the slider or type the percentage you want to keep.</p><p id="v2DetailNote" class="v2-detail-note"></p></div></details>
             </section>
 
             <section id="v2FixCard" class="v2-card v2-action-card v2-fix-card">
@@ -1482,6 +1482,18 @@
       setNative('geometry', text, 'input');
     }
 
+    // SHRINK found its own level: show it in the slider (no input event, the reducer is already there) and say what limited it.
+    window.addEventListener('shrink:auto-found', e => {
+      const d = e.detail || {}; if (!(d.ratio > 0)) return;
+      const text = String(Math.round(Math.max(1, Math.min(100, d.ratio * 100)) * 10) / 10);
+      if ($('v2Detail').value !== text) $('v2Detail').value = text;
+      if ($('v2DetailNumber').value !== text) $('v2DetailNumber').value = text;
+      const note = $('v2DetailNote'); if (!note) return;
+      const mm = Number(d.detailMM);
+      note.textContent = d.ratio >= 0.999 ? `Nothing could be removed without moving the surface more than ${mm} mm (${d.strict} of it).`
+        : d.ratio >= 0.5 ? `Limited by the printer detail: going lower would move more than ${d.strict} of the surface by over ${mm} mm. A coarser printer setting keeps fewer triangles.`
+        : `Smallest size that keeps ${d.strict} of the surface within ${mm} mm.`;
+    });
     $('v2Detail').addEventListener('input', () => applyDetailValue($('v2Detail').value, 'slider'));
     $('v2DetailNumber').addEventListener('input', () => {
       const v = $('v2DetailNumber').value;
@@ -1499,7 +1511,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', e => { poseD = null; window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { poseD = null; window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
