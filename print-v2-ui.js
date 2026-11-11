@@ -501,7 +501,8 @@
   const PRINTER_KEY = 'shrink-printer'; let restoringPrinter = false;
   const savedPrinter = () => { try { const v = JSON.parse(localStorage.getItem(PRINTER_KEY) || 'null'); return v && typeof v === 'object' ? v : null; } catch { return null; } };
   const syncPrinterSel = () => { const el = document.getElementById('v2PrinterSel'); if (el && dashboard) { const id = currentPrinter().id; if (el.value !== id) el.value = id; } };
-  const savePrinter = () => { syncPrinterSel(); if (restoringPrinter || !dashboard) return; try { localStorage.setItem(PRINTER_KEY, JSON.stringify({ type: dashboard.dataset.printerType || 'resin', quality: dashboard.dataset.quality || 'standard' })); } catch { /* private mode: nothing to remember */ } };
+  /* v2.262: only FDM / Custom are remembered. A resin model always starts on 16K, so a quality picked for one model (or switched automatically) never carries to the next. */
+  const savePrinter = () => { syncPrinterSel(); if (restoringPrinter || !dashboard) return; try { localStorage.setItem(PRINTER_KEY, JSON.stringify({ type: dashboard.dataset.printerType || 'resin', quality: (dashboard.dataset.printerType || 'resin') === 'resin' ? 'ultra' : (dashboard.dataset.quality || 'standard') })); } catch { /* private mode: nothing to remember */ } };
   function choosePrinter(type) {
     dashboard.dataset.printerType = type;
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.classList.toggle('active', b.dataset.printer === type));
@@ -1536,7 +1537,7 @@
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', e => { poseD = null; window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { poseD = null; { const cur = currentPrinter(); if (cur.type === 'resin' && cur.id !== 'r16') { try { restoringPrinter = true; const sel = $('v2PrinterSel'); if (sel) { sel.value = 'r16'; sel.dispatchEvent(new Event('change', { bubbles: true })); } } finally { restoringPrinter = false; } } } window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 

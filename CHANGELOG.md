@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.262
+- A resin model always opens on 16K. Only FDM and Custom are remembered between models; an 8K/4K pick, or the automatic 16K/8K switch from a hand-set Detail kept, applies to the current model only.
+
 ## v2.261
 - The Printer detail dropdown (Resin 16K / 8K fine / 8K / 4K, FDM, Custom) is visible again, directly above Detail kept. It had been moved into the hidden legacy block when the one big card was built, so the printer could not be changed from the screen.
 
