@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.256
+- A newly opened model now starts at its own height in the Finished height box (STL/OBJ units are mm, a GLB is metres, clamped to 1 to 500 mm) instead of a fixed 75 mm. BATCH already did this when its Height field is blank, and still sets its own value afterwards. `window.__shrinkFitHeight()`.
+
 ## v2.255
 - The big SHRINK and DOWNLOAD buttons (and SHRINK IT / FUSE IT / FIX IT / DOWNLOAD IT) stay grey for the whole run instead of flashing green between steps, in single and BATCH. `setWorking()` marks `<body data-v2-work>`; one CSS rule at the end of print-v2-ui.css does the rest.
 - Processing no longer waits on `requestAnimationFrame` alone (it stops in a hidden or covered tab, which froze QUICK-FIX and BATCH until the window was looked at again). Every such wait now also ends on a 60 ms timer: print-v2-ui, fuse-export, split-print, split-fallback, bvh-support, clay, app.

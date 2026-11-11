@@ -1385,7 +1385,16 @@
     $('v2ScaleUp').addEventListener('click', () => scaleBy(1.1));
     $('v2ScaleDown').addEventListener('click', () => scaleBy(0.9));
     window.addEventListener('shrink:reduced', () => { reducedTick++; refreshDims(); });
-    window.addEventListener('shrink:model-opened', () => { const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(refreshDims, 150); });
+    // v2.256: a newly opened model starts at ITS OWN height (STL/OBJ units are mm, a GLB is metres), not at a fixed 75 mm. BATCH sets its own height after this.
+    function fitHeightToModel() {
+      const units = window.__shrinkPrint?.state?.modelHeightUnits || 0; if (!(units > 0)) return;
+      const glb = window.__shrinkApp?.sourceKind === 'glb', mm = Math.max(1, Math.min(500, Math.round((glb && units < 10 ? units * 1000 : units) * 10) / 10));
+      const n = $('v2Height'); if (!n) return;
+      n.value = String(mm); const r = $('v2HeightRange'); if (r) r.value = String(Math.max(10, Math.min(300, mm)));
+      updateHeight();
+    }
+    window.__shrinkFitHeight = fitHeightToModel;
+    window.addEventListener('shrink:model-opened', () => { const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); });
     setTimeout(refreshDims, 300);
     $('v2HeightRange').addEventListener('input', () => { $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });

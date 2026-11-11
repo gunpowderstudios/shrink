@@ -247,6 +247,17 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(Date.now() - t1 < 1000, 'V1 a frame wait still ends when the browser stops sending frames (hidden tab)'); w.requestAnimationFrame = noRaf;
 }
 
+/* ---- v2.256: Height starts at the opened model's own height ---- */
+{
+  const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
+  w.__shrinkPrint = { state: { modelHeightUnits: 37.2 } }; w.__shrinkApp.sourceKind = 'stl'; w.__shrinkFitHeight();
+  ok(page.$('v2Height').value === '37.2', 'HT1 an STL opens at its own height (' + page.$('v2Height').value + ')');
+  w.__shrinkPrint = { state: { modelHeightUnits: 0.12 } }; w.__shrinkApp.sourceKind = 'glb'; w.__shrinkFitHeight();
+  ok(page.$('v2Height').value === '120', 'HT1 a GLB in metres becomes mm (' + page.$('v2Height').value + ')');
+  w.__shrinkPrint = { state: { modelHeightUnits: 900 } }; w.__shrinkApp.sourceKind = 'stl'; w.__shrinkFitHeight();
+  ok(page.$('v2Height').value === '500', 'HT1 the Height box stays within 1 to 500 mm');
+}
+
 /* ---- manual TURN pad ---- */
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(400);
