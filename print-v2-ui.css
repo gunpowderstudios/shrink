@@ -730,3 +730,18 @@ body:has(#v2MagicBtn[data-busy]) :is(#v2MagicBtn,#v2MagicDownload,#v2ShrinkBtn,#
 @media(max-width:900px){
   .print-v2-dashboard > .v2-left-toggle {width:auto;height:auto;writing-mode:horizontal-tb}
 }
+
+/* v2.286 — compact horizontal ADVANCED control inside the viewer, at top-left. */
+.print-v2-dashboard .v2-viewer-slot {position:relative}
+.print-v2-dashboard .v2-viewer-slot > #v2LeftToggle {
+  position:absolute;z-index:90;top:48px;left:12px;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:auto;height:auto;min-width:112px;max-width:max-content;
+  padding:9px 15px;margin:0;
+  writing-mode:horizontal-tb;transform:none;text-orientation:mixed;
+  font-size:12px;font-weight:800;line-height:1.2;white-space:nowrap;text-align:center;
+  border-radius:9px;box-sizing:border-box;
+}
+@media(max-width:900px){
+  .print-v2-dashboard .v2-viewer-slot > #v2LeftToggle {top:45px;left:10px;width:auto;height:auto;writing-mode:horizontal-tb}
+}
