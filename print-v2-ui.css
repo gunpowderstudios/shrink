@@ -769,3 +769,8 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2LeftTog
   font-size:12px;font-weight:800;line-height:1.2;white-space:nowrap;
   border-radius:9px;
 }
+
+/* v2.289 — clear SHRINK/DOWNLOAD states below the model-health card. */
+#v2WorkflowStatus.v2-workflow-status{display:block;margin:6px 0 8px;max-width:100%;font-size:12px;line-height:1.4;color:#b8c7d8;text-align:center}
+#v2MagicBtn{white-space:normal;line-height:1.25}
+#v2MagicDownload:disabled{opacity:.45;filter:grayscale(.7);cursor:not-allowed}
