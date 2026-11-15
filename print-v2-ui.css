@@ -781,3 +781,30 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadBtn,
 body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:none!important}
 /* Other formats must respect the same readiness as the main DOWNLOAD. */
 #v2SideGlb[data-available="no"]{opacity:.35;pointer-events:none}
+
+/* Hollowing is isolated from the regular print tools and downloads. */
+body:not(.app-mode-print) #v2HollowBtn { display: none; }
+#v2HollowDialog {
+  color: #f0f6f5; background: #18252c; border: 1px solid #547178; border-radius: 14px;
+  width: min(920px, 93vw); max-height: 90vh; padding: 16px;
+}
+#v2HollowDialog::backdrop { background: #000a; }
+#v2HollowDialog header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+#v2HollowDialog h2 { margin: 0; }
+.hollow-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); gap: 16px; }
+.hollow-preview { min-height: 360px; border: 1px solid #547178; border-radius: 10px; overflow: hidden; position: relative; }
+.hollow-preview canvas { width: 100%; height: 100%; position: absolute; inset: 0; display: block; touch-action: none; }
+.hollow-controls { display: grid; align-content: start; gap: 9px; }
+.hollow-controls p, .hollow-controls ol { margin: 0; }
+.hollow-controls ol { padding-left: 25px; max-height: 9em; overflow: auto; }
+.hollow-controls li { margin-bottom: 4px; }
+.hollow-controls label { display: flex; align-items: center; gap: 8px; }
+.hollow-controls input[type=number] { width: 72px; background: #0d1a20; color: inherit; padding: 4px; border: 1px solid #6d878c; border-radius: 4px; }
+#v2HollowDialog button { border: 1px solid #6d878c; border-radius: 6px; padding: 6px 9px; color: inherit; background: #23363d; }
+#v2HollowDialog button[aria-pressed=true], #v2HollowDialog #hollowSave:not(:disabled) { background: #1c694c; }
+#v2HollowDialog button:disabled { opacity: 0.5; }
+#hollowStatus { color: #a8f0c4; min-height: 2em; }
+@media (max-width: 620px) {
+  .hollow-layout { grid-template-columns: minmax(0, 1fr); }
+  .hollow-preview { min-height: min(35vh, 300px); }
+}

@@ -1,6 +1,7 @@
 // SHRINK 3D v2.68 — Auto and Manual both show true-size pegs; Manual uses axis sliders only.
 (() => {
   const VERSION = '2.68';
+  let hollow;
   const $ = id => document.getElementById(id);
   const app = () => window.__shrinkApp;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -15,6 +16,7 @@
   const appliedChanges = new Set();
 
   function setWorkingModel(model) {
+    if (workingModel !== model) hollow?.cancelHollow();
     workingModel = model || app()?.originalModel || null;
     return workingModel;
   }
@@ -452,6 +454,11 @@
     if (magic && !working) magic.textContent = settingsDirty ? 'AUTO-SHRINK AGAIN — Changes made' : autoReady ? 'AUTO-SHRINK AGAIN' : 'AUTO-SHRINK';
     if (dl) { dl.disabled = !ready; dl.title = settingsDirty ? 'Settings changed: press SHRINK again.' : detailUpdating ? 'Waiting for the manual detail preview.' : ready ? 'Download the current model.' : 'Press SHRINK first.'; }
     if (other) other.disabled = !ready;
+    const hollowButton = $('v2HollowBtn');
+    if (hollowButton) {
+      hollowButton.disabled = !ready;
+      if (!ready) hollow?.cancelHollow();
+    }
     const otherFormats = $('v2SideGlb');
     // Direct format conversion (GLB -> OBJ etc.) does not require AUTO-SHRINK.
     // It is separate from the protected, print-ready DOWNLOAD workflow.
@@ -1169,6 +1176,24 @@
     $('v2MagicBtn').addEventListener('click', shrinkMyModel);
     { const status = document.createElement('small'); status.id = 'v2WorkflowStatus'; status.className = 'v2-workflow-status'; $('v2MagicDownload')?.insertAdjacentElement('afterend', status); updateWorkflowButtons(); }
     $('v2MagicReset').addEventListener('click', () => { const f = $('fileInput'); if (f) { f.value = ''; f.click(); } });
+    const hollowButton = document.createElement('button');
+    hollowButton.id = 'v2HollowBtn';
+    hollowButton.className = 'v2-magic v2-magic-reset v2-magic-side';
+    hollowButton.type = 'button';
+    hollowButton.textContent = 'Hollow for Resin';
+    hollowButton.title = 'Optional after AUTO-SHRINK. Make a separate hollow STL.';
+    hollowButton.disabled = true;
+    $('v2MagicDownload')?.insertAdjacentElement('afterend', hollowButton);
+    hollowButton.addEventListener('click', async () => {
+      if (hollowButton.disabled || window.__shrinkBatchRunning) return;
+      try {
+        hollow ||= await import('./hollow-ui.js?v=2.293');
+        hollow.openHollow();
+      } catch (err) {
+        const note = $('v2WorkflowStatus');
+        if (note) note.textContent = err.message || 'Could not open the hollowing tool.';
+      }
+    });
     $('v2MagicDownload').addEventListener('click', () => { const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
   }
 

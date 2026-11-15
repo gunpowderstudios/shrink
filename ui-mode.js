@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.292';
+  const PRINT_RELEASE = '2.293';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -112,7 +112,7 @@
   const sniff=name=>{if(/\.(stl|obj|ply)$/i.test(name||''))setMode('print');};
   fileInput?.addEventListener('change',()=>sniff(fileInput.files?.[0]?.name));
   dropZone?.addEventListener('drop',e=>sniff(e.dataTransfer?.files?.[0]?.name),true);
-  /* v2.292: a GLB is valid in 3D Printing. Keep the user's chosen mode on upload; other mesh formats default to print. */
+  /* v2.293: a GLB is valid in 3D Printing. Keep the user's chosen mode on upload; other mesh formats default to print. */
   const override=document.createElement('p');override.className='mode-override';
   override.innerHTML='Gaming tools. <button type="button" id="modeUsePrint">Use as a print model</button>';
   steps.insertAdjacentElement('afterend',override);
