@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.306
+- HOLLOW card: a Hole size slider (2 to 8 mm across, default 3). Like Wall and Drain holes it rebuilds the hollow model when released, and the result line states the size used. Test HU13.
+
 ## v2.305
 - HOLLOW: once the model is hollow, letting go of the Wall slider (or changing Drain holes) rebuilds it automatically so the new thickness shows in the cut-away; the cut-away stays where you left it. Test HU12.
 

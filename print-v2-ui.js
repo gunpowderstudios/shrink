@@ -719,11 +719,11 @@
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, wallMm = Number($('v2HollowWall')?.value) || 2, holes = Number($('v2HollowHoles')?.value ?? 2);
       progress(card, 35, 'Working out the inside… this can take a moment');
       await paintNow();
-      const r = await window.__shrinkFuse.hollowModel(model, { wall: wallMm / mm, holes, holeRadius: 1.5 / mm });
+      const r = await window.__shrinkFuse.hollowModel(model, { wall: wallMm / mm, holes, holeRadius: (Number($('v2HollowHoleSize')?.value) || 3) / 2 / mm });
       progress(card, 85, 'Checking the result…');
       removeHollowBlue(); installWorkingResult(r.root, 'hollow'); hollowResult = r.root;
       const ml = v => (v * mm * mm * mm / 1000);
-      res.innerHTML = `<strong>✓ Hollowed</strong><span>Resin volume ${ml(r.before).toFixed(1)} ml → ${ml(r.after).toFixed(1)} ml (${Math.round(r.saved * 100)}% saved). ${r.holes.length ? r.holes.length + ' drain hole' + (r.holes.length > 1 ? 's' : '') + ' in the base, about 3 mm wide.' : '<b>No drain holes</b>: resin printers need them, add them in your slicer.'} Drag the cut-away slider to look inside.</span>`;
+      res.innerHTML = `<strong>✓ Hollowed</strong><span>Resin volume ${ml(r.before).toFixed(1)} ml → ${ml(r.after).toFixed(1)} ml (${Math.round(r.saved * 100)}% saved). ${r.holes.length ? r.holes.length + ' drain hole' + (r.holes.length > 1 ? 's' : '') + ' in the base, about ' + (Number($('v2HollowHoleSize')?.value) || 3) + ' mm wide.' : '<b>No drain holes</b>: resin printers need them, add them in your slicer.'} Drag the cut-away slider to look inside.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       const cut = $('v2HollowCut'); if (cut) { cut.hidden = false; $('v2HollowCutRange').value = '100'; }
       if (Number.isFinite(keepCut) && keepCut < 99.5) { try { hollowClip(keepCut); } catch {} }
@@ -1511,6 +1511,7 @@
               <p class="v2-hollow-note">Resin printing: a solid model fills with expensive resin that nobody sees. Hollowing leaves a shell, so the print uses far less resin (and is lighter). The drain holes let uncured resin run out; without them it stays trapped inside and can crack the print.</p>
               <div class="v2-hollow-row"><label for="v2HollowWall">Wall</label><input id="v2HollowWall" type="range" min="1" max="5" step="0.5" value="2" autocomplete="off"><output id="v2HollowWallOut">2 mm</output></div>
               <div class="v2-hollow-row"><label for="v2HollowHoles">Drain holes</label><select id="v2HollowHoles" autocomplete="off"><option value="2" selected>2 (recommended)</option><option value="1">1</option><option value="0">None</option></select></div>
+              <div class="v2-hollow-row"><label for="v2HollowHoleSize">Hole size</label><input id="v2HollowHoleSize" type="range" min="2" max="8" step="0.5" value="3" autocomplete="off"><output id="v2HollowHoleSizeOut">3 mm</output></div>
               <button id="v2HollowBtn" class="v2-mega v2-teal" type="button">HOLLOW IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
               <div id="v2HollowResult" class="v2-result">Works best after SHRINK with fix and fuse, on one watertight piece.</div>
@@ -1607,7 +1608,8 @@
     $('v2HollowWall')?.addEventListener('input', () => { $('v2HollowWallOut').textContent = $('v2HollowWall').value + ' mm'; });
     /* v2.305: once the model is hollow, letting go of the wall slider (or changing the drain holes) rebuilds it straight away so the new thickness shows in the cut-away */
     { let t = 0; const again = () => { clearTimeout(t); t = setTimeout(() => { if (hollowResult && sourceModel() === hollowResult && !$('v2HollowBtn')?.disabled) hollowModelNow(); }, 350); };
-      $('v2HollowWall')?.addEventListener('change', again); $('v2HollowHoles')?.addEventListener('change', again); }
+      $('v2HollowWall')?.addEventListener('change', again); $('v2HollowHoles')?.addEventListener('change', again); $('v2HollowHoleSize')?.addEventListener('change', again);
+      $('v2HollowHoleSize')?.addEventListener('input', () => { $('v2HollowHoleSizeOut').textContent = $('v2HollowHoleSize').value + ' mm'; }); }
     $('v2HollowCutRange')?.addEventListener('input', e => hollowClip(Number(e.target.value)));
     $('v2FixBigBtn').addEventListener('click', fixHealthModel);
     $('v2ProtectBtn').addEventListener('click', () => {

@@ -62,4 +62,15 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
   ok(y2 > y1 * 1.3, `HU12 changing the wall rebuilds the hollow model by itself (${y1} ml -> ${y2} ml)`);
   ok(c > 0 && Number(page.$('v2HollowSlideRange').value) === 60, 'HU12 the cut-away stays where it was after the rebuild');
 }
+
+/* v2.306: the drain hole size is adjustable and rebuilds the hollow model when released */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(300);
+  w.__shrinkMarkApplied('shrunk'); await wait(50);
+  page.$('v2HollowBtn').click();
+  await waitFor(() => /about 3 mm wide/.test(page.$('v2HollowResult').textContent), 110000);
+  ok(/about 3 mm wide/.test(page.$('v2HollowResult').textContent), 'HU13 the default drain hole is about 3 mm wide');
+  const prev = page.$('v2HollowResult').textContent; page.$('v2HollowHoleSize').value = '5'; page.$('v2HollowHoleSize').dispatchEvent(new w.Event('change', { bubbles: true }));
+  await waitFor(() => page.$('v2HollowResult').textContent !== prev && /Hollowed/.test(page.$('v2HollowResult').textContent), 110000);
+  ok(/about 5 mm wide/.test(page.$('v2HollowResult').textContent), 'HU13 a 5 mm hole size rebuilds with 5 mm holes: ' + page.$('v2HollowResult').textContent.slice(0, 200));
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('hollow ui tests passed'); process.exit(0);
