@@ -797,3 +797,10 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-auto-hollow{display:flex;align-items:center;gap:8px;margin:6px 2px 8px;font-size:12px;color:#cbd5e1;cursor:pointer}
 .v2-auto-hollow input{width:16px;height:16px;accent-color:#14b8a6;cursor:pointer}
 .v2-auto-hollow:has(input:disabled){opacity:.5;cursor:not-allowed}
+
+/* v2.303 — vertical blue cut-away slider at the left edge of the viewer (hollow models) */
+.print-v2-dashboard .v2-viewer-slot{position:relative}
+.v2-hollow-slide{position:absolute;z-index:80;left:14px;top:84px;bottom:70px;width:44px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 4px;border-radius:12px;background:rgba(10,18,32,.78);border:1px solid #2f86ff;color:#cfe2ff;font-size:11px;font-weight:800;letter-spacing:.5px}
+.v2-hollow-slide[hidden]{display:none!important}
+.v2-hollow-slide input[type=range]{flex:1;width:22px;writing-mode:vertical-lr;direction:rtl;accent-color:#2f86ff;cursor:ns-resize;margin:0}
+.v2-hollow-slide output{font-size:11px;color:#9cc4ff}

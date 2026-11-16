@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.303
+- Once a model is hollow, a tall blue CUT slider appears at the left edge of the viewer (right of the ADVANCED column). Drag it down to slice the top away and see inside; it drives the same cut-away as the slider on the Hollow card and the two stay in step. Test HU11.
+
 ## v2.302
 - A tick box "Hollow it too (saves resin)" under the green AUTO-SHRINK button (off by default). When ticked, AUTO-SHRINK finishes by hollowing (2 mm walls, 2 drain holes) after levelling and centring, so most people no longer need ADVANCED. Test HU10 (hollow-ui) covers it; clay test C8 allows the tick box between AUTO-SHRINK and DOWNLOAD.
 

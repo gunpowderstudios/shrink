@@ -145,6 +145,7 @@
   let fusedPieces = 1;                          // how many pieces the last fuse left (v2.187): the chip says so when it is not one
   function renderAppliedChanges() {
     { const hc = $('v2HollowCard'); if (hc) hc.hidden = !(HOLLOW_ON && appliedChanges.has('shrunk')); }
+    ensureHollowSlide(); { const hs = $('v2HollowSlide'); if (hs) hs.hidden = !appliedChanges.has('hollowed'); }
     const wrap = $('v2HealthChanges');
     if (!wrap) return;
     const order = ['clay','fixed','rebuilt','fused','hollowed','shrunk'];
@@ -665,6 +666,16 @@
 
   // ---- HOLLOW IT (v2.281, test branch): hollow the working model after SHRINK, then a cut-away slider to look inside ----
   let hollowPlane = null, hollowBase = null, hollowResult = null;
+  /* v2.303: a tall blue slider at the left of the viewer (right of the ADVANCED column) that cuts the hollow model open from the top; it drives the same cut-away as the slider on the Hollow card */
+  function ensureHollowSlide() {
+    if ($('v2HollowSlide')) return;
+    const slot = document.querySelector('.v2-viewer-slot'); if (!slot) return;
+    const d = document.createElement('div'); d.id = 'v2HollowSlide'; d.className = 'v2-hollow-slide'; d.hidden = true;
+    d.title = 'Slide down to cut the hollow model open and see the inside';
+    d.innerHTML = '<span>CUT</span><input id="v2HollowSlideRange" type="range" min="0" max="100" step="1" value="100" orient="vertical" aria-label="Cut-away height" autocomplete="off"><output id="v2HollowSlideOut">off</output>';
+    slot.appendChild(d);
+    $('v2HollowSlideRange').addEventListener('input', e => hollowClip(Number(e.target.value)));
+  }
   function removeHollowBlue() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkHollowBlue'); if (!g) return; V.scene.remove(g); g.traverse(o => { if (o.isMesh && o.material && o.material.dispose && g.children[0] === o) o.material.dispose(); }); }
   window.addEventListener('shrink:model-opened', () => { removeHollowBlue(); hollowBase = null; hollowResult = null; });
   function hollowClip(pct) {
@@ -685,6 +696,7 @@
       V.scene.add(g);
     }
     const out = $('v2HollowCutOut'); if (out) out.textContent = pct >= 99.5 ? 'off' : Math.round(pct) + '%';
+    { const r = $('v2HollowCutRange'); if (r && Number(r.value) !== Math.round(pct)) r.value = String(Math.round(pct)); const v = $('v2HollowSlideRange'); if (v && Number(v.value) !== Math.round(pct)) v.value = String(Math.round(pct)); const vo = $('v2HollowSlideOut'); if (vo) vo.textContent = pct >= 99.5 ? 'off' : Math.round(pct) + '%'; }
   }
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');

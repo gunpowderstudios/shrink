@@ -10,6 +10,7 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
   ok(page.$('v2HollowCard')?.hidden === true, 'HU2 with ?hollow=1 the card waits for SHRINK');
   w.__shrinkMarkApplied('shrunk'); await wait(50);
   ok(page.$('v2HollowCard')?.hidden === false, 'HU2 after SHRINK the card appears');
+  ok(!page.$('v2HollowSlide') || page.$('v2HollowSlide').hidden === true, 'HU11 no vertical slider before hollowing');
   const before = w.__shrinkWorkingModel(); let tri0 = 0; before.traverse(o => { if (o.isMesh) tri0 += (o.geometry.index?.count || o.geometry.attributes.position.count) / 3; });
   page.$('v2HollowWall').value = '2'; page.$('v2HollowBtn').click();
   const done = await waitFor(() => /Hollowed|Could not/.test(page.$('v2HollowResult').textContent), 110000);
@@ -18,6 +19,11 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
   ok(m !== before && tri1 > tri0, `HU4 the hollow result is the new working model with an inner shell (${tri0} -> ${tri1} triangles)`);
   ok(/HOLLOW/.test(page.$('v2HealthChanges').textContent), 'HU5 a HOLLOW chip appears');
   ok(page.$('v2HollowCut')?.hidden === false, 'HU6 the cut-away slider appears');
+  ok(page.$('v2HollowSlide')?.hidden === false, 'HU11 the vertical blue cut-away slider appears once the model is hollow');
+  { const vs = page.$('v2HollowSlideRange'); vs.value = '40'; vs.dispatchEvent(new w.Event('input', { bubbles: true })); await wait(100);
+    let c = 0; w.__shrinkWorkingModel().traverse(o => { if (o.isMesh && o.material?.clippingPlanes?.length) c++; });
+    ok(c > 0 && Number(page.$('v2HollowCutRange').value) === 40 && /40/.test(page.$('v2HollowCutOut').textContent), 'HU11 the vertical slider cuts the model and the card slider follows');
+    vs.value = '100'; vs.dispatchEvent(new w.Event('input', { bubbles: true })); await wait(100); }
   const r = page.$('v2HollowCutRange'); r.value = '50'; r.dispatchEvent(new w.Event('input', { bubbles: true })); await wait(100);
   let clipped = 0; w.__shrinkWorkingModel().traverse(o => { if (o.isMesh && o.material?.clippingPlanes?.length) clipped++; });
   ok(clipped > 0 && /50/.test(page.$('v2HollowCutOut').textContent), 'HU7 the cut-away slider clips the model');
