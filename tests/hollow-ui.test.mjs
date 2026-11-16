@@ -48,4 +48,18 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
   ok(done, 'HU10 AUTO-SHRINK with the box ticked ends with the model hollowed: ' + page.$('v2HollowResult').textContent.slice(0, 120));
   ok(/HOLLOW/.test(page.$('v2HealthChanges').textContent), 'HU10 the HOLLOW chip shows after the automatic run');
 }
+
+/* v2.305: letting go of the wall slider on a hollow model rebuilds it by itself and keeps the cut-away where it was */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(300);
+  w.__shrinkMarkApplied('shrunk'); await wait(50);
+  page.$('v2HollowWall').value = '2'; page.$('v2HollowBtn').click();
+  await waitFor(() => /Hollowed/.test(page.$('v2HollowResult').textContent), 110000);
+  const after = () => Number((/→ ([\d.]+) ml/.exec(page.$('v2HollowResult').textContent) || [])[1]);
+  const y1 = after(); const vs = page.$('v2HollowSlideRange'); vs.value = '60'; vs.dispatchEvent(new w.Event('input', { bubbles: true })); await wait(100);
+  const prev = page.$('v2HollowResult').textContent; page.$('v2HollowWall').value = '6'; page.$('v2HollowWall').dispatchEvent(new w.Event('change', { bubbles: true }));
+  await waitFor(() => page.$('v2HollowResult').textContent !== prev && /Hollowed/.test(page.$('v2HollowResult').textContent), 110000);
+  const y2 = after(); let c = 0; w.__shrinkWorkingModel().traverse(o => { if (o.isMesh && o.material?.clippingPlanes?.length) c++; });
+  ok(y2 > y1 * 1.3, `HU12 changing the wall rebuilds the hollow model by itself (${y1} ml -> ${y2} ml)`);
+  ok(c > 0 && Number(page.$('v2HollowSlideRange').value) === 60, 'HU12 the cut-away stays where it was after the rebuild');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('hollow ui tests passed'); process.exit(0);

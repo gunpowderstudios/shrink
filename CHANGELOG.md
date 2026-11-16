@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.305
+- HOLLOW: once the model is hollow, letting go of the Wall slider (or changing Drain holes) rebuilds it automatically so the new thickness shows in the cut-away; the cut-away stays where you left it. Test HU12.
+
 ## v2.304
 - AUTO-SHRINK is grey from the moment a model opens until its first full health check (including the piece count) has finished, then green and it stays green: later re-checks no longer turn it grey again (it used to flicker green / grey / green, inviting early clicks). Test Q2.
 

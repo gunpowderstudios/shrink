@@ -705,6 +705,7 @@
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
     if (!btn || btn.disabled) return;
     btn.disabled = true; setWorking(true, 0);
+    const keepCut = (hollowResult && sourceModel() === hollowResult) ? Number($('v2HollowCutRange')?.value) : 100;   // v2.305: re-hollowing keeps the cut-away where it was
     try {
       progress(card, 10, 'Loading the solid tools…');
       for (let i = 0; i < 50 && !window.__shrinkFuse?.hollowModel; i++) await wait(100);
@@ -725,6 +726,7 @@
       res.innerHTML = `<strong>✓ Hollowed</strong><span>Resin volume ${ml(r.before).toFixed(1)} ml → ${ml(r.after).toFixed(1)} ml (${Math.round(r.saved * 100)}% saved). ${r.holes.length ? r.holes.length + ' drain hole' + (r.holes.length > 1 ? 's' : '') + ' in the base, about 3 mm wide.' : '<b>No drain holes</b>: resin printers need them, add them in your slicer.'} Drag the cut-away slider to look inside.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       const cut = $('v2HollowCut'); if (cut) { cut.hidden = false; $('v2HollowCutRange').value = '100'; }
+      if (Number.isFinite(keepCut) && keepCut < 99.5) { try { hollowClip(keepCut); } catch {} }
       setTimeout(updateHealthCard, 80);
     } catch (err) {
       card.dataset.state = 'warn'; progress(card, 100, 'Could not hollow this model.');
@@ -1603,6 +1605,9 @@
     $('v2FuseBtn').addEventListener('click', fuseCheck);
     $('v2HollowBtn')?.addEventListener('click', hollowModelNow);
     $('v2HollowWall')?.addEventListener('input', () => { $('v2HollowWallOut').textContent = $('v2HollowWall').value + ' mm'; });
+    /* v2.305: once the model is hollow, letting go of the wall slider (or changing the drain holes) rebuilds it straight away so the new thickness shows in the cut-away */
+    { let t = 0; const again = () => { clearTimeout(t); t = setTimeout(() => { if (hollowResult && sourceModel() === hollowResult && !$('v2HollowBtn')?.disabled) hollowModelNow(); }, 350); };
+      $('v2HollowWall')?.addEventListener('change', again); $('v2HollowHoles')?.addEventListener('change', again); }
     $('v2HollowCutRange')?.addEventListener('input', e => hollowClip(Number(e.target.value)));
     $('v2FixBigBtn').addEventListener('click', fixHealthModel);
     $('v2ProtectBtn').addEventListener('click', () => {
