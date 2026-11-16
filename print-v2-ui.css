@@ -781,3 +781,8 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadBtn,
 body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:none!important}
 /* Other formats must respect the same readiness as the main DOWNLOAD. */
 #v2SideGlb[data-available="no"]{opacity:.35;pointer-events:none}
+.v2-hollow-row{display:grid;grid-template-columns:96px 1fr 52px;gap:8px;align-items:center;margin:8px 0;font-size:13px}.v2-hollow-row select{grid-column:2/4}
+.v2-hollow-card[hidden]{display:none!important}
+.v2-mega.v2-teal{background:linear-gradient(180deg,#14b8a6,#0f766e);color:#fff}
+#v2HollowBtn[data-done]::before{content:"✓";display:inline-flex;align-items:center;justify-content:center;width:1.25em;height:1.25em;margin-right:8px;border-radius:50%;background:#22c55e;color:#fff;font-size:.8em;font-weight:800;vertical-align:middle}
+.v2-change-chip.hollowed i{background:#14b8a6}

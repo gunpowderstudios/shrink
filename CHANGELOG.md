@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.293
+- HOLLOW IT merged into main (built as v2.281 on branch `hollow`). Hidden unless the address has `?hollow=1`: teal Hollow it card after SHRINK, wall thickness, drain holes, cut-away slider, HOLLOW change chip. Merged on top of v2.292.
+
 ## v2.292
 - Fixed GLB uploads forcing the app into Gaming when 3D Printing was selected. The chosen tab is now respected, including uploads from the start screen; STL/OBJ/PLY still default to printing.
 - Fixed MODEL HEALTH remaining stuck on “Checking…” when no health summary is available. For very large GLB files (over 400,000 triangles), expensive exact topology checks are deferred/skipped in the initial UI so conversion controls and AUTO-SHRINK remain responsive; the card says this explicitly rather than claiming health is 100/100.
@@ -56,6 +59,9 @@
 - Diagnostics now include displayed height, native export height and automatic/manual sizing status to help identify unit mismatches.
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
+
+## v2.281 (test branch `hollow`)
+- New HOLLOW IT card (only with `?hollow=1` in the address, and only after SHRINK): hollows the model for resin with a wall of 1-5 mm (default 2) and 0-2 drain holes in the base, shows resin volume saved, and a cut-away slider to look inside. The outside surface is untouched: the cavity comes from a coarse inward offset and is subtracted with Manifold. `hollow-core.js`, tests `hollow.test.mjs` and `hollow-ui.test.mjs`.
 
 ## v2.280
 - Safety net for the 30 mm minimum: 0.6 s and 1.5 s after a model opens, a Height under 30 mm is raised to 30. BATCH's "keep each model's own size" now also raises under-30 mm models to 30 (it used to write 2.8).

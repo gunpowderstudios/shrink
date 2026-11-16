@@ -376,4 +376,16 @@ function wire() {
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true }); else wire();
 window.__shrinkFuseBuild = '2.189 splits shells, drops specks';
-window.__shrinkFuse = { fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };
+// v2.281: hollow a closed model for resin (see hollow-core.js). Opts are in WORLD units; the caller converts mm.
+async function hollowModel(model, opts) {
+  const wasm = await loadManifold();
+  const { solid, components } = await modelToSolid(model);
+  try {
+    const q = (() => { try { return new URL(import.meta.url).search; } catch { return ''; } })();
+    const { hollowSolid } = await import('./hollow-core.js' + q);
+    const r = hollowSolid(wasm.Manifold, solid, opts);
+    try { return { root: solidToThree(r.solid), before: r.before, after: r.after, saved: r.saved, holes: r.holes, components }; }
+    finally { try { r.solid.delete?.(); } catch {} }
+  } finally { try { solid.delete?.(); } catch {} }
+}
+window.__shrinkFuse = { hollowModel, fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };

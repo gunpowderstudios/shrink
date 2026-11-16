@@ -42,7 +42,7 @@ export function prepareMultitool() {
   // the helper `collectTriangles` is not exported, so take it as a plain function too
   const helper = (() => { const i = mt.indexOf('function collectTriangles'); const open = mt.indexOf('{', mt.indexOf(')', i)); let d = 0; for (let k = open; k < mt.length; k++) { if (mt[k] === '{') d++; else if (mt[k] === '}' && --d === 0) return mt.slice(i, k + 1); } })();
   fs.writeFileSync(path.join(mtBuild, 'mesh-tools.js'), helper + '\n\n' + ['buildBinaryStl', 'buildObjBlob', 'analyzeTopology', 'modelHeight'].map(n => extractFn(mt, n)).join('\n\n') + '\n');
-  for (const f of ['live-reduce.js', 'crease-normals.js', 'reduce-core.js', 'repair-core.js', 'solid-core.js', 'solid-rebuild.js', 'clay-core.js', 'clay.js', 'batch.js', 'raw-split.js', 'split-print.js', 'split-fallback.js', 'fuse-export.js', 'watertight-remesh.js', 'print-export-safety.js', 'preview-material-fix.js']) {
+  for (const f of ['live-reduce.js', 'crease-normals.js', 'reduce-core.js', 'repair-core.js', 'solid-core.js', 'solid-rebuild.js', 'clay-core.js', 'hollow-core.js', 'clay.js', 'batch.js', 'raw-split.js', 'split-print.js', 'split-fallback.js', 'fuse-export.js', 'watertight-remesh.js', 'print-export-safety.js', 'preview-material-fix.js']) {
     if (fs.existsSync(path.join(repoRoot, f))) fs.writeFileSync(path.join(mtBuild, f), rewrite(sh(f)));
   }
   fs.writeFileSync(path.join(mtBuild, 'package.json'), '{"type":"module"}\n');
@@ -106,7 +106,7 @@ export const models = {
 let pageCounter = 0, currentRun = 0;
 const realSetTimeout = globalThis.setTimeout;
 globalThis.setTimeout = (fn, ms, ...args) => { const run = currentRun; return realSetTimeout(() => { if (run === currentRun) fn(...args); }, ms); };
-export async function makePage({ model, heightMm = 52, splitMax = 80, live = null } = {}) {
+export async function makePage({ model, heightMm = 52, splitMax = 80, live = null, url = 'https://example.test/' } = {}) {
   const run = ++pageCounter; currentRun = run;
   prepareMultitool();
   const html = `<!doctype html><html><body class="app-mode-print"><header class="topbar"></header>
@@ -119,7 +119,7 @@ export async function makePage({ model, heightMm = 52, splitMax = 80, live = nul
     <input id="printerDetailMm" value="0.05"><input id="geometry" value="70"><button id="autoBtn">auto</button><div id="liveLine"></div><div id="verdictText"></div>
     <button id="protectBtn"></button><button id="protectClearBtn"></button><input id="protectRadius" value="3">
   </main></body></html>`;
-  const dom = new JSDOM(html, { pretendToBeVisual: true, url: 'https://example.test/' });
+  const dom = new JSDOM(html, { pretendToBeVisual: true, url });
   const w = dom.window;
   const g = globalThis;
   // expose the browser globals the modules expect
