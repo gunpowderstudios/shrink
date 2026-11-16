@@ -2,8 +2,8 @@
 import { makePage, models, ok, failures, wait } from './mt-harness.mjs';
 const waitFor = async (fn, ms = 90000, step = 100) => { for (let t = 0; t < ms; t += step) { if (await fn()) return true; await wait(step); } return !!(await fn()); };
 
-{ const page = await makePage({ model: models.single(), heightMm: 40 }); await wait(300);
-  const c = page.$('v2HollowCard'); ok(!c || c.hidden, 'HU1 without ?hollow=1 the HOLLOW IT card is hidden even after SHRINK'); w_mark(page); ok(!page.$('v2HollowCard') || page.$('v2HollowCard').hidden, 'HU1 still hidden after SHRINK'); }
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/?hollow=0' }); await wait(300);
+  const c = page.$('v2HollowCard'); ok(!c || c.hidden, 'HU1 with ?hollow=0 the HOLLOW IT card is hidden even after SHRINK'); w_mark(page); ok(!page.$('v2HollowCard') || page.$('v2HollowCard').hidden, 'HU1 still hidden after SHRINK'); }
 function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
 
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/?hollow=1' }); const w = page.w; await wait(300);

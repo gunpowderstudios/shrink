@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.294** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.295** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -79,7 +79,7 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 ### Other formats (v2.236)
 `#v2SideGlb` is a `<details>` "Other formats" menu (GLB, OBJ, 3MF, USDZ) in `#v2SideStack`; buttons call `window.__shrinkExportFormat(kind)` in `print-tools.js` (`exportModel`/`exportGlb`). 3MF and USDZ come from `export-formats.js` (own tiny store-only zip writer; USDZ files are 64-byte aligned). Like STL they export the working model through `saveBlob`, so BATCH capture still sees them. The left tab `#v2LeftToggle` always reads ADVANCED.
 
-### HOLLOW IT (v2.281, merged into main in v2.293; visible only with `?hollow=1`)
+### HOLLOW IT (v2.281, shown to everyone since v2.295; `?hollow=0` hides it)
 `hollow-core.js` (no DOM; `hollowSolid(Manifold, solid, {wall, holes, holeRadius})`): voxelises the closed solid with vertical rays, Euclidean distance transform inward, `Manifold.levelSet` for the cavity at `wall` depth, `solid.subtract(cavity)` so the OUTER surface is never rebuilt, then Y-axis cylinders from the lowest point of the base up into the cavity as drain holes. `fuse-export.js` `hollowModel(model, opts)` wraps it (world units; the card converts mm with `__shrinkPrint.mmPerUnit()`). `print-v2-ui.js` `#v2HollowCard` (shown by `renderAppliedChanges()` when `appliedChanges` has `shrunk`), `hollowModelNow()`, `hollowClip(pct)` (a three.js clipping plane on the working model's materials, DoubleSide while cut; slider `#v2HollowCutRange`). Result goes through `installWorkingResult(root, 'hollow')` -> chip HOLLOW (`hollowed` in `appliedChanges`; counts as processed for the Detail slider revert). Needs a watertight model: `modelToSolid` refuses leaky ones. (v2.294) `hollowBase` keeps a cloned copy of the pre-hollow model; pressing again re-hollows from it while the working model is still `hollowResult`. The cut-away blue is a `shrinkHollowBlue` group in the viewer scene (BackSide MeshBasicMaterial, same clip plane), removed on any other install; never add it under the model or it would be exported. Tests: `hollow.test.mjs`, `hollow-ui.test.mjs`.
 
 ### CLAY (v2.141; switched off in v2.173: `CLAY_ENABLED = false` in `ui-mode.js`, card hidden, files and tests kept)

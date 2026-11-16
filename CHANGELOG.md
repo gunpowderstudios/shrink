@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.295
+- HOLLOW IT is now visible to everyone (after SHRINK). `?hollow=0` in the address hides it.
+
 ## v2.294
 - HOLLOW IT: pressing it again (after changing the wall) now starts from the solid you had before hollowing, not from the already hollow shell, which used to dig into the wall and leave only thin skins. The cut-away now shows the walls in blue (a blue back-face copy in the viewer scene, never part of the model or an export).
 

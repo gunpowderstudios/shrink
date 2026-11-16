@@ -141,7 +141,7 @@
   window.__shrinkMarkApplied = markApplied;       // tests
   window.__shrinkRefreshHealth = () => updateHealthCard();
   window.__shrinkHealthIsCurrent = () => !!(lastHealth && lastHealth.model === sourceModel());   // v2.251: BATCH waits for the health check of THIS model, not a leftover one
-  const HOLLOW_ON = (() => { try { return new URLSearchParams(window.location.search).has('hollow'); } catch { return false; } })();   // v2.281: HOLLOW IT is on a test branch: only with ?hollow=1 in the address
+  const HOLLOW_ON = (() => { try { return new URLSearchParams(window.location.search).get('hollow') !== '0'; } catch { return true; } })();   // v2.295: HOLLOW IT is on for everyone; ?hollow=0 switches it off
   let fusedPieces = 1;                          // how many pieces the last fuse left (v2.187): the chip says so when it is not one
   function renderAppliedChanges() {
     { const hc = $('v2HollowCard'); if (hc) hc.hidden = !(HOLLOW_ON && appliedChanges.has('shrunk')); }
