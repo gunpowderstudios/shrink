@@ -126,6 +126,7 @@
   // Make a tool's result the new current working model: show it, keep the camera, tell the rest of the app,
   // record the change chip and clear the red warning. Fix It, Make watertight and any future tool go through here.
   function installWorkingResult(root, kind) {
+    if (kind !== 'hollow') { try { removeHollowBlue(); } catch {} }
     const view = app()?.getViewState?.();
     app()?.setPreview?.(root);
     setWorkingModel(root);
@@ -663,14 +664,26 @@
   }
 
   // ---- HOLLOW IT (v2.281, test branch): hollow the working model after SHRINK, then a cut-away slider to look inside ----
-  let hollowPlane = null;
+  let hollowPlane = null, hollowBase = null, hollowResult = null;
+  function removeHollowBlue() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkHollowBlue'); if (!g) return; V.scene.remove(g); g.traverse(o => { if (o.isMesh && o.material && o.material.dispose && g.children[0] === o) o.material.dispose(); }); }
+  window.addEventListener('shrink:model-opened', () => { removeHollowBlue(); hollowBase = null; hollowResult = null; });
   function hollowClip(pct) {
     const V = window.__shrinkViewer, THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return;
     if (V?.renderer) V.renderer.localClippingEnabled = true;
     const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return;
     hollowPlane = hollowPlane || new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
     hollowPlane.constant = box.min.y + (box.max.y - box.min.y) * (pct / 100);          // keeps everything below the plane; dragging down slices the top away
-    model.traverse(o => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (!m) return; const want = pct >= 99.5 ? [] : [hollowPlane]; if ((m.clippingPlanes?.length || 0) !== want.length || want[0] !== m.clippingPlanes?.[0]) { m.clippingPlanes = want; m.side = pct >= 99.5 ? THREE.FrontSide : THREE.DoubleSide; m.needsUpdate = true; } }); });
+    const cutting = pct < 99.5;
+    model.traverse(o => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (!m) return; const want = cutting ? [hollowPlane] : []; if ((m.clippingPlanes?.length || 0) !== want.length || want[0] !== m.clippingPlanes?.[0]) { m.clippingPlanes = want; m.side = THREE.FrontSide; m.needsUpdate = true; } }); });
+    /* v2.294: the cut face and the inside of the walls show blue. Back faces seen through the cut are drawn by a separate blue copy kept in the viewer scene (never a child of the model, so it can not reach an export). */
+    removeHollowBlue();
+    if (cutting && V?.scene) {
+      const g = new THREE.Group(); g.name = 'shrinkHollowBlue'; g.userData.owner = model;
+      const mat = new THREE.MeshBasicMaterial({ color: 0x2f86ff, side: THREE.BackSide, clippingPlanes: [hollowPlane] });
+      model.updateWorldMatrix(true, true);
+      model.traverse(o => { if (!o.isMesh) return; const m = new THREE.Mesh(o.geometry, mat); m.matrixAutoUpdate = false; m.matrix.copy(o.matrixWorld); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m); });
+      V.scene.add(g);
+    }
     const out = $('v2HollowCutOut'); if (out) out.textContent = pct >= 99.5 ? 'off' : Math.round(pct) + '%';
   }
   async function hollowModelNow() {
@@ -681,7 +694,10 @@
       progress(card, 10, 'Loading the solid tools…');
       for (let i = 0; i < 50 && !window.__shrinkFuse?.hollowModel; i++) await wait(100);
       if (!window.__shrinkFuse?.hollowModel) throw new Error('The solid tools are still loading. Try again in a moment.');
-      const model = sourceModel(); if (!model) throw new Error('Load a model first.');
+      let model = sourceModel(); if (!model) throw new Error('Load a model first.');
+      /* v2.294: changing the wall and pressing again must start from the solid, not from the already hollow shell (that dug into the wall and left only thin skins) */
+      if (hollowBase && hollowResult && model === hollowResult) model = hollowBase;
+      else { const THREE0 = app()?.THREE; if (THREE0) { model.updateWorldMatrix(true, true); const c = model.clone(true); c.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); c.matrix.copy(model.matrixWorld); c.matrix.decompose(c.position, c.quaternion, c.scale); c.updateMatrixWorld(true); hollowBase = c; } }
       const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
       if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to hollow in the browser. Press SHRINK first.`);
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, wallMm = Number($('v2HollowWall')?.value) || 2, holes = Number($('v2HollowHoles')?.value ?? 2);
@@ -689,7 +705,7 @@
       await paintNow();
       const r = await window.__shrinkFuse.hollowModel(model, { wall: wallMm / mm, holes, holeRadius: 1.5 / mm });
       progress(card, 85, 'Checking the result…');
-      installWorkingResult(r.root, 'hollow');
+      removeHollowBlue(); installWorkingResult(r.root, 'hollow'); hollowResult = r.root;
       const ml = v => (v * mm * mm * mm / 1000);
       res.innerHTML = `<strong>✓ Hollowed</strong><span>Resin volume ${ml(r.before).toFixed(1)} ml → ${ml(r.after).toFixed(1)} ml (${Math.round(r.saved * 100)}% saved). ${r.holes.length ? r.holes.length + ' drain hole' + (r.holes.length > 1 ? 's' : '') + ' in the base, about 3 mm wide.' : '<b>No drain holes</b>: resin printers need them, add them in your slicer.'} Drag the cut-away slider to look inside.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');

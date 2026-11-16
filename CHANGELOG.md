@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.294
+- HOLLOW IT: pressing it again (after changing the wall) now starts from the solid you had before hollowing, not from the already hollow shell, which used to dig into the wall and leave only thin skins. The cut-away now shows the walls in blue (a blue back-face copy in the viewer scene, never part of the model or an export).
+
 ## v2.293
 - HOLLOW IT merged into main (built as v2.281 on branch `hollow`). Hidden unless the address has `?hollow=1`: teal Hollow it card after SHRINK, wall thickness, drain holes, cut-away slider, HOLLOW change chip. Merged on top of v2.292.
 

@@ -24,5 +24,11 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
   r.value = '100'; r.dispatchEvent(new w.Event('input', { bubbles: true })); await wait(100);
   let still = 0; w.__shrinkWorkingModel().traverse(o => { if (o.isMesh && o.material?.clippingPlanes?.length) still++; });
   ok(still === 0, 'HU8 100% turns the cut-away off');
+  /* v2.294: changing the wall and pressing again starts from the solid, so a thicker wall really gives more resin and the same wall gives the same result */
+  const after = () => Number((/→ ([\d.]+) ml/.exec(page.$('v2HollowResult').textContent) || [])[1]);
+  const again = async wall => { const prev = page.$('v2HollowResult').textContent; page.$('v2HollowWall').value = String(wall); page.$('v2HollowBtn').click(); await wait(100); await waitFor(() => page.$('v2HollowResult').textContent !== prev && /Hollowed|Could not/.test(page.$('v2HollowResult').textContent), 110000); return after(); };
+  const y1 = after(), y2 = await again(6), y3 = await again(2);
+  ok(y1 > 0 && y2 > y1 * 1.3, `HU9 a thicker wall on a second press gives more resin (${y1} ml -> ${y2} ml)`);
+  ok(Math.abs(y3 - y1) / y1 < 0.03, `HU9 the same wall again gives the same result (${y1} ml vs ${y3} ml)`);
 }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('hollow ui tests passed'); process.exit(0);
