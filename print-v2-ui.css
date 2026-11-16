@@ -788,3 +788,7 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-change-chip.hollowed i{background:#14b8a6}
 
 .v2-hollow-note{margin:6px 0 10px;font-size:12px;line-height:1.45;color:#b8c7d8}
+
+/* v2.300 — the HOLLOW result (resin before/after and how much was saved) stays visible in the compact view */
+.v2-main-controls #v2HollowCard #v2HollowResult{display:block;margin-top:8px;font-size:12px;line-height:1.45;color:#e8eef6}
+.v2-main-controls #v2HollowCard #v2HollowResult strong{display:block;font-size:13px;margin-bottom:2px}

@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.300
+- HOLLOW IT: the result line (resin volume before and after in ml, percentage saved, drain holes) is shown in the compact view; it was being hidden with the other tools' result text.
+
 ## v2.299
 - Tim asked to undo the per-card colour tints of v2.297/v2.298: notes, results and dropdowns are back to the standard dark look, and the compact view hides the SHRINK/FIX/FUSE result text again.
 
