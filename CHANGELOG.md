@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.297
+- Tool cards (SHRINK green, FIX red, FUSE purple, HOLLOW teal): the note, result message and dropdowns inside each card now use a dark tint of that card's colour.
+
 ## v2.296
 - HOLLOW IT card: a short note explains why to hollow (less resin, lighter) and why drain holes matter.
 
