@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.298
+- SHRINK, FIX and FUSE result messages show again in the compact view once that tool has run, in the card's own tint (HOLLOW already did).
+
 ## v2.297
 - Tool cards (SHRINK green, FIX red, FUSE purple, HOLLOW teal): the note, result message and dropdowns inside each card now use a dark tint of that card's colour.
 
