@@ -788,17 +788,3 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-change-chip.hollowed i{background:#14b8a6}
 
 .v2-hollow-note{margin:6px 0 10px;font-size:12px;line-height:1.45;color:#b8c7d8}
-
-/* v2.297 — each tool card tints its note, result and dropdowns a dark shade of its own colour (white text stays readable) */
-.v2-shrink-card{--tint:#0f241d;--edge:#246a51}
-.v2-fix-card{--tint:#2a1417;--edge:#7a2e34}
-.v2-fuse-card{--tint:#1e1433;--edge:#553391}
-.v2-hollow-card{--tint:#0b2623;--edge:#0f766e}
-:is(.v2-shrink-card,.v2-fix-card,.v2-fuse-card,.v2-hollow-card) :is(.v2-result,.v2-hollow-note){background:var(--tint);border:1px solid var(--edge);border-radius:10px;padding:8px 10px;color:#e8eef6}
-:is(.v2-shrink-card,.v2-fix-card,.v2-fuse-card,.v2-hollow-card) select{background:var(--tint);border:1px solid var(--edge);color:#e8eef6;border-radius:8px}
-:is(.v2-shrink-card,.v2-fix-card,.v2-fuse-card,.v2-hollow-card) select option{background:#10151c;color:#e8eef6}
-
-/* v2.298 — in the compact main view each tool's result message shows once that tool has run (good / warn / bad), in the card's own colour */
-.v2-main-controls :is(.v2-shrink-card,.v2-fix-card,.v2-fuse-card,.v2-hollow-card)[data-state="good"] .v2-result,
-.v2-main-controls :is(.v2-shrink-card,.v2-fix-card,.v2-fuse-card,.v2-hollow-card)[data-state="warn"] .v2-result,
-.v2-main-controls :is(.v2-shrink-card,.v2-fix-card,.v2-fuse-card,.v2-hollow-card)[data-state="bad"] .v2-result{display:block;margin-top:8px;font-size:12px;line-height:1.45}

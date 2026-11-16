@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.299
+- Tim asked to undo the per-card colour tints of v2.297/v2.298: notes, results and dropdowns are back to the standard dark look, and the compact view hides the SHRINK/FIX/FUSE result text again.
+
 ## v2.298
 - SHRINK, FIX and FUSE result messages show again in the compact view once that tool has run, in the card's own tint (HOLLOW already did).
 
