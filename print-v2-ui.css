@@ -786,3 +786,5 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-mega.v2-teal{background:linear-gradient(180deg,#14b8a6,#0f766e);color:#fff}
 #v2HollowBtn[data-done]::before{content:"✓";display:inline-flex;align-items:center;justify-content:center;width:1.25em;height:1.25em;margin-right:8px;border-radius:50%;background:#22c55e;color:#fff;font-size:.8em;font-weight:800;vertical-align:middle}
 .v2-change-chip.hollowed i{background:#14b8a6}
+
+.v2-hollow-note{margin:6px 0 10px;font-size:12px;line-height:1.45;color:#b8c7d8}

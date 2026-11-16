@@ -1481,6 +1481,7 @@
 
             <section id="v2HollowCard" class="v2-card v2-action-card v2-hollow-card" hidden>
               <div class="v2-card-head"><div><h2>Hollow it</h2><p>Save resin: empty the inside, keep a wall you choose, and open drain holes in the base.</p></div></div>
+              <p class="v2-hollow-note">Resin printing: a solid model fills with expensive resin that nobody sees. Hollowing leaves a shell, so the print uses far less resin (and is lighter). The drain holes let uncured resin run out; without them it stays trapped inside and can crack the print.</p>
               <div class="v2-hollow-row"><label for="v2HollowWall">Wall</label><input id="v2HollowWall" type="range" min="1" max="5" step="0.5" value="2" autocomplete="off"><output id="v2HollowWallOut">2 mm</output></div>
               <div class="v2-hollow-row"><label for="v2HollowHoles">Drain holes</label><select id="v2HollowHoles" autocomplete="off"><option value="2" selected>2 (recommended)</option><option value="1">1</option><option value="0">None</option></select></div>
               <button id="v2HollowBtn" class="v2-mega v2-teal" type="button">HOLLOW IT</button>

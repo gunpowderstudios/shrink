@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.296
+- HOLLOW IT card: a short note explains why to hollow (less resin, lighter) and why drain holes matter.
+
 ## v2.295
 - HOLLOW IT is now visible to everyone (after SHRINK). `?hollow=0` in the address hides it.
 
