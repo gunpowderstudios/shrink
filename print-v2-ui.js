@@ -132,24 +132,27 @@
     app()?.show?.('optimized');
     if (view) app()?.restoreViewState?.(view);
     app()?.notifyReduced?.({ kind });
-    markApplied(kind === 'rebuild' ? 'rebuilt' : kind === 'clay' ? 'clay' : 'fixed');
+    markApplied(kind === 'rebuild' ? 'rebuilt' : kind === 'clay' ? 'clay' : kind === 'hollow' ? 'hollowed' : 'fixed');
     window.__shrinkPrintSafety?.clearDiagnostic?.();
     return root;
   }
   window.__shrinkInstallWorkingModel = installWorkingResult;
+  window.__shrinkMarkApplied = markApplied;       // tests
   window.__shrinkRefreshHealth = () => updateHealthCard();
   window.__shrinkHealthIsCurrent = () => !!(lastHealth && lastHealth.model === sourceModel());   // v2.251: BATCH waits for the health check of THIS model, not a leftover one
+  const HOLLOW_ON = (() => { try { return new URLSearchParams(window.location.search).has('hollow'); } catch { return false; } })();   // v2.281: HOLLOW IT is on a test branch: only with ?hollow=1 in the address
   let fusedPieces = 1;                          // how many pieces the last fuse left (v2.187): the chip says so when it is not one
   function renderAppliedChanges() {
+    { const hc = $('v2HollowCard'); if (hc) hc.hidden = !(HOLLOW_ON && appliedChanges.has('shrunk')); }
     const wrap = $('v2HealthChanges');
     if (!wrap) return;
-    const order = ['clay','fixed','rebuilt','fused','shrunk'];
-    const labels = { clay:'CLAY', fixed:'FIXED', rebuilt:'REBUILT', fused:'FUSED', shrunk:'SHRUNK' };
+    const order = ['clay','fixed','rebuilt','fused','hollowed','shrunk'];
+    const labels = { clay:'CLAY', fixed:'FIXED', rebuilt:'REBUILT', fused:'FUSED', hollowed:'HOLLOW', shrunk:'SHRUNK' };
     const chips = order.filter(k => appliedChanges.has(k))
       .map(k => `<span class="v2-change-chip ${k}"><i></i>${k === 'fused' && fusedPieces > 1 ? `FUSED · ${fusedPieces} PIECES` : labels[k]}</span>`)
       .join('');
     // v2.278: a green tick on the SHRINK / FIX / FUSE buttons in ADVANCED once that step has been done on the working model
-    [['v2ShrinkBtn', 'shrunk'], ['v2FixBigBtn', 'fixed'], ['v2FuseBtn', 'fused']].forEach(([id, k]) => { const b = $(id); if (!b) return; const on = appliedChanges.has(k) || (k === 'fixed' && appliedChanges.has('rebuilt')); if (on) { if (b.dataset.done !== '1') b.dataset.done = '1'; } else if (b.dataset.done) delete b.dataset.done; });
+    [['v2ShrinkBtn', 'shrunk'], ['v2FixBigBtn', 'fixed'], ['v2FuseBtn', 'fused'], ['v2HollowBtn', 'hollowed']].forEach(([id, k]) => { const b = $(id); if (!b) return; const on = appliedChanges.has(k) || (k === 'fixed' && appliedChanges.has('rebuilt')); if (on) { if (b.dataset.done !== '1') b.dataset.done = '1'; } else if (b.dataset.done) delete b.dataset.done; });
     wrap.innerHTML = chips
       ? `<small>CHANGES</small><div>${chips}</div>`
       : '<small>CHANGES</small><div class="v2-change-none">None yet</div>';
@@ -283,7 +286,7 @@
   const origTrisOf = () => Math.max(1, modelTriangles(app()?.originalModel));
   function syncDetailToBase() {
     const live = window.__shrinkLive, d = $('v2Detail'), n = $('v2DetailNumber'), note = $('v2DetailNote'); if (!live?.root || !d || !sourceModel() || sourceModel() === app()?.originalModel) return;
-    if (!['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k))) return;   // a freshly opened model also differs from the live preview root: only a tool that really replaced the model counts
+    if (!['fixed', 'fused', 'rebuilt', 'clay', 'hollowed'].some(k => appliedChanges.has(k))) return;   // a freshly opened model also differs from the live preview root: only a tool that really replaced the model counts
     const pct = Math.max(1, Math.min(100, Math.round(Math.min(1, modelTriangles(sourceModel()) / origTrisOf()) * 1000) / 10)), t = String(pct);
     if (d.value !== t) d.value = t; if (n && n.value !== t) n.value = t;
     detailManual = false; manualLevel = '';
@@ -616,6 +619,45 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  // ---- HOLLOW IT (v2.281, test branch): hollow the working model after SHRINK, then a cut-away slider to look inside ----
+  let hollowPlane = null;
+  function hollowClip(pct) {
+    const V = window.__shrinkViewer, THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return;
+    if (V?.renderer) V.renderer.localClippingEnabled = true;
+    const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return;
+    hollowPlane = hollowPlane || new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+    hollowPlane.constant = box.min.y + (box.max.y - box.min.y) * (pct / 100);          // keeps everything below the plane; dragging down slices the top away
+    model.traverse(o => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (!m) return; const want = pct >= 99.5 ? [] : [hollowPlane]; if ((m.clippingPlanes?.length || 0) !== want.length || want[0] !== m.clippingPlanes?.[0]) { m.clippingPlanes = want; m.side = pct >= 99.5 ? THREE.FrontSide : THREE.DoubleSide; m.needsUpdate = true; } }); });
+    const out = $('v2HollowCutOut'); if (out) out.textContent = pct >= 99.5 ? 'off' : Math.round(pct) + '%';
+  }
+  async function hollowModelNow() {
+    const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true; setWorking(true, 0);
+    try {
+      progress(card, 10, 'Loading the solid tools…');
+      for (let i = 0; i < 50 && !window.__shrinkFuse?.hollowModel; i++) await wait(100);
+      if (!window.__shrinkFuse?.hollowModel) throw new Error('The solid tools are still loading. Try again in a moment.');
+      const model = sourceModel(); if (!model) throw new Error('Load a model first.');
+      const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
+      if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to hollow in the browser. Press SHRINK first.`);
+      const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, wallMm = Number($('v2HollowWall')?.value) || 2, holes = Number($('v2HollowHoles')?.value ?? 2);
+      progress(card, 35, 'Working out the inside… this can take a moment');
+      await paintNow();
+      const r = await window.__shrinkFuse.hollowModel(model, { wall: wallMm / mm, holes, holeRadius: 1.5 / mm });
+      progress(card, 85, 'Checking the result…');
+      installWorkingResult(r.root, 'hollow');
+      const ml = v => (v * mm * mm * mm / 1000);
+      res.innerHTML = `<strong>✓ Hollowed</strong><span>Resin volume ${ml(r.before).toFixed(1)} ml → ${ml(r.after).toFixed(1)} ml (${Math.round(r.saved * 100)}% saved). ${r.holes.length ? r.holes.length + ' drain hole' + (r.holes.length > 1 ? 's' : '') + ' in the base, about 3 mm wide.' : '<b>No drain holes</b>: resin printers need them, add them in your slicer.'} Drag the cut-away slider to look inside.</span>`;
+      card.dataset.state = 'good'; progress(card, 100, 'Done.');
+      const cut = $('v2HollowCut'); if (cut) { cut.hidden = false; $('v2HollowCutRange').value = '100'; }
+      setTimeout(updateHealthCard, 80);
+    } catch (err) {
+      card.dataset.state = 'warn'; progress(card, 100, 'Could not hollow this model.');
+      res.innerHTML = `<strong>Could not hollow</strong><span>${err?.message || err}</span>`;
+    } finally { btn.disabled = false; setWorking(false); }
   }
 
   // v2.245: a batch run showed SHRINK silently doing nothing on some models (the engine's button was still disabled, so shrinkModelInner just returned and the file went out unreduced).
@@ -1253,7 +1295,7 @@
     const detail = $('v2Detail')?.closest('label'); const detailBox = document.createElement('div'); detailBox.className = 'v2-main-detail'; { const pick = setup?.querySelector('.v2-printer-pick') || dashboard.querySelector('.v2-printer-pick'); if (pick) detailBox.appendChild(pick); }   /* v2.261: the printer dropdown (resin 16K/8K/4K, FDM, custom) sits above Detail kept again; it had been swept into the hidden legacy block */
     if (detail) detailBox.appendChild(detail);
     const actions = document.createElement('div'); actions.className = 'v2-main-actions';
-    ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
+    ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard', 'v2HollowCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
     const dl = document.createElement('div'); dl.className = 'v2-main-download';
     ['v2DownloadBtn', 'v2DownloadGlb'].forEach(id => { const el = $(id); if (el) dl.appendChild(el); });
     /* v2.244: splitting is back as an optional, folded-away section above DOWNLOAD IT (the controls already exist in the Download card; they are moved, not rebuilt) */
@@ -1358,6 +1400,17 @@
               <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles and joins touching/overlapping parts. Multiple closed components are valid; SHRINK only reports a repair problem when the mesh itself is open or non-manifold.</p></div></details>
             </section>
 
+            <section id="v2HollowCard" class="v2-card v2-action-card v2-hollow-card" hidden>
+              <div class="v2-card-head"><div><h2>Hollow it</h2><p>Save resin: empty the inside, keep a wall you choose, and open drain holes in the base.</p></div></div>
+              <div class="v2-hollow-row"><label for="v2HollowWall">Wall</label><input id="v2HollowWall" type="range" min="1" max="5" step="0.5" value="2" autocomplete="off"><output id="v2HollowWallOut">2 mm</output></div>
+              <div class="v2-hollow-row"><label for="v2HollowHoles">Drain holes</label><select id="v2HollowHoles" autocomplete="off"><option value="2" selected>2 (recommended)</option><option value="1">1</option><option value="0">None</option></select></div>
+              <button id="v2HollowBtn" class="v2-mega v2-teal" type="button">HOLLOW IT</button>
+              <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
+              <div id="v2HollowResult" class="v2-result">Works best after SHRINK with fix and fuse, on one watertight piece.</div>
+              <div id="v2HollowCut" class="v2-hollow-row" hidden><label for="v2HollowCutRange">Cut-away</label><input id="v2HollowCutRange" type="range" min="0" max="100" step="1" value="100" autocomplete="off"><output id="v2HollowCutOut">off</output></div>
+            </section>
+
+
           </div>
           </details>
 
@@ -1428,6 +1481,9 @@
     $('v2HeightRange').addEventListener('input', () => { $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); });
     $('v2FuseBtn').addEventListener('click', fuseCheck);
+    $('v2HollowBtn')?.addEventListener('click', hollowModelNow);
+    $('v2HollowWall')?.addEventListener('input', () => { $('v2HollowWallOut').textContent = $('v2HollowWall').value + ' mm'; });
+    $('v2HollowCutRange')?.addEventListener('input', e => hollowClip(Number(e.target.value)));
     $('v2FixBigBtn').addEventListener('click', fixHealthModel);
     $('v2ProtectBtn').addEventListener('click', () => {
       const native = $('protectBtn');
@@ -1535,7 +1591,7 @@
       let reverted = false;
       { const live = window.__shrinkLive;
         // v2.279: no "is the reducer's own root on screen" test here: after a first slider move the reducer is re-based ON the fixed/fused model (live.root === working model), and 100% must still mean the untouched upload
-        const processed = ['fixed', 'fused', 'rebuilt', 'clay'].some(k => appliedChanges.has(k)) || detailScale < 0.999;
+        const processed = ['fixed', 'fused', 'rebuilt', 'clay', 'hollowed'].some(k => appliedChanges.has(k)) || detailScale < 0.999;
         if (live?.root && sourceModel() && app()?.originalModel && sourceModel() !== app().originalModel && processed) {
           const cur = Math.min(1, modelTriangles(sourceModel()) / origTrisOf());
           if (value >= 99.95 || value / 100 > cur * 1.05) {            // asking for more detail than the processed model has: go back to the upload

@@ -2,6 +2,9 @@
 
 This file records user-facing workflow and architecture changes. Git history remains the authoritative line-by-line record.
 
+## v2.281 (test branch `hollow`)
+- New HOLLOW IT card (only with `?hollow=1` in the address, and only after SHRINK): hollows the model for resin with a wall of 1-5 mm (default 2) and 0-2 drain holes in the base, shows resin volume saved, and a cut-away slider to look inside. The outside surface is untouched: the cavity comes from a coarse inward offset and is subtracted with Manifold. `hollow-core.js`, tests `hollow.test.mjs` and `hollow-ui.test.mjs`.
+
 ## v2.280
 - Safety net for the 30 mm minimum: 0.6 s and 1.5 s after a model opens, a Height under 30 mm is raised to 30. BATCH's "keep each model's own size" now also raises under-30 mm models to 30 (it used to write 2.8).
 
