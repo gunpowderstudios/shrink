@@ -453,7 +453,7 @@
     const magic = $('v2MagicBtn'), dl = $('v2MagicDownload'), other = $('v2DownloadBtn');
     const working = !!magic?.dataset.busy;
     const ready = autoReady && !settingsDirty && !detailUpdating && !working;
-    if (magic && !working) magic.textContent = settingsDirty ? 'AUTO-SHRINK AGAIN — Changes made' : autoReady ? 'AUTO-SHRINK AGAIN' : 'AUTO-SHRINK';
+    if (magic && !working) magic.textContent = settingsDirty ? 'AUTO-SHRINK — settings changed' : 'AUTO-SHRINK';   /* v2.301: no "AGAIN" any more; the line under DOWNLOAD says when it is done */
     if (dl) { dl.disabled = !ready; dl.title = settingsDirty ? 'Settings changed: press SHRINK again.' : detailUpdating ? 'Waiting for the manual detail preview.' : ready ? 'Download the current model.' : 'Press SHRINK first.'; }
     if (other) other.disabled = !ready;
     const otherFormats = $('v2SideGlb');
@@ -1363,7 +1363,7 @@
     const setup = dashboard.querySelector('.v2-setup-card');
     ['.v2-size-row:not(.v2-dim-row)', '.v2-uniform-row', '.v2-dim-row'].forEach(q => { const el = setup?.querySelector(q); if (el) sizeBox.appendChild(el); });
     { const rb = document.createElement('button'); rb.type = 'button'; rb.id = 'v2ResizeBtn'; rb.className = 'v2-resize-btn'; rb.textContent = 'RESIZE';
-      rb.title = 'Apply the new size, then press SHRINK AGAIN to re-optimise before downloading.';
+      rb.title = 'Apply the new size, then press AUTO-SHRINK to re-optimise before downloading.';
       rb.addEventListener('click', () => { rb.classList.remove('glow'); updateHeight(); refreshDims(); });
       // v2.279: typing or dragging the Height makes RESIZE glow until it is pressed (programmatic fits on open do not fire input events)
       ['v2Height', 'v2HeightRange'].forEach(id => $(id)?.addEventListener('input', () => rb.classList.add('glow')));

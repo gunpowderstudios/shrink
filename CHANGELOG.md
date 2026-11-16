@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.301
+- The green main button always reads AUTO-SHRINK (it no longer changes to AUTO-SHRINK AGAIN); after a settings change it reads AUTO-SHRINK — settings changed. Tim: the AGAIN wording was confusing next to SHRINK IT / FIX IT / HOLLOW IT.
+
 ## v2.300
 - HOLLOW IT: the result line (resin volume before and after in ml, percentage saved, drain holes) is shown in the compact view; it was being hidden with the other tools' result text.
 
