@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.302
+- A tick box "Hollow it too (saves resin)" under the green AUTO-SHRINK button (off by default). When ticked, AUTO-SHRINK finishes by hollowing (2 mm walls, 2 drain holes) after levelling and centring, so most people no longer need ADVANCED. Test HU10 (hollow-ui) covers it; clay test C8 allows the tick box between AUTO-SHRINK and DOWNLOAD.
+
 ## v2.301
 - The green main button always reads AUTO-SHRINK (it no longer changes to AUTO-SHRINK AGAIN); after a settings change it reads AUTO-SHRINK — settings changed. Tim: the AGAIN wording was confusing next to SHRINK IT / FIX IT / HOLLOW IT.
 

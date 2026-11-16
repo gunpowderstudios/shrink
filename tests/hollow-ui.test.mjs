@@ -31,4 +31,15 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
   ok(y1 > 0 && y2 > y1 * 1.3, `HU9 a thicker wall on a second press gives more resin (${y1} ml -> ${y2} ml)`);
   ok(Math.abs(y3 - y1) / y1 < 0.03, `HU9 the same wall again gives the same result (${y1} ml vs ${y3} ml)`);
 }
+
+/* v2.302: a tick box under AUTO-SHRINK (off by default) makes the automatic run hollow the model as its last step */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(300);
+  const box = page.$('v2AutoHollow'), qb = page.$('v2MagicBtn');
+  ok(!!box && box.checked === false, 'HU10 the Hollow tick box exists and is off by default');
+  ok(!!box && box.closest('label')?.previousElementSibling === qb, 'HU10 it sits directly under the AUTO-SHRINK button');
+  box.checked = true; qb.click();
+  const done = await waitFor(() => !qb.dataset.busy && /Hollowed/.test(page.$('v2HollowResult').textContent), 200000);
+  ok(done, 'HU10 AUTO-SHRINK with the box ticked ends with the model hollowed: ' + page.$('v2HollowResult').textContent.slice(0, 120));
+  ok(/HOLLOW/.test(page.$('v2HealthChanges').textContent), 'HU10 the HOLLOW chip shows after the automatic run');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('hollow ui tests passed'); process.exit(0);

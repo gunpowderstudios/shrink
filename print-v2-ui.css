@@ -792,3 +792,8 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 /* v2.300 — the HOLLOW result (resin before/after and how much was saved) stays visible in the compact view */
 .v2-main-controls #v2HollowCard #v2HollowResult{display:block;margin-top:8px;font-size:12px;line-height:1.45;color:#e8eef6}
 .v2-main-controls #v2HollowCard #v2HollowResult strong{display:block;font-size:13px;margin-bottom:2px}
+
+/* v2.302 — Hollow tick box under AUTO-SHRINK */
+.v2-auto-hollow{display:flex;align-items:center;gap:8px;margin:6px 2px 8px;font-size:12px;color:#cbd5e1;cursor:pointer}
+.v2-auto-hollow input{width:16px;height:16px;accent-color:#14b8a6;cursor:pointer}
+.v2-auto-hollow:has(input:disabled){opacity:.5;cursor:not-allowed}

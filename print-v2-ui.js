@@ -1130,6 +1130,15 @@
       let lv = null; try { lv = levelModel(); } catch (e) { console.warn('level', e); }
       if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);
       reducedTick++; const cr = centreOnBed(); setTimeout(refreshDims, 50); if (cr.ok) { try { showBedGuide(); } catch (e) { console.warn('bed guide', e); } } try { faceFront(); } catch (e) { console.warn('front view', e); } done(cr.ok ? 'ok' : 'warn', cr.ok ? '✓' : '⚠', cr.ok ? `Model ${cr.text}` : `Could not centre: ${cr.text}`);
+      // 5. HOLLOW (v2.302): only when the box under AUTO-SHRINK is ticked. Last, because the drain holes go in the lowest point of the (now levelled) model.
+      if ($('v2AutoHollow')?.checked && HOLLOW_ON) {
+        btn.textContent = 'Hollowing…'; show('Hollowing to save resin…'); await paintNow();
+        try {
+          await hollowModelNow();
+          const ok = $('v2HollowCard')?.dataset.state === 'good', msg = ($('v2HollowResult')?.textContent || '').replace(/\s+/g, ' ').trim();
+          done(ok ? 'ok' : 'warn', ok ? '✓' : '⚠', ok ? msg.replace(/^✓\s*/, '') : (msg || 'Could not hollow this model'));
+        } catch (e) { console.warn('auto hollow', e); done('warn', '⚠', 'Could not hollow this model'); }
+      }
       window.__shrinkLastVerdict = verdict;
       if (verdict) { rows.push({ cls: verdict.healthy && verdict.fused ? 'ok' : 'warn', icon: verdict.healthy && verdict.fused ? '✓' : '⚠', text: verdict.text }); note.dataset.verdict = verdict.healthy && verdict.fused ? 'ok' : 'warn'; }
       rows.push({ cls: 'end', icon: '', text: 'Ready: press Download when you are happy.' }); show();
@@ -1215,6 +1224,7 @@
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
+        { const lab = document.createElement('label'); lab.className = 'v2-auto-hollow'; lab.title = 'Also hollow the model to save resin (2 mm walls, 2 drain holes in the base) as the last step of AUTO-SHRINK. Fine-tune it in ADVANCED.'; lab.innerHTML = '<input id="v2AutoHollow" type="checkbox" autocomplete="off"> <span>Hollow it too (saves resin)</span>'; st.insertBefore(lab, mb.nextSibling); }   /* v2.302: off by default */
         const g = document.createElement('details'); g.id = 'v2SideGlb'; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)
         g.innerHTML = '<summary title="Convert the loaded model without AUTO-SHRINK (geometry only)">Other formats / Convert</summary><div class="v2-more-menu"><button type="button" data-fmt="glb">GLB</button><button type="button" data-fmt="obj">OBJ</button><button type="button" data-fmt="3mf">3MF</button><button type="button" data-fmt="usdz">USDZ</button></div>';
         g.addEventListener('click', e => {

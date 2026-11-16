@@ -95,7 +95,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); await wait(300);
   const dl = page.$('v2MagicDownload');
-  ok(!!dl && dl.disabled && dl.previousElementSibling === page.$('v2MagicBtn'), 'C8 the DOWNLOAD button sits under SHRINK and starts greyed out');
+  ok(!!dl && dl.disabled && (dl.previousElementSibling === page.$('v2MagicBtn') || dl.previousElementSibling?.previousElementSibling === page.$('v2MagicBtn')), 'C8 the DOWNLOAD button sits under SHRINK (and its Hollow tick box) and starts greyed out');
   dl.disabled = false; page.w.dispatchEvent(new page.w.CustomEvent('shrink:model-opened')); await wait(50);
   ok(dl.disabled, 'C8 a newly opened model greys it out again');
   ok(!!page.$('v2AdvTools').querySelector('#v2ClayCard'), 'C8 the CLAY card is inside the ADVANCED drawer');
