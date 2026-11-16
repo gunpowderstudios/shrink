@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.303** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.304** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -97,7 +97,7 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 `batch.js` (ES module, loaded by `ui-mode.js`; the only button is BATCH UPLOAD on the start screen (the v2.180 top-bar `#v2BatchTop` was removed in v2.238; the load-screen button `#v2BatchHome` was removed in v2.184 and came back in v2.212 as the plainer BATCH UPLOAD under the drop zone), panel `#v2BatchPanel`, `window.__shrinkBatch`). For each queued file it calls `__shrinkApp.openFile`, waits for the QUICK-FIX button (`data-state="ready"`), clicks it, waits until `data-busy` clears, then clicks DOWNLOAD with `window.__shrinkCapture` set. **Every `saveBlob` must call `window.__shrinkCapture?.(blob, filename)` first** (print-tools, fuse-export, split-print, split-fallback do); a new exporter that saves on its own would bypass the batch. Memory bar = `estimate()`: biggest file x12 plus finished results, against `performance.memory.jsHeapSizeLimit` (Chrome) or deviceMemory x 0.5. (v2.154) The panel has its own Printer + Height; `applySettings()` clicks the print dashboard's `[data-printer]`/`[data-quality]` buttons and sets `#v2Height` for every file (always scope to `.print-v2-dashboard`: another `data-quality` element appears after a second open). These factors are rough guesses, tune them with real runs. Tests: `tests/clay.test.mjs` (B1-B4, with the real work stubbed through `__shrinkBatch.deps`).
 
 ### QUICK-FIX button state (v2.149)
-`quickState()` in `print-v2-ui.js` sets `#v2MagicBtn[data-state]` (`checking` = grey and disabled, like DOWNLOAD; `ready` = green) from `updateHealthCard()`. BATCH waits for `ready`.
+`quickState()` in `print-v2-ui.js` sets `#v2MagicBtn[data-state]` (`checking` = grey and disabled, like DOWNLOAD; `ready` = green) from `updateHealthCard()`. BATCH waits for `ready`. (v2.304) `firstHealthDone`: grey from `shrink:model-opened` until the first check AND `countPieces` finish; later re-checks never go back to `checking`.
 
 ### 16K ultra (v2.150, default since v2.159)
 The printer type + quality are saved in `localStorage['shrink-printer']` (`savePrinter()`/`savedPrinter()` in `print-v2-ui.js`; BATCH reads the same key) and restored when the dashboard is built; with nothing saved the default is resin + `ultra`. `setQuality('ultra')`: detail 0.018 mm for resin and `window.__shrinkStrict='p995'`; Standard/Fine/Large put it back to default. (v2.166) The visible control is one `#v2PrinterSel` dropdown built from `window.__shrinkPrinterList` (BATCH reads the same list); the old `[data-printer]`/`[data-quality]` buttons stay in a hidden block so code and tests can still click them. `downloadStem()` builds the export name (v2.266): `<name>-SHRINK` only after SHRINK, then `-<height>mm` (the older -16K/-FIXED/-FUSED parts were dropped).

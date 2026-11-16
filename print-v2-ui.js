@@ -281,6 +281,9 @@
   window.__shrinkRefreshSizeWarning = updateSizeWarning;
 
   // QUICK-FIX is grey and unclickable (like DOWNLOAD) while the health check runs and turns green when it has finished, so it is clear when to press it (v2.148).
+  /* v2.304: AUTO-SHRINK stays grey from the moment a model opens until its FIRST full health check (including the piece count) has finished; later re-checks never turn it grey again, so it no longer flickers green / grey / green */
+  let firstHealthDone = false;
+  window.addEventListener('shrink:model-opened', () => { firstHealthDone = false; try { quickState('checking'); } catch {} });
   const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; }
     const sb = $('v2ShrinkBtn'); if (sb) { const sOff = st === 'checking' || !sourceModel(); if (sOff) { sb.dataset.checking = '1'; if (!sb.disabled) sb.disabled = true; } else if (sb.dataset.checking) { delete sb.dataset.checking; if (!shrinkRunning && sb.disabled) sb.disabled = false; } } };
   let shrinkRunning = false;
@@ -302,7 +305,7 @@
     if (!card || !model) return;
     const run = ++healthRun;
     card.className = 'v2-health-card checking';
-    quickState('checking');
+    if (!firstHealthDone) quickState('checking');
     $('v2HealthLabel').textContent = 'Checking…';
     $('v2HealthScore').textContent = '—';
     $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Running mesh checks…</div>';
@@ -320,13 +323,13 @@
         $('v2HealthLabel').textContent = largeGlb ? 'Large GLB loaded' : 'Health check unavailable';
         $('v2HealthScore').textContent = '—';
         $('v2HealthRows').innerHTML = heightRowHtml() + '<div class="v2-health-row"><span>Triangles</span><strong>' + modelTriangles(model).toLocaleString() + '</strong></div><div class="v2-health-minor">' + (largeGlb ? 'Detailed mesh checks skipped for this large GLB so the interface stays responsive. AUTO-SHRINK can still run; OBJ conversion does not require it.' : 'The health analyser did not load. You can still convert this model using Other formats.') + '</div>';
-        quickState('ready');
+        firstHealthDone = true; quickState('ready');
         return;
       }
       lastHealth = { model, h };
       const rating = healthScore(h);
       card.className = `v2-health-card ${rating.level}`;
-      quickState('ready');
+      if (firstHealthDone) quickState('ready');   // first check: turns green only after the piece count below has finished
       $('v2HealthLabel').textContent = rating.label;
       $('v2HealthScore').textContent = String(rating.score);
       const watertight = h.openEdges === 0;
@@ -361,10 +364,10 @@
         if (run !== healthRun || !np) return;
         rowsEl.dataset.pieces = String(np);
         rowsEl.insertAdjacentHTML('beforeend', np === 1 ? '<div class="v2-health-row"><span>Pieces</span><strong class="ok">1 (one solid)</strong></div>' : `<div class="v2-health-row v2-pieces-row"><span>Separate pieces</span><strong class="note">${np} (not fused)</strong></div>`);
-      });
+      }).catch(() => {}).finally(() => { if (run === healthRun) { firstHealthDone = true; quickState('ready'); } });
     } catch (err) {
       card.className = 'v2-health-card bad';
-      quickState('ready');
+      firstHealthDone = true; quickState('ready');
       $('v2HealthLabel').textContent = 'Check failed';
       $('v2HealthScore').textContent = '—';
       $('v2HealthRows').innerHTML = '<div class="v2-health-checking">Could not analyse this mesh.</div>';

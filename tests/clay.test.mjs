@@ -114,6 +114,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(qb.dataset.state === 'checking' && qb.disabled, 'Q1 QUICK-FIX is grey (state checking) and unclickable while the health check runs');
   await wait(1500);
   ok(qb.dataset.state === 'ready' && !qb.disabled, 'Q1 and goes green once the check has finished');
+  { const seen = []; const obs = new w.MutationObserver(() => seen.push(qb.dataset.state)); obs.observe(qb, { attributes: true, attributeFilter: ['data-state'] });
+    await w.__shrinkRefreshHealth?.(); await wait(600); await w.__shrinkRefreshHealth?.(); await wait(600); obs.disconnect();
+    ok(!seen.includes('checking') && qb.dataset.state === 'ready' && !qb.disabled, 'Q2 (v2.304) later health re-checks never turn AUTO-SHRINK grey again (' + seen.join(',') + ')'); }
 }
 
 /* ---- 16K quality ---- */

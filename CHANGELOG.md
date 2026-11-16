@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.304
+- AUTO-SHRINK is grey from the moment a model opens until its first full health check (including the piece count) has finished, then green and it stays green: later re-checks no longer turn it grey again (it used to flicker green / grey / green, inviting early clicks). Test Q2.
+
 ## v2.303
 - Once a model is hollow, a tall blue CUT slider appears at the left edge of the viewer (right of the ADVANCED column). Drag it down to slice the top away and see inside; it drives the same cut-away as the slider on the Hollow card and the two stay in step. Test HU11.
 
