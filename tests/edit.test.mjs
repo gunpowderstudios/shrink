@@ -1,6 +1,6 @@
 // edit-core.js against the real Manifold library: shapes join/cut and plane slicing (shorten a "sword").
 import Module from 'manifold-3d';
-import { applyShapes, sliceSolid, applySolid, copyRegion } from '../edit-core.js';
+import { applyShapes, sliceSolid, applySolid, lassoPrism, lassoRegion } from '../edit-core.js';
 const wasm = await Module(); wasm.setup(); const M = wasm.Manifold;
 let bad = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) bad++; };
 const T = (x, y, z, sx = 1, sy = 1, sz = 1) => [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, x, y, z, 1];   // column-major translate + scale
@@ -36,13 +36,28 @@ ok(/whole model/.test(msg), 'E9 a cut that removes everything says so: ' + msg);
   void head;
 }
 
-/* copy / cut a region */
-{ const body = M.cube([20, 40, 20], true), cm = T(0, 15, 0, 30, 10, 30);          // box around the top 10 units (y 10..20)
-  const c1 = copyRegion(M, body, cm, false); const pb = c1.piece.boundingBox();
-  ok(c1.rest === null && Math.abs(c1.piece.volume() - 20 * 10 * 20) < 1 && Math.abs(pb.min[1] - 10) < 1e-6, `E12 COPY takes the piece in the box (volume ${c1.piece.volume().toFixed(0)}) and leaves the model alone`);
-  const c2 = copyRegion(M, body, cm, true);
-  ok(Math.abs(c2.rest.volume() - (body.volume() - 4000)) < 1 && c2.rest.decompose().length === 1, 'E12 CUT also removes it from the model');
-  let msg = ''; try { copyRegion(M, body, T(0, 100, 0, 5, 5, 5), false); } catch (e) { msg = e.message; }
-  ok(/Nothing is inside/.test(msg), 'E12 an empty box is refused: ' + msg);
+/* v2.313 lasso: a screen outline becomes a prism through the model */
+{ const body = M.cube([20, 40, 20], true), CS = wasm.CrossSection;
+  const world = T(0, 0, 100);                                                  // camera at z=100 looking down -z
+  const ortho = { world, persp: false, halfW: 50, halfH: 50 }, loop = [[-1, 0.2], [1, 0.2], [1, 0.4], [-1, 0.4]];   // y 10..20 on screen
+  const pr = lassoPrism(M, CS, loop, ortho, 10, 190);
+  const c1 = lassoRegion(M, body, pr, 'copy'); const pb = c1.piece.boundingBox();
+  ok(c1.rest === null && Math.abs(c1.piece.volume() - 20 * 10 * 20) < 1 && Math.abs(pb.min[1] - 10) < 1e-6, `E12 COPY takes the lassoed piece (volume ${c1.piece.volume().toFixed(0)}) and leaves the model alone`);
+  const c2 = lassoRegion(M, body, pr, 'delete');
+  ok(c2.piece === null && Math.abs(c2.rest.volume() - (body.volume() - 4000)) < 1 && c2.rest.decompose().length === 1, 'E13 DELETE removes it and the hole is capped flat (one closed piece)');
+  const c3 = lassoRegion(M, body, pr, 'cut');
+  ok(c3.piece && c3.rest && Math.abs(c3.piece.volume() + c3.rest.volume() - body.volume()) < 1 && c3.rest.boundingBox().max[1] < 10.001, 'E14 CUT OFF gives the piece and the capped rest');
+  const rot = { world: [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, -100, 1], persp: false, halfW: 50, halfH: 50 };   // camera behind, looking +z
+  const c4 = lassoRegion(M, body, lassoPrism(M, CS, loop, rot, 10, 190), 'copy');
+  ok(Math.abs(c4.piece.volume() - 4000) < 1, 'E15 a rotated camera selects the same place (screen up is still up)');
+  const side = [[0.1, -1], [0.5, -1], [0.5, 1], [0.1, 1]];                     // x 5..25 on screen, so x 5..10 of the body
+  const c5 = lassoRegion(M, body, lassoPrism(M, CS, side, ortho, 10, 190), 'copy');
+  ok(Math.abs(c5.piece.boundingBox().min[0] - 5) < 1e-6 && Math.abs(c5.piece.volume() - 5 * 40 * 20) < 1, 'E16 screen right is world right');
+  const persp = { world, persp: true, tanY: 0.4, aspect: 1 }, pc = lassoRegion(M, body, lassoPrism(M, CS, [[-1, 0.1], [1, 0.1], [1, 0.6], [-1, 0.6]], persp, 60, 140), 'copy');
+  ok(pc.piece.volume() > 3000 && pc.piece.volume() < 9000, `E17 a perspective lasso catches a piece too (${pc.piece.volume().toFixed(0)})`);
+  let msg = ''; try { lassoRegion(M, body, lassoPrism(M, CS, [[0.8, 0.8], [0.9, 0.8], [0.9, 0.9]], ortho, 10, 190), 'delete'); } catch (e) { msg = e.message; }
+  ok(/did not catch/.test(msg), 'E18 a loop that misses the model is refused: ' + msg);
+  let m2 = ''; try { lassoPrism(M, CS, [[0, 0], [1, 1]], ortho, 10, 190); } catch (e) { m2 = e.message; }
+  ok(/loop/.test(m2), 'E19 a two-point scribble is refused');
 }
 console.log(bad ? `${bad} FAILED` : 'edit tests passed'); process.exit(bad ? 1 : 0);

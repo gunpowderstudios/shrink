@@ -394,14 +394,16 @@ async function editModel(model, ops) {
   const { solid, components } = await modelToSolid(model);
   try {
     const q = (() => { try { return new URL(import.meta.url).search; } catch { return ''; } })();
-    const { applyShapes, sliceSolid, applySolid, copyRegion } = await import('./edit-core.js' + q);
-    if (ops.copy) {                                        // v2.312: copy / cut the part inside a box
-      const c = copyRegion(wasm.Manifold, solid, ops.copy.matrix, !!ops.copy.remove);
+    const { applyShapes, sliceSolid, applySolid, lassoPrism, lassoRegion } = await import('./edit-core.js' + q);
+    if (ops.lasso) {                                       // v2.313: lasso / razor. cam + pts + near/far describe the screen outline; op = delete | copy | cut
+      const L = ops.lasso, prism = lassoPrism(wasm.Manifold, wasm.CrossSection, L.pts, L.cam, L.near, L.far);
+      let c; try { c = lassoRegion(wasm.Manifold, solid, prism, L.op); } finally { try { prism.delete?.(); } catch {} }
       try {
-        const out = { piece: solidToThree(c.piece), pieceVolume: c.piece.volume(), components };
+        const out = { components };
+        if (c.piece) { out.piece = solidToThree(c.piece); out.pieceVolume = c.piece.volume(); }
         if (c.rest) { out.root = solidToThree(c.rest); out.volume = c.rest.volume(); out.pieces = c.rest.decompose().length; }
         return out;
-      } finally { try { c.piece.delete?.(); c.rest?.delete?.(); } catch {} }
+      } finally { try { c.piece?.delete?.(); c.rest?.delete?.(); } catch {} }
     }
     let r;
     if (ops.part) {                                        // an uploaded part: already placed in world space on ops.part.root

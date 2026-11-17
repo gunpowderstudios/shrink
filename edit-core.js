@@ -42,17 +42,40 @@ export function applySolid(M, solid, other, mode) {
   return r;
 }
 
-/** Copy (and optionally remove) the part of a solid inside a box. matrix places the unit cube. Returns { piece, rest } (rest is null unless remove). */
-export function copyRegion(M, solid, matrix, remove) {
-  const box = primitive(M, 'cube').transform(matrix);
-  try {
-    const piece = solid.intersect(box);
-    if (piece.isEmpty()) { try { piece.delete?.(); } catch {} throw new Error('Nothing is inside that box. Move it over the part you want, or make it bigger.'); }
-    let rest = null;
-    if (remove) {
-      rest = solid.subtract(box);
-      if (rest.isEmpty()) { try { rest.delete?.(); piece.delete?.(); } catch {} throw new Error('That would remove the whole model.'); }
-    }
-    return { piece, rest };
-  } finally { try { box.delete?.(); } catch {} }
+/**
+ * v2.313 lasso: a prism (a sideways pyramid for a perspective camera) from a screen outline.
+ * pts = [[ndcX, ndcY], ...] (-1..1, +y up). cam = { world: 16-number camera matrixWorld, persp, tanY, aspect } or
+ * { world, persp:false, halfW, halfH }. near/far = distances from the camera along its view direction.
+ */
+export function lassoPrism(M, CS, pts, cam, near, far) {
+  if (!pts || pts.length < 3) throw new Error('Draw a loop with the lasso first.');
+  if (!(far > near)) throw new Error('The lasso has no depth to cut.');
+  const d0 = cam.persp ? Math.max(1e-6, near) : 1;
+  const sx = cam.persp ? d0 * cam.tanY * cam.aspect : cam.halfW, sy = cam.persp ? d0 * cam.tanY : cam.halfH;
+  let poly = pts.map(([x, y]) => [-x * sx, y * sy]);     // x is mirrored because the prism is turned 180° about Y below
+  let area = 0; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; area += a[0] * b[1] - b[0] * a[1]; }
+  if (area < 0) poly = poly.reverse();
+  const cs = new CS([poly], 'NonZero');
+  if (cs.isEmpty()) { try { cs.delete?.(); } catch {} throw new Error('That loop is too small. Draw a bigger one.'); }
+  const top = cam.persp ? far / d0 : 1;
+  let prism = M.extrude(cs, far - near, 0, 0, [top, top]);
+  try { cs.delete?.(); } catch {}
+  const step = (m) => { const n = m(prism); try { prism.delete?.(); } catch {} prism = n; };
+  step(p => p.translate([0, 0, cam.persp ? near : near]));
+  step(p => p.rotate([0, 180, 0]));
+  step(p => p.transform(cam.world));
+  return prism;
+}
+
+/** op: 'delete' (remove what is inside the prism), 'copy' (keep the model, return the piece), 'cut' (take the piece out and return it, or drop it when keep is false). Returns { piece, rest } (either may be null). The hole is always capped flat. */
+export function lassoRegion(M, solid, prism, op) {
+  const piece = (op === 'copy' || op === 'cut') ? solid.intersect(prism) : null;
+  if (piece && piece.isEmpty()) { try { piece.delete?.(); } catch {} throw new Error('The loop did not catch any of the model. Draw it around the part you want.'); }
+  let rest = null;
+  if (op !== 'copy') {
+    rest = solid.subtract(prism);
+    if (rest.isEmpty()) { try { rest.delete?.(); piece?.delete?.(); } catch {} throw new Error('That would remove the whole model.'); }
+    if (rest.volume() > solid.volume() * 0.999999) { try { rest.delete?.(); piece?.delete?.(); } catch {} throw new Error('The loop did not catch any of the model. Draw it around the part you want.'); }
+  }
+  return { piece, rest };
 }

@@ -851,3 +851,24 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-edit-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}.v2-edit-actions .v2-edit-undo{margin:0}.v2-edit-actions .v2-edit-undo[hidden]{display:none!important}
 .v2-edit-actions:has(#v2EdUndo[hidden]){grid-template-columns:1fr}
 .v2-edit-reset{border-color:#8a5a2a!important;color:#ffcf9a!important}
+
+/* v2.313 lasso / razor / part pad */
+.v2-lasso-cv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6}
+#viewer.v2-cur-lasso,#viewer.v2-cur-lasso canvas{cursor:crosshair}
+#viewer.v2-cur-razor,#viewer.v2-cur-razor canvas{cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><g transform='rotate(-35 16 16)'><rect x='3' y='12' width='26' height='8' rx='1' fill='%23e8eef5' stroke='%23222' stroke-width='1.5'/><path d='M3 16h26' stroke='%23d33' stroke-width='1.5'/><circle cx='9' cy='14' r='1.2' fill='%23222'/><circle cx='16' cy='14' r='1.2' fill='%23222'/><circle cx='23' cy='14' r='1.2' fill='%23222'/></g></svg>") 4 28,crosshair}
+#v2ClayCard{display:none!important}
+.v2-exact{margin-top:6px}
+.v2-part-pad{position:absolute;right:12px;bottom:12px;z-index:8;width:236px;padding:10px;border-radius:12px;background:rgba(20,24,32,.92);border:1px solid rgba(120,150,190,.4);color:#e8eef5;box-shadow:0 6px 24px rgba(0,0,0,.45);font-size:12px}
+.v2-part-pad[hidden]{display:none!important}
+.v2-pad-title{font-weight:700;letter-spacing:.04em;margin-bottom:6px;text-transform:uppercase;font-size:11px;opacity:.8}
+.v2-pad-row{display:flex;gap:8px;align-items:stretch}
+.v2-pad-cross{display:grid;grid-template-columns:repeat(3,34px);grid-template-rows:repeat(2,34px);gap:4px}
+.v2-pad-cross button:nth-child(1){grid-column:2;grid-row:1}.v2-pad-cross span{display:none}
+.v2-pad-cross button:nth-child(3){grid-column:1;grid-row:2}.v2-pad-cross button:nth-child(4){grid-column:2;grid-row:2}.v2-pad-cross button:nth-child(5){grid-column:3;grid-row:2}
+.v2-pad-col{display:grid;gap:4px;flex:1}
+.v2-part-pad button,.v2-part-pad select{font:inherit;color:#e8eef5;background:#2a3342;border:1px solid #3d4a60;border-radius:7px;padding:4px 6px;cursor:pointer}
+.v2-part-pad button:hover{background:#34425a}
+.v2-pad-col button{font-size:10px;font-weight:700;padding:5px 2px}
+.v2-pad-tilt{display:flex;gap:4px;align-items:center;margin-top:8px}.v2-pad-tilt span{font-size:11px;opacity:.8;margin-right:2px}.v2-pad-tilt button{flex:1;font-size:15px;padding:3px 0}
+.v2-pad-foot{display:flex;gap:6px;margin-top:8px}.v2-pad-foot select{flex:1;min-width:0}
+.v2-pad-go{background:#1f9d6b!important;border-color:#27c088!important;font-weight:700}.v2-pad-no{background:#5a2a2a!important}

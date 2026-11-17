@@ -3,6 +3,11 @@ import { makePage, models, ok, failures, wait } from './mt-harness.mjs';
 const waitFor = async (fn, ms = 90000, step = 100) => { for (let t = 0; t < ms; t += step) { if (await fn()) return true; await wait(step); } return !!(await fn()); };
 const tris = m => { let n = 0; m.traverse(o => { if (o.isMesh) n += (o.geometry.index?.count || o.geometry.attributes.position.count) / 3; }); return n; };
 const set = (page, id, v) => { const e = page.$(id); e.value = String(v); e.dispatchEvent(new page.w.Event('input', { bubbles: true })); e.dispatchEvent(new page.w.Event('change', { bubbles: true })); };
+const orthoCam = (page, yLo, yHi) => {          // an orthographic camera in front of the model: the loop covers the model's height between yLo and yHi (fractions of its height), all across
+  const THREE = page.w.__shrinkApp.THREE, b = new THREE.Box3().setFromObject(page.w.__shrinkWorkingModel(), true), c = b.getCenter(new THREE.Vector3()), H = Math.max(b.max.y - b.min.y, b.max.x - b.min.x, b.max.z - b.min.z), h = b.max.y - b.min.y;
+  const ndcY = f => (b.min.y + h * f - c.y) / H;
+  return { cam: { world: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, c.x, c.y, c.z + H * 5, 1], persp: false, halfW: H, halfH: H }, pts: [[-1, ndcY(yLo)], [1, ndcY(yLo)], [1, ndcY(yHi)], [-1, ndcY(yHi)]] };
+};
 const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THREE.Box3().setFromObject(page.w.__shrinkWorkingModel(), true); return b.max.y - b.min.y; };
 
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
@@ -35,12 +40,15 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   set(page, 'v2EdPos', 0); set(page, 'v2EdSide', 'high'); const mKeep = w.__shrinkWorkingModel(); page.$('v2EdGo').click();
   ok(await waitFor(() => /Could not edit/.test(page.$('v2EdResult').textContent), 60000) && w.__shrinkWorkingModel() === mKeep, 'ED9 removing everything is refused and the model stays');
 
-  /* brush tool: the Brush card shows only for the Brush tool, and leaving the EDIT tab clears the previews */
-  set(page, 'v2EdTab', 'brush'); await wait(50);
-  ok(page.$('v2ClayCard').hidden === false && page.$('v2EdRun').hidden === true && page.$('v2EdShapeBox').hidden === true, 'ED10 the Brush tool shows the brush card and hides the shape controls');
-  ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), 'ED10 no shape preview while brushing');
+  /* lasso and razor tools: their own controls, no shape preview */
+  set(page, 'v2EdTab', 'lasso'); await wait(50);
+  ok(page.$('v2EdLassoBox').hidden === false && page.$('v2EdGo').hidden === true && page.$('v2EdShapeBox').hidden === true && page.$('v2EdDepth').value === 'front' && /DELETE/.test(page.$('v2LassoDelBtn').textContent) && /COPY/.test(page.$('v2LassoKeepBtn').textContent), 'ED10 the Lasso tool shows DELETE / COPY and hides the shape controls');
+  ok(page.$('v2LassoDelBtn').disabled === true, 'ED10 DELETE waits until a loop is drawn');
+  ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), 'ED10 no shape preview while lassoing');
+  set(page, 'v2EdTab', 'razor'); await wait(50);
+  ok(page.$('v2EdDepth').value === 'through' && /CUT OFF$/.test(page.$('v2LassoDelBtn').textContent.trim()) && /CUT OFF & KEEP/.test(page.$('v2LassoKeepBtn').textContent), 'ED10 the Razor cuts right through and reads CUT OFF / CUT OFF & KEEP');
   set(page, 'v2EdTab', 'shape'); await wait(50);
-  ok(page.$('v2ClayCard').hidden === true && page.$('v2EdRun').hidden === false, 'ED10 going back to Shape hides the brush card');
+  ok(page.$('v2EdLassoBox').hidden === true && page.$('v2EdRun').hidden === false, 'ED10 going back to Shape hides the lasso controls');
   page.$('v2TabFinish').click(); await wait(50);
   ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') && page.$('v2EditCard').closest('.v2-main-card').dataset.tab === 'finish', 'ED11 SHRINK & FINISH removes the edit preview');
   /* an edit after hollowing is refused */
@@ -52,15 +60,17 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(await waitFor(() => /Could not edit/.test(page.$('v2EdResult').textContent), 60000) && w.__shrinkWorkingModel() === mHol, 'ED12 editing a hollow model is refused and nothing changes');
 }
 
-/* brush: a carve stroke applied from the EDIT tab with APPLY BRUSH NOW */
+/* lasso DELETE: loop round the top 30 %, the hole is capped, undo brings it back */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
-  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'brush'); await wait(100);
-  const m0 = w.__shrinkWorkingModel(), b = new w.__shrinkApp.THREE.Box3().setFromObject(m0, true), top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2, r = (b.max.y - b.min.y) * 0.15;
-  w.__shrinkClay.addStroke('cut', [{ x: cx, y: top, z: cz, r }, { x: cx + r, y: top, z: cz, r }]);
-  await wait(50); ok(!page.$('v2ClayApply').disabled, 'ED13 APPLY BRUSH NOW is enabled once there is a stroke');
-  page.$('v2ClayApply').click();
-  ok(await waitFor(() => /Brush applied|could not/.test(page.$('v2ClayNote').textContent), 90000) && /Brush applied/.test(page.$('v2ClayNote').textContent), 'ED13 the brush applies: ' + page.$('v2ClayNote').textContent.slice(0, 120));
-  ok(w.__shrinkWorkingModel() !== m0 && /BRUSH/.test(page.$('v2HealthChanges').textContent), 'ED13 the carved model is the working model and a BRUSH chip shows');
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(100); set(page, 'v2EdDepth', 'through');
+  const m0 = w.__shrinkWorkingModel(), h0 = height(page), L = orthoCam(page, 0.7, 1.3);
+  w.__shrinkEdit.setSel(L.pts, L.cam); await wait(30); ok(page.$('v2LassoDelBtn').disabled === false, 'ED13 DELETE is enabled once a loop exists');
+  page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 90000) && /Deleted/.test(page.$('v2EdResult').textContent), 'ED13 the lasso deletes: ' + page.$('v2EdResult').textContent.slice(0, 140));
+  ok(w.__shrinkWorkingModel() !== m0 && Math.abs(height(page) - h0 * 0.7) < h0 * 0.05 && /EDITED/.test(page.$('v2HealthChanges').textContent) && !w.__shrinkEdit.hasSel(), `ED13 the top 30 % is gone (${h0.toFixed(1)} -> ${height(page).toFixed(1)}), the chip shows and the loop is cleared`);
+  page.$('v2EdUndo').click(); await wait(200); ok(Math.abs(height(page) - h0) < 0.01, 'ED13 UNDO brings it back');
+  page.$('v2EdResult').textContent = ''; w.__shrinkEdit.setSel(orthoCam(page, 3, 4).pts, orthoCam(page, 3, 4).cam); page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Could not/.test(page.$('v2EdResult').textContent), 60000) && /did not catch/.test(page.$('v2EdResult').textContent), 'ED13 a loop beside the model is refused: ' + page.$('v2EdResult').textContent.slice(0, 90));
 }
 
 /* icons and the brush tip ring */
@@ -73,14 +83,8 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(page.$('v2EdKind').value === 'ball' && pressed('kind', 'ball') === 'true' && pressed('kind', 'cube') === 'false', 'ED14 clicking the Ball icon picks ball');
   page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="slice"]').click(); await wait(50);
   ok(page.$('v2EdTab').value === 'slice' && page.$('v2EdSliceBox').hidden === false && pressed('tool', 'slice') === 'true', 'ED14 clicking the Slice icon opens the slice controls');
-  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="brush"]').click(); await wait(50);
-  ok(page.$('v2ClayCard').hidden === false, 'ED14 clicking the Brush icon shows the brush card');
-  w.__shrinkClay.setTool(true, 'add'); w.__shrinkClay.ring({ clientX: 100, clientY: 120 });
-  const ring = page.$('v2BrushRing'); ok(!!ring && ring.hidden === false && /^6\.0 mm$/.test(ring.textContent), 'ED15 selecting the brush shows a tip ring labelled with its width: ' + ring?.textContent);
-  set(page, 'v2ClaySize', 12); await wait(30);
-  ok(/^12\.0 mm$/.test(page.$('v2BrushRing').textContent) && /12\.0 mm wide/.test(page.$('v2ClaySizeVal').textContent), 'ED15 the ring follows the size slider');
-  w.__shrinkClay.setTool(true, 'cut'); w.__shrinkClay.ring({ clientX: 100, clientY: 120 }); ok(page.$('v2BrushRing').dataset.mode === 'cut', 'ED15 the ring turns orange for carve');
-  w.__shrinkClay.setTool(false); ok(page.$('v2BrushRing').hidden === true, 'ED15 the ring goes when the brush is off');
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="razor"]').click(); await wait(50);
+  ok(page.$('v2EdTab').value === 'razor' && pressed('tool', 'razor') === 'true' && !page.$('v2EditCard').querySelector('.v2-icon-btn[data-value="brush"]'), 'ED14 the Razor icon is there and the pink/orange Brush icon is gone');
 }
 
 /* Part tool: slice the top off, then sit an uploaded part on top and join it */
@@ -107,27 +111,35 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(!w.__shrinkEdit.hasPart() && w.__shrinkEdit.depth() === 2, 'ED18 the part is used up and the edit can be undone');
 }
 
-/* Copy / cut then paste: duplicate the top of the model, then cut it out and put it back elsewhere */
+/* Lasso COPY then the arrow pad and PLACE IT; razor CUT OFF & KEEP */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
   page.$('v2TabEdit').click(); await wait(50);
-  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="copy"]').click(); await wait(80);
-  ok(page.$('v2EdCopyBox').hidden === false && page.$('v2EdGo').hidden === true && page.$('v2EdModeRow').hidden === true, 'ED19 the Copy / cut tool shows the blue box controls');
-  ok(Number(page.$('v2EdCH').value) > 0, 'ED19 the box starts at half the model: ' + page.$('v2EdCW').value + ' x ' + page.$('v2EdCH').value + ' x ' + page.$('v2EdCD').value);
-  set(page, 'v2EdCY', 10); set(page, 'v2EdCH', 20); set(page, 'v2EdCW', 80); set(page, 'v2EdCD', 80);          // the top half of a 40 mm model
-  const m0 = w.__shrinkWorkingModel(), h0 = height(page);
-  page.$('v2EdResult').textContent = ''; page.$('v2EdCopyBtn').click();
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="lasso"]').click(); await wait(80); set(page, 'v2EdDepth', 'through');
+  const m0 = w.__shrinkWorkingModel(), h0 = height(page), L = orthoCam(page, 0.5, 1.3);
+  w.__shrinkEdit.setSel(L.pts, L.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
   ok(await waitFor(() => /Copied|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Copied/.test(page.$('v2EdResult').textContent), 'ED20 COPY works: ' + page.$('v2EdResult').textContent.slice(0, 110));
   ok(w.__shrinkWorkingModel() === m0 && w.__shrinkEdit.depth() === 0, 'ED20 copying leaves the model alone');
-  ok(page.$('v2EdTab').value === 'part' && w.__shrinkEdit.hasPart() && /Copied piece ready/.test(page.$('v2EdPartInfo').textContent) && /PASTE PART ON/.test(page.$('v2EdGo').textContent), 'ED20 the copied piece is ready to paste');
-  page.$('v2EdResult').textContent = ''; set(page, 'v2EdPartY', 25); await wait(30);       // move it up by 25 mm
-  page.$('v2EdGo').click();
-  ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED21 PASTE joins it: ' + page.$('v2EdResult').textContent.slice(0, 110));
-  ok(height(page) > h0 + 10, `ED21 the pasted copy made the model taller (${h0.toFixed(1)} -> ${height(page).toFixed(1)})`);
+  ok(page.$('v2EdTab').value === 'part' && w.__shrinkEdit.hasPart() && /Copied piece ready/.test(page.$('v2EdPartInfo').textContent) && /PASTE PART ON/.test(page.$('v2EdGo').textContent) && page.$('v2EdMode').value === 'join', 'ED20 the copied piece is ready to paste (join)');
+  if (w.document.getElementById('viewer')) ok(w.__shrinkEdit.padVisible(), 'ED20 the arrow pad pops up'); 
+  /* the pad: up, bigger, tilt */
+  const y0 = Number(page.$('v2EdPartY').value), hh = Number(page.$('v2EdPartH').value);
+  w.__shrinkEdit.pad('up'); w.__shrinkEdit.pad('up'); ok(Number(page.$('v2EdPartY').value) > y0 + 1, `ED21 the up arrow moves the part up (${y0} -> ${page.$('v2EdPartY').value})`);
+  w.__shrinkEdit.pad('right'); ok(Math.abs(Number(page.$('v2EdPartX').value)) > 0.5, 'ED21 the right arrow moves it sideways');
+  w.__shrinkEdit.pad('bigger'); ok(Number(page.$('v2EdPartH').value) > hh, 'ED21 BIGGER enlarges it'); w.__shrinkEdit.pad('smaller'); w.__shrinkEdit.pad('smaller'); ok(Number(page.$('v2EdPartH').value) < hh, 'ED21 SMALLER reduces it');
+  w.__shrinkEdit.pad('tiltL'); w.__shrinkEdit.pad('tiltD'); ok(w.__shrinkEdit.hasPart(), 'ED21 tilting does not lose the part');
+  w.__shrinkEdit.pad('tiltR'); w.__shrinkEdit.pad('tiltU'); w.__shrinkEdit.pad('smaller'); w.__shrinkEdit.pad('bigger'); w.__shrinkEdit.pad('bigger');
+  Array.from({ length: 12 }).forEach(() => w.__shrinkEdit.pad('up'));
+  page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click();
+  ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED21 PLACE IT joins it: ' + page.$('v2EdResult').textContent.slice(0, 110));
+  ok(height(page) > h0 + 5, `ED21 the pasted copy made the model taller (${h0.toFixed(1)} -> ${height(page).toFixed(1)})`);
+  if (w.document.getElementById('viewer')) ok(!w.__shrinkEdit.padVisible(), 'ED21 the pad goes away once the part is placed');
   page.$('v2EdUndo').click(); await wait(200);
-  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="copy"]').click(); await wait(50);
-  page.$('v2EdResult').textContent = ''; page.$('v2EdCutBtn').click();
-  ok(await waitFor(() => /Cut out|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Cut out/.test(page.$('v2EdResult').textContent), 'ED22 CUT OUT works: ' + page.$('v2EdResult').textContent.slice(0, 110));
-  ok(height(page) < h0 * 0.7 && w.__shrinkEdit.depth() >= 1 && w.__shrinkEdit.hasPart(), `ED22 the piece is taken out of the model (${h0.toFixed(1)} -> ${height(page).toFixed(1)}) and held for pasting`);
+  /* razor: cut off and keep */
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="razor"]').click(); await wait(50);
+  const h1 = height(page), R = orthoCam(page, 0.5, 1.3); w.__shrinkEdit.setSel(R.pts, R.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
+  ok(await waitFor(() => /Cut off|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Cut off/.test(page.$('v2EdResult').textContent), 'ED22 CUT OFF & KEEP works: ' + page.$('v2EdResult').textContent.slice(0, 110));
+  ok(height(page) < h1 * 0.7 && w.__shrinkEdit.depth() >= 1 && w.__shrinkEdit.hasPart(), `ED22 the piece is off the model (${h1.toFixed(1)} -> ${height(page).toFixed(1)}) and held for pasting`);
+  page.$('v2PartPad')?.querySelector('#v2PadCancel')?.click(); if (w.document.getElementById('viewer')) { await wait(50); ok(!w.__shrinkEdit.hasPart() && page.$('v2EdTab').value === 'none', 'ED22 CANCEL puts the part away'); }
 }
 
 /* put the tool down (click it again, or Esc) and RESET ALL EDITS */
@@ -138,9 +150,13 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   tool('shape').click(); await wait(50);
   ok(page.$('v2EdTab').value === 'none' && tool('shape').getAttribute('aria-pressed') === 'false' && page.$('v2EdShapeBox').hidden === true && page.$('v2EdRun').hidden === true, 'ED23 clicking the pressed tool puts it down');
   ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), 'ED23 and removes its preview');
-  tool('brush').click(); await wait(50); ok(page.$('v2EdTab').value === 'brush' && page.$('v2ClayCard').hidden === false, 'ED23 a tool can be picked again');
-  w.__shrinkClay.setTool(true, 'add'); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
-  ok(page.$('v2EdTab').value === 'none' && w.__shrinkClay.state.on === false && page.$('v2ClayCard').hidden === true, 'ED24 Esc puts the brush down and deselects it');
+  tool('lasso').click(); await wait(50); ok(page.$('v2EdTab').value === 'lasso' && page.$('v2EdLassoBox').hidden === false, 'ED23 a tool can be picked again');
+  const Lc = orthoCam(page, 0.5, 1); w.__shrinkEdit.setSel(Lc.pts, Lc.cam); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
+  ok(page.$('v2EdTab').value === 'lasso' && !w.__shrinkEdit.hasSel(), 'ED24 the first Esc only clears the loop');
+  w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
+  ok(page.$('v2EdTab').value === 'none', 'ED24 the next Esc puts the lasso down');
+  { const h = height(page); w.__shrinkEdit.setSel(Lc.pts, Lc.cam); tool('lasso').click(); await wait(30); set(page, 'v2EdDepth', 'through'); w.__shrinkEdit.setSel(Lc.pts, Lc.cam); page.$('v2EdResult').textContent = ''; w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Delete', bubbles: true })); 
+    ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && height(page) < h * 0.8, 'ED24 the Delete key deletes the loop'); page.$('v2EdUndo').click(); await wait(200); }
   tool('shape').click(); await wait(50); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
   ok(page.$('v2EdTab').value === 'none', 'ED24 Esc also puts down the Shape tool');
   /* two edits, a brush stroke and a part, then reset */
@@ -149,11 +165,11 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   await waitFor(() => /Sliced|Could not/.test(page.$('v2EdResult').textContent), 60000);
   tool('shape').click(); set(page, 'v2EdKind', 'ball'); set(page, 'v2EdMode', 'cut'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click();
   await waitFor(() => /Cut|Could not/.test(page.$('v2EdResult').textContent), 60000);
-  w.__shrinkClay.addStroke('cut', [{ x: 0, y: 0, z: 0, r: 1 }]); w.__shrinkEdit.setPart(new Float32Array([0,0,0, 1,0,0, 0,1,0, 0,0,1, 1,0,0, 0,0,0]), false, 'x.stl');
-  ok(w.__shrinkEdit.depth() === 2 && height(page) < h0 * 0.6 && w.__shrinkClay.hasClay() && w.__shrinkEdit.hasPart(), 'ED25 set up: two edits, a stroke and a part');
+  w.__shrinkEdit.setPart(new Float32Array([0,0,0, 1,0,0, 0,1,0, 0,0,1, 1,0,0, 0,0,0]), false, 'x.stl');
+  ok(w.__shrinkEdit.depth() === 2 && height(page) < h0 * 0.6 && w.__shrinkEdit.hasPart(), 'ED25 set up: two edits and a part');
   page.$('v2EdReset').click(); await wait(300);
   ok(Math.abs(height(page) - h0) < 0.01 && w.__shrinkEdit.depth() === 0 && !/EDITED/.test(page.$('v2HealthChanges').textContent), `ED25 RESET brings the model back (height ${h0.toFixed(1)} -> ${height(page).toFixed(1)}) and clears the EDITED chip`);
-  ok(!w.__shrinkClay.hasClay() && !w.__shrinkEdit.hasPart() && page.$('v2EdUndo').hidden === true && page.$('v2EdTab').value === 'none' && /Reset/.test(page.$('v2EdResult').textContent), 'ED25 and the brush strokes, the part and the tool are cleared');
+  ok(!w.__shrinkEdit.hasPart() && page.$('v2EdUndo').hidden === true && page.$('v2EdTab').value === 'none' && /Reset/.test(page.$('v2EdResult').textContent), 'ED25 and the part and the tool are cleared');
   page.$('v2EdReset').click(); await wait(100); ok(/Nothing to reset/.test(page.$('v2EdResult').textContent), 'ED25 resetting again says there is nothing to reset');
   void m0;
 }

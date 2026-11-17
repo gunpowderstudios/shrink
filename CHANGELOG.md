@@ -1,5 +1,13 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.313
+- EDIT tab rebuilt around two simple tools. The pink/orange Brush is gone (clay.js stays in the repo, switched off).
+- **Lasso**: hold the mouse down and draw a loop round a part, then **DELETE** (or the Delete key) or **COPY**. Esc clears the loop, a second Esc puts the tool down; Ctrl / ⌘ + drag still turns the model. "How deep" picks front half only or right through.
+- **Razor** (razor-blade cursor): same loop, cuts straight through; **CUT OFF** removes the piece, **CUT OFF & KEEP** takes it with you to paste. The hole is always closed flat (Manifold keeps the result a solid).
+- A copied or cut piece pops up an **arrow pad** over the model: move up / down / left / right, nearer / farther, bigger / smaller, tilt and spin, in fine / medium / big steps, then **PLACE IT** (or CANCEL). An uploaded part now sits on top of the model first. The numeric boxes moved into a folded "Exact numbers".
+- The old Copy / cut box tool is replaced by the lasso. Engine: `edit-core.js` `lassoPrism` / `lassoRegion`, `fuse-export.js` `editModel(model, {lasso})`. Tests E12–E19, ED10–ED25.
+- Fixed: a copied piece's start position was read after its points had been centred, so it pasted at the model's middle height.
+
 ## v2.312
 - EDIT tab: new **Copy / cut** tool. Put the blue box around a piece (an arm, a head, a horn), then **COPY** (the model stays as it is) or **CUT OUT** (the piece is taken out of the model). The piece goes straight into the Paste part tool, starting exactly where it came from, set to Join; move it, turn it or change its height and press **PASTE PART ON**. The Part tool is now called **Paste part** and also takes files, as before.
 - A tool can be put down: click the pressed tool again, or press Esc (also puts the Brush down). With no tool selected nothing is previewed.
