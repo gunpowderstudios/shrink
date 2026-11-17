@@ -133,7 +133,7 @@
     app()?.show?.('optimized');
     if (view) app()?.restoreViewState?.(view);
     app()?.notifyReduced?.({ kind });
-    markApplied(kind === 'rebuild' ? 'rebuilt' : kind === 'clay' ? 'clay' : kind === 'hollow' ? 'hollowed' : 'fixed');
+    markApplied(kind === 'rebuild' ? 'rebuilt' : kind === 'clay' ? 'clay' : kind === 'hollow' ? 'hollowed' : kind === 'edit' ? 'edited' : 'fixed');
     window.__shrinkPrintSafety?.clearDiagnostic?.();
     return root;
   }
@@ -148,8 +148,8 @@
     ensureHollowSlide(); { const hs = $('v2HollowSlide'); if (hs) hs.hidden = !appliedChanges.has('hollowed'); }
     const wrap = $('v2HealthChanges');
     if (!wrap) return;
-    const order = ['clay','fixed','rebuilt','fused','hollowed','shrunk'];
-    const labels = { clay:'CLAY', fixed:'FIXED', rebuilt:'REBUILT', fused:'FUSED', hollowed:'HOLLOW', shrunk:'SHRUNK' };
+    const order = ['clay','fixed','rebuilt','fused','edited','hollowed','shrunk'];
+    const labels = { clay:'CLAY', fixed:'FIXED', rebuilt:'REBUILT', fused:'FUSED', hollowed:'HOLLOW', edited:'EDITED', shrunk:'SHRUNK' };
     const chips = order.filter(k => appliedChanges.has(k))
       .map(k => `<span class="v2-change-chip ${k}"><i></i>${k === 'fused' && fusedPieces > 1 ? `FUSED · ${fusedPieces} PIECES` : labels[k]}</span>`)
       .join('');
@@ -291,7 +291,7 @@
   const origTrisOf = () => Math.max(1, modelTriangles(app()?.originalModel));
   function syncDetailToBase() {
     const live = window.__shrinkLive, d = $('v2Detail'), n = $('v2DetailNumber'), note = $('v2DetailNote'); if (!live?.root || !d || !sourceModel() || sourceModel() === app()?.originalModel) return;
-    if (!['fixed', 'fused', 'rebuilt', 'clay', 'hollowed'].some(k => appliedChanges.has(k))) return;   // a freshly opened model also differs from the live preview root: only a tool that really replaced the model counts
+    if (!['fixed', 'fused', 'rebuilt', 'clay', 'hollowed', 'edited'].some(k => appliedChanges.has(k))) return;   // a freshly opened model also differs from the live preview root: only a tool that really replaced the model counts
     const pct = Math.max(1, Math.min(100, Math.round(Math.min(1, modelTriangles(sourceModel()) / origTrisOf()) * 1000) / 10)), t = String(pct);
     if (d.value !== t) d.value = t; if (n && n.value !== t) n.value = t;
     detailManual = false; manualLevel = '';
@@ -701,6 +701,91 @@
     const out = $('v2HollowCutOut'); if (out) out.textContent = pct >= 99.5 ? 'off' : Math.round(pct) + '%';
     { const r = $('v2HollowCutRange'); if (r && Number(r.value) !== Math.round(pct)) r.value = String(Math.round(pct)); const v = $('v2HollowSlideRange'); if (v && Number(v.value) !== Math.round(pct)) v.value = String(Math.round(pct)); const vo = $('v2HollowSlideOut'); if (vo) vo.textContent = pct >= 99.5 ? 'off' : Math.round(pct) + '%'; }
   }
+  // ---- v2.307 EDIT MODEL: basic shapes (join / cut) and a slice-off plane, both through Manifold (edit-core.js) ----
+  let editStack = [];                                   // clones of the working model before each edit, for UNDO
+  function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
+  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; });
+  function editFrame() {
+    const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return null;
+    const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return null;
+    return { THREE, box, centre: box.getCenter(new THREE.Vector3()), size: box.getSize(new THREE.Vector3()), mm: Number(window.__shrinkPrint?.mmPerUnit?.()) || 1 };
+  }
+  const num = (id, d = 0) => { const v = Number($(id)?.value); return Number.isFinite(v) ? v : d; };
+  function shapeSpec() {                                // the shape inputs (mm, offset from the model's centre) as a world-space matrix
+    const f = editFrame(); if (!f) return null;
+    const sx = Math.max(0.1, num('v2EdW', 10)) / f.mm, sy = Math.max(0.1, num('v2EdH', 10)) / f.mm, sz = Math.max(0.1, num('v2EdD', 10)) / f.mm;
+    const px = f.centre.x + num('v2EdX') / f.mm, py = f.centre.y + num('v2EdY') / f.mm, pz = f.centre.z + num('v2EdZ') / f.mm;
+    return { f, kind: $('v2EdKind').value, mode: $('v2EdMode').value, matrix: [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, px, py, pz, 1] };
+  }
+  function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT
+    const f = editFrame(); if (!f) return null;
+    const ax = $('v2EdAxis').value, i = { x: 0, y: 1, z: 2 }[ax], t = num('v2EdTilt') * Math.PI / 180;
+    const other = ax === 'y' ? 0 : 1;                   // tilt a vertical-axis cut toward X, a sideways cut toward Y
+    const n = [0, 0, 0]; n[i] = Math.cos(t); n[other] += Math.sin(t);
+    const c = f.centre.clone(); const lo = f.box.min.getComponent(i), hi = f.box.max.getComponent(i); c.setComponent(i, lo + (hi - lo) * num('v2EdPos', 50) / 100);
+    const dot = n[0] * c.x + n[1] * c.y + n[2] * c.z, removeHigh = $('v2EdSide').value === 'high';
+    const normal = removeHigh ? n.map(v => -v) : n, offset = removeHigh ? -dot : dot;
+    return { f, n, c, normal, offset };
+  }
+  function updateEditPreview() {
+    removeEditPreview();
+    const card = $('v2EditCard'), V = window.__shrinkViewer; if (!card?.open || !V?.scene) return;
+    const sl = $('v2EdTab')?.value === 'slice';
+    const THREE = app()?.THREE; if (!THREE) return;
+    const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
+    if (sl) {
+      const s = sliceSpec(); if (!s) return;
+      const d = s.f.size.length() * 1.15, m = new THREE.Mesh(new THREE.PlaneGeometry(d, d), new THREE.MeshBasicMaterial({ color: 0x2f86ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+      m.position.copy(s.c); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...s.n).normalize()); m.raycast = () => {}; g.add(m);
+    } else {
+      const s = shapeSpec(); if (!s) return;
+      const geo = { cube: () => new THREE.BoxGeometry(1, 1, 1), ball: () => new THREE.SphereGeometry(0.5, 28, 18), cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 36), cone: () => new THREE.ConeGeometry(0.5, 1, 36) }[s.kind]();
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: s.mode === 'cut' ? 0xff9a2f : 0xff4fa0, transparent: true, opacity: 0.45, depthWrite: false }));
+      m.matrixAutoUpdate = false; m.matrix.fromArray(s.matrix); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
+    }
+    V.scene.add(g);
+  }
+  function editTabChanged() { const sl = $('v2EdTab').value === 'slice'; $('v2EdShapeBox').hidden = sl; $('v2EdSliceBox').hidden = !sl; $('v2EdGo').textContent = sl ? 'SLICE OFF' : ($('v2EdMode').value === 'cut' ? 'CUT SHAPE OUT' : 'JOIN SHAPE ON'); updateEditPreview(); }
+  async function editModelNow() {
+    const btn = $('v2EdGo'), card = $('v2EditCard'), res = $('v2EdResult');
+    if (!btn || btn.disabled) return;
+    const sl = $('v2EdTab').value === 'slice';
+    btn.disabled = true; setWorking(true, 0);
+    try {
+      progress(card, 10, 'Loading the solid tools…');
+      for (let i = 0; i < 50 && !window.__shrinkFuse?.editModel; i++) await wait(100);
+      if (!window.__shrinkFuse?.editModel) throw new Error('The solid tools are still loading. Try again in a moment.');
+      const model = sourceModel(); if (!model) throw new Error('Load a model first.');
+      const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
+      if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Press SHRINK first.`);
+      const THREE0 = app()?.THREE; let snap = null;
+      if (THREE0) { model.updateWorldMatrix(true, true); snap = model.clone(true); snap.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); snap.matrix.copy(model.matrixWorld); snap.matrix.decompose(snap.position, snap.quaternion, snap.scale); snap.updateMatrixWorld(true); }
+      const ops = sl ? (() => { const s = sliceSpec(); return { slice: { normal: s.normal, offset: s.offset } }; })() : (() => { const s = shapeSpec(); return { shapes: [{ kind: s.kind, mode: s.mode, matrix: s.matrix }] }; })();
+      progress(card, 40, 'Working…'); await paintNow();
+      const r = await window.__shrinkFuse.editModel(model, ops);
+      progress(card, 85, 'Checking the result…');
+      if (snap) { editStack.push(snap); if (editStack.length > 6) editStack.shift(); }
+      removeEditPreview(); installWorkingResult(r.root, 'edit');
+      const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
+      res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
+      card.dataset.state = 'good'; progress(card, 100, 'Done.');
+      $('v2EdUndo').hidden = !editStack.length;
+      setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
+    } catch (err) {
+      card.dataset.state = 'warn'; progress(card, 100, 'Could not edit this model.');
+      res.innerHTML = `<strong>Could not edit</strong><span>${err?.message || err}${/watertight|manifold|reject/i.test(String(err?.message || err)) ? ' Run FIX IT or FUSE IT first.' : ''}</span>`;
+    } finally { btn.disabled = false; setWorking(false); }
+  }
+  function undoEdit() {
+    const snap = editStack.pop(); if (!snap) return;
+    removeEditPreview(); installWorkingResult(snap, 'edit');
+    if (!editStack.length) { appliedChanges.delete('edited'); renderAppliedChanges(); }
+    $('v2EdUndo').hidden = !editStack.length;
+    $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
+    setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
+  }
+  window.__shrinkEdit = { run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
+
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
     if (!btn || btn.disabled) return;
@@ -1399,7 +1484,7 @@
     const detail = $('v2Detail')?.closest('label'); const detailBox = document.createElement('div'); detailBox.className = 'v2-main-detail'; { const pick = setup?.querySelector('.v2-printer-pick') || dashboard.querySelector('.v2-printer-pick'); if (pick) detailBox.appendChild(pick); }   /* v2.261: the printer dropdown (resin 16K/8K/4K, FDM, custom) sits above Detail kept again; it had been swept into the hidden legacy block */
     if (detail) detailBox.appendChild(detail);
     const actions = document.createElement('div'); actions.className = 'v2-main-actions';
-    ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard', 'v2HollowCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
+    ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard', 'v2EditCard', 'v2HollowCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
     // Keep the native export controls available to BATCH, but show only the
     // one DOWNLOAD beneath MODEL HEALTH to users.
     const dl = document.createElement('div'); dl.className = 'v2-main-download';
@@ -1506,6 +1591,27 @@
               <details class="v2-advanced"><summary>Advanced repair settings & diagnostics</summary><div class="v2-advanced-body"><p>Welds near-duplicate vertices, removes bad triangles and joins touching/overlapping parts. Multiple closed components are valid; SHRINK only reports a repair problem when the mesh itself is open or non-manifold.</p></div></details>
             </section>
 
+            <details id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
+              <summary class="v2-card-head"><div><h2>Edit model</h2><p>Add or cut basic shapes, or slice a piece off (shorten a sword, drill a hole).</p></div></summary>
+              <div class="v2-hollow-row"><label for="v2EdTab">Tool</label><select id="v2EdTab" autocomplete="off"><option value="shape" selected>Shape (cube, ball…)</option><option value="slice">Slice off</option></select></div>
+              <div id="v2EdShapeBox">
+                <div class="v2-hollow-row"><label for="v2EdKind">Shape</label><select id="v2EdKind" autocomplete="off"><option value="cube">Cube</option><option value="ball">Ball</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option></select></div>
+                <div class="v2-hollow-row"><label for="v2EdMode">Do</label><select id="v2EdMode" autocomplete="off"><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>
+                <div class="v2-edit-grid"><span>Size mm</span><input id="v2EdW" type="number" min="0.1" step="1" value="10" title="Width"><input id="v2EdH" type="number" min="0.1" step="1" value="10" title="Height"><input id="v2EdD" type="number" min="0.1" step="1" value="10" title="Depth"></div>
+                <div class="v2-edit-grid"><span>Move mm</span><input id="v2EdX" type="number" step="1" value="0" title="Left / right"><input id="v2EdY" type="number" step="1" value="0" title="Up / down"><input id="v2EdZ" type="number" step="1" value="0" title="Front / back"></div>
+              </div>
+              <div id="v2EdSliceBox" hidden>
+                <div class="v2-hollow-row"><label for="v2EdAxis">Cut across</label><select id="v2EdAxis" autocomplete="off"><option value="y" selected>Up / down (height)</option><option value="x">Left / right</option><option value="z">Front / back</option></select></div>
+                <div class="v2-hollow-row"><label for="v2EdPos">Position</label><input id="v2EdPos" type="range" min="0" max="100" step="1" value="50" autocomplete="off"><output id="v2EdPosOut">50%</output></div>
+                <div class="v2-hollow-row"><label for="v2EdTilt">Tilt</label><input id="v2EdTilt" type="range" min="-60" max="60" step="1" value="0" autocomplete="off"><output id="v2EdTiltOut">0°</output></div>
+                <div class="v2-hollow-row"><label for="v2EdSide">Remove</label><select id="v2EdSide" autocomplete="off"><option value="high" selected>the top / far side</option><option value="low">the bottom / near side</option></select></div>
+              </div>
+              <button id="v2EdGo" class="v2-mega v2-teal" type="button">CUT SHAPE OUT</button>
+              <button id="v2EdUndo" class="v2-edit-undo" type="button" hidden>UNDO LAST EDIT</button>
+              <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
+              <div id="v2EdResult" class="v2-result">The preview (pink = join, orange = cut, blue plane = slice) shows where it will go. Needs one watertight model: run FIX IT or FUSE IT first if it says no.</div>
+            </details>
+
             <section id="v2HollowCard" class="v2-card v2-action-card v2-hollow-card" hidden>
               <div class="v2-card-head"><div><h2>Hollow it</h2><p>Save resin: empty the inside, keep a wall you choose, and open drain holes in the base.</p></div></div>
               <p class="v2-hollow-note">Resin printing: a solid model fills with expensive resin that nobody sees. Hollowing leaves a shell, so the print uses far less resin (and is lighter). The drain holes let uncured resin run out; without them it stays trapped inside and can crack the print.</p>
@@ -1604,6 +1710,13 @@
     $('v2HeightRange').addEventListener('input', () => { manualHeight = true; $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); markSettingsChanged(); });
     $('v2FuseBtn').addEventListener('click', fuseCheck);
+    /* v2.307: EDIT MODEL wiring */
+    { const ed = $('v2EditCard'); if (ed) {
+      ed.addEventListener('toggle', updateEditPreview);
+      $('v2EdTab').addEventListener('change', editTabChanged);
+      $('v2EdMode').addEventListener('change', editTabChanged);
+      ['v2EdKind', 'v2EdW', 'v2EdH', 'v2EdD', 'v2EdX', 'v2EdY', 'v2EdZ', 'v2EdAxis', 'v2EdSide', 'v2EdPos', 'v2EdTilt'].forEach(id => { $(id).addEventListener('input', () => { $('v2EdPosOut').textContent = $('v2EdPos').value + '%'; $('v2EdTiltOut').textContent = $('v2EdTilt').value + '°'; updateEditPreview(); }); $(id).addEventListener('change', updateEditPreview); });
+      $('v2EdGo').addEventListener('click', editModelNow); $('v2EdUndo').addEventListener('click', undoEdit); } }
     $('v2HollowBtn')?.addEventListener('click', hollowModelNow);
     $('v2HollowWall')?.addEventListener('input', () => { $('v2HollowWallOut').textContent = $('v2HollowWall').value + ' mm'; });
     /* v2.305: once the model is hollow, letting go of the wall slider (or changing the drain holes) rebuilds it straight away so the new thickness shows in the cut-away */
@@ -1720,7 +1833,7 @@
       let reverted = false;
       { const live = window.__shrinkLive;
         // v2.279: no "is the reducer's own root on screen" test here: after a first slider move the reducer is re-based ON the fixed/fused model (live.root === working model), and 100% must still mean the untouched upload
-        const processed = ['shrunk', 'fixed', 'fused', 'rebuilt', 'clay', 'hollowed'].some(k => appliedChanges.has(k)) || detailScale < 0.999;
+        const processed = ['shrunk', 'fixed', 'fused', 'rebuilt', 'clay', 'hollowed', 'edited'].some(k => appliedChanges.has(k)) || detailScale < 0.999;
         if (live?.root && sourceModel() && app()?.originalModel && sourceModel() !== app().originalModel && processed) {
           const cur = Math.min(1, modelTriangles(sourceModel()) / origTrisOf());
           if (value >= 99.95 || value / 100 > cur * 1.05) {            // asking for more detail than the processed model has: go back to the upload

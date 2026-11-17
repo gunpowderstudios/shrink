@@ -1,6 +1,6 @@
 // Runs every test file in turn. Usage: cd tests && npm install && npm test   (perf.mjs is separate: node perf.mjs)
 import { spawnSync } from 'child_process';
-const files = ['crease.test.mjs', 'hollow.test.mjs', 'hollow-ui.test.mjs', 'livereduce.test.mjs', 'multitool.test.mjs', 'clay.test.mjs', 'repair.test.mjs', 'fallback.test.mjs', 'material.test.mjs', 'stamp.test.mjs', 'wheel-split.test.mjs', 'settings-file.test.mjs', 'remove-part.test.mjs', 'add-part.test.mjs', 'ground.test.mjs', 'formats.test.mjs'];
+const files = ['crease.test.mjs', 'hollow.test.mjs', 'hollow-ui.test.mjs', 'edit.test.mjs', 'edit-ui.test.mjs', 'livereduce.test.mjs', 'multitool.test.mjs', 'clay.test.mjs', 'repair.test.mjs', 'fallback.test.mjs', 'material.test.mjs', 'stamp.test.mjs', 'wheel-split.test.mjs', 'settings-file.test.mjs', 'remove-part.test.mjs', 'add-part.test.mjs', 'ground.test.mjs', 'formats.test.mjs'];
 let bad = 0;
 for (const f of files) {
   console.log(`\n=== ${f}`);

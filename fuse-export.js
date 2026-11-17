@@ -388,4 +388,16 @@ async function hollowModel(model, opts) {
     finally { try { r.solid.delete?.(); } catch {} }
   } finally { try { solid.delete?.(); } catch {} }
 }
-window.__shrinkFuse = { hollowModel, fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };
+// v2.307: EDIT MODEL. ops = { shapes:[{kind,mode,matrix}] } or { slice:{normal:[x,y,z], offset} } (keeps n·x >= offset). World units.
+async function editModel(model, ops) {
+  const wasm = await loadManifold();
+  const { solid, components } = await modelToSolid(model);
+  try {
+    const q = (() => { try { return new URL(import.meta.url).search; } catch { return ''; } })();
+    const { applyShapes, sliceSolid } = await import('./edit-core.js' + q);
+    const r = ops.slice ? sliceSolid(wasm.Manifold, solid, ops.slice.normal, ops.slice.offset) : applyShapes(wasm.Manifold, solid, ops.shapes || []);
+    try { return { root: solidToThree(r), volume: r.volume(), pieces: r.decompose().length, components }; }
+    finally { try { r.delete?.(); } catch {} }
+  } finally { try { solid.delete?.(); } catch {} }
+}
+window.__shrinkFuse = { editModel, hollowModel, fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };

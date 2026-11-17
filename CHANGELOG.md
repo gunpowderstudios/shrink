@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.307
+- New **Edit model** card (folded, above Hollow it). **Shape**: cube, ball, cylinder or cone, sized and moved in mm from the model's centre, **Join** (add on) or **Cut** (make a hole); a pink/orange preview shows where it goes. **Slice off**: cut across height, left/right or front/back at a position and tilt, removing one side (shorten a sword); a blue plane previews it. Both use Manifold, close the cut face, and can be undone (UNDO LAST EDIT, up to 6 steps). Chip: EDITED. Needs a watertight model (run FIX IT / FUSE IT if it says no). New `edit-core.js`; tests `edit.test.mjs`, `edit-ui.test.mjs`.
+
 ## v2.306
 - HOLLOW card: a Hole size slider (2 to 8 mm across, default 3). Like Wall and Drain holes it rebuilds the hollow model when released, and the result line states the size used. Test HU13.
 

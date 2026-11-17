@@ -804,3 +804,10 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-hollow-slide[hidden]{display:none!important}
 .v2-hollow-slide input[type=range]{flex:1;width:22px;writing-mode:vertical-lr;direction:rtl;accent-color:#2f86ff;cursor:ns-resize;margin:0}
 .v2-hollow-slide output{font-size:11px;color:#9cc4ff}
+
+/* v2.307 EDIT MODEL */
+.v2-edit-card>summary{cursor:pointer;list-style:none}.v2-edit-card>summary::-webkit-details-marker{display:none}
+.v2-edit-card:not([open])>*:not(summary){display:none}
+.v2-edit-grid{display:grid;grid-template-columns:70px 1fr 1fr 1fr;gap:6px;align-items:center;margin:8px 0;font-size:12px;color:#b8c7d8}.v2-edit-grid input{min-width:0;width:100%}
+.v2-edit-undo{margin:8px 0 0;width:100%;padding:8px;border-radius:10px;border:1px solid #2f86ff;background:transparent;color:#9cc4ff;font-weight:800;cursor:pointer}.v2-edit-undo[hidden]{display:none!important}
+.v2-change-chip.edited{color:#ffd28a;border-color:rgba(255,154,47,.4)}.v2-change-chip.edited i{background:#ff9a2f}
