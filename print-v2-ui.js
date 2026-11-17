@@ -836,15 +836,41 @@
     const razor = lzTool() === 'razor'; g.lineWidth = 2; g.lineJoin = 'round'; g.setLineDash([7, 5]); g.strokeStyle = razor ? '#ff6a5a' : '#ffffff'; g.fillStyle = razor ? 'rgba(255,106,90,.18)' : 'rgba(47,134,255,.22)';
     g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); if (closed) g.closePath(); g.stroke(); if (closed) g.fill();
   }
-  function clearLasso() { lassoSel = null; lassoDraw = null; lassoPaint(null); lassoBarState(); }
+  // v2.314: the red preview. Every surface triangle whose centre is inside the loop (and inside the depth range) is drawn red, so you see what DELETE / CUT OFF will take.
+  function removeLassoRed() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkLassoRed'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
+  function lassoRed(sel) {
+    removeLassoRed(); const V = window.__shrinkViewer, f = editFrame(); if (!sel || !V?.scene || !f) return 0;
+    const THREE = f.THREE, cam = sel.cam, { near, far } = depthRange(cam, f, $('v2EdDepth')?.value === 'through' ? 'through' : 'front');
+    const inv = new THREE.Matrix4().fromArray(cam.world).invert(), poly = sel.pts, np = poly.length, out = [], model = sourceModel(); if (!model) return 0;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), g3 = new THREE.Vector3();
+    const inside = (x, y) => { let r = false; for (let i = 0, j = np - 1; i < np; j = i++) { const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) r = !r; } return r; };
+    model.updateWorldMatrix(true, true);
+    model.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return; const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count, mw = o.matrixWorld;
+      for (let i = 0; i + 2 < n; i += 3) {
+        a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(mw); b.fromBufferAttribute(pos, idx ? idx.getX(i + 1) : i + 1).applyMatrix4(mw); c.fromBufferAttribute(pos, idx ? idx.getX(i + 2) : i + 2).applyMatrix4(mw);
+        g3.set((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3, (a.z + b.z + c.z) / 3).applyMatrix4(inv);
+        const d = -g3.z; if (d < near || d > far) continue;
+        const nx = cam.persp ? g3.x / (d * cam.tanY * cam.aspect) : g3.x / cam.halfW, ny = cam.persp ? g3.y / (d * cam.tanY) : g3.y / cam.halfH;
+        if (inside(nx, ny)) out.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      }
+    });
+    if (!out.length) return 0;
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(out), 3));
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, side: THREE.DoubleSide, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    mesh.raycast = () => {}; const grp = new THREE.Group(); grp.name = 'shrinkLassoRed'; grp.raycast = () => {}; grp.add(mesh); V.scene.add(grp);
+    return out.length / 9;
+  }
+  function clearLasso() { lassoSel = null; lassoDraw = null; lassoPaint(null); removeLassoRed(); lassoBarState(); }
   function lassoBarState() { document.querySelectorAll('#v2EditCard .v2-lasso-act').forEach(b => { const off = !lassoSel || lassoBusy; if (b.disabled !== off) b.disabled = off; }); }
   function lassoEnd() {
     const d = lassoDraw; if (!d) return; lassoDraw = null;
     let area = 0; const p = d.px; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; area += a[0] * b[1] - b[0] * a[1]; }
     if (p.length < 4 || Math.abs(area / 2) < 150) { lassoPaint(null); $('v2EdResult').innerHTML = '<strong>Draw a bigger loop</strong><span>Hold the mouse button down and go all the way round the part.</span>'; lassoBarState(); return; }
     const cam = cameraSnap(); if (!cam) { lassoPaint(null); return; }
-    lassoSel = { pts: d.ndc, cam, px: p }; lassoPaint(p, true); lassoBarState();
-    $('v2EdResult').innerHTML = lzTool() === 'razor' ? '<strong>Loop drawn</strong><span>Press CUT OFF to remove it (the hole is closed flat), or CUT OFF & KEEP to take it with you. Esc clears the loop.</span>' : '<strong>Loop drawn</strong><span>Press DELETE (or the Delete key) to remove it, or COPY to paste it somewhere else. Esc clears the loop.</span>';
+    lassoSel = { pts: d.ndc, cam, px: p }; lassoPaint(p, true); lassoBarState(); const nRed = lassoRed(lassoSel);
+    if (!nRed) { $('v2EdResult').innerHTML = '<strong>Nothing under the loop</strong><span>The loop did not catch any of the model. Press Esc and draw it round the part (try "Right through" if the part is behind).</span>'; return; }
+    $('v2EdResult').innerHTML = lzTool() === 'razor' ? '<strong>Red = what goes</strong><span>Press CUT OFF to remove it (the hole is closed flat), or CUT OFF & KEEP to take it with you. Esc clears the loop.</span>' : '<strong>Red = what goes</strong><span>Press DELETE (or the Delete key) to remove it, or COPY to paste it somewhere else. Esc clears the loop.</span>';
   }
   function wireLasso() {
     const v = $('viewer'); if (!v || v.dataset.lassoWired) return; v.dataset.lassoWired = '1';
@@ -890,7 +916,7 @@
         msg = `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. Use the arrows on the model to move, size and tilt it, then press PLACE IT.</span>`;
       } else msg = `<strong>✓ Deleted</strong><span>Now ${(r.volume * mm * mm * mm / 1000).toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. The hole is closed flat. Press UNDO if that is not what you wanted.</span>`;
       res.innerHTML = msg; card.dataset.state = 'good'; progress(card, 100, 'Done.');
-      lassoSel = null; lassoPaint(null);
+      lassoSel = null; lassoPaint(null); removeLassoRed();
     } catch (err) {
       card.dataset.state = 'warn'; progress(card, 100, 'Could not do that.');
       res.innerHTML = `<strong>Could not ${op === 'copy' ? 'copy' : 'cut'} that</strong><span>${err?.message || err}${/watertight|manifold|reject/i.test(String(err?.message || err)) ? ' Run FIX IT or FUSE IT first.' : ''}</span>`;
@@ -1058,7 +1084,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
+  window.__shrinkEdit = { reset: resetEdits, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -2013,6 +2039,7 @@
       ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed]); if (!sel) return; sel.value = (b.dataset.ed === 'tool' && b.getAttribute('aria-pressed') === 'true') ? 'none' : b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
       $('v2EdKind').addEventListener('change', editTabChanged);
       ['v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
+      $('v2EdDepth').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); });
       $('v2LassoDelBtn').addEventListener('click', () => lassoApply('delete')); $('v2LassoKeepBtn').addEventListener('click', e => lassoApply(e.currentTarget.dataset.op || 'copy'));
       $('v2EdPartTop').addEventListener('click', () => partPlace('top')); $('v2EdPartCentre').addEventListener('click', () => partPlace('centre'));
       $('v2EdPartFile').addEventListener('change', async e => { const file = e.target.files?.[0]; if (!file) return; $('v2EdPartInfo').textContent = 'Reading ' + file.name + '…'; try { setPart(await loadPartFile(file)); partPlace('top'); } catch (err) { editPart = null; $('v2EdPartInfo').textContent = 'Could not read that file: ' + (err?.message || err); updateEditPreview(); updateGoState(); } });

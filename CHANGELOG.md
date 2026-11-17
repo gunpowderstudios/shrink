@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.314
+- Lasso / Razor: when you finish a loop, the part of the model inside it turns **red** (what DELETE / CUT OFF will take). Changing "How deep" updates the red; Esc, a new loop, leaving the EDIT tab or doing the cut clears it. If nothing is under the loop it says so. The red is a `shrinkLassoRed` group in the viewer scene (never under the model, so it is not exported).
+
 ## v2.313
 - EDIT tab rebuilt around two simple tools. The pink/orange Brush is gone (clay.js stays in the repo, switched off).
 - **Lasso**: hold the mouse down and draw a loop round a part, then **DELETE** (or the Delete key) or **COPY**. Esc clears the loop, a second Esc puts the tool down; Ctrl / ⌘ + drag still turns the model. "How deep" picks front half only or right through.

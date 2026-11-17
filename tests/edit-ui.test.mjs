@@ -173,4 +173,19 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2EdReset').click(); await wait(100); ok(/Nothing to reset/.test(page.$('v2EdResult').textContent), 'ED25 resetting again says there is nothing to reset');
   void m0;
 }
+/* v2.314: the red preview of what the loop will take */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80);
+  const red = () => w.__shrinkViewer.scene.getObjectByName('shrinkLassoRed'), L = orthoCam(page, 0.5, 1.3);
+  set(page, 'v2EdDepth', 'through'); const nAll = w.__shrinkEdit.setSel(L.pts, L.cam);
+  ok(nAll > 0 && !!red(), `ED26 a loop marks the triangles inside it red (${nAll})`);
+  set(page, 'v2EdDepth', 'front'); await wait(30); const g = red(); let nFront = 0; g?.traverse(o => { if (o.isMesh) nFront = o.geometry.attributes.position.count / 3; });
+  ok(nFront > 0 && nFront < nAll, `ED26 "front half only" marks fewer (${nFront} < ${nAll})`);
+  const none = orthoCam(page, 3, 4); ok(w.__shrinkEdit.setSel(none.pts, none.cam) === 0 && !red(), 'ED26 a loop beside the model marks nothing');
+  w.__shrinkEdit.setSel(L.pts, L.cam); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(30);
+  ok(!red(), 'ED26 Esc clears the red');
+  set(page, 'v2EdDepth', 'through'); w.__shrinkEdit.setSel(L.pts, L.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Deleted/.test(page.$('v2EdResult').textContent) && !red(), 'ED26 DELETE removes the part and the red');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
