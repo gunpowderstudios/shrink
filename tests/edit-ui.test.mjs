@@ -42,7 +42,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
 
   /* lasso and razor tools: their own controls, no shape preview */
   set(page, 'v2EdTab', 'lasso'); await wait(50);
-  ok(page.$('v2EdLassoBox').hidden === false && page.$('v2EdGo').hidden === true && page.$('v2EdShapeBox').hidden === true && page.$('v2EdDepth').value === 'front' && /DELETE/.test(page.$('v2LassoDelBtn').textContent) && /COPY/.test(page.$('v2LassoKeepBtn').textContent), 'ED10 the Lasso tool shows DELETE / COPY and hides the shape controls');
+  ok(page.$('v2EdLassoBox').hidden === false && page.$('v2EdGo').hidden === true && page.$('v2EdShapeBox').hidden === true && page.$('v2EdDepth').value === 'near' && /DELETE/.test(page.$('v2LassoDelBtn').textContent) && /COPY/.test(page.$('v2LassoKeepBtn').textContent), 'ED10 the Lasso tool shows DELETE / COPY and hides the shape controls');
   ok(page.$('v2LassoDelBtn').disabled === true, 'ED10 DELETE waits until a loop is drawn');
   ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), 'ED10 no shape preview while lassoing');
   set(page, 'v2EdTab', 'razor'); await wait(50);
@@ -242,8 +242,31 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(!hint().hidden && /Shapes needs under 100/.test(hint().textContent), 'ED29 Shape warns when the model is over the Manifold limit: ' + hint().textContent.slice(0, 90));
   tool('slice').click(); await wait(40); ok(/Slicing needs under/.test(hint().textContent) && /Sculpt tool works on bigger/.test(hint().textContent), 'ED29 Slice names itself and points to Sculpt');
   tool('sculpt').click(); await wait(40); ok(hint().hidden === true, 'ED29 Sculpt shows no warning on a model Manifold would refuse');
-  tool('lasso').click(); await wait(40); ok(hint().hidden === false && /Grab the whole loose piece/.test(hint().textContent), 'ED29 the plain lasso warns and mentions the whole-piece option');
+  tool('lasso').click(); await wait(40); ok(hint().hidden === false && /DELETE works on the triangles directly/.test(hint().textContent), 'ED29 the plain lasso says DELETE still works on a big model');
   page.$('v2EdWhole').checked = true; page.$('v2EdWhole').dispatchEvent(new w.Event('change', { bubbles: true })); await wait(40); ok(hint().hidden === true, 'ED29 ticking "Grab the whole loose piece" clears it');
   tool('lasso').click(); await wait(40); ok(hint().hidden === true, 'ED29 no tool selected: no warning');
+}
+/* v2.318: nearest part (auto) and DELETE on a model too big for Manifold */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80);
+  ok(page.$('v2EdDepth').value === 'near' && /Nearest part/.test(page.$('v2EdDepth').options[0].textContent) && /Everything under the loop/.test(page.$('v2EdDepth').options[1].textContent), 'ED30 the depth choice is "Nearest part (auto)" by default, with plain-English alternatives');
+  const small = () => { const L = orthoCam(page, 0.4, 0.6); return { cam: L.cam, pts: L.pts.map(([x, y]) => [x * 0.12, y]) }; };
+  const red = () => { let n = 0; w.__shrinkViewer.scene.getObjectByName('shrinkLassoRed')?.traverse(o => { if (o.isMesh) n = o.geometry.attributes.position.count / 3; }); return n; };
+  const S = small(); set(page, 'v2EdDepth', 'through'); const nAll = w.__shrinkEdit.setSel(S.pts, S.cam); set(page, 'v2EdDepth', 'near'); await wait(30); const nNear = red();
+  ok(nNear > 0 && nNear < nAll * 0.7, `ED30 "nearest part" marks only the front layer (${nNear} of ${nAll})`);
+  const minZ = () => new THREE.Box3().setFromObject(w.__shrinkWorkingModel(), true).min.z, z0 = minZ();
+  page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Deleted/.test(page.$('v2EdResult').textContent) && Math.abs(minZ() - z0) < 0.05, `ED30 deleting the nearest part leaves the back of the model alone (back at ${z0.toFixed(2)} -> ${minZ().toFixed(2)})`);
+  page.$('v2EdUndo').click(); await wait(200);
+  set(page, 'v2EdDepth', 'through'); w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && minZ() > z0 + 0.3, `ED30 "everything under the loop" goes right through (back ${z0.toFixed(2)} -> ${minZ().toFixed(2)})`);
+  page.$('v2EdUndo').click(); await wait(200);
+  /* too big for Manifold: DELETE works on the triangles and says the hole is open; COPY refuses and the error shows in the viewer */
+  w.__shrinkFuseTriLimit = 100; set(page, 'v2EdDepth', 'near'); const t0 = tris(w.__shrinkWorkingModel()); w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /triangles removed/.test(page.$('v2EdResult').textContent) && /FIX IT/.test(page.$('v2EdResult').textContent) && tris(w.__shrinkWorkingModel()) < t0, `ED30 on a model over the limit DELETE removes the triangles directly (${t0} -> ${tris(w.__shrinkWorkingModel())}): ` + page.$('v2EdResult').textContent.slice(0, 90));
+  w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
+  ok(await waitFor(() => /Could not/.test(page.$('v2EdResult').textContent), 60000) && /DELETE still works/.test(page.$('v2EdResult').textContent), 'ED30 COPY on a model over the limit explains why');
+  ok(!!page.$('v2EdToast') && page.$('v2EdToast').hidden === false && /Could not copy/.test(page.$('v2EdToast').textContent), 'ED30 the failure also shows in the viewer');
 }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

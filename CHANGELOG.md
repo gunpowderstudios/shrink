@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.318
+- Lasso: the "How deep" choice is now **Which part**, and the default is **Nearest part (auto)**. Only the part closest to you under the loop is taken (a hand held up in front of a body), found from a gap in the distances behind the loop. The other choices read **Everything under the loop** and **Half way through**. The red preview shows exactly that nearest layer. The razor still cuts right through.
+- DELETE now works on models over 1,000,000 triangles (up to 2,500,000) by removing the red triangles directly. That leaves an open hole, and the result message says to press FIX IT. COPY and CUT OFF still need under 1,000,000 and now say so.
+- A failed cut or copy now also shows a red message in the viewer, because the text under the tool was easy to miss.
+
 ## v2.317
 - The "too many triangles" warning in the EDIT tab now depends on the tool. Tools that use Manifold (lasso cut, razor, shape, paste part, slice) still need under 1,000,000 triangles and say which tool is blocked. **Sculpt** and the lasso with **Grab the whole loose piece** work on the mesh itself, so their limit is now 2,500,000 (was 1,500,000 for Sculpt). No tool selected: no warning. The "open edges, press FIX IT" warning only appears for the Manifold tools.
 

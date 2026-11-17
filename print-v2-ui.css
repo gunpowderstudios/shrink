@@ -877,3 +877,6 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-icon-row-6{grid-template-columns:repeat(3,1fr)}
 #viewer.v2-cur-sculpt,#viewer.v2-cur-sculpt canvas{cursor:none}
 .v2-brush-ring[data-mode="sculpt"]{border-color:#4aa8ff;background:rgba(74,168,255,.12)}
+
+.v2-ed-toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);max-width:min(560px,86%);z-index:9;background:#b3261e;color:#fff;font:600 13px/1.35 system-ui,sans-serif;padding:10px 14px;border-radius:10px;box-shadow:0 6px 22px rgba(0,0,0,.4);cursor:pointer}
+.v2-ed-toast[hidden]{display:none!important}
