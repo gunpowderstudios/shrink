@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.308
+- The side column now has two tabs: **1 · EDIT** (optional, do it first) and **2 · SHRINK & FINISH** (shrink, fix, fuse, hollow; still the default). Same viewer, same working model, same chips.
+- New **Brush** tool in the EDIT tab (the old CLAY tool, switched back on and renamed): paint ADD (pink) or CARVE (orange) strokes on the model, then APPLY BRUSH NOW (FIX IT still applies pending strokes). Chip BRUSH. Ctrl/Cmd+drag turns the model, Esc leaves the tool.
+- The Edit model card is no longer folded (the tab replaces the fold); its Tool menu is Brush / Shape / Slice off. A hint appears when the model is too big, has open edges (press FIX IT) or is already hollow; editing a hollow model with Shape/Slice is refused.
+
 ## v2.307
 - New **Edit model** card (folded, above Hollow it). **Shape**: cube, ball, cylinder or cone, sized and moved in mm from the model's centre, **Join** (add on) or **Cut** (make a hole); a pink/orange preview shows where it goes. **Slice off**: cut across height, left/right or front/back at a position and tilt, removing one side (shorten a sword); a blue plane previews it. Both use Manifold, close the cut face, and can be undone (UNDO LAST EDIT, up to 6 steps). Chip: EDITED. Needs a watertight model (run FIX IT / FUSE IT if it says no). New `edit-core.js`; tests `edit.test.mjs`, `edit-ui.test.mjs`.
 

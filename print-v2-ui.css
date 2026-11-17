@@ -806,8 +806,16 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-hollow-slide output{font-size:11px;color:#9cc4ff}
 
 /* v2.307 EDIT MODEL */
-.v2-edit-card>summary{cursor:pointer;list-style:none}.v2-edit-card>summary::-webkit-details-marker{display:none}
-.v2-edit-card:not([open])>*:not(summary){display:none}
 .v2-edit-grid{display:grid;grid-template-columns:70px 1fr 1fr 1fr;gap:6px;align-items:center;margin:8px 0;font-size:12px;color:#b8c7d8}.v2-edit-grid input{min-width:0;width:100%}
 .v2-edit-undo{margin:8px 0 0;width:100%;padding:8px;border-radius:10px;border:1px solid #2f86ff;background:transparent;color:#9cc4ff;font-weight:800;cursor:pointer}.v2-edit-undo[hidden]{display:none!important}
 .v2-change-chip.edited{color:#ffd28a;border-color:rgba(255,154,47,.4)}.v2-change-chip.edited i{background:#ff9a2f}
+
+/* v2.308 tabs: EDIT / SHRINK & FINISH */
+.v2-main-tabs{display:grid;grid-template-columns:1fr 1.2fr;gap:6px;margin:0 0 10px}
+.v2-main-tabs button{border:1px solid #3a4b61;border-radius:10px;background:#142033;color:#9fb4cc;font:inherit;font-weight:800;font-size:12px;letter-spacing:.4px;padding:10px 6px;cursor:pointer}
+.v2-main-tabs button small{font-weight:500;opacity:.7;margin-left:4px}
+.v2-main-tabs button[aria-selected="true"]{background:#1d6bd8;border-color:#2f86ff;color:#fff}
+.v2-main-card[data-tab="edit"] .v2-main-actions>:not(.v2-edit-pane),.v2-main-card[data-tab="edit"] .v2-main-detail{display:none}
+.v2-main-card[data-tab="finish"] .v2-edit-pane{display:none}
+.v2-edit-hint{margin:6px 0 10px;padding:8px 10px;border-radius:10px;background:rgba(255,154,47,.12);border:1px solid rgba(255,154,47,.4);color:#ffd28a;font-size:12px;line-height:1.4}.v2-edit-hint[hidden]{display:none!important}
+#v2EdRun[hidden],#v2ClayCard[hidden]{display:none!important}

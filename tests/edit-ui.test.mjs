@@ -6,10 +6,12 @@ const set = (page, id, v) => { const e = page.$(id); e.value = String(v); e.disp
 const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THREE.Box3().setFromObject(page.w.__shrinkWorkingModel(), true); return b.max.y - b.min.y; };
 
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
-  const card = page.$('v2EditCard'); ok(!!card && card.tagName === 'DETAILS' && card.open === false, 'ED1 the Edit model card exists, folded');
+  const card = page.$('v2EditCard'); ok(!!card && !!page.$('v2EditPane')?.contains(card), 'ED1 the Edit model card lives in the EDIT pane');
+  ok(page.$('v2EditCard').closest('.v2-main-card').dataset.tab === 'finish' && page.$('v2TabEdit')?.getAttribute('aria-selected') === 'false', 'ED1 the page opens on SHRINK & FINISH, not EDIT');
   ok(!!page.$('v2EdGo') && /CUT SHAPE OUT/.test(page.$('v2EdGo').textContent), 'ED1 the button reads CUT SHAPE OUT for the default (cut a cube)');
-  card.open = true; card.dispatchEvent(new w.Event('toggle')); await wait(100);
-  ok(!!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') || !w.__shrinkViewer, 'ED2 opening the card shows the shape preview');
+  page.$('v2TabEdit').click(); await wait(100);
+  ok(page.$('v2EditCard').closest('.v2-main-card').dataset.tab === 'edit' && page.$('v2TabFinish').getAttribute('aria-selected') === 'false', 'ED2 clicking EDIT switches the tab');
+  ok(!!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') || !w.__shrinkViewer, 'ED2 the EDIT tab shows the shape preview');
 
   const t0 = tris(w.__shrinkWorkingModel()), m0 = w.__shrinkWorkingModel();
   set(page, 'v2EdKind', 'ball'); set(page, 'v2EdW', 12); set(page, 'v2EdH', 12); set(page, 'v2EdD', 12);
@@ -32,5 +34,32 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   /* a cut that removes everything is refused and nothing changes */
   set(page, 'v2EdPos', 0); set(page, 'v2EdSide', 'high'); const mKeep = w.__shrinkWorkingModel(); page.$('v2EdGo').click();
   ok(await waitFor(() => /Could not edit/.test(page.$('v2EdResult').textContent), 60000) && w.__shrinkWorkingModel() === mKeep, 'ED9 removing everything is refused and the model stays');
+
+  /* brush tool: the Brush card shows only for the Brush tool, and leaving the EDIT tab clears the previews */
+  set(page, 'v2EdTab', 'brush'); await wait(50);
+  ok(page.$('v2ClayCard').hidden === false && page.$('v2EdRun').hidden === true && page.$('v2EdShapeBox').hidden === true, 'ED10 the Brush tool shows the brush card and hides the shape controls');
+  ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), 'ED10 no shape preview while brushing');
+  set(page, 'v2EdTab', 'shape'); await wait(50);
+  ok(page.$('v2ClayCard').hidden === true && page.$('v2EdRun').hidden === false, 'ED10 going back to Shape hides the brush card');
+  page.$('v2TabFinish').click(); await wait(50);
+  ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') && page.$('v2EditCard').closest('.v2-main-card').dataset.tab === 'finish', 'ED11 SHRINK & FINISH removes the edit preview');
+  /* an edit after hollowing is refused */
+  w.__shrinkMarkApplied('shrunk'); page.$('v2HollowWall').value = '2'; page.$('v2HollowBtn').click();
+  await waitFor(() => /Hollowed|Could not/.test(page.$('v2HollowResult').textContent), 110000);
+  page.$('v2TabEdit').click(); await wait(100);
+  ok(/already hollow/.test(page.$('v2EdHint').textContent) && page.$('v2EdHint').hidden === false, 'ED12 the EDIT tab warns when the model is already hollow');
+  set(page, 'v2EdTab', 'shape'); const mHol = w.__shrinkWorkingModel(); page.$('v2EdGo').click();
+  ok(await waitFor(() => /Could not edit/.test(page.$('v2EdResult').textContent), 60000) && w.__shrinkWorkingModel() === mHol, 'ED12 editing a hollow model is refused and nothing changes');
+}
+
+/* brush: a carve stroke applied from the EDIT tab with APPLY BRUSH NOW */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'brush'); await wait(100);
+  const m0 = w.__shrinkWorkingModel(), b = new w.__shrinkApp.THREE.Box3().setFromObject(m0, true), top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2, r = (b.max.y - b.min.y) * 0.15;
+  w.__shrinkClay.addStroke('cut', [{ x: cx, y: top, z: cz, r }, { x: cx + r, y: top, z: cz, r }]);
+  await wait(50); ok(!page.$('v2ClayApply').disabled, 'ED13 APPLY BRUSH NOW is enabled once there is a stroke');
+  page.$('v2ClayApply').click();
+  ok(await waitFor(() => /Brush applied|could not/.test(page.$('v2ClayNote').textContent), 90000) && /Brush applied/.test(page.$('v2ClayNote').textContent), 'ED13 the brush applies: ' + page.$('v2ClayNote').textContent.slice(0, 120));
+  ok(w.__shrinkWorkingModel() !== m0 && /BRUSH/.test(page.$('v2HealthChanges').textContent), 'ED13 the carved model is the working model and a BRUSH chip shows');
 }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

@@ -82,11 +82,11 @@ function setTool(on, mode) {
   st.on = !!on; wire();
   const c = V()?.controls; if (c?.mouseButtons) c.mouseButtons.LEFT = st.on ? 0 : 0;
   viewer()?.classList.toggle('v2-clay-on', st.on);
-  if (st.on) { ensureGroup(); say(st.mode === 'add' ? 'Add clay: drag over a hole or gap. Hold Ctrl or Cmd and drag to turn the model.' : 'Cut away: drag over what you want carved off (shows orange). Hold Ctrl or Cmd and drag to turn the model.'); }
+  if (st.on) { ensureGroup(); say(st.mode === 'add' ? 'Add: drag over where you want material (pink). Hold Ctrl or Cmd and drag to turn the model.' : 'Carve: drag over what you want removed (orange). Hold Ctrl or Cmd and drag to turn the model.'); }
   refreshUi();
 }
 function undo() { if (st.busy) return; st.strokes.pop(); drawPreview(); }
-function clear() { if (st.busy) return; st.strokes = []; drawPreview(); say('Clay cleared.'); }
+function clear() { if (st.busy) return; st.strokes = []; drawPreview(); say('Strokes cleared.'); }
 const hasClay = () => st.strokes.some(s => s.dabs.length);
 
 /* ----------------------------- apply: join / carve, then the usual health check ----------------------------- */
@@ -167,8 +167,8 @@ async function applyNow() {
     window.__shrinkInstallWorkingModel(r.root, 'clay');
     st.strokes = []; drawPreview(); removePreview();
     window.__shrinkRefreshHealth?.();
-    say(`✓ Clay applied (${new Intl.NumberFormat().format(triCount(r.root))} triangles). ${r.note}`);
-  } catch (err) { console.error('[SHRINK 3D v2.141] Clay failed', err); say(`Clay could not be applied: ${err.message} Your model is unchanged and the clay is still there.`, true); }
+    say(`✓ Brush applied (${new Intl.NumberFormat().format(triCount(r.root))} triangles). ${r.note}`);
+  } catch (err) { console.error('[SHRINK 3D v2.141] Clay failed', err); say(`The brush could not be applied: ${err.message} Your model is unchanged and your strokes are still there.`, true); }
   finally { st.busy = false; refreshUi(); }
 }
 
@@ -178,16 +178,16 @@ function refreshUi() {
   q('v2ClayAdd').setAttribute('aria-pressed', String(st.on && st.mode === 'add')); q('v2ClayCut').setAttribute('aria-pressed', String(st.on && st.mode === 'cut'));
   q('v2ClayUndo').disabled = !st.strokes.length || st.busy; q('v2ClayClear').disabled = !st.strokes.length || st.busy; q('v2ClayApply').disabled = !hasClay() || st.busy;
   q('v2ClaySizeVal').textContent = `${st.mm.toFixed(1)} mm`;
-  q('v2ClayCount').textContent = hasClay() ? `${st.strokes.filter(s => s.mode === 'add').length} clay · ${st.strokes.filter(s => s.mode === 'cut').length} cut` : 'No clay yet';
+  q('v2ClayCount').textContent = hasClay() ? `${st.strokes.filter(s => s.mode === 'add').length} add · ${st.strokes.filter(s => s.mode === 'cut').length} carve` : 'No strokes yet';
 }
 function buildCard() {
   const host = $('v2ClayHost'); if (!host || host.dataset.built) return; host.dataset.built = '1';
-  host.innerHTML = `<div class="v2-card-head"><div><h2>CLAY <em>(optional)</em></h2><p>Paint pink clay over holes and gaps you want sealed, or mark parts to carve away. FIX IT then joins it all up.</p></div></div>
-    <div class="v2-clay-tools"><button id="v2ClayAdd" type="button" aria-pressed="false">ADD CLAY</button><button id="v2ClayCut" type="button" aria-pressed="false">CUT AWAY</button></div>
+  host.innerHTML = `<div class="v2-card-head"><div><h2>Brush</h2><p>Paint to add material (pink) or carve it away (orange). Press APPLY BRUSH to make it real.</p></div></div>
+    <div class="v2-clay-tools"><button id="v2ClayAdd" type="button" aria-pressed="false">ADD (PINK)</button><button id="v2ClayCut" type="button" aria-pressed="false">CARVE (ORANGE)</button></div>
     <label class="v2-clay-size">Brush size <input id="v2ClaySize" type="range" min="0.5" max="15" step="0.5" value="3"><output id="v2ClaySizeVal">3.0 mm</output></label>
     <div class="v2-clay-row"><span id="v2ClayCount">No clay yet</span><button id="v2ClayUndo" type="button">UNDO</button><button id="v2ClayClear" type="button">CLEAR</button></div>
-    <button id="v2ClayApply" class="v2-mega v2-green" type="button">APPLY CLAY NOW</button>
-    <div id="v2ClayNote" class="v2-result">Pink clay joins the model when you press FIX IT or QUICK-FIX. Nothing changes until then.</div>`;
+    <button id="v2ClayApply" class="v2-mega v2-green" type="button">APPLY BRUSH NOW</button>
+    <div id="v2ClayNote" class="v2-result">Pick ADD or CARVE, then drag on the model. Nothing changes until you press APPLY BRUSH NOW (FIX IT also applies it).</div>`;
   $('v2ClayAdd').addEventListener('click', () => setTool(!(st.on && st.mode === 'add'), 'add'));
   $('v2ClayCut').addEventListener('click', () => setTool(!(st.on && st.mode === 'cut'), 'cut'));
   $('v2ClaySize').addEventListener('input', e => { st.mm = Number(e.target.value) || 3; refreshUi(); });
@@ -198,6 +198,6 @@ function buildCard() {
 window.__shrinkClay = { apply, hasClay, clear, strokes: () => st.strokes, addStroke: (mode, dabs) => { st.strokes.push({ mode, r: dabs[0]?.r || radius(), dabs }); drawPreview(); }, setTool, state: st, applyNow, finish: () => { st.strokes = []; drawPreview(); removePreview(); } };
 const init = () => { buildCard(); if (!document.body.classList.contains('app-mode-print')) setTool(false); };
 window.addEventListener('shrink:ui-mode', init);
-window.addEventListener('shrink:model-opened', () => { setTool(false); st.strokes = []; drawPreview(); say('Pink clay joins the model when you press FIX IT or QUICK-FIX. Nothing changes until then.'); });
+window.addEventListener('shrink:model-opened', () => { setTool(false); st.strokes = []; drawPreview(); say('Pick ADD or CARVE, then drag on the model. Nothing changes until you press APPLY BRUSH NOW (FIX IT also applies it).'); });
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
 { let tries = 0; const retry = () => { if ($('v2ClayHost')?.dataset.built || ++tries > 20) return; buildCard(); setTimeout(retry, 500); }; setTimeout(retry, 300); }

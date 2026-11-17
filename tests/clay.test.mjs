@@ -30,7 +30,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   const m1 = w.__shrinkWorkingModel(), b1 = bbox(m1), v1 = bakedVolume(m1);
   ok(b1.max.x > b0.max.x + 2.5 && v1 > v0 * 1.004, `C2 the lump is part of the model now (x reach ${b0.max.x.toFixed(1)} → ${b1.max.x.toFixed(1)}, volume +${((v1 / v0 - 1) * 100).toFixed(1)}%)`);
   ok((await healthOf(m1)).clean && !w.__shrinkClay.hasClay(), 'C2 the result is clean and the clay is used up');
-  ok(/CLAY/.test(page.$('v2HealthChanges').textContent), 'C2 the change list says CLAY');
+  ok(/BRUSH/.test(page.$('v2HealthChanges').textContent), 'C2 the change list says BRUSH');
   ok(await waitFor(() => !page.$('v2FixBigBtn').disabled), 'C2 FIX IT is usable again');
   // cut away the top
   const top = b1.max.y;
@@ -98,7 +98,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   ok(!!dl && dl.disabled && (dl.previousElementSibling === page.$('v2MagicBtn') || dl.previousElementSibling?.previousElementSibling === page.$('v2MagicBtn')), 'C8 the DOWNLOAD button sits under SHRINK (and its Hollow tick box) and starts greyed out');
   dl.disabled = false; page.w.dispatchEvent(new page.w.CustomEvent('shrink:model-opened')); await wait(50);
   ok(dl.disabled, 'C8 a newly opened model greys it out again');
-  ok(!!page.$('v2AdvTools').querySelector('#v2ClayCard'), 'C8 the CLAY card is inside the ADVANCED drawer');
+  ok(!!page.$('v2EditPane')?.querySelector('#v2ClayCard'), 'C8 the Brush card is inside the EDIT tab');
 }
 
 /* ---- RELOAD: opens the file chooser for a new model ---- */
