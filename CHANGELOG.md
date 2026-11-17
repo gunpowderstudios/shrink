@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.317
+- The "too many triangles" warning in the EDIT tab now depends on the tool. Tools that use Manifold (lasso cut, razor, shape, paste part, slice) still need under 1,000,000 triangles and say which tool is blocked. **Sculpt** and the lasso with **Grab the whole loose piece** work on the mesh itself, so their limit is now 2,500,000 (was 1,500,000 for Sculpt). No tool selected: no warning. The "open edges, press FIX IT" warning only appears for the Manifold tools.
+
 ## v2.316
 - EDIT tab: new **Sculpt** brush, like clay. Pick **Smooth** (blends lined faces, rough scans), **Pull out** (raises the surface) or **Push in** (presses it), set the **Tip size** in mm and the **Strength**, and paint on the model; a blue ring shows the tip. Ctrl / ⌘ + drag turns the model. Each stroke is one UNDO step (RESET ALL EDITS undoes them all).
 - It moves the model's own vertices (no Manifold, so no repair first and the triangle count never changes). Sculpt before SHRINK, while there are plenty of triangles.

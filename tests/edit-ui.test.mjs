@@ -235,4 +235,15 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   for (let i = 0; i < 4; i++) { page.$('v2EdUndo').click(); await wait(120); }
   ok(Math.abs(sd(rad()) - s0) < 1e-6 && w.__shrinkEdit.depth() === 0, 'ED28 UNDO steps all the way back to the rough model');
 }
+/* v2.317: the "too many triangles" warning depends on the tool */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  w.__shrinkFuseTriLimit = 100; page.$('v2TabEdit').click(); await wait(80);
+  const hint = () => page.$('v2EdHint'), tool = v => page.$('v2EditCard').querySelector(`.v2-icon-btn[data-ed="tool"][data-value="${v}"]`);
+  ok(!hint().hidden && /Shapes needs under 100/.test(hint().textContent), 'ED29 Shape warns when the model is over the Manifold limit: ' + hint().textContent.slice(0, 90));
+  tool('slice').click(); await wait(40); ok(/Slicing needs under/.test(hint().textContent) && /Sculpt tool works on bigger/.test(hint().textContent), 'ED29 Slice names itself and points to Sculpt');
+  tool('sculpt').click(); await wait(40); ok(hint().hidden === true, 'ED29 Sculpt shows no warning on a model Manifold would refuse');
+  tool('lasso').click(); await wait(40); ok(hint().hidden === false && /Grab the whole loose piece/.test(hint().textContent), 'ED29 the plain lasso warns and mentions the whole-piece option');
+  page.$('v2EdWhole').checked = true; page.$('v2EdWhole').dispatchEvent(new w.Event('change', { bubbles: true })); await wait(40); ok(hint().hidden === true, 'ED29 ticking "Grab the whole loose piece" clears it');
+  tool('lasso').click(); await wait(40); ok(hint().hidden === true, 'ED29 no tool selected: no warning');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

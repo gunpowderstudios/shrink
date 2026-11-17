@@ -248,6 +248,7 @@
 
   // How many separate pieces (shells that share no vertex) the working model has. Quantised world positions, union-find; skipped for huge models (v2.185).
   const PIECES_MAX_TRIANGLES = 1500000;
+  const SCULPT_MAX_TRIANGLES = 2500000;           // v2.317: Sculpt and Grab-whole-piece work on the mesh itself (no Manifold), so they take bigger models
   async function countPieces(model) {
     const THREE = app()?.THREE; if (!model || !THREE) return null;
     try {
@@ -949,7 +950,7 @@
   function sculptBegin() {                                      // one UNDO step per stroke; the first stroke (or the first after another tool changed the model) works on a fresh copy
     const model = sourceModel(); if (!model) return false;
     if (hollowResult && model === hollowResult) { $('v2EdResult').innerHTML = '<strong>Could not sculpt</strong><span>This model is already hollow. Sculpt the solid model before you hollow it.</span>'; return false; }
-    const tris = modelTriangles(model); if (tris > 1500000) { $('v2EdResult').innerHTML = '<strong>Could not sculpt</strong><span>This model has ' + tris.toLocaleString() + ' triangles, too many to sculpt in the browser. Press SHRINK first.</span>'; return false; }
+    const tris = modelTriangles(model); if (tris > SCULPT_MAX_TRIANGLES) { $('v2EdResult').innerHTML = '<strong>Could not sculpt</strong><span>This model has ' + tris.toLocaleString() + ' triangles, too many to sculpt in the browser. Press SHRINK first.</span>'; return false; }
     const snap = cloneRoot(model); if (!snap) return false;
     if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift();
     if (model !== sculptWork) { const work = cloneRoot(model); removeEditPreview(); installWorkingResult(work, 'edit'); sculptWork = work; sculptData = null; }
@@ -1061,7 +1062,7 @@
       const model = sourceModel(); if (!model) throw new Error('Load a model first.');
       if (hollowResult && model === hollowResult) throw new Error('This model is already hollow. Edit the solid model before you hollow it.');
       const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
-      if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Press SHRINK first.`);
+      if (tris > (wholeOn() ? SCULPT_MAX_TRIANGLES : limit)) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to ${wholeOn() ? 'grab pieces from' : 'cut'} in the browser. Press SHRINK first.`);
       const THREE0 = app()?.THREE, f = editFrame(); if (!f) throw new Error('Load a model first.');
       const { near, far } = depthRange(sel.cam, f, $('v2EdDepth')?.value === 'through' ? 'through' : 'front');
       const whole = wholeOn(), snap = op !== 'copy' ? cloneRoot(model) : null;
@@ -1161,6 +1162,7 @@
     if (!lz && lastLz) clearLasso(); lastLz = lz ? t : '';
     { const v = $('viewer'); if (v) { v.classList.toggle('v2-cur-lasso', t === 'lasso' && editActive()); v.classList.toggle('v2-cur-razor', t === 'razor' && editActive()); } }
     if (lz) wireLasso();
+    updateEditHint();
     if (t === 'sculpt') { wireSculpt(); if (!sculptSized) { const f = editFrame(); if (f) { sculptSized = true; const v = Math.min(60, Math.max(2, Math.round(f.size.y * f.mm * 0.06 * 2) / 2)); $('v2SculptSize').value = String(v); $('v2SculptSizeOut').textContent = v + ' mm'; } } } else sculptRing(null);
     { const vw = $('viewer'); if (vw) vw.classList.toggle('v2-cur-sculpt', t === 'sculpt' && editActive()); }
     { const card = $('v2EditCard'); card?.querySelectorAll('.v2-icon-btn').forEach(b => { const sel = { tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode', smode: 'v2EdSculptMode' }[b.dataset.ed], on = $(sel)?.value === b.dataset.value; if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on)); }); }
@@ -1172,12 +1174,15 @@
     const hint = $('v2EdHint'); if (!hint) return;
     const m = sourceModel(); let msg = '';
     if (m) {
-      const tris = modelTriangles(m), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
-      if (appliedChanges.has('hollowed') && sourceModel() === hollowResult) msg = 'This model is already hollow. Edit the solid model before you hollow it.';
-      else if (tris > limit) msg = `This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Go to SHRINK & FINISH and press SHRINK first.`;
-      else if (lastHealth && lastHealth.model === m && lastHealth.h && !lastHealth.h.clean ) msg = 'This model has open or broken edges, so shapes, slices and the lasso cannot cut it yet. Press FIX IT first (SHRINK & FINISH tab).';
+      const tris = modelTriangles(m), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES, t = $('v2EdTab')?.value || 'none';
+      const meshOnly = t === 'sculpt' || (t === 'lasso' && wholeOn());          // these work on the triangles themselves, no Manifold
+      if (t === 'none') msg = '';
+      else if (appliedChanges.has('hollowed') && sourceModel() === hollowResult) msg = 'This model is already hollow. Edit the solid model before you hollow it.';
+      else if (meshOnly && tris > SCULPT_MAX_TRIANGLES) msg = `This model has ${tris.toLocaleString()} triangles, too many for this tool in the browser. Go to SHRINK & FINISH and press SHRINK first.`;
+      else if (!meshOnly && tris > limit) msg = `This model has ${tris.toLocaleString()} triangles. ${t === 'lasso' ? 'The lasso cut' : t === 'razor' ? 'The razor' : t === 'part' ? 'Pasting a part' : t === 'slice' ? 'Slicing' : 'Shapes'} needs under ${limit.toLocaleString()}, so press SHRINK first (SHRINK & FINISH tab).${t === 'lasso' ? ' Sculpt, or the lasso with "Grab the whole loose piece" ticked, work on bigger models.' : t === 'razor' || t === 'slice' || t === 'shape' || t === 'part' ? ' The Sculpt tool works on bigger models.' : ''}`;
+      else if (!meshOnly && t !== 'sculpt' && lastHealth && lastHealth.model === m && lastHealth.h && !lastHealth.h.clean) msg = 'This model has open or broken edges, so shapes, slices and the lasso cannot cut it yet. Press FIX IT first (SHRINK & FINISH tab).';
     }
-    hint.textContent = msg; hint.hidden = !msg;
+    if (hint.textContent !== msg) hint.textContent = msg; if (hint.hidden !== !msg) hint.hidden = !msg;
   }
   function setMainTab(tab) {
     const mc = $('v2EditCard')?.closest('.v2-main-card'); if (!mc) return;
@@ -2214,7 +2219,7 @@
       $('v2EdKind').addEventListener('change', editTabChanged);
       ['v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
       $('v2SculptSize').addEventListener('input', () => { $('v2SculptSizeOut').textContent = $('v2SculptSize').value + ' mm'; }); $('v2SculptStrength').addEventListener('input', () => { $('v2SculptStrengthOut').textContent = $('v2SculptStrength').value; }); $('v2EdSculptMode').addEventListener('change', editTabChanged);
-      $('v2EdDepth').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); }); $('v2EdWhole').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); });
+      $('v2EdDepth').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); }); $('v2EdWhole').addEventListener('change', () => { updateEditHint(); if (lassoSel) lassoRed(lassoSel); });
       $('v2LassoDelBtn').addEventListener('click', () => lassoApply('delete')); $('v2LassoKeepBtn').addEventListener('click', e => lassoApply(e.currentTarget.dataset.op || 'copy'));
       $('v2EdPartTop').addEventListener('click', () => partPlace('top')); $('v2EdPartCentre').addEventListener('click', () => partPlace('centre'));
       $('v2EdPartFile').addEventListener('change', async e => { const file = e.target.files?.[0]; if (!file) return; $('v2EdPartInfo').textContent = 'Reading ' + file.name + '…'; try { setPart(await loadPartFile(file)); partPlace('top'); } catch (err) { editPart = null; $('v2EdPartInfo').textContent = 'Could not read that file: ' + (err?.message || err); updateEditPreview(); updateGoState(); } });
