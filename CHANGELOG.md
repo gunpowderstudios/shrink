@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.315
+- Lasso / Razor: new tick box **Grab the whole loose piece**. Touch a separate shell (a horn, a leaf, a floating bit) with the loop and the whole piece turns red; DELETE removes it, COPY / CUT OFF & KEEP sends it to the paste pad. It works straight on the mesh (no Manifold), so it is quick and exact, and the model needs no repair first. On a model that is one connected piece it says so and changes nothing. It does not detect a branch that is fused into the body; use the normal loop for that.
+
 ## v2.314
 - Lasso / Razor: when you finish a loop, the part of the model inside it turns **red** (what DELETE / CUT OFF will take). Changing "How deep" updates the red; Esc, a new loop, leaving the EDIT tab or doing the cut clears it. If nothing is under the loop it says so. The red is a `shrinkLassoRed` group in the viewer scene (never under the model, so it is not exported).
 

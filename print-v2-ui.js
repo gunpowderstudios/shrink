@@ -740,7 +740,7 @@
   // ---- v2.307 EDIT MODEL: basic shapes (join / cut) and a slice-off plane, both through Manifold (edit-core.js) ----
   let editStack = [], editBase = null;               // editBase = a copy of the model from before the FIRST edit, for RESET ALL EDITS                                   // clones of the working model before each edit, for UNDO
   function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
-  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); partRot = null; } catch {} });
+  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); partRot = null; islandCache = null; } catch {} });
   function editFrame() {
     const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return null;
     const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return null;
@@ -838,28 +838,85 @@
   }
   // v2.314: the red preview. Every surface triangle whose centre is inside the loop (and inside the depth range) is drawn red, so you see what DELETE / CUT OFF will take.
   function removeLassoRed() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkLassoRed'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
-  function lassoRed(sel) {
-    removeLassoRed(); const V = window.__shrinkViewer, f = editFrame(); if (!sel || !V?.scene || !f) return 0;
+  // v2.315: which triangles does the loop take? One mask per mesh (same traversal order everywhere). With `whole` it grows to every loose piece (separate shell) the loop touches.
+  let islandCache = null;
+  function islandsOf(model) {
+    if (islandCache && islandCache.model === model) return islandCache.meshes;
+    const THREE = app().THREE, f = editFrame(); model.updateWorldMatrix(true, true);
+    const q = 1e6 / Math.max(1e-9, f.size.length()), key = new Map(), parent = [], v = new THREE.Vector3(), meshes = [];
+    const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const uni = (a, b) => { a = find(a); b = find(b); if (a !== b) parent[a] = b; };
+    model.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count, nt = Math.floor(n / 3), gid = new Int32Array(pos.count).fill(-1), tv = new Int32Array(nt * 3);
+      const idOf = i => { let g = gid[i]; if (g >= 0) return g; v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); const k = Math.round(v.x * q) + ',' + Math.round(v.y * q) + ',' + Math.round(v.z * q); g = key.get(k); if (g === undefined) { g = parent.length; parent.push(g); key.set(k, g); } gid[i] = g; return g; };
+      for (let t = 0; t < nt; t++) { for (let c = 0; c < 3; c++) tv[t * 3 + c] = idOf(idx ? idx.getX(t * 3 + c) : t * 3 + c); uni(tv[t * 3], tv[t * 3 + 1]); uni(tv[t * 3], tv[t * 3 + 2]); }
+      meshes.push({ nt, tv });
+    });
+    for (const m of meshes) { m.isl = new Int32Array(m.nt); for (let t = 0; t < m.nt; t++) m.isl[t] = find(m.tv[t * 3]); delete m.tv; }
+    islandCache = { model, meshes }; return meshes;
+  }
+  const wholeOn = () => !!$('v2EdWhole')?.checked;
+  function lassoMasks(sel, whole) {
+    const f = editFrame(), model = sourceModel(); if (!f || !model) return null;
     const THREE = f.THREE, cam = sel.cam, { near, far } = depthRange(cam, f, $('v2EdDepth')?.value === 'through' ? 'through' : 'front');
-    const inv = new THREE.Matrix4().fromArray(cam.world).invert(), poly = sel.pts, np = poly.length, out = [], model = sourceModel(); if (!model) return 0;
+    const inv = new THREE.Matrix4().fromArray(cam.world).invert(), poly = sel.pts, np = poly.length, out = [];
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), g3 = new THREE.Vector3();
     const inside = (x, y) => { let r = false; for (let i = 0, j = np - 1; i < np; j = i++) { const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) r = !r; } return r; };
-    model.updateWorldMatrix(true, true);
+    model.updateWorldMatrix(true, true); let count = 0, total = 0;
     model.traverse(o => {
-      if (!o.isMesh || !o.geometry?.attributes?.position) return; const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count, mw = o.matrixWorld;
-      for (let i = 0; i + 2 < n; i += 3) {
-        a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(mw); b.fromBufferAttribute(pos, idx ? idx.getX(i + 1) : i + 1).applyMatrix4(mw); c.fromBufferAttribute(pos, idx ? idx.getX(i + 2) : i + 2).applyMatrix4(mw);
+      if (!o.isMesh || !o.geometry?.attributes?.position) return; const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count, nt = Math.floor(n / 3), mw = o.matrixWorld, mask = new Uint8Array(nt);
+      for (let t = 0; t < nt; t++) {
+        const i = t * 3; a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(mw); b.fromBufferAttribute(pos, idx ? idx.getX(i + 1) : i + 1).applyMatrix4(mw); c.fromBufferAttribute(pos, idx ? idx.getX(i + 2) : i + 2).applyMatrix4(mw);
         g3.set((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3, (a.z + b.z + c.z) / 3).applyMatrix4(inv);
         const d = -g3.z; if (d < near || d > far) continue;
         const nx = cam.persp ? g3.x / (d * cam.tanY * cam.aspect) : g3.x / cam.halfW, ny = cam.persp ? g3.y / (d * cam.tanY) : g3.y / cam.halfH;
-        if (inside(nx, ny)) out.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+        if (inside(nx, ny)) { mask[t] = 1; count++; }
       }
+      total += nt; out.push({ mesh: o, mask });
     });
-    if (!out.length) return 0;
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(out), 3));
+    if (whole && count) {
+      const isl = islandsOf(model), hit = new Set(); out.forEach((m, k) => { for (let t = 0; t < m.mask.length; t++) if (m.mask[t]) hit.add(isl[k].isl[t]); });
+      count = 0; out.forEach((m, k) => { for (let t = 0; t < m.mask.length; t++) { const on = hit.has(isl[k].isl[t]) ? 1 : 0; m.mask[t] = on; count += on; } }); out.islands = hit.size;
+    }
+    out.count = count; out.total = total; return out;
+  }
+  function maskPoints(masks) {                          // world-space triangle soup of the masked triangles
+    const out = [], v = new (app().THREE.Vector3)();
+    for (const { mesh: o, mask } of masks) { const pos = o.geometry.attributes.position, idx = o.geometry.index; for (let t = 0; t < mask.length; t++) if (mask[t]) for (let c = 0; c < 3; c++) { const i = t * 3 + c; v.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(o.matrixWorld); out.push(v.x, v.y, v.z); } }
+    return new Float32Array(out);
+  }
+  function lassoRed(sel) {
+    removeLassoRed(); const V = window.__shrinkViewer, f = editFrame(); if (!sel || !V?.scene || !f) return 0;
+    const masks = lassoMasks(sel, wholeOn()); if (!masks?.count) return 0; const THREE = f.THREE, pts = maskPoints(masks);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, side: THREE.DoubleSide, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     mesh.raycast = () => {}; const grp = new THREE.Group(); grp.name = 'shrinkLassoRed'; grp.raycast = () => {}; grp.add(mesh); V.scene.add(grp);
-    return out.length / 9;
+    return masks.count;
+  }
+  // delete / copy / cut whole loose pieces straight on the mesh (no Manifold): the removed triangles are dropped from a copy of the model, the rest is untouched
+  async function wholePieceEdit(model, sel, op) {
+    const THREE = app().THREE, masks = lassoMasks(sel, true);
+    if (!masks?.count) throw new Error('The loop did not catch any of the model. Draw it around the part you want.');
+    if (masks.count >= masks.total) throw new Error('This model is one connected piece, so there is no loose piece to grab. Switch off "Grab the whole loose piece" and use the loop instead.');
+    const pts = maskPoints(masks), out = { whole: true, islands: masks.islands || 1, tris: masks.count };
+    let vol = 0; for (let i = 0; i + 8 < pts.length; i += 9) vol += pts[i] * (pts[i + 4] * pts[i + 8] - pts[i + 5] * pts[i + 7]) - pts[i + 1] * (pts[i + 3] * pts[i + 8] - pts[i + 5] * pts[i + 6]) + pts[i + 2] * (pts[i + 3] * pts[i + 7] - pts[i + 4] * pts[i + 6]);
+    out.pieceVolume = Math.abs(vol) / 6;
+    if (op !== 'copy') {
+      const root = cloneRoot(model), keep = new Map(); masks.forEach(m => keep.set(m.mesh, m.mask));
+      const src = []; model.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) src.push(o); }); const dst = []; root.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) dst.push(o); });
+      dst.forEach((o, k) => {                            // keep only the triangles that stay, and only the vertices they use (the precise bounding box reads every vertex)
+        const mask = keep.get(src[k]), g = o.geometry, idx = g.index, remap = new Map(), kept = [];
+        for (let t = 0; t < mask.length; t++) if (!mask[t]) for (let c = 0; c < 3; c++) { const old = idx ? idx.getX(t * 3 + c) : t * 3 + c; let nv = remap.get(old); if (nv === undefined) { nv = remap.size; remap.set(old, nv); } kept.push(nv); }
+        const olds = new Uint32Array(remap.size); remap.forEach((nv, old) => { olds[nv] = old; });
+        for (const name of Object.keys(g.attributes)) { const at = g.attributes[name], sz = at.itemSize, arr = new at.array.constructor(olds.length * sz); for (let i = 0; i < olds.length; i++) for (let c = 0; c < sz; c++) arr[i * sz + c] = at.array[olds[i] * sz + c]; g.setAttribute(name, new THREE.BufferAttribute(arr, sz, at.normalized)); }
+        g.setIndex(new THREE.BufferAttribute(new Uint32Array(kept), 1)); g.computeBoundingBox?.(); g.computeBoundingSphere?.();
+      });
+      root.updateMatrixWorld(true); out.root = root; out.pieces = null;
+    }
+    const grp = new THREE.Group(), pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pts, 3)); grp.add(new THREE.Mesh(pg, new THREE.MeshStandardMaterial())); grp.updateMatrixWorld(true);
+    if (op !== 'delete') out.piece = grp;
+    return out;
   }
   function clearLasso() { lassoSel = null; lassoDraw = null; lassoPaint(null); removeLassoRed(); lassoBarState(); }
   function lassoBarState() { document.querySelectorAll('#v2EditCard .v2-lasso-act').forEach(b => { const off = !lassoSel || lassoBusy; if (b.disabled !== off) b.disabled = off; }); }
@@ -900,9 +957,9 @@
       if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Press SHRINK first.`);
       const THREE0 = app()?.THREE, f = editFrame(); if (!f) throw new Error('Load a model first.');
       const { near, far } = depthRange(sel.cam, f, $('v2EdDepth')?.value === 'through' ? 'through' : 'front');
-      const snap = op !== 'copy' ? cloneRoot(model) : null;
+      const whole = wholeOn(), snap = op !== 'copy' ? cloneRoot(model) : null;
       progress(card, 40, 'Working…'); await paintNow();
-      const r = await window.__shrinkFuse.editModel(model, { lasso: { pts: sel.pts, cam: sel.cam, near, far, op } });
+      const r = whole ? await wholePieceEdit(model, sel, op) : await window.__shrinkFuse.editModel(model, { lasso: { pts: sel.pts, cam: sel.cam, near, far, op } });
       progress(card, 85, 'Checking the result…');
       if (r.root) { if (snap) { if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift(); } removeEditPreview(); installWorkingResult(r.root, 'edit'); $('v2EdUndo').hidden = !editStack.length; setTimeout(updateHealthCard, 80); }
       const mm = f.mm; let msg;
@@ -914,7 +971,7 @@
         { const md = $('v2EdMode'); md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); }
         set$tool('part');
         msg = `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. Use the arrows on the model to move, size and tilt it, then press PLACE IT.</span>`;
-      } else msg = `<strong>✓ Deleted</strong><span>Now ${(r.volume * mm * mm * mm / 1000).toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. The hole is closed flat. Press UNDO if that is not what you wanted.</span>`;
+      } else msg = r.whole ? `<strong>✓ Deleted</strong><span>${r.islands} loose piece${r.islands === 1 ? '' : 's'} removed (${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml). Press UNDO if that is not what you wanted.</span>` : `<strong>✓ Deleted</strong><span>Now ${(r.volume * mm * mm * mm / 1000).toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. The hole is closed flat. Press UNDO if that is not what you wanted.</span>`;
       res.innerHTML = msg; card.dataset.state = 'good'; progress(card, 100, 'Done.');
       lassoSel = null; lassoPaint(null); removeLassoRed();
     } catch (err) {
@@ -1911,6 +1968,7 @@
               </div>
               <div id="v2EdLassoBox" hidden>
                 <div id="v2LassoHelp" class="v2-edit-hint-plain">Hold the mouse button down and draw a loop round the part on the model. Ctrl / ⌘ + drag still turns the model.</div>
+                <label class="v2-edit-hint-plain" style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="v2EdWhole" autocomplete="off"><span>Grab the whole loose piece. For a part that is its own separate shell (a horn, a leaf, a floating bit): touch it with the loop and all of it turns red. Not for a branch that is fused into the body.</span></label>
                 <div class="v2-hollow-row"><label for="v2EdDepth">How deep</label><select id="v2EdDepth" autocomplete="off"><option value="front" selected>Front half only</option><option value="through">Right through</option></select></div>
                 <div class="v2-icon-row v2-icon-row-2"><button id="v2LassoDelBtn" type="button" class="v2-icon-btn v2-lasso-act" data-op="delete" disabled>${icon('cut')}<span>DELETE</span></button><button id="v2LassoKeepBtn" type="button" class="v2-icon-btn v2-lasso-act" data-op="copy" disabled>${icon('copy')}<span>COPY</span></button></div>
               </div>
@@ -2039,7 +2097,7 @@
       ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed]); if (!sel) return; sel.value = (b.dataset.ed === 'tool' && b.getAttribute('aria-pressed') === 'true') ? 'none' : b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
       $('v2EdKind').addEventListener('change', editTabChanged);
       ['v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
-      $('v2EdDepth').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); });
+      $('v2EdDepth').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); }); $('v2EdWhole').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); });
       $('v2LassoDelBtn').addEventListener('click', () => lassoApply('delete')); $('v2LassoKeepBtn').addEventListener('click', e => lassoApply(e.currentTarget.dataset.op || 'copy'));
       $('v2EdPartTop').addEventListener('click', () => partPlace('top')); $('v2EdPartCentre').addEventListener('click', () => partPlace('centre'));
       $('v2EdPartFile').addEventListener('change', async e => { const file = e.target.files?.[0]; if (!file) return; $('v2EdPartInfo').textContent = 'Reading ' + file.name + '…'; try { setPart(await loadPartFile(file)); partPlace('top'); } catch (err) { editPart = null; $('v2EdPartInfo').textContent = 'Could not read that file: ' + (err?.message || err); updateEditPreview(); updateGoState(); } });

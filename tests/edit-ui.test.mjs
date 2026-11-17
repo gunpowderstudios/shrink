@@ -188,4 +188,26 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   set(page, 'v2EdDepth', 'through'); w.__shrinkEdit.setSel(L.pts, L.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
   ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Deleted/.test(page.$('v2EdResult').textContent) && !red(), 'ED26 DELETE removes the part and the red');
 }
+/* v2.315: grab the whole loose piece (separate shells) */
+{ const page = await makePage({ model: models.multi(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80); set(page, 'v2EdDepth', 'through');
+  const tri0 = tris(w.__shrinkWorkingModel()), h0 = height(page), L = orthoCam(page, 0.85, 1.3), chk = page.$('v2EdWhole');
+  const nLoop = w.__shrinkEdit.setSel(L.pts, L.cam);
+  chk.checked = true; chk.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(50);
+  let nRed = 0; w.__shrinkViewer.scene.getObjectByName('shrinkLassoRed')?.traverse(o => { if (o.isMesh) nRed = o.geometry.attributes.position.count / 3; });
+  ok(nLoop > 0 && nRed > nLoop && Math.abs(nRed - tri0 / 3) < tri0 * 0.06, `ED27 the whole top sphere turns red, not just the loop (${nLoop} -> ${nRed} of ${tri0})`);
+  page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /1 loose piece/.test(page.$('v2EdResult').textContent), 'ED27 DELETE removes it: ' + page.$('v2EdResult').textContent.slice(0, 110));
+  ok(Math.abs(tris(w.__shrinkWorkingModel()) - (tri0 - nRed)) < 2 && height(page) < h0 * 0.8 && /EDITED/.test(page.$('v2HealthChanges').textContent), `ED27 two spheres are left (${tris(w.__shrinkWorkingModel())} triangles, height ${h0.toFixed(1)} -> ${height(page).toFixed(1)})`);
+  page.$('v2EdUndo').click(); await wait(200); ok(tris(w.__shrinkWorkingModel()) === tri0, 'ED27 UNDO brings the sphere back');
+  /* copy: the piece goes to the paste pad */
+  const L2 = orthoCam(page, 0.85, 1.3); w.__shrinkEdit.setSel(L2.pts, L2.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
+  ok(await waitFor(() => /Copied|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Copied/.test(page.$('v2EdResult').textContent) && w.__shrinkEdit.hasPart() && page.$('v2EdTab').value === 'part', 'ED27 COPY hands the loose piece to the paste tool');
+}
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80); set(page, 'v2EdDepth', 'through'); page.$('v2EdWhole').checked = true;
+  const L = orthoCam(page, 0.6, 1.3); w.__shrinkEdit.setSel(L.pts, L.cam); page.$('v2EdResult').textContent = ''; const m0 = w.__shrinkWorkingModel(); page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Could not/.test(page.$('v2EdResult').textContent), 60000) && /one connected piece/.test(page.$('v2EdResult').textContent) && w.__shrinkWorkingModel() === m0, 'ED27 on a one-piece model it says so and changes nothing');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

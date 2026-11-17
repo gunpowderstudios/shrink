@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.314';
+  const PRINT_RELEASE = '2.315';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -18,7 +18,7 @@
   import(`./game-save-guard.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game save verification did not load`, err));
   import(`./game-protection-fix.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err));
   import(`./batch.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Batch tool did not load`, err));
-  const CLAY_ENABLED = false;      // v2.314: the pink/orange brush is gone from the EDIT tab (lasso + razor replace it); clay.js stays in the repo, dormant
+  const CLAY_ENABLED = false;      // v2.315: the pink/orange brush is gone from the EDIT tab (lasso + razor replace it); clay.js stays in the repo, dormant
   if (CLAY_ENABLED) import(`./clay.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Clay tool did not load`, err));
   import(`./print-v2-ui.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
   import(`./print-upload.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Print upload control did not load`, err));
@@ -112,7 +112,7 @@
   const sniff=name=>{if(/\.(stl|obj|ply)$/i.test(name||''))setMode('print');};
   fileInput?.addEventListener('change',()=>sniff(fileInput.files?.[0]?.name));
   dropZone?.addEventListener('drop',e=>sniff(e.dataTransfer?.files?.[0]?.name),true);
-  /* v2.314: a GLB is valid in 3D Printing. Keep the user's chosen mode on upload; other mesh formats default to print. */
+  /* v2.315: a GLB is valid in 3D Printing. Keep the user's chosen mode on upload; other mesh formats default to print. */
   const override=document.createElement('p');override.className='mode-override';
   override.innerHTML='Gaming tools. <button type="button" id="modeUsePrint">Use as a print model</button>';
   steps.insertAdjacentElement('afterend',override);
