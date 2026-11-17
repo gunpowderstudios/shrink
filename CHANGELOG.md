@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.316
+- EDIT tab: new **Sculpt** brush, like clay. Pick **Smooth** (blends lined faces, rough scans), **Pull out** (raises the surface) or **Push in** (presses it), set the **Tip size** in mm and the **Strength**, and paint on the model; a blue ring shows the tip. Ctrl / ⌘ + drag turns the model. Each stroke is one UNDO step (RESET ALL EDITS undoes them all).
+- It moves the model's own vertices (no Manifold, so no repair first and the triangle count never changes). Sculpt before SHRINK, while there are plenty of triangles.
+
 ## v2.315
 - Lasso / Razor: new tick box **Grab the whole loose piece**. Touch a separate shell (a horn, a leaf, a floating bit) with the loop and the whole piece turns red; DELETE removes it, COPY / CUT OFF & KEEP sends it to the paste pad. It works straight on the mesh (no Manifold), so it is quick and exact, and the model needs no repair first. On a model that is one connected piece it says so and changes nothing. It does not detect a branch that is fused into the body; use the normal loop for that.
 

@@ -872,3 +872,8 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-pad-tilt{display:flex;gap:4px;align-items:center;margin-top:8px}.v2-pad-tilt span{font-size:11px;opacity:.8;margin-right:2px}.v2-pad-tilt button{flex:1;font-size:15px;padding:3px 0}
 .v2-pad-foot{display:flex;gap:6px;margin-top:8px}.v2-pad-foot select{flex:1;min-width:0}
 .v2-pad-go{background:#1f9d6b!important;border-color:#27c088!important;font-weight:700}.v2-pad-no{background:#5a2a2a!important}
+
+/* v2.316 sculpt */
+.v2-icon-row-6{grid-template-columns:repeat(3,1fr)}
+#viewer.v2-cur-sculpt,#viewer.v2-cur-sculpt canvas{cursor:none}
+.v2-brush-ring[data-mode="sculpt"]{border-color:#4aa8ff;background:rgba(74,168,255,.12)}

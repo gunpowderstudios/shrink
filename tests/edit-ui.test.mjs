@@ -210,4 +210,29 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   const L = orthoCam(page, 0.6, 1.3); w.__shrinkEdit.setSel(L.pts, L.cam); page.$('v2EdResult').textContent = ''; const m0 = w.__shrinkWorkingModel(); page.$('v2LassoDelBtn').click();
   ok(await waitFor(() => /Could not/.test(page.$('v2EdResult').textContent), 60000) && /one connected piece/.test(page.$('v2EdResult').textContent) && w.__shrinkWorkingModel() === m0, 'ED27 on a one-piece model it says so and changes nothing');
 }
+/* v2.316: the Sculpt brush (smooth / pull / push) */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  page.$('v2TabEdit').click(); await wait(50);
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="sculpt"]').click(); await wait(80);
+  ok(page.$('v2EdSculptBox').hidden === false && page.$('v2EdGo').hidden === true && page.$('v2EdSculptMode').value === 'smooth', 'ED28 the Sculpt tool shows its controls (Smooth first)');
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="smode"][data-value="pull"]').click(); await wait(30); ok(page.$('v2EdSculptMode').value === 'pull', 'ED28 the Pull icon picks pull');
+  const top = [0, 40, 0], centre = [0, 20, 0];
+  const rad = () => { const out = []; w.__shrinkWorkingModel().traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (y > 33) out.push(Math.hypot(x - centre[0], y - centre[1], z - centre[2])); } }); return out; };
+  const radCol = () => { const out = []; w.__shrinkWorkingModel().traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (Math.abs(x) < 8 && Math.abs(z) < 8 && y > 20) out.push(Math.hypot(x, y - 20, z)); } }); return out; };
+  const sd = a => { const m = a.reduce((s, v) => s + v, 0) / a.length; return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / a.length); }, mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+  { let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;          // roughen the model first
+    w.__shrinkWorkingModel().traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i) - 20, z = p.getZ(i), r = Math.hypot(x, y, z) || 1, k = 1 + (rnd() - 0.5) * 0.08; p.setXYZ(i, x * k, y * k + 20, z * k); } p.needsUpdate = true; }); }
+  const m0 = w.__shrinkWorkingModel(), t0 = tris(m0), r0 = rad(), s0 = sd(r0);
+  ok(w.__shrinkEdit.sculpt(top, 44, 10, 'smooth', [0, 1, 0], 14), 'ED28 a smooth stroke runs');
+  const m1 = w.__shrinkWorkingModel(), r1 = rad(), s1 = sd(r1);
+  ok(m1 !== m0 && tris(m1) === t0 && s1 < s0 * 0.7 && w.__shrinkEdit.depth() === 1 && /EDITED/.test(page.$('v2HealthChanges').textContent), `ED28 smoothing calms the roughness (${s0.toFixed(3)} -> ${s1.toFixed(3)}), keeps the triangles, adds one undo step and the chip`);
+  const mean1 = mean(radCol()); w.__shrinkEdit.sculpt(top, 44, 10, 'pull', [0, 1, 0], 3);
+  ok(w.__shrinkWorkingModel() === m1 && mean(radCol()) > mean1 + 0.1, `ED28 PULL raises the surface (${mean1.toFixed(2)} -> ${mean(radCol()).toFixed(2)})`);
+  const mean2 = mean(radCol()); w.__shrinkEdit.sculpt(top, 44, 10, 'push', [0, 1, 0], 6);
+  ok(mean(radCol()) < mean2 - 0.1, `ED28 PUSH presses it in (${mean2.toFixed(2)} -> ${mean(radCol()).toFixed(2)})`);
+  const far = (() => { let n = 0; w.__shrinkWorkingModel().traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 5) n++; }); return n; })();
+  ok(far > 0, 'ED28 the far side of the model is still there');
+  for (let i = 0; i < 4; i++) { page.$('v2EdUndo').click(); await wait(120); }
+  ok(Math.abs(sd(rad()) - s0) < 1e-6 && w.__shrinkEdit.depth() === 0, 'ED28 UNDO steps all the way back to the rough model');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

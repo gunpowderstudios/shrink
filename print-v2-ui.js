@@ -58,6 +58,10 @@
     cone: '<path d="M12 3L5 18M12 3l7 15"/><ellipse cx="12" cy="18" rx="7" ry="3"/>',
     join: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/>',
     cut: '<circle cx="12" cy="12" r="9"/><path d="M7 12h10"/>',
+    sculpt: '<path d="M20 4l-9 9"/><path d="M11 13c-3 0-4 2-4 4 0 2-1 3-3 3 3 2 8 1 9-2 .8-2.2-.2-4.2-2-5z"/>',
+    smooth: '<path d="M3 9c3-3 5 3 9 0s6 3 9 0"/><path d="M3 15c3-3 5 3 9 0s6 3 9 0"/>',
+    pull: '<path d="M12 20V5M6 11l6-6 6 6"/>',
+    push: '<path d="M12 4v15M6 13l6 6 6-6"/>',
     lasso: '<path d="M12 4C6.5 4 3 6.2 3 9s3.5 5 9 5 9-2.2 9-5-3.5-5-9-5z" stroke-dasharray="3 2"/><path d="M8.5 13.5c-1.2 2-1.2 4.2.8 5.2 1.3.6 2.6-.4 2.1-2"/>',
     razor: '<rect x="3" y="8" width="18" height="8" rx="1"/><path d="M3 12h18"/><circle cx="7" cy="10" r="1"/><circle cx="12" cy="10" r="1"/><circle cx="17" cy="10" r="1"/>',
     copy: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
@@ -740,7 +744,7 @@
   // ---- v2.307 EDIT MODEL: basic shapes (join / cut) and a slice-off plane, both through Manifold (edit-core.js) ----
   let editStack = [], editBase = null;               // editBase = a copy of the model from before the FIRST edit, for RESET ALL EDITS                                   // clones of the working model before each edit, for UNDO
   function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
-  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); partRot = null; islandCache = null; } catch {} });
+  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); partRot = null; islandCache = null; sculptWork = null; sculptData = null; } catch {} });
   function editFrame() {
     const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return null;
     const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return null;
@@ -918,6 +922,109 @@
     if (op !== 'delete') out.piece = grp;
     return out;
   }
+  // ---- v2.316 SCULPT brush: smooth / pull / push the surface like clay. Works on the mesh itself (no Manifold), on a private copy that becomes the working model.
+  let sculptWork = null, sculptData = null, sculptDown = false, sculptTouched = new Set(), sculptNormAt = 0, sculptLastAt = 0, sculptSized = false;
+  const sculptMode = () => $('v2EdSculptMode')?.value || 'smooth';
+  function sculptRadius() { const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1; return Math.max(1e-6, num('v2SculptSize', 6) / 2 / mm); }
+  function sculptBuild(model) {
+    const THREE = app().THREE, f = editFrame(); model.updateWorldMatrix(true, true);
+    const q = 1e6 / Math.max(1e-9, f.size.length()), key = new Map(), P = [], meshes = [], v = new THREE.Vector3();
+    model.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const pos = o.geometry.attributes.position, idx = o.geometry.index, nv = pos.count, n = idx ? idx.count : nv, nt = Math.floor(n / 3), gid = new Int32Array(nv).fill(-1), tg = new Int32Array(nt * 3);
+      const idOf = i => { let g = gid[i]; if (g >= 0) return g; v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); const k = Math.round(v.x * q) + ',' + Math.round(v.y * q) + ',' + Math.round(v.z * q); g = key.get(k); if (g === undefined) { g = P.length / 3; P.push(v.x, v.y, v.z); key.set(k, g); } gid[i] = g; return g; };
+      for (let t = 0; t < nt; t++) for (let c = 0; c < 3; c++) tg[t * 3 + c] = idOf(idx ? idx.getX(t * 3 + c) : t * 3 + c);
+      for (let i = 0; i < nv; i++) idOf(i);                         // vertices no triangle uses still need an id
+      meshes.push({ mesh: o, gid, tg, nt, inv: new THREE.Matrix4().copy(o.matrixWorld).invert().elements });
+    });
+    const gc = P.length / 3, deg = new Int32Array(gc + 1);
+    for (const m of meshes) for (let t = 0; t < m.nt; t++) { const a = m.tg[t * 3], b = m.tg[t * 3 + 1], c = m.tg[t * 3 + 2]; deg[a] += 2; deg[b] += 2; deg[c] += 2; }
+    const off = new Int32Array(gc + 1); for (let g = 0; g < gc; g++) off[g + 1] = off[g] + deg[g]; const fill = off.slice(0, gc), nbr = new Int32Array(off[gc]);
+    for (const m of meshes) for (let t = 0; t < m.nt; t++) { const a = m.tg[t * 3], b = m.tg[t * 3 + 1], c = m.tg[t * 3 + 2]; nbr[fill[a]++] = b; nbr[fill[a]++] = c; nbr[fill[b]++] = a; nbr[fill[b]++] = c; nbr[fill[c]++] = a; nbr[fill[c]++] = b; }
+    const vc = new Int32Array(gc + 1); meshes.forEach(m => { for (let i = 0; i < m.gid.length; i++) vc[m.gid[i] + 1]++; });
+    const vOff = new Int32Array(gc + 1); for (let g = 0; g < gc; g++) vOff[g + 1] = vOff[g] + vc[g + 1]; const vf = vOff.slice(0, gc), vm = new Int32Array(vOff[gc]), vi = new Int32Array(vOff[gc]);
+    meshes.forEach((m, k) => { for (let i = 0; i < m.gid.length; i++) { const g = m.gid[i], p = vf[g]++; vm[p] = k; vi[p] = i; } });
+    return { model, P: Float32Array.from(P), gc, off, nbr, vOff, vm, vi, meshes, mark: new Int32Array(gc), stamp: 0 };
+  }
+  function sculptBegin() {                                      // one UNDO step per stroke; the first stroke (or the first after another tool changed the model) works on a fresh copy
+    const model = sourceModel(); if (!model) return false;
+    if (hollowResult && model === hollowResult) { $('v2EdResult').innerHTML = '<strong>Could not sculpt</strong><span>This model is already hollow. Sculpt the solid model before you hollow it.</span>'; return false; }
+    const tris = modelTriangles(model); if (tris > 1500000) { $('v2EdResult').innerHTML = '<strong>Could not sculpt</strong><span>This model has ' + tris.toLocaleString() + ' triangles, too many to sculpt in the browser. Press SHRINK first.</span>'; return false; }
+    const snap = cloneRoot(model); if (!snap) return false;
+    if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift();
+    if (model !== sculptWork) { const work = cloneRoot(model); removeEditPreview(); installWorkingResult(work, 'edit'); sculptWork = work; sculptData = null; }
+    $('v2EdUndo').hidden = !editStack.length; sculptTouched = new Set(); return true;
+  }
+  function sculptRefreshNormals(force) {
+    const t = performance.now(); if (!force && t - sculptNormAt < 160) return; sculptNormAt = t;
+    sculptTouched.forEach(m => { const g = m.mesh.geometry; if (g.attributes.normal && g.index) g.computeVertexNormals(); });
+  }
+  function sculptEnd() {
+    if (!sculptDown) return; sculptDown = false; sculptRefreshNormals(true);
+    sculptTouched.forEach(m => { const g = m.mesh.geometry; g.computeBoundingBox?.(); g.computeBoundingSphere?.(); try { g.boundsTree?.refit?.(); } catch {} });
+    sculptTouched = new Set(); try { window.__shrinkStretchTick = (window.__shrinkStretchTick || 0) + 1; } catch {}
+    setTimeout(updateHealthCard, 120);
+  }
+  // one dab: h = centre (world), start = gids to begin from, nrm = outward direction for pull / push
+  function sculptDab(h, start, nrm) {
+    const model = sourceModel(); if (!model) return false; if (!sculptData || sculptData.model !== model) sculptData = sculptBuild(model);
+    const d = sculptData, { P, off, nbr, vOff, vm, vi, meshes } = d, R = sculptRadius(), s = Math.min(1, Math.max(0.02, num('v2SculptStrength', 5) / 10)), mode = sculptMode();
+    const tag = ++d.stamp, G = [], dist = []; const q = start.slice(); start.forEach(g => { d.mark[g] = tag; });
+    for (let head = 0; head < q.length && G.length < 120000; head++) {
+      const g = q[head], dd = Math.hypot(P[g * 3] - h[0], P[g * 3 + 1] - h[1], P[g * 3 + 2] - h[2]); if (dd > R) continue; G.push(g); dist.push(dd);
+      for (let k = off[g]; k < off[g + 1]; k++) { const n = nbr[k]; if (d.mark[n] !== tag) { d.mark[n] = tag; q.push(n); } }
+    }
+    if (!G.length) return false;
+    const fall = dist.map(dd => { const t = dd / R, u = 1 - t * t; return mode === 'smooth' ? Math.min(1, u * 1.6) : u * u; });
+    const smoothPass = lam => { const out = new Float32Array(G.length * 3); G.forEach((g, i) => { let ax = 0, ay = 0, az = 0, c = off[g + 1] - off[g]; if (!c) { out[i * 3] = P[g * 3]; out[i * 3 + 1] = P[g * 3 + 1]; out[i * 3 + 2] = P[g * 3 + 2]; return; } for (let k = off[g]; k < off[g + 1]; k++) { const n = nbr[k]; ax += P[n * 3]; ay += P[n * 3 + 1]; az += P[n * 3 + 2]; } const w = lam * fall[i]; out[i * 3] = P[g * 3] + w * (ax / c - P[g * 3]); out[i * 3 + 1] = P[g * 3 + 1] + w * (ay / c - P[g * 3 + 1]); out[i * 3 + 2] = P[g * 3 + 2] + w * (az / c - P[g * 3 + 2]); }); G.forEach((g, i) => { P[g * 3] = out[i * 3]; P[g * 3 + 1] = out[i * 3 + 1]; P[g * 3 + 2] = out[i * 3 + 2]; }); };
+    if (mode === 'smooth') { smoothPass(0.6 * s); smoothPass(-0.64 * s); }
+    else { const sg = mode === 'pull' ? 1 : -1, amt = sg * s * R * 0.015; G.forEach((g, i) => { P[g * 3] += nrm[0] * amt * fall[i]; P[g * 3 + 1] += nrm[1] * amt * fall[i]; P[g * 3 + 2] += nrm[2] * amt * fall[i]; }); smoothPass(0.3); }
+    const touched = new Set();
+    for (const g of G) for (let k = vOff[g]; k < vOff[g + 1]; k++) { const m = meshes[vm[k]], e = m.inv, X = P[g * 3], Y = P[g * 3 + 1], Z = P[g * 3 + 2]; m.mesh.geometry.attributes.position.setXYZ(vi[k], e[0] * X + e[4] * Y + e[8] * Z + e[12], e[1] * X + e[5] * Y + e[9] * Z + e[13], e[2] * X + e[6] * Y + e[10] * Z + e[14]); touched.add(m); }
+    touched.forEach(m => { m.mesh.geometry.attributes.position.needsUpdate = true; sculptTouched.add(m); });
+    return true;
+  }
+  function sculptPick(e) {
+    const V = window.__shrinkViewer, model = sourceModel(), THREE = app()?.THREE; if (!V?.renderer || !V.camera || !model || !THREE) return null;
+    const rect = V.renderer.domElement.getBoundingClientRect(); if (!rect.width) return null;
+    const rc = new THREE.Raycaster(); rc.setFromCamera({ x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 }, V.camera);
+    const hit = rc.intersectObject(model, true).find(x => x.object.isMesh && x.object.visible && x.face); if (!hit) return null;
+    const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+    return { point: hit.point.toArray(), normal: n.toArray(), mesh: hit.object, face: [hit.face.a, hit.face.b, hit.face.c] };
+  }
+  function sculptStart(hit) {                                   // gids of the hit triangle
+    const d = sculptData; if (!d) return [];
+    const m = d.meshes.find(x => x.mesh === hit.mesh); return m ? hit.face.map(i => m.gid[i]) : [];
+  }
+  function sculptRing(e, hit) {
+    let r = $('v2SculptRing'); if (!r) { r = document.createElement('div'); r.id = 'v2SculptRing'; r.className = 'v2-brush-ring'; r.dataset.mode = 'sculpt'; r.hidden = true; r.innerHTML = '<span></span>'; document.body.appendChild(r); }
+    if (!e) { setHid(r, true); return; }
+    let px = 14; try { const V = window.__shrinkViewer, THREE = app().THREE, rect = V.renderer.domElement.getBoundingClientRect(), ref = hit ? new THREE.Vector3(...hit.point) : editFrame().centre; V.camera.updateMatrixWorld(); const right = new THREE.Vector3().setFromMatrixColumn(V.camera.matrixWorld, 0).normalize(), a = ref.clone().project(V.camera), b = ref.clone().addScaledVector(right, sculptRadius()).project(V.camera), dd = Math.abs(b.x - a.x) * rect.width / 2; if (Number.isFinite(dd) && dd > 0) px = dd; } catch {}
+    const size = Math.max(8, Math.round(px * 2)); r.style.width = r.style.height = size + 'px'; r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px'; r.firstChild.textContent = num('v2SculptSize', 6).toFixed(1) + ' mm ' + sculptMode(); setHid(r, false);
+  }
+  function sculptStrokeAt(e) {
+    const now = performance.now(); if (now - sculptLastAt < 16) return; sculptLastAt = now;
+    const hit = sculptPick(e); sculptRing(e, hit); if (!hit) return;
+    if (!sculptData || sculptData.model !== sourceModel()) sculptData = sculptBuild(sourceModel());
+    if (sculptDab(hit.point, sculptStart(hit), hit.normal)) sculptRefreshNormals(false);
+  }
+  function wireSculpt() {
+    const v = $('viewer'); if (!v || v.dataset.sculptWired) return; v.dataset.sculptWired = '1';
+    const active = () => $('v2EdTab')?.value === 'sculpt' && editActive();
+    v.addEventListener('pointerdown', e => { if (!active() || e.button !== 0 || e.ctrlKey || e.metaKey) return; e.stopPropagation(); e.preventDefault(); if (!sculptBegin()) return; sculptDown = true; sculptStrokeAt(e); }, true);
+    v.addEventListener('pointermove', e => { if (!active() || e.ctrlKey || e.metaKey) { sculptRing(null); return; } if (sculptDown) { e.stopPropagation(); if ((e.buttons & 1) === 0) { sculptEnd(); return; } sculptStrokeAt(e); } else sculptRing(e, sculptPick(e)); }, true);
+    v.addEventListener('pointerleave', () => sculptRing(null)); v.addEventListener('pointerup', sculptEnd, true); v.addEventListener('pointercancel', sculptEnd, true); window.addEventListener('pointerup', sculptEnd, true); window.addEventListener('blur', sculptEnd);
+    const orbitLeft = pan => { const c = window.__shrinkViewer?.controls; if (c?.mouseButtons) c.mouseButtons.LEFT = pan ? 2 : 0; };
+    window.addEventListener('keydown', e => { if (active() && (e.key === 'Meta' || e.key === 'Control')) { orbitLeft(true); sculptEnd(); } }, true);
+    window.addEventListener('keyup', e => { if (active() && (e.key === 'Meta' || e.key === 'Control')) orbitLeft(false); }, true);
+  }
+  // test hook: one whole stroke at a world point
+  function sculptAt(point, mm, strength, mode, normal, dabs = 1) {
+    if (mm) { $('v2SculptSize').value = String(mm); } if (strength) $('v2SculptStrength').value = String(strength); if (mode) { const sel = $('v2EdSculptMode'); sel.value = mode; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+    if (!sculptBegin()) return false; sculptDown = true; let ok = false;
+    try { const model = sourceModel(); if (!sculptData || sculptData.model !== model) sculptData = sculptBuild(model); const d = sculptData; let best = 0, bd = Infinity; for (let g = 0; g < d.gc; g++) { const dd = Math.hypot(d.P[g * 3] - point[0], d.P[g * 3 + 1] - point[1], d.P[g * 3 + 2] - point[2]); if (dd < bd) { bd = dd; best = g; } } for (let i = 0; i < dabs; i++) ok = sculptDab(point, [best], normal || [0, 1, 0]); } finally { sculptEnd(); }
+    return ok;
+  }
   function clearLasso() { lassoSel = null; lassoDraw = null; lassoPaint(null); removeLassoRed(); lassoBarState(); }
   function lassoBarState() { document.querySelectorAll('#v2EditCard .v2-lasso-act').forEach(b => { const off = !lassoSel || lassoBusy; if (b.disabled !== off) b.disabled = off; }); }
   function lassoEnd() {
@@ -1024,7 +1131,7 @@
   }
   function updateEditPreview() {
     removeEditPreview();
-    updatePad(); const V = window.__shrinkViewer; if (!editActive() || !V?.scene || ['lasso', 'razor', 'none'].includes($('v2EdTab')?.value)) return;
+    updatePad(); const V = window.__shrinkViewer; if (!editActive() || !V?.scene || ['lasso', 'razor', 'sculpt', 'none'].includes($('v2EdTab')?.value)) return;
     const sl = $('v2EdTab')?.value === 'slice', isPart = $('v2EdTab')?.value === 'part';
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
@@ -1048,13 +1155,15 @@
   function editTabChanged() {
     const t = $('v2EdTab').value, sl = t === 'slice';
     const lz = t === 'lasso' || t === 'razor';
-    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdGo'), lz); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
+    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2EdGo'), lz || t === 'sculpt'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
     { const tip = $('v2EdTip'); const msg = t === 'none' ? 'No tool selected. Pick one above.' : 'Click the tool again or press Esc to put it down.'; if (tip && tip.textContent !== msg) tip.textContent = msg; updateGoState(); }
     if (lz && t !== lastLz) { clearLasso(); const dp = $('v2EdDepth'); if (dp) dp.value = t === 'razor' ? 'through' : 'front'; const k = $('v2LassoKeepBtn'); if (k) { k.dataset.op = t === 'razor' ? 'cut' : 'copy'; k.querySelector('span').textContent = t === 'razor' ? 'CUT OFF & KEEP' : 'COPY'; } const d = $('v2LassoDelBtn'); if (d) d.querySelector('span').textContent = t === 'razor' ? 'CUT OFF' : 'DELETE'; const h = $('v2LassoHelp'); if (h) h.textContent = t === 'razor' ? 'The razor cuts straight through. Draw a loop round the piece you want off. The hole is always closed flat. Ctrl / ⌘ + drag turns the model.' : 'Hold the mouse button down and draw a loop round the part on the model. Ctrl / ⌘ + drag still turns the model.'; }
     if (!lz && lastLz) clearLasso(); lastLz = lz ? t : '';
     { const v = $('viewer'); if (v) { v.classList.toggle('v2-cur-lasso', t === 'lasso' && editActive()); v.classList.toggle('v2-cur-razor', t === 'razor' && editActive()); } }
     if (lz) wireLasso();
-    { const card = $('v2EditCard'); card?.querySelectorAll('.v2-icon-btn').forEach(b => { const sel = { tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed], on = $(sel)?.value === b.dataset.value; if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on)); }); }
+    if (t === 'sculpt') { wireSculpt(); if (!sculptSized) { const f = editFrame(); if (f) { sculptSized = true; const v = Math.min(60, Math.max(2, Math.round(f.size.y * f.mm * 0.06 * 2) / 2)); $('v2SculptSize').value = String(v); $('v2SculptSizeOut').textContent = v + ' mm'; } } } else sculptRing(null);
+    { const vw = $('viewer'); if (vw) vw.classList.toggle('v2-cur-sculpt', t === 'sculpt' && editActive()); }
+    { const card = $('v2EditCard'); card?.querySelectorAll('.v2-icon-btn').forEach(b => { const sel = { tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode', smode: 'v2EdSculptMode' }[b.dataset.ed], on = $(sel)?.value === b.dataset.value; if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on)); }); }
     $('v2EdGo').textContent = sl ? 'SLICE OFF' : t === 'part' ? ($('v2EdMode').value === 'cut' ? 'CUT PART OUT' : editPart?.copied ? 'PASTE PART ON' : 'JOIN PART ON') : ($('v2EdMode').value === 'cut' ? 'CUT SHAPE OUT' : 'JOIN SHAPE ON');
     updateEditPreview(); updatePad();
   }
@@ -1074,7 +1183,7 @@
     const mc = $('v2EditCard')?.closest('.v2-main-card'); if (!mc) return;
     tab = tab === 'edit' ? 'edit' : 'finish'; mc.dataset.tab = tab;
     mc.querySelectorAll('.v2-main-tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-    if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { removeEditPreview(); clearLasso(); updatePad(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor'); }
+    if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { removeEditPreview(); clearLasso(); updatePad(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-sculpt'); sculptRing(null); }
   }
   window.__shrinkTab = setMainTab;
   async function editModelNow() {
@@ -1127,7 +1236,7 @@
     }
     const set = (id, v) => { const e = $(id); if (e) e.value = v; };
     ['v2EdW', 'v2EdH', 'v2EdD'].forEach(i => set(i, '10')); ['v2EdX', 'v2EdY', 'v2EdZ', 'v2EdTilt', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ'].forEach(i => set(i, '0'));
-    set('v2EdPos', '50'); set('v2EdAxis', 'y'); set('v2EdSide', 'high'); set('v2EdPartH', '30'); set('v2EdKind', 'cube'); set('v2EdMode', 'cut'); partRot = null; clearLasso();
+    set('v2EdPos', '50'); set('v2EdAxis', 'y'); set('v2EdSide', 'high'); set('v2EdPartH', '30'); set('v2EdKind', 'cube'); set('v2EdMode', 'cut'); partRot = null; clearLasso(); sculptWork = null; sculptData = null;
     $('v2EdPosOut').textContent = '50%'; $('v2EdTiltOut').textContent = '0°';
     { const t = $('v2EdTab'); t.value = 'none'; t.dispatchEvent(new Event('change', { bubbles: true })); }
     res.innerHTML = did ? '<strong>Reset</strong><span>Every edit is undone and the tools are back to normal.</span>' : '<strong>Nothing to reset</strong><span>No edits have been made yet.</span>';
@@ -1141,7 +1250,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
+  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -1955,8 +2064,8 @@
             <section id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
               <div class="v2-card-head"><div><h2>Edit model</h2><p>Lasso a part to delete or copy it, cut a piece off with the razor, add a shape, paste a part, or slice a piece off.</p></div></div>
               <div id="v2EdHint" class="v2-edit-hint" hidden></div>
-              <div class="v2-icon-row v2-icon-row-5" role="group" aria-label="Edit tool">${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
-              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
+              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
+              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
               <div id="v2EdTip" class="v2-edit-hint-plain">Click the tool again or press Esc to put it down.</div>
               <div id="v2EdModeRow"><div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
                 <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>
@@ -1971,6 +2080,13 @@
                 <label class="v2-edit-hint-plain" style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="v2EdWhole" autocomplete="off"><span>Grab the whole loose piece. For a part that is its own separate shell (a horn, a leaf, a floating bit): touch it with the loop and all of it turns red. Not for a branch that is fused into the body.</span></label>
                 <div class="v2-hollow-row"><label for="v2EdDepth">How deep</label><select id="v2EdDepth" autocomplete="off"><option value="front" selected>Front half only</option><option value="through">Right through</option></select></div>
                 <div class="v2-icon-row v2-icon-row-2"><button id="v2LassoDelBtn" type="button" class="v2-icon-btn v2-lasso-act" data-op="delete" disabled>${icon('cut')}<span>DELETE</span></button><button id="v2LassoKeepBtn" type="button" class="v2-icon-btn v2-lasso-act" data-op="copy" disabled>${icon('copy')}<span>COPY</span></button></div>
+              </div>
+              <div id="v2EdSculptBox" hidden>
+                <div class="v2-edit-hint-plain">Paint on the model like clay. SMOOTH blends the surface (lined faces, rough scans), PULL raises it, PUSH presses it in. Bigger tip = broader strokes. Ctrl / ⌘ + drag turns the model. It works on the model's own triangles, so keep plenty of them: sculpt before you SHRINK.</div>
+                <div class="v2-icon-row v2-icon-row-3" role="group" aria-label="Sculpt mode">${iconBtn('smode', 'smooth', 'Smooth', true)}${iconBtn('smode', 'pull', 'Pull out')}${iconBtn('smode', 'push', 'Push in')}</div>
+                <select id="v2EdSculptMode" autocomplete="off" hidden><option value="smooth" selected>Smooth</option><option value="pull">Pull out</option><option value="push">Push in</option></select>
+                <div class="v2-hollow-row"><label for="v2SculptSize">Tip size</label><input id="v2SculptSize" type="range" min="1" max="120" step="0.5" value="8" autocomplete="off"><output id="v2SculptSizeOut">8 mm</output></div>
+                <div class="v2-hollow-row"><label for="v2SculptStrength">Strength</label><input id="v2SculptStrength" type="range" min="1" max="10" step="1" value="5" autocomplete="off"><output id="v2SculptStrengthOut">5</output></div>
               </div>
               <div id="v2EdPartBox" hidden>
                 <label class="v2-part-file"><input type="file" id="v2EdPartFile" accept=".stl,.obj,.ply,.glb,.gltf"><span>CHOOSE A PART FILE</span></label>
@@ -2094,9 +2210,10 @@
     $('v2FuseBtn').addEventListener('click', fuseCheck);
     /* v2.307: EDIT MODEL wiring */
     { const ed = $('v2EditCard'); if (ed) {
-      ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed]); if (!sel) return; sel.value = (b.dataset.ed === 'tool' && b.getAttribute('aria-pressed') === 'true') ? 'none' : b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
+      ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode', smode: 'v2EdSculptMode' }[b.dataset.ed]); if (!sel) return; sel.value = (b.dataset.ed === 'tool' && b.getAttribute('aria-pressed') === 'true') ? 'none' : b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
       $('v2EdKind').addEventListener('change', editTabChanged);
       ['v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
+      $('v2SculptSize').addEventListener('input', () => { $('v2SculptSizeOut').textContent = $('v2SculptSize').value + ' mm'; }); $('v2SculptStrength').addEventListener('input', () => { $('v2SculptStrengthOut').textContent = $('v2SculptStrength').value; }); $('v2EdSculptMode').addEventListener('change', editTabChanged);
       $('v2EdDepth').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); }); $('v2EdWhole').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); });
       $('v2LassoDelBtn').addEventListener('click', () => lassoApply('delete')); $('v2LassoKeepBtn').addEventListener('click', e => lassoApply(e.currentTarget.dataset.op || 'copy'));
       $('v2EdPartTop').addEventListener('click', () => partPlace('top')); $('v2EdPartCentre').addEventListener('click', () => partPlace('centre'));
