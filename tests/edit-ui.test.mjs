@@ -269,4 +269,26 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(await waitFor(() => /Could not/.test(page.$('v2EdResult').textContent), 60000) && /DELETE still works/.test(page.$('v2EdResult').textContent), 'ED30 COPY on a model over the limit explains why');
   ok(!!page.$('v2EdToast') && page.$('v2EdToast').hidden === false && /Could not copy/.test(page.$('v2EdToast').textContent), 'ED30 the failure also shows in the viewer');
 }
+/* v2.319: grab the pasted part with the mouse (move / turn / size) and see it */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80); set(page, 'v2EdDepth', 'through');
+  const L = orthoCam(page, 0.6, 1.3), S = { cam: L.cam, pts: L.pts.map(([x, y]) => [x * 0.3, y]) };
+  w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
+  ok(await waitFor(() => /Copied|Could not/.test(page.$('v2EdResult').textContent), 60000) && w.__shrinkEdit.hasPart() && page.$('v2EdTab').value === 'part', 'ED31 COPY hands the piece to the paste tool');
+  const st0 = w.__shrinkEdit.partState(); ok(Math.abs(st0.x) > 1, `ED31 a copy starts beside its source, not hidden inside it (x ${st0.x.toFixed(1)} mm)`);
+  ok(w.__shrinkEdit.ghosts() === 2 && !!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview').getObjectByName('shrinkPartGhostSee'), 'ED31 the ghost is drawn twice: solid in front and see-through behind the model');
+  ok(!!page.$('v2PartPad') && page.$('v2PartPad').querySelectorAll('[data-pmode]').length === 3 && page.$('v2PartPad').querySelector('[data-pmode="move"]').getAttribute('aria-pressed') === 'true', 'ED31 the pad has MOVE / TURN / SIZE with MOVE on');
+  /* MOVE: dragging right by 0.2 of the screen half-width moves the part right by that much in the view plane */
+  const ex = L.cam.halfW * 0.2 * st0.h / st0.h; const mm = w.__shrinkPrint.mmPerUnit();
+  ok(w.__shrinkEdit.drag('move', [0, 0], [0.2, 0.1], false, L.cam), 'ED31 MOVE drag runs');
+  const st1 = w.__shrinkEdit.partState(); ok(Math.abs((st1.x - st0.x) - L.cam.halfW * 0.2 * mm) < 0.05 && Math.abs((st1.y - st0.y) - L.cam.halfH * 0.1 * mm) < 0.05 && Math.abs(st1.z - st0.z) < 0.01, `ED31 MOVE follows the mouse in the screen plane (dx ${(st1.x - st0.x).toFixed(2)} mm, dy ${(st1.y - st0.y).toFixed(2)} mm, dz ${(st1.z - st0.z).toFixed(2)})`);
+  w.__shrinkEdit.drag('move', [0, 0], [0, 0.1], true, L.cam); const st2 = w.__shrinkEdit.partState(); ok(Math.abs(st2.z - st1.z) > 0.5 && Math.abs(st2.x - st1.x) < 0.01, 'ED31 Shift+drag moves it nearer / farther');
+  w.__shrinkEdit.drag('turn', [0, 0], [0.25, 0], false, L.cam); const st3 = w.__shrinkEdit.partState(); ok(st3.rot && Math.abs(st3.rot[3]) < 0.95 && Math.abs(st3.rot[1]) > 0.2, 'ED31 TURN spins it about the screen-up axis');
+  w.__shrinkEdit.drag('size', [0, 0], [0, 0.2], false, L.cam); const st4 = w.__shrinkEdit.partState(); ok(st4.h > st3.h * 1.3, `ED31 SIZE: dragging up enlarges it (${st3.h} -> ${st4.h} mm)`);
+  w.__shrinkEdit.drag('size', [0, 0.2], [0, 0], false, L.cam); ok(Math.abs(w.__shrinkEdit.partState().h - st3.h) < 0.05, 'ED31 and dragging back down reduces it to the same size');
+  page.$('v2PartPad').querySelector('[data-pmode="turn"]').click(); ok(page.$('v2PartPad').querySelector('[data-pmode="turn"]').getAttribute('aria-pressed') === 'true' && page.$('v2PartPad').querySelector('[data-pmode="move"]').getAttribute('aria-pressed') === 'false', 'ED31 clicking TURN switches the mode');
+  const t0 = tris(w.__shrinkWorkingModel()); page.$('v2EdResult').textContent = ''; page.$('v2PadPlace').click();
+  ok(await waitFor(() => /Joined|Pasted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED31 PLACE IT still pastes the moved part: ' + page.$('v2EdResult').textContent.slice(0, 100));
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

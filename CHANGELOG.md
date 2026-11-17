@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.319
+- Pasting a part: the green ghost is now always visible (a see-through copy shows even where the part sits inside or behind the model, a solid one where it is in front). A COPY now starts beside its source instead of hidden inside it; CUT OFF & KEEP still starts in its own hole.
+- You can now grab the ghost with the mouse. The pad has **MOVE / TURN / SIZE**: MOVE drags it across the screen (hold Shift to push it nearer or farther), TURN spins it like a ball, SIZE enlarges (drag up) or reduces (drag down). The arrow buttons still work. Click and drag anywhere else to turn the model as usual.
+
 ## v2.318
 - Lasso: the "How deep" choice is now **Which part**, and the default is **Nearest part (auto)**. Only the part closest to you under the loop is taken (a hand held up in front of a body), found from a gap in the distances behind the loop. The other choices read **Everything under the loop** and **Half way through**. The red preview shows exactly that nearest layer. The razor still cuts right through.
 - DELETE now works on models over 1,000,000 triangles (up to 2,500,000) by removing the red triangles directly. That leaves an open hole, and the result message says to press FIX IT. COPY and CUT OFF still need under 1,000,000 and now say so.

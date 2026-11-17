@@ -744,7 +744,7 @@
   }
   // ---- v2.307 EDIT MODEL: basic shapes (join / cut) and a slice-off plane, both through Manifold (edit-core.js) ----
   let editStack = [], editBase = null;               // editBase = a copy of the model from before the FIRST edit, for RESET ALL EDITS                                   // clones of the working model before each edit, for UNDO
-  function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
+  function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { if (o.geometry !== editPart?.geometry) o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
   window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); partRot = null; islandCache = null; sculptWork = null; sculptData = null; } catch {} });
   function editFrame() {
     const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return null;
@@ -790,7 +790,7 @@
         $('v2EdPartX').value = ((part.origin.x - f.centre.x) * f.mm).toFixed(2); $('v2EdPartY').value = ((part.origin.y - f.centre.y) * f.mm).toFixed(2); $('v2EdPartZ').value = ((part.origin.z - f.centre.z) * f.mm).toFixed(2);
       } else { const h = Math.max(1, Math.round(f.size.y * f.mm * 0.3 * 10) / 10); $('v2EdPartH').value = String(h); ['X', 'Y', 'Z'].forEach(a => { $('v2EdPart' + a).value = '0'; }); }
     }
-    $('v2EdPartInfo').textContent = part ? (part.copied ? 'Copied piece ready. It starts where it came from: move it (the green ghost shows where it goes), turn it or change its height, then paste it.' : `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.`) : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
+    $('v2EdPartInfo').textContent = part ? (part.copied ? 'Copied piece ready (the green ghost). Drag it with the mouse: MOVE, TURN or SIZE on the pad, then PLACE IT.' : `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.`) : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
     updateEditPreview(); updateGoState();
   }
   function partMatrix(offsets = true) {
@@ -1097,9 +1097,10 @@
         for (let i = 0; i < pts.length; i += 3) bb.expandByPoint(v.set(pts[i], pts[i + 1], pts[i + 2]));
         const part = partFromPoints(pts, false, 'Copied piece'); part.copied = true; part.origin = bb.getCenter(new THREE0.Vector3());
         setPart(part);
+        if (op === 'copy') { const ax = camAxes(sel.cam), w = bb.getSize(new THREE0.Vector3()).length() * 0.75; ['X', 'Y', 'Z'].forEach((a, i) => { $('v2EdPart' + a).value = (num('v2EdPart' + a) + ax.right[i] * w * f.mm).toFixed(2); }); }   // v2.319: the model is still whole, so the copy starts beside it instead of hidden inside it
         { const md = $('v2EdMode'); md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); }
         set$tool('part');
-        msg = `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. Use the arrows on the model to move, size and tilt it, then press PLACE IT.</span>`;
+        msg = `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. Drag the green piece with the mouse (MOVE, TURN or SIZE on the pad, or the arrows), then press PLACE IT.</span>`;
       } else msg = r.mesh ? `<strong>✓ Deleted</strong><span>${r.tris.toLocaleString()} triangles removed. The model is too big to close the hole automatically, so it is open there. Press FIX IT (SHRINK & FINISH tab) to close it, or UNDO.</span>` : r.whole ? `<strong>✓ Deleted</strong><span>${r.islands} loose piece${r.islands === 1 ? '' : 's'} removed (${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml). Press UNDO if that is not what you wanted.</span>` : `<strong>✓ Deleted</strong><span>Now ${(r.volume * mm * mm * mm / 1000).toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. The hole is closed flat. Press UNDO if that is not what you wanted.</span>`;
       res.innerHTML = msg; card.dataset.state = 'good'; progress(card, 100, 'Done.');
       lassoSel = null; lassoPaint(null); removeLassoRed();
@@ -1110,7 +1111,7 @@
     } finally { lassoBusy = false; lassoBarState(); setWorking(false); }
   }
   // ---- v2.313: the arrow pad that pops up over the viewer while a part is waiting to be placed
-  function camAxes() { const e = cameraSnap()?.world; return e ? { right: [e[0], e[1], e[2]], up: [e[4], e[5], e[6]], fw: [-e[8], -e[9], -e[10]] } : { right: [1, 0, 0], up: [0, 1, 0], fw: [0, 0, -1] }; }
+  function camAxes(cam) { const e = (cam || cameraSnap())?.world; return e ? { right: [e[0], e[1], e[2]], up: [e[4], e[5], e[6]], fw: [-e[8], -e[9], -e[10]] } : { right: [1, 0, 0], up: [0, 1, 0], fw: [0, 0, -1] }; }
   function padAct(act) {
     const f = editFrame(); if (!f || !editPart) return; const THREE = f.THREE, lv = $('v2PadStep')?.value || 'm';
     const stepMm = Math.max(0.5, f.size.y * f.mm * 0.01) * { s: 1, m: 3, l: 10 }[lv], grow = { s: 1.03, m: 1.1, l: 1.3 }[lv], ang = { s: 5, m: 15, l: 45 }[lv] * Math.PI / 180, ax = camAxes();
@@ -1130,16 +1131,60 @@
     let pad = $('v2PartPad'); if (pad) return pad; const v = $('viewer'); if (!v) return null;
     pad = document.createElement('div'); pad.id = 'v2PartPad'; pad.className = 'v2-part-pad'; pad.hidden = true;
     const b = (a, t, tip) => `<button type="button" data-pad="${a}" title="${tip}" aria-label="${tip}">${t}</button>`;
-    pad.innerHTML = `<div class="v2-pad-title">Move the part</div>
+    pad.innerHTML = `<div class="v2-pad-title">Drag the green part</div>
+      <div class="v2-pad-modes"><button type="button" data-pmode="move" title="Drag the part about (hold Shift to push it nearer or farther)">✥ MOVE</button><button type="button" data-pmode="turn" title="Drag to turn the part">⟳ TURN</button><button type="button" data-pmode="size" title="Drag up to enlarge, down to reduce">⤢ SIZE</button></div>
       <div class="v2-pad-row"><div class="v2-pad-cross">${b('up', '▲', 'Move up')}<span></span>${b('left', '◀', 'Move left')}${b('down', '▼', 'Move down')}${b('right', '▶', 'Move right')}</div>
       <div class="v2-pad-col">${b('near', 'NEARER', 'Move towards you')}${b('far', 'FARTHER', 'Move away from you')}${b('bigger', 'BIGGER +', 'Enlarge')}${b('smaller', 'SMALLER −', 'Reduce')}</div></div>
       <div class="v2-pad-tilt"><span>Tilt</span>${b('tiltU', '⤒', 'Tilt top away')}${b('tiltD', '⤓', 'Tilt top towards you')}${b('tiltL', '↶', 'Tilt left')}${b('tiltR', '↷', 'Tilt right')}${b('spinL', '⟲', 'Spin anticlockwise')}${b('spinR', '⟳', 'Spin clockwise')}</div>
       <div class="v2-pad-foot"><select id="v2PadStep" aria-label="Step size"><option value="s">Fine steps</option><option value="m" selected>Medium steps</option><option value="l">Big steps</option></select><button type="button" id="v2PadPlace" class="v2-pad-go">PLACE IT</button><button type="button" id="v2PadCancel" class="v2-pad-no">CANCEL</button></div>`;
     pad.addEventListener('pointerdown', e => e.stopPropagation()); pad.addEventListener('wheel', e => e.stopPropagation());
-    pad.addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; if (bt.dataset.pad) padAct(bt.dataset.pad); else if (bt.id === 'v2PadPlace') editModelNow(); else if (bt.id === 'v2PadCancel') { setPart(null); set$tool('none'); $('v2EdResult').innerHTML = '<strong>Part put away</strong><span>Nothing was changed.</span>'; } });
+    pad.addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; if (bt.dataset.pmode) { padMode = bt.dataset.pmode; padModeState(); } else if (bt.dataset.pad) padAct(bt.dataset.pad); else if (bt.id === 'v2PadPlace') editModelNow(); else if (bt.id === 'v2PadCancel') { setPart(null); set$tool('none'); $('v2EdResult').innerHTML = '<strong>Part put away</strong><span>Nothing was changed.</span>'; } });
     v.appendChild(pad); return pad;
   }
-  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); }
+  // ---- v2.319: grab the ghost with the mouse. MOVE drags it in the screen plane (Shift = nearer / farther), TURN spins it like a ball, SIZE drags up / down.
+  let padMode = 'move', partDrag = null, hoverAt = 0;
+  function padModeState() { document.querySelectorAll('#v2PartPad [data-pmode]').forEach(b => { const on = String(b.dataset.pmode === padMode); if (b.getAttribute('aria-pressed') !== on) b.setAttribute('aria-pressed', on); }); const v = $('viewer'); if (v) { v.classList.toggle('v2-cur-move', padMode === 'move'); } }
+  function rayFor(cam, ndc) {
+    const e = cam.world, right = [e[0], e[1], e[2]], up = [e[4], e[5], e[6]], fw = [-e[8], -e[9], -e[10]], pos = [e[12], e[13], e[14]];
+    if (cam.persp) { const a = ndc[0] * cam.tanY * cam.aspect, b = ndc[1] * cam.tanY, d = [fw[0] + right[0] * a + up[0] * b, fw[1] + right[1] * a + up[1] * b, fw[2] + right[2] * a + up[2] * b], l = Math.hypot(...d) || 1; return { o: pos, d: d.map(v => v / l), fw }; }
+    const a = ndc[0] * cam.halfW, b = ndc[1] * cam.halfH; return { o: [pos[0] + right[0] * a + up[0] * b, pos[1] + right[1] * a + up[1] * b, pos[2] + right[2] * a + up[2] * b], d: fw, fw };
+  }
+  function partDragApply(mode, from, to, shift, camIn) {
+    const pm = partMatrix(); if (!pm || !editPart) return false; const { f, m } = pm, THREE = f.THREE, cam = camIn || cameraSnap(); if (!cam) return false;
+    if (mode === 'move') {
+      const c = [m.elements[12], m.elements[13], m.elements[14]], r0 = rayFor(cam, from), r1 = rayFor(cam, to); let delta;
+      if (shift) { const amt = (to[1] - from[1]) * f.size.length() * 0.8; delta = r0.fw.map(v => v * amt); }
+      else {
+        const hit = r => { const den = r.d[0] * r.fw[0] + r.d[1] * r.fw[1] + r.d[2] * r.fw[2]; if (Math.abs(den) < 1e-9) return null; const t = ((c[0] - r.o[0]) * r.fw[0] + (c[1] - r.o[1]) * r.fw[1] + (c[2] - r.o[2]) * r.fw[2]) / den; return [r.o[0] + r.d[0] * t, r.o[1] + r.d[1] * t, r.o[2] + r.d[2] * t]; };
+        const a = hit(r0), b = hit(r1); if (!a || !b) return false; delta = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      }
+      ['X', 'Y', 'Z'].forEach((ax, i) => { $('v2EdPart' + ax).value = (num('v2EdPart' + ax) + delta[i] * f.mm).toFixed(2); });
+    } else if (mode === 'turn') {
+      const ax = camAxes(cam), q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...ax.up).normalize(), -(to[0] - from[0]) * Math.PI);
+      q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...ax.right).normalize(), -(to[1] - from[1]) * Math.PI)); partRot = q.multiply(partRot || new THREE.Quaternion());
+    } else if (mode === 'size') {
+      $('v2EdPartH').value = Math.max(0.1, num('v2EdPartH', 30) * Math.exp((to[1] - from[1]) * 1.5)).toFixed(2);
+    } else return false;
+    updateEditPreview(); return true;
+  }
+  function ghostHit(ndc) {
+    const cam = cameraSnap(), g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), mesh = g?.getObjectByName('shrinkPartGhost'); if (!cam || !mesh) return false;
+    const THREE = app().THREE, r = rayFor(cam, ndc), rc = new THREE.Raycaster(); rc.ray.set(new THREE.Vector3(...r.o), new THREE.Vector3(...r.d)); rc.near = 0; rc.far = Infinity;
+    mesh.updateMatrixWorld(true); const hits = []; THREE.Mesh.prototype.raycast.call(mesh, rc, hits); return hits.length > 0;
+  }
+  function wirePartDrag() {
+    const v = $('viewer'); if (!v || v.dataset.partWired) return; v.dataset.partWired = '1';
+    const act = () => !!editPart && editActive() && $('v2EdTab')?.value === 'part';
+    const ndcOf = e => { const r = v.getBoundingClientRect(); return [((e.clientX - r.left) / (r.width || 1)) * 2 - 1, -(((e.clientY - r.top) / (r.height || 1)) * 2 - 1)]; };
+    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey) return; const n = ndcOf(e); if (!ghostHit(n)) return; e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap() }; v.classList.add('v2-cur-grabbing'); }, true);
+    v.addEventListener('pointermove', e => {
+      if (partDrag) { e.stopPropagation(); if ((e.buttons & 1) === 0) { partDragEnd(); return; } const n = ndcOf(e); partDragApply(padMode, partDrag.last, n, e.shiftKey, partDrag.cam); partDrag.last = n; return; }
+      const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const on = ghostHit(ndcOf(e)); v.classList.toggle('v2-cur-grab', on);
+    }, true);
+    const partDragEnd = () => { if (!partDrag) return; partDrag = null; v.classList.remove('v2-cur-grabbing'); };
+    v.addEventListener('pointerup', partDragEnd, true); v.addEventListener('pointercancel', partDragEnd, true); window.addEventListener('pointerup', partDragEnd, true); window.addEventListener('blur', partDragEnd);
+  }
+  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); if (show) { wirePartDrag(); padModeState(); } }
   function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
   function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
   function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT
@@ -1160,8 +1205,11 @@
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
     if (isPart) {
       const pm = partMatrix(); if (!pm) return;
-      const m = new THREE.Mesh(editPart.geometry, new THREE.MeshBasicMaterial({ color: $('v2EdMode').value === 'cut' ? 0xff9a2f : 0x35d6a0, transparent: true, opacity: 0.55, depthWrite: false }));
-      m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
+      const col = $('v2EdMode').value === 'cut' ? 0xff9a2f : 0x35d6a0;      // v2.319: one pass is seen through the model (so a part sitting inside or behind it is never hidden), one is solid where it is in front
+      [{ test: false, op: 0.4, ro: 998 }, { test: true, op: 0.85, ro: 999 }].forEach((c, i) => {
+        const m = new THREE.Mesh(editPart.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: c.op, depthWrite: false, depthTest: c.test, side: THREE.DoubleSide }));
+        m.name = i ? 'shrinkPartGhost' : 'shrinkPartGhostSee'; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
+      });
     } else if (sl) {
       const s = sliceSpec(); if (!s) return;
       const d = s.f.size.length() * 1.15, m = new THREE.Mesh(new THREE.PlaneGeometry(d, d), new THREE.MeshBasicMaterial({ color: 0x2f86ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
@@ -1278,7 +1326,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
+  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
