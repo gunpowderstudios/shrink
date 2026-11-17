@@ -41,3 +41,18 @@ export function applySolid(M, solid, other, mode) {
   if (r.isEmpty()) { try { r.delete?.(); } catch {} throw new Error('That would remove the whole model.'); }
   return r;
 }
+
+/** Copy (and optionally remove) the part of a solid inside a box. matrix places the unit cube. Returns { piece, rest } (rest is null unless remove). */
+export function copyRegion(M, solid, matrix, remove) {
+  const box = primitive(M, 'cube').transform(matrix);
+  try {
+    const piece = solid.intersect(box);
+    if (piece.isEmpty()) { try { piece.delete?.(); } catch {} throw new Error('Nothing is inside that box. Move it over the part you want, or make it bigger.'); }
+    let rest = null;
+    if (remove) {
+      rest = solid.subtract(box);
+      if (rest.isEmpty()) { try { rest.delete?.(); piece.delete?.(); } catch {} throw new Error('That would remove the whole model.'); }
+    }
+    return { piece, rest };
+  } finally { try { box.delete?.(); } catch {} }
+}

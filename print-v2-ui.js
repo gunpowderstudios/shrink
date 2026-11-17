@@ -58,6 +58,7 @@
     cone: '<path d="M12 3L5 18M12 3l7 15"/><ellipse cx="12" cy="18" rx="7" ry="3"/>',
     join: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/>',
     cut: '<circle cx="12" cy="12" r="9"/><path d="M7 12h10"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
     part: '<rect x="5" y="12" width="14" height="8" rx="1"/><rect x="8.5" y="3" width="7" height="9" rx="1"/>'
   };
   const icon = k => `<svg class="v2-ico" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
@@ -735,9 +736,9 @@
     { const r = $('v2HollowCutRange'); if (r && Number(r.value) !== Math.round(pct)) r.value = String(Math.round(pct)); const v = $('v2HollowSlideRange'); if (v && Number(v.value) !== Math.round(pct)) v.value = String(Math.round(pct)); const vo = $('v2HollowSlideOut'); if (vo) vo.textContent = pct >= 99.5 ? 'off' : Math.round(pct) + '%'; }
   }
   // ---- v2.307 EDIT MODEL: basic shapes (join / cut) and a slice-off plane, both through Manifold (edit-core.js) ----
-  let editStack = [];                                   // clones of the working model before each edit, for UNDO
+  let editStack = [], editBase = null;               // editBase = a copy of the model from before the FIRST edit, for RESET ALL EDITS                                   // clones of the working model before each edit, for UNDO
   function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
-  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; });
+  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; });
   function editFrame() {
     const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return null;
     const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return null;
@@ -775,8 +776,14 @@
   }
   function setPart(part) {
     editPart = part; const f = editFrame();
-    if (part && f) { const h = Math.max(1, Math.round(f.size.y * f.mm * 0.3 * 10) / 10); $('v2EdPartH').value = String(h); ['X', 'Y', 'Z'].forEach(a => { $('v2EdPart' + a).value = '0'; $('v2EdPartR' + a).value = '0'; }); }
-    $('v2EdPartInfo').textContent = part ? `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.` : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
+    if (part && f) {
+      ['X', 'Y', 'Z'].forEach(a => { $('v2EdPartR' + a).value = '0'; });
+      if (part.origin) {                                // a copied piece starts exactly where it came from, at its own size
+        $('v2EdPartH').value = String(Math.round(part.height * f.mm * 100) / 100);
+        $('v2EdPartX').value = ((part.origin.x - f.centre.x) * f.mm).toFixed(2); $('v2EdPartY').value = ((part.origin.y - f.centre.y) * f.mm).toFixed(2); $('v2EdPartZ').value = ((part.origin.z - f.centre.z) * f.mm).toFixed(2);
+      } else { const h = Math.max(1, Math.round(f.size.y * f.mm * 0.3 * 10) / 10); $('v2EdPartH').value = String(h); ['X', 'Y', 'Z'].forEach(a => { $('v2EdPart' + a).value = '0'; }); }
+    }
+    $('v2EdPartInfo').textContent = part ? (part.copied ? 'Copied piece ready. It starts where it came from: move it (the green ghost shows where it goes), turn it or change its height, then paste it.' : `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.`) : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
     updateEditPreview(); updateGoState();
   }
   function partMatrix(offsets = true) {
@@ -794,6 +801,57 @@
     const offY = where === 'top' ? (f.box.max.y - 1 / f.mm - b.min.y - f.centre.y) * f.mm : -bc.y * f.mm;
     $('v2EdPartX').value = offX.toFixed(1); $('v2EdPartZ').value = offZ.toFixed(1); $('v2EdPartY').value = offY.toFixed(1); updateEditPreview();
   }
+  // ---- v2.312: copy / cut a piece out of the model (a box region), then paste it with the Part tool
+  let copyInit = false;
+  window.addEventListener('shrink:model-opened', () => { copyInit = false; });
+  function copyDefaults() {
+    if (copyInit) return; const f = editFrame(); if (!f) return; copyInit = true;
+    ['W', 'H', 'D'].forEach((k, i) => { $('v2EdC' + k).value = String(Math.max(1, Math.round(f.size.getComponent(i) * f.mm * 0.5))); });
+    ['X', 'Y', 'Z'].forEach(k => { $('v2EdC' + k).value = '0'; });
+  }
+  function copySpec() {
+    const f = editFrame(); if (!f) return null;
+    const sx = Math.max(0.1, num('v2EdCW', 20)) / f.mm, sy = Math.max(0.1, num('v2EdCH', 20)) / f.mm, sz = Math.max(0.1, num('v2EdCD', 20)) / f.mm;
+    return { f, matrix: [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, f.centre.x + num('v2EdCX') / f.mm, f.centre.y + num('v2EdCY') / f.mm, f.centre.z + num('v2EdCZ') / f.mm, 1] };
+  }
+  function rootToPoints(root) {
+    const out = []; root.updateMatrixWorld(true); const v = new (app().THREE.Vector3)();
+    root.traverse(o => { if (!o.isMesh) return; const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count; for (let i = 0; i < n; i++) { v.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(o.matrixWorld); out.push(v.x, v.y, v.z); } });
+    return new Float32Array(out);
+  }
+  async function copyPieceNow(remove) {
+    const card = $('v2EditCard'), res = $('v2EdResult'), b1 = $('v2EdCopyBtn'), b2 = $('v2EdCutBtn');
+    if (!b1 || b1.disabled) return;
+    b1.disabled = b2.disabled = true; setWorking(true, 0, remove ? 'Cutting…' : 'Copying…');
+    try {
+      progress(card, 10, 'Loading the solid tools…');
+      for (let i = 0; i < 50 && !window.__shrinkFuse?.editModel; i++) await wait(100);
+      if (!window.__shrinkFuse?.editModel) throw new Error('The solid tools are still loading. Try again in a moment.');
+      const model = sourceModel(); if (!model) throw new Error('Load a model first.');
+      if (hollowResult && model === hollowResult) throw new Error('This model is already hollow. Edit the solid model before you hollow it.');
+      const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
+      if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Press SHRINK first.`);
+      const THREE0 = app()?.THREE; let snap = null;
+      if (remove && THREE0) { model.updateWorldMatrix(true, true); snap = model.clone(true); snap.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); snap.matrix.copy(model.matrixWorld); snap.matrix.decompose(snap.position, snap.quaternion, snap.scale); snap.updateMatrixWorld(true); }
+      const spec = copySpec(); progress(card, 40, 'Working…'); await paintNow();
+      const r = await window.__shrinkFuse.editModel(model, { copy: { matrix: spec.matrix, remove } });
+      progress(card, 85, 'Checking the result…');
+      const part = partFromPoints(rootToPoints(r.piece), false, 'Copied piece'); part.copied = true;
+      // the piece's own world centre, so it can be pasted back exactly where it came from
+      { const pts = rootToPoints(r.piece), bb = new THREE0.Box3(); const v = new THREE0.Vector3(); for (let i = 0; i < pts.length; i += 3) bb.expandByPoint(v.set(pts[i], pts[i + 1], pts[i + 2])); part.origin = bb.getCenter(new THREE0.Vector3()); }
+      if (r.root) { if (snap) { if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift(); } removeEditPreview(); installWorkingResult(r.root, 'edit'); $('v2EdUndo').hidden = !editStack.length; setTimeout(updateHealthCard, 80); }
+      setPart(part);
+      { const md = $('v2EdMode'); md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); }
+      set$tool('part');
+      const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1;
+      res.innerHTML = `<strong>✓ ${remove ? 'Cut out' : 'Copied'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. Move it where you want it and press PASTE PART ON.</span>`;
+      card.dataset.state = 'good'; progress(card, 100, 'Done.');
+    } catch (err) {
+      card.dataset.state = 'warn'; progress(card, 100, 'Could not copy that piece.');
+      res.innerHTML = `<strong>Could not ${remove ? 'cut' : 'copy'}</strong><span>${err?.message || err}${/watertight|manifold|reject/i.test(String(err?.message || err)) ? ' Run FIX IT or FUSE IT first.' : ''}</span>`;
+    } finally { b1.disabled = b2.disabled = false; setWorking(false); }
+  }
+  function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
   function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
   function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT
     const f = editFrame(); if (!f) return null;
@@ -807,11 +865,16 @@
   }
   function updateEditPreview() {
     removeEditPreview();
-    const V = window.__shrinkViewer; if (!editActive() || !V?.scene || $('v2EdTab')?.value === 'brush') return;
-    const sl = $('v2EdTab')?.value === 'slice', isPart = $('v2EdTab')?.value === 'part';
+    const V = window.__shrinkViewer; if (!editActive() || !V?.scene || ['brush', 'none'].includes($('v2EdTab')?.value)) return;
+    const sl = $('v2EdTab')?.value === 'slice', isPart = $('v2EdTab')?.value === 'part', isCopy = $('v2EdTab')?.value === 'copy';
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
-    if (isPart) {
+    if (isCopy) {
+      const s = copySpec(); if (!s) return;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x2f86ff, transparent: true, opacity: 0.28, depthWrite: false }));
+      m.matrixAutoUpdate = false; m.matrix.fromArray(s.matrix); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0x9cc4ff })); e.matrixAutoUpdate = false; e.matrix.fromArray(s.matrix); e.raycast = () => {}; g.add(e);
+    } else if (isPart) {
       const pm = partMatrix(); if (!pm) return;
       const m = new THREE.Mesh(editPart.geometry, new THREE.MeshBasicMaterial({ color: $('v2EdMode').value === 'cut' ? 0xff9a2f : 0x35d6a0, transparent: true, opacity: 0.55, depthWrite: false }));
       m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
@@ -830,11 +893,11 @@
   const editActive = () => $('v2EditCard')?.closest('.v2-main-card')?.dataset.tab === 'edit';
   function editTabChanged() {
     const t = $('v2EdTab').value, sl = t === 'slice';
-    $('v2EdShapeBox').hidden = t !== 'shape'; $('v2EdSliceBox').hidden = !sl; $('v2EdPartBox').hidden = t !== 'part'; $('v2EdModeRow').hidden = !(t === 'shape' || t === 'part'); $('v2EdRun').hidden = t === 'brush'; updateGoState();
+    $('v2EdShapeBox').hidden = t !== 'shape'; $('v2EdSliceBox').hidden = !sl; $('v2EdPartBox').hidden = t !== 'part'; $('v2EdCopyBox').hidden = t !== 'copy'; $('v2EdGo').hidden = t === 'copy'; $('v2EdModeRow').hidden = !(t === 'shape' || t === 'part'); if (t === 'copy') copyDefaults(); $('v2EdRun').hidden = t === 'brush' || t === 'none'; { const tip = $('v2EdTip'); if (tip) tip.textContent = t === 'none' ? 'No tool selected. Pick one above.' : 'Click the tool again or press Esc to put it down.'; } updateGoState();
     const cc = $('v2ClayCard'); if (cc) cc.hidden = t !== 'brush';
     if (t !== 'brush') { try { window.__shrinkClay?.setTool?.(false); } catch {} }
     { const card = $('v2EditCard'); card?.querySelectorAll('.v2-icon-btn').forEach(b => { const sel = { tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed], on = $(sel)?.value === b.dataset.value; if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on)); }); }
-    $('v2EdGo').textContent = sl ? 'SLICE OFF' : t === 'part' ? ($('v2EdMode').value === 'cut' ? 'CUT PART OUT' : 'JOIN PART ON') : ($('v2EdMode').value === 'cut' ? 'CUT SHAPE OUT' : 'JOIN SHAPE ON');
+    $('v2EdGo').textContent = sl ? 'SLICE OFF' : t === 'part' ? ($('v2EdMode').value === 'cut' ? 'CUT PART OUT' : editPart?.copied ? 'PASTE PART ON' : 'JOIN PART ON') : ($('v2EdMode').value === 'cut' ? 'CUT SHAPE OUT' : 'JOIN SHAPE ON');
     updateEditPreview();
   }
   // v2.308: the two tabs in the side column. EDIT (optional, do it first) and SHRINK & FINISH (shrink, fix, fuse, hollow); one working model, one viewer, one undo chain.
@@ -877,7 +940,7 @@
       progress(card, 40, 'Working…'); await paintNow();
       const r = await window.__shrinkFuse.editModel(model, ops);
       progress(card, 85, 'Checking the result…');
-      if (snap) { editStack.push(snap); if (editStack.length > 6) editStack.shift(); }
+      if (snap) { if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift(); }
       removeEditPreview(); installWorkingResult(r.root, 'edit');
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
       if (isPart) { editPart = null; $('v2EdPartInfo').textContent = 'Done. Choose another part file if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
@@ -890,6 +953,28 @@
       res.innerHTML = `<strong>Could not edit</strong><span>${err?.message || err}${/watertight|manifold|reject/i.test(String(err?.message || err)) ? ' Run FIX IT or FUSE IT first.' : ''}</span>`;
     } finally { btn.disabled = false; setWorking(false); }
   }
+  function cloneRoot(model) {
+    const THREE0 = app()?.THREE; if (!THREE0 || !model) return null; model.updateWorldMatrix(true, true);
+    const c = model.clone(true); c.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); c.matrix.copy(model.matrixWorld); c.matrix.decompose(c.position, c.quaternion, c.scale); c.updateMatrixWorld(true); return c;
+  }
+  // v2.312: RESET ALL EDITS: back to the model as it was before the first edit; brush strokes, the loaded part and the tool settings are cleared too
+  function resetEdits() {
+    const res = $('v2EdResult'); let did = false;
+    try { if (window.__shrinkClay?.hasClay?.()) { window.__shrinkClay.clear(); did = true; } } catch {}
+    if (editPart) { editPart = null; did = true; try { $('v2EdPartFile').value = ''; } catch {} $('v2EdPartInfo').textContent = 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.'; }
+    if (editBase) {
+      const base = editBase; editBase = null; editStack = []; removeEditPreview();
+      const fresh = cloneRoot(base) || base; installWorkingResult(fresh, 'edit');
+      appliedChanges.delete('edited'); renderAppliedChanges(); $('v2EdUndo').hidden = true; did = true; setTimeout(updateHealthCard, 80);
+    }
+    const set = (id, v) => { const e = $(id); if (e) e.value = v; };
+    ['v2EdW', 'v2EdH', 'v2EdD'].forEach(i => set(i, '10')); ['v2EdX', 'v2EdY', 'v2EdZ', 'v2EdTilt', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ'].forEach(i => set(i, '0'));
+    set('v2EdPos', '50'); set('v2EdAxis', 'y'); set('v2EdSide', 'high'); set('v2EdPartH', '30'); set('v2EdKind', 'cube'); set('v2EdMode', 'cut'); copyInit = false;
+    $('v2EdPosOut').textContent = '50%'; $('v2EdTiltOut').textContent = '0°';
+    { const t = $('v2EdTab'); t.value = 'none'; t.dispatchEvent(new Event('change', { bubbles: true })); }
+    res.innerHTML = did ? '<strong>Reset</strong><span>Every edit is undone and the tools are back to normal.</span>' : '<strong>Nothing to reset</strong><span>No edits have been made yet.</span>';
+    updateEditPreview(); updateGoState();
+  }
   function undoEdit() {
     const snap = editStack.pop(); if (!snap) return;
     removeEditPreview(); installWorkingResult(snap, 'edit');
@@ -898,7 +983,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
+  window.__shrinkEdit = { reset: resetEdits, copy: copyPieceNow, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -1712,8 +1797,9 @@
             <section id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
               <div class="v2-card-head"><div><h2>Edit model</h2><p>Paint on or carve off material, add a cube or ball, or slice a piece off (shorten a sword, drill a hole).</p></div></div>
               <div id="v2EdHint" class="v2-edit-hint" hidden></div>
-              <div class="v2-icon-row v2-icon-row-4" role="group" aria-label="Edit tool">${iconBtn('tool', 'brush', 'Brush')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
-              <select id="v2EdTab" autocomplete="off" hidden><option value="brush">Brush</option><option value="shape" selected>Shape</option><option value="part">Part</option><option value="slice">Slice off</option></select>
+              <div class="v2-icon-row v2-icon-row-5" role="group" aria-label="Edit tool">${iconBtn('tool', 'brush', 'Brush')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'copy', 'Copy / cut')}${iconBtn('tool', 'part', 'Paste part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
+              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="brush">Brush</option><option value="shape" selected>Shape</option><option value="copy">Copy / cut</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
+              <div id="v2EdTip" class="v2-edit-hint-plain">Click the tool again or press Esc to put it down.</div>
               <div id="v2EdModeRow"><div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
                 <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>
               <div id="v2EdShapeBox">
@@ -1722,8 +1808,15 @@
                 <div class="v2-edit-grid"><span>Size mm</span><input id="v2EdW" type="number" min="0.1" step="1" value="10" title="Width"><input id="v2EdH" type="number" min="0.1" step="1" value="10" title="Height"><input id="v2EdD" type="number" min="0.1" step="1" value="10" title="Depth"></div>
                 <div class="v2-edit-grid"><span>Move mm</span><input id="v2EdX" type="number" step="1" value="0" title="Left / right"><input id="v2EdY" type="number" step="1" value="0" title="Up / down"><input id="v2EdZ" type="number" step="1" value="0" title="Front / back"></div>
               </div>
+              <div id="v2EdCopyBox" hidden>
+                <div class="v2-edit-hint-plain">Put the blue box around the piece you want (an arm, a head, a horn). COPY keeps the model as it is; CUT OUT takes the piece out of it. The piece is then ready to PASTE: move it, turn it or resize it, and press the button.</div>
+                <div class="v2-edit-grid"><span>Box mm</span><input id="v2EdCW" type="number" min="0.1" step="1" value="20" title="Width"><input id="v2EdCH" type="number" min="0.1" step="1" value="20" title="Height"><input id="v2EdCD" type="number" min="0.1" step="1" value="20" title="Depth"></div>
+                <div class="v2-edit-grid"><span>Move mm</span><input id="v2EdCX" type="number" step="1" value="0" title="Left / right"><input id="v2EdCY" type="number" step="1" value="0" title="Up / down"><input id="v2EdCZ" type="number" step="1" value="0" title="Front / back"></div>
+                <div class="v2-icon-row v2-icon-row-2"><button id="v2EdCopyBtn" type="button" class="v2-icon-btn">${icon('copy')}<span>COPY</span></button><button id="v2EdCutBtn" type="button" class="v2-icon-btn">${icon('cut')}<span>CUT OUT</span></button></div>
+              </div>
               <div id="v2EdPartBox" hidden>
                 <label class="v2-part-file"><input type="file" id="v2EdPartFile" accept=".stl,.obj,.ply,.glb,.gltf"><span>CHOOSE A PART FILE</span></label>
+                <div class="v2-edit-hint-plain" id="v2EdPartOr">or use Copy / cut to take a piece from this model.</div>
                 <div id="v2EdPartInfo" class="v2-edit-hint-plain">STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.</div>
                 <div class="v2-edit-grid"><span>Height mm</span><input id="v2EdPartH" type="number" min="0.1" step="1" value="30" title="Part height"><button id="v2EdPartTop" type="button" class="v2-edit-small" title="Put the part on top of the model, centred, sunk in by 1 mm so it joins">SIT ON TOP</button><button id="v2EdPartCentre" type="button" class="v2-edit-small" title="Put the part in the middle of the model">CENTRE</button></div>
                 <div class="v2-edit-grid"><span>Turn °</span><input id="v2EdPartRX" type="number" step="15" value="0" title="Turn about left/right"><input id="v2EdPartRY" type="number" step="15" value="0" title="Turn about up/down"><input id="v2EdPartRZ" type="number" step="15" value="0" title="Turn about front/back"></div>
@@ -1735,9 +1828,9 @@
                 <div class="v2-hollow-row"><label for="v2EdTilt">Tilt</label><input id="v2EdTilt" type="range" min="-60" max="60" step="1" value="0" autocomplete="off"><output id="v2EdTiltOut">0°</output></div>
                 <div class="v2-hollow-row"><label for="v2EdSide">Remove</label><select id="v2EdSide" autocomplete="off"><option value="high" selected>the top / far side</option><option value="low">the bottom / near side</option></select></div>
               </div>
+              <div class="v2-edit-actions"><button id="v2EdUndo" class="v2-edit-undo" type="button" hidden>UNDO LAST EDIT</button><button id="v2EdReset" class="v2-edit-undo v2-edit-reset" type="button" title="Undo every edit, clear any brush strokes and the loaded part, and put the tools back to normal">RESET ALL EDITS</button></div>
               <div id="v2EdRun">
                 <button id="v2EdGo" class="v2-mega v2-teal" type="button">CUT SHAPE OUT</button>
-                <button id="v2EdUndo" class="v2-edit-undo" type="button" hidden>UNDO LAST EDIT</button>
                 <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
                 <div id="v2EdResult" class="v2-result">The preview (pink = join, orange = cut, blue plane = slice) shows where it will go. Needs one watertight model: run FIX IT or FUSE IT first if it says no.</div>
               </div>
@@ -1843,14 +1936,18 @@
     $('v2FuseBtn').addEventListener('click', fuseCheck);
     /* v2.307: EDIT MODEL wiring */
     { const ed = $('v2EditCard'); if (ed) {
-      ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed]); if (!sel) return; sel.value = b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
+      ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed]); if (!sel) return; sel.value = (b.dataset.ed === 'tool' && b.getAttribute('aria-pressed') === 'true') ? 'none' : b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
       $('v2EdKind').addEventListener('change', editTabChanged);
       ['v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
+      ['v2EdCW', 'v2EdCH', 'v2EdCD', 'v2EdCX', 'v2EdCY', 'v2EdCZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
+      $('v2EdCopyBtn').addEventListener('click', () => copyPieceNow(false)); $('v2EdCutBtn').addEventListener('click', () => copyPieceNow(true));
       $('v2EdPartTop').addEventListener('click', () => partPlace('top')); $('v2EdPartCentre').addEventListener('click', () => partPlace('centre'));
       $('v2EdPartFile').addEventListener('change', async e => { const file = e.target.files?.[0]; if (!file) return; $('v2EdPartInfo').textContent = 'Reading ' + file.name + '…'; try { setPart(await loadPartFile(file)); } catch (err) { editPart = null; $('v2EdPartInfo').textContent = 'Could not read that file: ' + (err?.message || err); updateEditPreview(); updateGoState(); } });
       $('v2EdTab').addEventListener('change', editTabChanged);
       $('v2EdMode').addEventListener('change', editTabChanged);
       ['v2EdKind', 'v2EdW', 'v2EdH', 'v2EdD', 'v2EdX', 'v2EdY', 'v2EdZ', 'v2EdAxis', 'v2EdSide', 'v2EdPos', 'v2EdTilt'].forEach(id => { $(id).addEventListener('input', () => { $('v2EdPosOut').textContent = $('v2EdPos').value + '%'; $('v2EdTiltOut').textContent = $('v2EdTilt').value + '°'; updateEditPreview(); }); $(id).addEventListener('change', updateEditPreview); });
+      window.addEventListener('keydown', e => { if (e.key === 'Escape' && editActive() && $('v2EdTab').value !== 'none') { $('v2EdTab').value = 'none'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); } });
+      $('v2EdReset').addEventListener('click', resetEdits);
       $('v2EdGo').addEventListener('click', editModelNow); $('v2EdUndo').addEventListener('click', undoEdit); editTabChanged(); } }
     $('v2HollowBtn')?.addEventListener('click', hollowModelNow);
     $('v2HollowWall')?.addEventListener('input', () => { $('v2HollowWallOut').textContent = $('v2HollowWall').value + ' mm'; });

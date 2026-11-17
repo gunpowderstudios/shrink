@@ -394,7 +394,15 @@ async function editModel(model, ops) {
   const { solid, components } = await modelToSolid(model);
   try {
     const q = (() => { try { return new URL(import.meta.url).search; } catch { return ''; } })();
-    const { applyShapes, sliceSolid, applySolid } = await import('./edit-core.js' + q);
+    const { applyShapes, sliceSolid, applySolid, copyRegion } = await import('./edit-core.js' + q);
+    if (ops.copy) {                                        // v2.312: copy / cut the part inside a box
+      const c = copyRegion(wasm.Manifold, solid, ops.copy.matrix, !!ops.copy.remove);
+      try {
+        const out = { piece: solidToThree(c.piece), pieceVolume: c.piece.volume(), components };
+        if (c.rest) { out.root = solidToThree(c.rest); out.volume = c.rest.volume(); out.pieces = c.rest.decompose().length; }
+        return out;
+      } finally { try { c.piece.delete?.(); c.rest?.delete?.(); } catch {} }
+    }
     let r;
     if (ops.part) {                                        // an uploaded part: already placed in world space on ops.part.root
       let part = null;

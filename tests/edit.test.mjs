@@ -1,6 +1,6 @@
 // edit-core.js against the real Manifold library: shapes join/cut and plane slicing (shorten a "sword").
 import Module from 'manifold-3d';
-import { applyShapes, sliceSolid, applySolid } from '../edit-core.js';
+import { applyShapes, sliceSolid, applySolid, copyRegion } from '../edit-core.js';
 const wasm = await Module(); wasm.setup(); const M = wasm.Manifold;
 let bad = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) bad++; };
 const T = (x, y, z, sx = 1, sy = 1, sz = 1) => [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, x, y, z, 1];   // column-major translate + scale
@@ -34,5 +34,15 @@ ok(/whole model/.test(msg), 'E9 a cut that removes everything says so: ' + msg);
   const holed = applySolid(M, body, M.cylinder(50, 3, 3, 24, true).rotate([90, 0, 0]), 'cut');
   ok(holed.genus() === 1, 'E11 a part cut out drills a hole through the body (genus 1)');
   void head;
+}
+
+/* copy / cut a region */
+{ const body = M.cube([20, 40, 20], true), cm = T(0, 15, 0, 30, 10, 30);          // box around the top 10 units (y 10..20)
+  const c1 = copyRegion(M, body, cm, false); const pb = c1.piece.boundingBox();
+  ok(c1.rest === null && Math.abs(c1.piece.volume() - 20 * 10 * 20) < 1 && Math.abs(pb.min[1] - 10) < 1e-6, `E12 COPY takes the piece in the box (volume ${c1.piece.volume().toFixed(0)}) and leaves the model alone`);
+  const c2 = copyRegion(M, body, cm, true);
+  ok(Math.abs(c2.rest.volume() - (body.volume() - 4000)) < 1 && c2.rest.decompose().length === 1, 'E12 CUT also removes it from the model');
+  let msg = ''; try { copyRegion(M, body, T(0, 100, 0, 5, 5, 5), false); } catch (e) { msg = e.message; }
+  ok(/Nothing is inside/.test(msg), 'E12 an empty box is refused: ' + msg);
 }
 console.log(bad ? `${bad} FAILED` : 'edit tests passed'); process.exit(bad ? 1 : 0);

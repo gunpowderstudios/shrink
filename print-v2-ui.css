@@ -842,3 +842,12 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 #v2EdGo[data-need-part="true"]{opacity:.5}
 #v2EdPartBox[hidden],#v2EdModeRow[hidden]{display:none!important}
 .v2-icon-row-4 .v2-icon-btn span{font-size:10px}
+
+/* v2.312 copy / cut */
+.v2-icon-row-5{grid-template-columns:repeat(5,1fr)}.v2-icon-row-5 .v2-icon-btn{padding:8px 2px}.v2-icon-row-5 .v2-icon-btn span{font-size:9.5px}
+#v2EdCopyBox[hidden]{display:none!important}
+
+/* v2.312 undo / reset row */
+.v2-edit-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}.v2-edit-actions .v2-edit-undo{margin:0}.v2-edit-actions .v2-edit-undo[hidden]{display:none!important}
+.v2-edit-actions:has(#v2EdUndo[hidden]){grid-template-columns:1fr}
+.v2-edit-reset{border-color:#8a5a2a!important;color:#ffcf9a!important}

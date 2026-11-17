@@ -106,4 +106,55 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(Math.abs(h1 - want) < 1.2 && /in 1 piece/.test(page.$('v2EdResult').textContent), `ED18 it sits on top as one piece (height ${h0.toFixed(1)} -> ${h1.toFixed(1)}, expected about ${want.toFixed(1)})`);
   ok(!w.__shrinkEdit.hasPart() && w.__shrinkEdit.depth() === 2, 'ED18 the part is used up and the edit can be undone');
 }
+
+/* Copy / cut then paste: duplicate the top of the model, then cut it out and put it back elsewhere */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  page.$('v2TabEdit').click(); await wait(50);
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="copy"]').click(); await wait(80);
+  ok(page.$('v2EdCopyBox').hidden === false && page.$('v2EdGo').hidden === true && page.$('v2EdModeRow').hidden === true, 'ED19 the Copy / cut tool shows the blue box controls');
+  ok(Number(page.$('v2EdCH').value) > 0, 'ED19 the box starts at half the model: ' + page.$('v2EdCW').value + ' x ' + page.$('v2EdCH').value + ' x ' + page.$('v2EdCD').value);
+  set(page, 'v2EdCY', 10); set(page, 'v2EdCH', 20); set(page, 'v2EdCW', 80); set(page, 'v2EdCD', 80);          // the top half of a 40 mm model
+  const m0 = w.__shrinkWorkingModel(), h0 = height(page);
+  page.$('v2EdResult').textContent = ''; page.$('v2EdCopyBtn').click();
+  ok(await waitFor(() => /Copied|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Copied/.test(page.$('v2EdResult').textContent), 'ED20 COPY works: ' + page.$('v2EdResult').textContent.slice(0, 110));
+  ok(w.__shrinkWorkingModel() === m0 && w.__shrinkEdit.depth() === 0, 'ED20 copying leaves the model alone');
+  ok(page.$('v2EdTab').value === 'part' && w.__shrinkEdit.hasPart() && /Copied piece ready/.test(page.$('v2EdPartInfo').textContent) && /PASTE PART ON/.test(page.$('v2EdGo').textContent), 'ED20 the copied piece is ready to paste');
+  page.$('v2EdResult').textContent = ''; set(page, 'v2EdPartY', 25); await wait(30);       // move it up by 25 mm
+  page.$('v2EdGo').click();
+  ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED21 PASTE joins it: ' + page.$('v2EdResult').textContent.slice(0, 110));
+  ok(height(page) > h0 + 10, `ED21 the pasted copy made the model taller (${h0.toFixed(1)} -> ${height(page).toFixed(1)})`);
+  page.$('v2EdUndo').click(); await wait(200);
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="copy"]').click(); await wait(50);
+  page.$('v2EdResult').textContent = ''; page.$('v2EdCutBtn').click();
+  ok(await waitFor(() => /Cut out|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Cut out/.test(page.$('v2EdResult').textContent), 'ED22 CUT OUT works: ' + page.$('v2EdResult').textContent.slice(0, 110));
+  ok(height(page) < h0 * 0.7 && w.__shrinkEdit.depth() >= 1 && w.__shrinkEdit.hasPart(), `ED22 the piece is taken out of the model (${h0.toFixed(1)} -> ${height(page).toFixed(1)}) and held for pasting`);
+}
+
+/* put the tool down (click it again, or Esc) and RESET ALL EDITS */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  page.$('v2TabEdit').click(); await wait(50);
+  const tool = v => page.$('v2EditCard').querySelector(`.v2-icon-btn[data-ed="tool"][data-value="${v}"]`);
+  ok(page.$('v2EdTab').value === 'shape', 'ED23 starts on the Shape tool');
+  tool('shape').click(); await wait(50);
+  ok(page.$('v2EdTab').value === 'none' && tool('shape').getAttribute('aria-pressed') === 'false' && page.$('v2EdShapeBox').hidden === true && page.$('v2EdRun').hidden === true, 'ED23 clicking the pressed tool puts it down');
+  ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), 'ED23 and removes its preview');
+  tool('brush').click(); await wait(50); ok(page.$('v2EdTab').value === 'brush' && page.$('v2ClayCard').hidden === false, 'ED23 a tool can be picked again');
+  w.__shrinkClay.setTool(true, 'add'); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
+  ok(page.$('v2EdTab').value === 'none' && w.__shrinkClay.state.on === false && page.$('v2ClayCard').hidden === true, 'ED24 Esc puts the brush down and deselects it');
+  tool('shape').click(); await wait(50); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
+  ok(page.$('v2EdTab').value === 'none', 'ED24 Esc also puts down the Shape tool');
+  /* two edits, a brush stroke and a part, then reset */
+  const m0 = w.__shrinkWorkingModel(), h0 = height(page);
+  tool('slice').click(); set(page, 'v2EdPos', 50); set(page, 'v2EdSide', 'high'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click();
+  await waitFor(() => /Sliced|Could not/.test(page.$('v2EdResult').textContent), 60000);
+  tool('shape').click(); set(page, 'v2EdKind', 'ball'); set(page, 'v2EdMode', 'cut'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click();
+  await waitFor(() => /Cut|Could not/.test(page.$('v2EdResult').textContent), 60000);
+  w.__shrinkClay.addStroke('cut', [{ x: 0, y: 0, z: 0, r: 1 }]); w.__shrinkEdit.setPart(new Float32Array([0,0,0, 1,0,0, 0,1,0, 0,0,1, 1,0,0, 0,0,0]), false, 'x.stl');
+  ok(w.__shrinkEdit.depth() === 2 && height(page) < h0 * 0.6 && w.__shrinkClay.hasClay() && w.__shrinkEdit.hasPart(), 'ED25 set up: two edits, a stroke and a part');
+  page.$('v2EdReset').click(); await wait(300);
+  ok(Math.abs(height(page) - h0) < 0.01 && w.__shrinkEdit.depth() === 0 && !/EDITED/.test(page.$('v2HealthChanges').textContent), `ED25 RESET brings the model back (height ${h0.toFixed(1)} -> ${height(page).toFixed(1)}) and clears the EDITED chip`);
+  ok(!w.__shrinkClay.hasClay() && !w.__shrinkEdit.hasPart() && page.$('v2EdUndo').hidden === true && page.$('v2EdTab').value === 'none' && /Reset/.test(page.$('v2EdResult').textContent), 'ED25 and the brush strokes, the part and the tool are cleared');
+  page.$('v2EdReset').click(); await wait(100); ok(/Nothing to reset/.test(page.$('v2EdResult').textContent), 'ED25 resetting again says there is nothing to reset');
+  void m0;
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.312
+- EDIT tab: new **Copy / cut** tool. Put the blue box around a piece (an arm, a head, a horn), then **COPY** (the model stays as it is) or **CUT OUT** (the piece is taken out of the model). The piece goes straight into the Paste part tool, starting exactly where it came from, set to Join; move it, turn it or change its height and press **PASTE PART ON**. The Part tool is now called **Paste part** and also takes files, as before.
+- A tool can be put down: click the pressed tool again, or press Esc (also puts the Brush down). With no tool selected nothing is previewed.
+- **RESET ALL EDITS** (next to UNDO LAST EDIT): back to the model as it was before the first edit; also clears brush strokes, the loaded part and the tool settings.
+
 ## v2.311
 - EDIT tab: new **Part** tool. Choose an STL, OBJ, PLY or GLB file (a closed solid, e.g. a new head), set its height in mm, turn and move it (a green ghost previews it), then **JOIN PART ON** or **CUT PART OUT**. **SIT ON TOP** drops it onto the top of the model, centred and sunk 1 mm so it fuses; **CENTRE** puts it in the middle. To replace a head: slice the old head off, then add the new one. Undoable like the other edits.
 
