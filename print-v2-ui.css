@@ -822,3 +822,13 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-dim{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(4,10,18,.66);color:#eaf4ff;font-size:clamp(28px,4vw,56px);font-weight:900;letter-spacing:.02em;text-shadow:0 0 24px rgba(70,160,255,.6);cursor:progress;animation:v2dimpulse 1.8s ease-in-out infinite}
 .v2-dim[hidden]{display:none!important}
 @keyframes v2dimpulse{0%,100%{opacity:.88}50%{opacity:1}}
+
+/* v2.310 icons in the EDIT tab + brush tip ring */
+.v2-icon-row{display:grid;gap:6px;margin:8px 0}.v2-icon-row-2{grid-template-columns:1fr 1fr}.v2-icon-row-3{grid-template-columns:repeat(3,1fr)}.v2-icon-row-4{grid-template-columns:repeat(4,1fr)}
+.v2-icon-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px;border:1px solid #3a4b61;border-radius:12px;background:#142033;color:#b8c7d8;font:inherit;font-size:11px;font-weight:700;cursor:pointer;line-height:1.15;text-align:center}
+.v2-icon-btn:hover{border-color:#5d86b8;color:#fff}.v2-icon-btn[aria-pressed="true"]{background:#1d6bd8;border-color:#2f86ff;color:#fff}
+.v2-clay-tools button{display:flex;align-items:center;justify-content:center;gap:8px}
+.v2-brush-ring{position:fixed;z-index:500;pointer-events:none;transform:translate(-50%,-50%);border-radius:50%;border:2px solid #ff4fb8;background:rgba(255,79,184,.12);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.v2-brush-ring[data-mode="cut"]{border-color:#ff5a1f;background:rgba(255,90,31,.12)}
+.v2-brush-ring span{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);white-space:nowrap;font-size:11px;font-weight:800;padding:1px 6px;border-radius:8px;background:rgba(6,12,20,.85);color:#fff}
+.v2-brush-ring[hidden]{display:none!important}

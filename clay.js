@@ -10,7 +10,7 @@ const $ = id => document.getElementById(id);
 const V = () => window.__shrinkViewer;
 const model = () => window.__shrinkWorkingModel?.() || null;
 const mmPerUnit = () => window.__shrinkPrint?.mmPerUnit?.() || 1;
-const st = { on: false, mode: 'add', mm: 3, strokes: [], down: false, last: null, group: null, inst: {}, count: { add: 0, cut: 0 }, busy: false };
+const st = { on: false, mode: 'add', mm: 6, strokes: [], down: false, last: null, group: null, inst: {}, count: { add: 0, cut: 0 }, busy: false };
 const CAP = 40000;
 const raycaster = new THREE.Raycaster();
 
@@ -48,7 +48,7 @@ function pick(clientX, clientY) {
   const h = raycaster.intersectObject(root, true).find(x => x.object.isMesh && x.object.visible);
   return h ? { x: h.point.x, y: h.point.y, z: h.point.z } : null;
 }
-const radius = () => Math.max(0.01, st.mm / mmPerUnit());
+const radius = () => Math.max(0.01, st.mm / 2 / mmPerUnit());      // st.mm is the tip WIDTH (diameter) in mm since v2.310
 function dabTo(x, y, stroke) {
   const p = pick(x, y); if (!p) { stroke.prev = null; return; }
   const r = stroke.r;
@@ -61,6 +61,34 @@ function strokeTo(e, stroke) {
   st.last = to; stroke.dabs = thin(stroke.dabs); drawPreview();
 }
 let cur = null;
+/* ----------------------------- brush tip ring (v2.310): a circle on the model the size of the brush tip ----------------------------- */
+function ensureRing() {
+  let r = $('v2BrushRing');
+  if (!r) { r = document.createElement('div'); r.id = 'v2BrushRing'; r.className = 'v2-brush-ring'; r.hidden = true; r.setAttribute('aria-hidden', 'true'); r.innerHTML = '<span></span>'; document.body.appendChild(r); }
+  return r;
+}
+function hideRing() { const r = $('v2BrushRing'); if (r) r.hidden = true; }
+function moveRing(e) {
+  st.lastPt = { clientX: e.clientX, clientY: e.clientY };
+  const ring = ensureRing();
+  if (!st.on) { ring.hidden = true; return; }
+  let px = 14;                                          // fallback radius in pixels when there is no camera (tests)
+  try {
+    const v = V(), root = model();
+    if (v?.camera && v?.renderer && root) {
+      const rect = v.renderer.domElement.getBoundingClientRect();
+      const p = pick(e.clientX, e.clientY), ref = p ? new THREE.Vector3(p.x, p.y, p.z) : new THREE.Box3().setFromObject(root, true).getCenter(new THREE.Vector3());
+      v.camera.updateMatrixWorld();
+      const right = new THREE.Vector3().setFromMatrixColumn(v.camera.matrixWorld, 0).normalize();
+      const a = ref.clone().project(v.camera), b = ref.clone().addScaledVector(right, radius()).project(v.camera), d = Math.abs(b.x - a.x) * rect.width / 2;
+      if (Number.isFinite(d) && d > 0) px = d;
+    }
+  } catch {}
+  const size = Math.max(8, Math.round(px * 2));
+  ring.style.width = ring.style.height = size + 'px'; ring.style.left = e.clientX + 'px'; ring.style.top = e.clientY + 'px'; ring.dataset.mode = st.mode;
+  ring.firstChild.textContent = `${st.mm.toFixed(1)} mm`;
+  ring.hidden = false;
+}
 const rotating = e => e.metaKey || e.ctrlKey;
 function wire() {
   const el = viewer(); if (!el || el.dataset.clayWired) return; el.dataset.clayWired = '1';
@@ -69,6 +97,8 @@ function wire() {
     e.stopPropagation(); e.preventDefault();
     cur = { mode: st.mode, r: radius(), dabs: [], prev: null }; st.strokes.push(cur); st.down = true; st.last = null; strokeTo(e, cur);
   }, true);
+  el.addEventListener('pointermove', e => { if (st.on) { if (rotating(e)) hideRing(); else moveRing(e); } });
+  el.addEventListener('pointerleave', hideRing);
   el.addEventListener('pointermove', e => { if (st.on && st.down && cur) { e.stopPropagation(); if ((e.buttons & 1) === 0) end(); else strokeTo(e, cur); } }, true);
   const end = () => { if (!st.down) return; st.down = false; st.last = null; if (cur && !cur.dabs.length) st.strokes.pop(); cur = null; drawPreview(); };
   el.addEventListener('pointerup', end, true); el.addEventListener('pointercancel', end, true);
@@ -79,7 +109,7 @@ function wire() {
 }
 function setTool(on, mode) {
   if (mode) st.mode = mode;
-  st.on = !!on; wire();
+  st.on = !!on; wire(); if (!st.on) hideRing();
   const c = V()?.controls; if (c?.mouseButtons) c.mouseButtons.LEFT = st.on ? 0 : 0;
   viewer()?.classList.toggle('v2-clay-on', st.on);
   if (st.on) { ensureGroup(); say(st.mode === 'add' ? 'Add: drag over where you want material (pink). Hold Ctrl or Cmd and drag to turn the model.' : 'Carve: drag over what you want removed (orange). Hold Ctrl or Cmd and drag to turn the model.'); }
@@ -177,25 +207,25 @@ function refreshUi() {
   const q = id => $(id); if (!q('v2ClayAdd')) return;
   q('v2ClayAdd').setAttribute('aria-pressed', String(st.on && st.mode === 'add')); q('v2ClayCut').setAttribute('aria-pressed', String(st.on && st.mode === 'cut'));
   q('v2ClayUndo').disabled = !st.strokes.length || st.busy; q('v2ClayClear').disabled = !st.strokes.length || st.busy; q('v2ClayApply').disabled = !hasClay() || st.busy;
-  q('v2ClaySizeVal').textContent = `${st.mm.toFixed(1)} mm`;
+  q('v2ClaySizeVal').textContent = `${st.mm.toFixed(1)} mm wide`; if (st.lastPt) moveRing(st.lastPt);
   q('v2ClayCount').textContent = hasClay() ? `${st.strokes.filter(s => s.mode === 'add').length} add · ${st.strokes.filter(s => s.mode === 'cut').length} carve` : 'No strokes yet';
 }
 function buildCard() {
   const host = $('v2ClayHost'); if (!host || host.dataset.built) return; host.dataset.built = '1';
   host.innerHTML = `<div class="v2-card-head"><div><h2>Brush</h2><p>Paint to add material (pink) or carve it away (orange). Press APPLY BRUSH to make it real.</p></div></div>
-    <div class="v2-clay-tools"><button id="v2ClayAdd" type="button" aria-pressed="false">ADD (PINK)</button><button id="v2ClayCut" type="button" aria-pressed="false">CARVE (ORANGE)</button></div>
-    <label class="v2-clay-size">Brush size <input id="v2ClaySize" type="range" min="0.5" max="15" step="0.5" value="3"><output id="v2ClaySizeVal">3.0 mm</output></label>
+    <div class="v2-clay-tools"><button id="v2ClayAdd" type="button" aria-pressed="false"><svg class="v2-ico" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/></svg><span>ADD (pink)</span></button><button id="v2ClayCut" type="button" aria-pressed="false"><svg class="v2-ico" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M7 12h10"/></svg><span>CARVE (orange)</span></button></div>
+    <label class="v2-clay-size">Tip size <input id="v2ClaySize" type="range" min="1" max="30" step="0.5" value="6"><output id="v2ClaySizeVal">6.0 mm wide</output></label>
     <div class="v2-clay-row"><span id="v2ClayCount">No clay yet</span><button id="v2ClayUndo" type="button">UNDO</button><button id="v2ClayClear" type="button">CLEAR</button></div>
     <button id="v2ClayApply" class="v2-mega v2-green" type="button">APPLY BRUSH NOW</button>
     <div id="v2ClayNote" class="v2-result">Pick ADD or CARVE, then drag on the model. Nothing changes until you press APPLY BRUSH NOW (FIX IT also applies it).</div>`;
   $('v2ClayAdd').addEventListener('click', () => setTool(!(st.on && st.mode === 'add'), 'add'));
   $('v2ClayCut').addEventListener('click', () => setTool(!(st.on && st.mode === 'cut'), 'cut'));
-  $('v2ClaySize').addEventListener('input', e => { st.mm = Number(e.target.value) || 3; refreshUi(); });
+  $('v2ClaySize').addEventListener('input', e => { st.mm = Number(e.target.value) || 6; refreshUi(); });
   $('v2ClayUndo').addEventListener('click', undo); $('v2ClayClear').addEventListener('click', clear); $('v2ClayApply').addEventListener('click', applyNow);
   refreshUi();
 }
 
-window.__shrinkClay = { apply, hasClay, clear, strokes: () => st.strokes, addStroke: (mode, dabs) => { st.strokes.push({ mode, r: dabs[0]?.r || radius(), dabs }); drawPreview(); }, setTool, state: st, applyNow, finish: () => { st.strokes = []; drawPreview(); removePreview(); } };
+window.__shrinkClay = { apply, hasClay, clear, strokes: () => st.strokes, addStroke: (mode, dabs) => { st.strokes.push({ mode, r: dabs[0]?.r || radius(), dabs }); drawPreview(); }, setTool, ring: moveRing, state: st, applyNow, finish: () => { st.strokes = []; drawPreview(); removePreview(); } };
 const init = () => { buildCard(); if (!document.body.classList.contains('app-mode-print')) setTool(false); };
 window.addEventListener('shrink:ui-mode', init);
 window.addEventListener('shrink:model-opened', () => { setTool(false); st.strokes = []; drawPreview(); say('Pick ADD or CARVE, then drag on the model. Nothing changes until you press APPLY BRUSH NOW (FIX IT also applies it).'); });

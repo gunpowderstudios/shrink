@@ -47,6 +47,20 @@
     { id: 'custom', label: 'Custom (set in Advanced printer settings)', tag: 'custom', type: 'custom', quality: 'standard' }
   ];
   window.__shrinkPrinterList = PRINTER_LIST;
+  // v2.310: small line icons for the EDIT tab (24x24, drawn with the text colour)
+  const ICON = {
+    brush: '<path d="M20 4l-9 9"/><path d="M11 13c-3 0-4 2-4 4 0 2-1 3-3 3 3 2 8 1 9-2 .8-2.2-.2-4.2-2-5z"/>',
+    shape: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+    slice: '<rect x="6" y="4" width="12" height="16" rx="1"/><path d="M2 15l20-6" stroke-dasharray="3 2"/>',
+    cube: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+    ball: '<circle cx="12" cy="12" r="8.5"/><ellipse cx="12" cy="12" rx="8.5" ry="3"/>',
+    cylinder: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/>',
+    cone: '<path d="M12 3L5 18M12 3l7 15"/><ellipse cx="12" cy="18" rx="7" ry="3"/>',
+    join: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/>',
+    cut: '<circle cx="12" cy="12" r="9"/><path d="M7 12h10"/>'
+  };
+  const icon = k => `<svg class="v2-ico" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
+  const iconBtn = (group, value, label, pressed) => `<button type="button" class="v2-icon-btn" data-ed="${group}" data-value="${value}" aria-pressed="${pressed ? 'true' : 'false'}" title="${label}">${icon(value)}<span>${label}</span></button>`;
   function currentPrinter() {
     const d = document.querySelector('.print-v2-dashboard'); if (!d) return PRINTER_LIST[0];
     const t = d.dataset.printerType || 'resin', q = d.dataset.quality || 'standard';
@@ -769,6 +783,7 @@
     $('v2EdShapeBox').hidden = t !== 'shape'; $('v2EdSliceBox').hidden = !sl; $('v2EdRun').hidden = t === 'brush';
     const cc = $('v2ClayCard'); if (cc) cc.hidden = t !== 'brush';
     if (t !== 'brush') { try { window.__shrinkClay?.setTool?.(false); } catch {} }
+    { const card = $('v2EditCard'); card?.querySelectorAll('.v2-icon-btn').forEach(b => { const sel = { tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed], on = $(sel)?.value === b.dataset.value; if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on)); }); }
     $('v2EdGo').textContent = sl ? 'SLICE OFF' : ($('v2EdMode').value === 'cut' ? 'CUT SHAPE OUT' : 'JOIN SHAPE ON');
     updateEditPreview();
   }
@@ -1644,10 +1659,13 @@
             <section id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
               <div class="v2-card-head"><div><h2>Edit model</h2><p>Paint on or carve off material, add a cube or ball, or slice a piece off (shorten a sword, drill a hole).</p></div></div>
               <div id="v2EdHint" class="v2-edit-hint" hidden></div>
-              <div class="v2-hollow-row"><label for="v2EdTab">Tool</label><select id="v2EdTab" autocomplete="off"><option value="brush">Brush (paint add / carve)</option><option value="shape" selected>Shape (cube, ball…)</option><option value="slice">Slice off</option></select></div>
+              <div class="v2-icon-row v2-icon-row-3" role="group" aria-label="Edit tool">${iconBtn('tool', 'brush', 'Brush')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'slice', 'Slice off')}</div>
+              <select id="v2EdTab" autocomplete="off" hidden><option value="brush">Brush</option><option value="shape" selected>Shape</option><option value="slice">Slice off</option></select>
               <div id="v2EdShapeBox">
-                <div class="v2-hollow-row"><label for="v2EdKind">Shape</label><select id="v2EdKind" autocomplete="off"><option value="cube">Cube</option><option value="ball">Ball</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option></select></div>
-                <div class="v2-hollow-row"><label for="v2EdMode">Do</label><select id="v2EdMode" autocomplete="off"><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>
+                <div class="v2-icon-row v2-icon-row-4" role="group" aria-label="Shape">${iconBtn('kind', 'cube', 'Cube', true)}${iconBtn('kind', 'ball', 'Ball')}${iconBtn('kind', 'cylinder', 'Cylinder')}${iconBtn('kind', 'cone', 'Cone')}</div>
+                <select id="v2EdKind" autocomplete="off" hidden><option value="cube">Cube</option><option value="ball">Ball</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option></select>
+                <div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
+                <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select>
                 <div class="v2-edit-grid"><span>Size mm</span><input id="v2EdW" type="number" min="0.1" step="1" value="10" title="Width"><input id="v2EdH" type="number" min="0.1" step="1" value="10" title="Height"><input id="v2EdD" type="number" min="0.1" step="1" value="10" title="Depth"></div>
                 <div class="v2-edit-grid"><span>Move mm</span><input id="v2EdX" type="number" step="1" value="0" title="Left / right"><input id="v2EdY" type="number" step="1" value="0" title="Up / down"><input id="v2EdZ" type="number" step="1" value="0" title="Front / back"></div>
               </div>
@@ -1765,6 +1783,8 @@
     $('v2FuseBtn').addEventListener('click', fuseCheck);
     /* v2.307: EDIT MODEL wiring */
     { const ed = $('v2EditCard'); if (ed) {
+      ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed]); if (!sel) return; sel.value = b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
+      $('v2EdKind').addEventListener('change', editTabChanged);
       $('v2EdTab').addEventListener('change', editTabChanged);
       $('v2EdMode').addEventListener('change', editTabChanged);
       ['v2EdKind', 'v2EdW', 'v2EdH', 'v2EdD', 'v2EdX', 'v2EdY', 'v2EdZ', 'v2EdAxis', 'v2EdSide', 'v2EdPos', 'v2EdTilt'].forEach(id => { $(id).addEventListener('input', () => { $('v2EdPosOut').textContent = $('v2EdPos').value + '%'; $('v2EdTiltOut').textContent = $('v2EdTilt').value + '°'; updateEditPreview(); }); $(id).addEventListener('change', updateEditPreview); });

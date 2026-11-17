@@ -62,4 +62,24 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(await waitFor(() => /Brush applied|could not/.test(page.$('v2ClayNote').textContent), 90000) && /Brush applied/.test(page.$('v2ClayNote').textContent), 'ED13 the brush applies: ' + page.$('v2ClayNote').textContent.slice(0, 120));
   ok(w.__shrinkWorkingModel() !== m0 && /BRUSH/.test(page.$('v2HealthChanges').textContent), 'ED13 the carved model is the working model and a BRUSH chip shows');
 }
+
+/* icons and the brush tip ring */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  page.$('v2TabEdit').click(); await wait(100);
+  const pressed = (g, v) => page.$('v2EditCard').querySelector(`.v2-icon-btn[data-ed="${g}"][data-value="${v}"]`)?.getAttribute('aria-pressed');
+  ok(page.$('v2EditCard').querySelectorAll('.v2-icon-btn svg').length >= 9, 'ED14 the tool, shape and join/cut choices are icon buttons');
+  ok(pressed('tool', 'shape') === 'true' && pressed('kind', 'cube') === 'true' && pressed('mode', 'cut') === 'true', 'ED14 the defaults are highlighted');
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="kind"][data-value="ball"]').click(); await wait(50);
+  ok(page.$('v2EdKind').value === 'ball' && pressed('kind', 'ball') === 'true' && pressed('kind', 'cube') === 'false', 'ED14 clicking the Ball icon picks ball');
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="slice"]').click(); await wait(50);
+  ok(page.$('v2EdTab').value === 'slice' && page.$('v2EdSliceBox').hidden === false && pressed('tool', 'slice') === 'true', 'ED14 clicking the Slice icon opens the slice controls');
+  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="brush"]').click(); await wait(50);
+  ok(page.$('v2ClayCard').hidden === false, 'ED14 clicking the Brush icon shows the brush card');
+  w.__shrinkClay.setTool(true, 'add'); w.__shrinkClay.ring({ clientX: 100, clientY: 120 });
+  const ring = page.$('v2BrushRing'); ok(!!ring && ring.hidden === false && /^6\.0 mm$/.test(ring.textContent), 'ED15 selecting the brush shows a tip ring labelled with its width: ' + ring?.textContent);
+  set(page, 'v2ClaySize', 12); await wait(30);
+  ok(/^12\.0 mm$/.test(page.$('v2BrushRing').textContent) && /12\.0 mm wide/.test(page.$('v2ClaySizeVal').textContent), 'ED15 the ring follows the size slider');
+  w.__shrinkClay.setTool(true, 'cut'); w.__shrinkClay.ring({ clientX: 100, clientY: 120 }); ok(page.$('v2BrushRing').dataset.mode === 'cut', 'ED15 the ring turns orange for carve');
+  w.__shrinkClay.setTool(false); ok(page.$('v2BrushRing').hidden === true, 'ED15 the ring goes when the brush is off');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
