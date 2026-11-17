@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.308** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.309** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -57,8 +57,8 @@ The button, `makeWatertightCopy`, `window.__shrinkMakeWatertight`, BATCH's `wate
 ### Red box rules (v2.198)
 `showDiagnostic()` (print-export-safety.js) does nothing while `window.__shrinkBatchRunning` is set (batch.js) or when the model has no open edges and 1 to 250 non-manifold edges plus flipped faces; the batch also hides the box when it finishes.
 
-### Big-task note (v2.191, centred since v2.192)
-`#v2BigTask` (still built inside `.v2-magic-wrap`, but `position:fixed` in the middle of the screen with `pointer-events:none`) is shown by `shrinkMyModel()` when the model starts above `BIG_TASK_TRIANGLES` (1,000,000; tests override with `window.__shrinkBigTaskTris`) and hidden in its `finally`. Tests: M1 in `tests/clay.test.mjs`.
+### Dim screen (v2.309; replaces the v2.191 big-task note)
+`setWorking(on, delayMs, label)` in `print-v2-ui.js` keeps a stack of jobs; `dimUpdate()` shows `#v2Dim` (fixed, full screen, blocks clicks) with the label of the OUTERMOST labelled job (so a health check inside FIX IT still reads Fixing…). Labels: updateHealthCard 'Checking…' (no delay until the first check is done, 350 ms after), fixHealthModel, fuseCheck, shrinkModel, hollowModelNow, editModelNow, clay `applyNow` (via `window.__shrinkWork(true, 0, label)`). `firstChecking` is set on `shrink:model-opened` and cleared when `quickState('ready')` runs, so the dim stays until the first health check AND piece count are done. `window.__shrinkDimState()` for tests (M1 in `tests/clay.test.mjs`). Any new long job should call `setWorking(true, 0, 'Word…')`.
 
 ### Health score ignores degenerates (v2.190)
 `healthScore()` in `print-v2-ui.js` no longer deducts for degenerate triangles and the row is never red; they are informational (same rule as `meshHealth`). Do not delete them to "fix" the row: a zero-area triangle can be part of a closed edge loop.

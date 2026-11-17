@@ -161,7 +161,7 @@ async function apply(source, onStatus = () => {}) {
 async function applyNow() {
   if (st.busy || !hasClay()) return;
   const src = model(); if (!src) return;
-  st.busy = true; refreshUi(); setTool(false);
+  st.busy = true; refreshUi(); setTool(false); window.__shrinkWork?.(true, 0, 'Applying brush…');
   try {
     const r = await apply(src, t => say(t));
     window.__shrinkInstallWorkingModel(r.root, 'clay');
@@ -169,7 +169,7 @@ async function applyNow() {
     window.__shrinkRefreshHealth?.();
     say(`✓ Brush applied (${new Intl.NumberFormat().format(triCount(r.root))} triangles). ${r.note}`);
   } catch (err) { console.error('[SHRINK 3D v2.141] Clay failed', err); say(`The brush could not be applied: ${err.message} Your model is unchanged and your strokes are still there.`, true); }
-  finally { st.busy = false; refreshUi(); }
+  finally { st.busy = false; refreshUi(); window.__shrinkWork?.(false); }
 }
 
 /* ----------------------------- card ----------------------------- */

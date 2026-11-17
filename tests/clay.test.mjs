@@ -404,17 +404,19 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 }
 
 
-/* ---- v2.191: a "complex one" note appears while QUICK-FIX works on a very detailed model, and goes away after ---- */
+/* ---- v2.309: the screen dims with one word while a job runs (and until the first health check ends); the old "complex one" note is gone ---- */
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); const w = page.w; await wait(900);
-  const big = page.$('v2BigTask');
-  ok(!!big && big.hidden && /complex one/.test(big.textContent) && /Hold tight/.test(big.textContent), 'M1 the note exists, hidden, with the wording');
-  let shown = false; const mo = new w.MutationObserver(() => { if (!big.hidden) shown = true; }); mo.observe(big, { attributes: true });
-  const run = async () => { shown = false; page.$('v2MagicBtn').click(); await wait(500); for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250); await wait(300); return shown; };
-  ok(!(await run()), 'M1 a normal model never shows it');
-  w.__shrinkBigTaskTris = 100;
-  ok(await run(), 'M1 a model over the limit shows it while QUICK-FIX works');
-  ok(big.hidden, 'M1 and it goes away when QUICK-FIX finishes');
+  ok(!page.$('v2BigTask'), 'M1 the old "complex one" note is gone');
+  const words = new Set(); let sawDim = false; const poll = setInterval(() => { const s = w.__shrinkDimState(); if (s.shown) { sawDim = true; words.add(s.text); } }, 20);
+  w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await wait(30);
+  ok(w.__shrinkDimState().shown && w.__shrinkDimState().text === 'Checking…', 'M1 right after a model opens the screen is dimmed and says Checking…');
+  for (let i = 0; i < 100 && w.__shrinkDimState().shown; i++) await wait(100);
+  ok(!w.__shrinkDimState().shown, 'M1 the dim lifts once the first health check has finished');
+  page.$('v2MagicBtn').click(); await wait(500); for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250); await wait(300);
+  clearInterval(poll);
+  ok(sawDim && [...words].every(x => /^(Checking|Shrinking|Fixing|Fusing|Hollowing|Editing|Applying brush)…$/.test(x)), 'M1 AUTO-SHRINK dims the screen with one word: ' + [...words].join(' / '));
+  ok(!w.__shrinkDimState().shown && w.__shrinkDimState().depth === 0, 'M1 and the dim is gone when it finishes');
 }
 
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');

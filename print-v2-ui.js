@@ -68,7 +68,24 @@
   // Reference-counted: nested tools (QUICK-FIX runs shrink, fix, fuse) keep the rain going until the last one ends.
   // A delay lets quick things (the health check) finish before the rain shows, so it does not flash.
   let workCount = 0, workTimer = null, workShown = false, workOnViewer = false;
-  function setWorking(on, delayMs = 0) {
+  // v2.309: while any job runs (and until the FIRST health check has finished) the whole screen is dimmed with one word: Checking… / Shrinking… / Fixing… / Fusing… / Hollowing… / Editing…
+  // Nested jobs (QUICK-FIX runs fix, shrink, fuse, each with its own health check) show the OUTERMOST labelled job, so the word only changes between steps.
+  let dimStack = [], dimLast = '', dimTimer = 0, firstChecking = false;
+  function dimUpdate() {
+    let el = document.getElementById('v2Dim');
+    const now = Date.now(), live = dimStack.filter(e => e.until <= now), labelled = dimStack.find(e => e.label);
+    if (labelled) dimLast = labelled.label; else if (!dimStack.length) dimLast = '';
+    const text = labelled ? labelled.label : (dimLast || (firstChecking ? 'Checking…' : ''));
+    const want = (live.length > 0 || firstChecking) && !!text && document.body.classList.contains('app-mode-print');
+    if (want && !el) { el = document.createElement('div'); el.id = 'v2Dim'; el.className = 'v2-dim'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
+    if (el) { if (want && el.textContent !== text) el.textContent = text; if (el.hidden === want) el.hidden = !want; }
+    clearTimeout(dimTimer); const next = dimStack.filter(e => e.until > now).map(e => e.until); if (next.length) dimTimer = setTimeout(dimUpdate, Math.max(20, Math.min(...next) - now + 5));
+  }
+  window.addEventListener('shrink:model-opened', () => { firstChecking = true; setTimeout(dimUpdate, 0); });
+  window.__shrinkDimState = () => ({ text: document.getElementById('v2Dim')?.textContent || '', shown: !!document.getElementById('v2Dim') && !document.getElementById('v2Dim').hidden, firstChecking, depth: dimStack.length });
+  function setWorking(on, delayMs = 0, label = '') {
+    if (on) dimStack.push({ label, until: Date.now() + (delayMs > 0 ? delayMs : 0) }); else dimStack.pop();
+    dimUpdate();
     if (on) {
       workCount++; document.body.setAttribute('data-v2-work', '1');
       if (workShown || workTimer) return;
@@ -284,7 +301,8 @@
   /* v2.304: AUTO-SHRINK stays grey from the moment a model opens until its FIRST full health check (including the piece count) has finished; later re-checks never turn it grey again, so it no longer flickers green / grey / green */
   let firstHealthDone = false;
   window.addEventListener('shrink:model-opened', () => { firstHealthDone = false; try { quickState('checking'); } catch {} });
-  const quickState = (st) => { const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; }
+  const quickState = (st) => { if (st === 'ready' && firstChecking) { firstChecking = false; setTimeout(dimUpdate, 0); }
+    const b = $('v2MagicBtn'); if (!b) return; if (b.dataset.state !== st) b.dataset.state = st; if (!b.dataset.busy) { const off = st === 'checking' || !sourceModel(); if (b.disabled !== off) b.disabled = off; }
     const sb = $('v2ShrinkBtn'); if (sb) { const sOff = st === 'checking' || !sourceModel(); if (sOff) { sb.dataset.checking = '1'; if (!sb.disabled) sb.disabled = true; } else if (sb.dataset.checking) { delete sb.dataset.checking; if (!shrinkRunning && sb.disabled) sb.disabled = false; } } };
   let shrinkRunning = false;
   // v2.267/v2.270: once FIX IT / FUSE IT / QUICK-FIX has installed a new working model, Detail kept shows how much of the ORIGINAL it holds (e.g. 1.1%), not the stale value from before. Dragging it back up restores the original (see applyDetailValue).
@@ -297,7 +315,7 @@
     detailManual = false; manualLevel = '';
     if (note) note.textContent = `This model keeps ${pct}% of the original triangles (${modelTriangles(sourceModel()).toLocaleString()}). Drag the slider up to go back to the original; FIX IT and FUSE IT are then undone.`;
   }
-  async function updateHealthCard(...a) { setWorking(true, 350); try { return await updateHealthCardInner(...a); } finally { setWorking(false); try { syncDetailToBase(); } catch {} } }
+  async function updateHealthCard(...a) { setWorking(true, firstHealthDone ? 350 : 0, 'Checking…'); try { return await updateHealthCardInner(...a); } finally { setWorking(false); try { syncDetailToBase(); } catch {} } }
   async function updateHealthCardInner() {
     updateSizeWarning(); ensureTurnPad();
     const card = ensureHealthCard();
@@ -386,7 +404,7 @@
     progress($('v2FixCard'), pct, text);
     await paintNow();
   }
-  async function fixHealthModel(...a) { setWorking(true, 0); try { return await fixHealthModelInner(...a); } finally { setWorking(false); } }
+  async function fixHealthModel(...a) { setWorking(true, 0, 'Fixing…'); try { return await fixHealthModelInner(...a); } finally { setWorking(false); } }
   async function fixHealthModelInner() {
     const big = $('v2FixBigBtn');
     const model = healthModel();
@@ -607,7 +625,7 @@
 
   const FUSE_MAX_TRIANGLES = 1000000;
   const BIG_TASK_TRIANGLES = 1000000;           // QUICK-FIX shows the "complex one" note above this many triangles
-  async function fuseCheck(...a) { setWorking(true, 0); try { return await fuseCheckInner(...a); } finally { setWorking(false); } }
+  async function fuseCheck(...a) { setWorking(true, 0, 'Fusing…'); try { return await fuseCheckInner(...a); } finally { setWorking(false); } }
   async function fuseCheckInner() {
     const btn = $('v2FuseBtn');
     const card = $('v2FuseCard');
@@ -777,7 +795,7 @@
     const btn = $('v2EdGo'), card = $('v2EditCard'), res = $('v2EdResult');
     if (!btn || btn.disabled) return;
     const sl = $('v2EdTab').value === 'slice';
-    btn.disabled = true; setWorking(true, 0);
+    btn.disabled = true; setWorking(true, 0, 'Editing…');
     try {
       progress(card, 10, 'Loading the solid tools…');
       for (let i = 0; i < 50 && !window.__shrinkFuse?.editModel; i++) await wait(100);
@@ -817,7 +835,7 @@
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
     if (!btn || btn.disabled) return;
-    btn.disabled = true; setWorking(true, 0);
+    btn.disabled = true; setWorking(true, 0, 'Hollowing…');
     const keepCut = (hollowResult && sourceModel() === hollowResult) ? Number($('v2HollowCutRange')?.value) : 100;   // v2.305: re-hollowing keeps the cut-away where it was
     try {
       progress(card, 10, 'Loading the solid tools…');
@@ -855,7 +873,7 @@
     if ($('v2ShrinkBtn')?.dataset.checking) { window.__shrinkShrinkNote = 'skipped: health check still running after 60 s'; throw new Error('the health check did not finish'); }
     const src = $('autoBtn'); for (let i = 0; i < 900 && src?.disabled; i++) await wait(100);
     if (src?.disabled) { window.__shrinkShrinkNote = 'skipped: the SHRINK engine button stayed disabled for 90 s'; throw new Error('the shrink engine was not ready'); }
-    shrinkRunning = true; setWorking(true, 0); try { return await shrinkModelInner(...a); } finally { shrinkRunning = false; setWorking(false); const sb = $('v2ShrinkBtn'); if (sb?.dataset.checking) sb.disabled = true; } }
+    shrinkRunning = true; setWorking(true, 0, 'Shrinking…'); try { return await shrinkModelInner(...a); } finally { shrinkRunning = false; setWorking(false); const sb = $('v2ShrinkBtn'); if (sb?.dataset.checking) sb.disabled = true; } }
   async function shrinkModelInner() {
     const source = $('autoBtn');
     const btn = $('v2ShrinkBtn');
@@ -1189,7 +1207,6 @@
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
       const startTris = modelTriangles(sourceModel());
-      { const big = $('v2BigTask'); if (big && startTris > (window.__shrinkBigTaskTris || BIG_TASK_TRIANGLES)) big.hidden = false; }      // a very detailed model takes a while: say so (v2.191)
       // 0. REPAIR FIRST, at full detail (v2.147). Shrinking a model that still has holes bakes the holes into a coarse mesh that is much harder to
       //    close, so a model under FIX_FIRST_MAX triangles is repaired before it is reduced. Bigger ones are shrunk first (repair runs on the main thread).
       if (startTris <= FIX_FIRST_MAX) {
@@ -1282,7 +1299,6 @@
       setWorking(false);
       delete btn.dataset.busy; btn.disabled = false; btn.textContent = label;
       updateWorkflowButtons();
-      { const big = $('v2BigTask'); if (big) big.hidden = true; }
     }
   }
 
@@ -1350,7 +1366,7 @@
     if ($('v2MagicBtn')) return;
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
-    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">AUTO-SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button><div id="v2BigTask" class="v2-bigtask" role="status" hidden>This is a complex one! Hold tight while SHRINK works its magic!</div>';
+    wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">AUTO-SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);

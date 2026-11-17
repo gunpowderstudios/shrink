@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.309
+- The screen now dims with one word while a job runs: **Checking…** (from the moment a model opens until the first health check has finished), **Shrinking…**, **Fixing…**, **Fusing…**, **Hollowing…**, **Editing…**, **Applying brush…**. During AUTO-SHRINK the word changes between steps. The old "This is a complex one!" note is gone.
+
 ## v2.308
 - The side column now has two tabs: **1 · EDIT** (optional, do it first) and **2 · SHRINK & FINISH** (shrink, fix, fuse, hollow; still the default). Same viewer, same working model, same chips.
 - New **Brush** tool in the EDIT tab (the old CLAY tool, switched back on and renamed): paint ADD (pink) or CARVE (orange) strokes on the model, then APPLY BRUSH NOW (FIX IT still applies pending strokes). Chip BRUSH. Ctrl/Cmd+drag turns the model, Esc leaves the tool.
