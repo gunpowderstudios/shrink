@@ -1,6 +1,6 @@
 // edit-core.js against the real Manifold library: shapes join/cut and plane slicing (shorten a "sword").
 import Module from 'manifold-3d';
-import { applyShapes, sliceSolid } from '../edit-core.js';
+import { applyShapes, sliceSolid, applySolid } from '../edit-core.js';
 const wasm = await Module(); wasm.setup(); const M = wasm.Manifold;
 let bad = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) bad++; };
 const T = (x, y, z, sx = 1, sy = 1, sz = 1) => [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, x, y, z, 1];   // column-major translate + scale
@@ -26,4 +26,13 @@ const s2 = sliceSolid(M, sword, [1, 1, 0], 10);                  // slanted plan
 ok(!s2.isEmpty() && s2.volume() < sword.volume(), 'E8 a slanted cut works');
 let msg = ''; try { sliceSolid(M, box, [0, 1, 0], 100); } catch (e) { msg = e.message; }
 ok(/whole model/.test(msg), 'E9 a cut that removes everything says so: ' + msg);
+
+/* a second solid: replace the head */
+{ const body = M.cube([20, 40, 20], true), head = M.sphere(10, 32).translate([0, 30, 0]), lowered = sliceSolid(M, body, [0, -1, 0], -10);   // body trimmed to y <= 10
+  const joined = applySolid(M, lowered, M.cube([12, 12, 12], true).translate([0, 6, 0]), 'join'); const bb = joined.boundingBox();
+  ok(Math.abs(bb.max[1] - 12) < 1e-6 && joined.decompose().length === 1, `E10 a part joined onto the trimmed body is one piece, top at y=${bb.max[1].toFixed(1)}`);
+  const holed = applySolid(M, body, M.cylinder(50, 3, 3, 24, true).rotate([90, 0, 0]), 'cut');
+  ok(holed.genus() === 1, 'E11 a part cut out drills a hole through the body (genus 1)');
+  void head;
+}
 console.log(bad ? `${bad} FAILED` : 'edit tests passed'); process.exit(bad ? 1 : 0);

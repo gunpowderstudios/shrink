@@ -82,4 +82,28 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.__shrinkClay.setTool(true, 'cut'); w.__shrinkClay.ring({ clientX: 100, clientY: 120 }); ok(page.$('v2BrushRing').dataset.mode === 'cut', 'ED15 the ring turns orange for carve');
   w.__shrinkClay.setTool(false); ok(page.$('v2BrushRing').hidden === true, 'ED15 the ring goes when the brush is off');
 }
+
+/* Part tool: slice the top off, then sit an uploaded part on top and join it */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  page.$('v2TabEdit').click(); await wait(50);
+  set(page, 'v2EdTab', 'slice'); set(page, 'v2EdPos', 50); set(page, 'v2EdSide', 'high'); page.$('v2EdGo').click();
+  await waitFor(() => /Sliced|Could not/.test(page.$('v2EdResult').textContent), 60000);
+  const h0 = height(page);
+  set(page, 'v2EdTab', 'part'); await wait(50);
+  ok(page.$('v2EdPartBox').hidden === false && page.$('v2EdModeRow').hidden === false && page.$('v2EdShapeBox').hidden === true, 'ED16 the Part tool shows the file chooser and Join / Cut');
+  ok(page.$('v2EdGo').dataset.needPart === 'true', 'ED16 the button waits for a part file');
+  page.$('v2EdGo').click(); await wait(100); ok(/Choose a part file/.test(page.$('v2EdResult').textContent), 'ED16 pressing it with no part says so');
+  const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
+  for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 5));
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'head.stl'); await wait(100);
+  ok(w.__shrinkEdit.hasPart() && /head.stl: loaded/.test(page.$('v2EdPartInfo').textContent) && page.$('v2EdGo').dataset.needPart === 'false', 'ED17 a loaded part is announced');
+  ok(!!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') || !w.__shrinkViewer, 'ED17 the part ghost is previewed');
+  set(page, 'v2EdMode', 'join'); await wait(30); ok(/JOIN PART ON/.test(page.$('v2EdGo').textContent), 'ED17 the button reads JOIN PART ON');
+  page.$('v2EdPartTop').click(); await wait(50); page.$('v2EdResult').textContent = '';
+  page.$('v2EdGo').click();
+  ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED18 the part joins: ' + page.$('v2EdResult').textContent.slice(0, 140));
+  const h1 = height(page), want = h0 + Number(page.$('v2EdPartH').value) - 1;
+  ok(Math.abs(h1 - want) < 1.2 && /in 1 piece/.test(page.$('v2EdResult').textContent), `ED18 it sits on top as one piece (height ${h0.toFixed(1)} -> ${h1.toFixed(1)}, expected about ${want.toFixed(1)})`);
+  ok(!w.__shrinkEdit.hasPart() && w.__shrinkEdit.depth() === 2, 'ED18 the part is used up and the edit can be undone');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

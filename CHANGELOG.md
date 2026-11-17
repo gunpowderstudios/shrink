@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.311
+- EDIT tab: new **Part** tool. Choose an STL, OBJ, PLY or GLB file (a closed solid, e.g. a new head), set its height in mm, turn and move it (a green ghost previews it), then **JOIN PART ON** or **CUT PART OUT**. **SIT ON TOP** drops it onto the top of the model, centred and sunk 1 mm so it fuses; **CENTRE** puts it in the middle. To replace a head: slice the old head off, then add the new one. Undoable like the other edits.
+
 ## v2.310
 - EDIT tab: the tool (Brush / Shape / Slice off), the shape (cube, ball, cylinder, cone) and Join / Cut are now icon buttons (the old drop-downs stay in the page, hidden, for the tests and BATCH). ADD / CARVE on the Brush have icons too.
 - Brush: a ring the size of the brush tip follows the mouse over the model (pink for ADD, orange for CARVE) with its width in mm. The size slider is now "Tip size" (the width, 1 to 30 mm, default 6; it used to be the radius).

@@ -34,3 +34,10 @@ export function sliceSolid(M, solid, n, offset) {
   if (kept.isEmpty()) { try { kept.delete?.(); } catch {} throw new Error('That cut would remove the whole model.'); }
   return kept;
 }
+
+/** Join (add) or cut (subtract) a whole second solid, e.g. a new head. Returns a NEW solid. */
+export function applySolid(M, solid, other, mode) {
+  const r = mode === 'cut' ? solid.subtract(other) : solid.add(other);
+  if (r.isEmpty()) { try { r.delete?.(); } catch {} throw new Error('That would remove the whole model.'); }
+  return r;
+}

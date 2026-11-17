@@ -57,7 +57,8 @@
     cylinder: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/>',
     cone: '<path d="M12 3L5 18M12 3l7 15"/><ellipse cx="12" cy="18" rx="7" ry="3"/>',
     join: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/>',
-    cut: '<circle cx="12" cy="12" r="9"/><path d="M7 12h10"/>'
+    cut: '<circle cx="12" cy="12" r="9"/><path d="M7 12h10"/>',
+    part: '<rect x="5" y="12" width="14" height="8" rx="1"/><rect x="8.5" y="3" width="7" height="9" rx="1"/>'
   };
   const icon = k => `<svg class="v2-ico" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
   const iconBtn = (group, value, label, pressed) => `<button type="button" class="v2-icon-btn" data-ed="${group}" data-value="${value}" aria-pressed="${pressed ? 'true' : 'false'}" title="${label}">${icon(value)}<span>${label}</span></button>`;
@@ -749,6 +750,51 @@
     const px = f.centre.x + num('v2EdX') / f.mm, py = f.centre.y + num('v2EdY') / f.mm, pz = f.centre.z + num('v2EdZ') / f.mm;
     return { f, kind: $('v2EdKind').value, mode: $('v2EdMode').value, matrix: [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, px, py, pz, 1] };
   }
+  // ---- v2.311: an uploaded part (e.g. a new head). editPart = { geometry (centred, Y-up, raw units), height (raw Y size), name }
+  let editPart = null;
+  async function loadPartFile(file) {
+    const THREE = app()?.THREE; if (!THREE) throw new Error('The viewer is not ready.');
+    const ext = (file.name.split('.').pop() || '').toLowerCase(), base = 'https://esm.sh/three@0.180.0/examples/jsm/loaders/', buf = await file.arrayBuffer();
+    const geoms = [];
+    const flat = (g, m) => { const pos = g.attributes.position, idx = g.index, out = []; const v = new THREE.Vector3(); const n = idx ? idx.count : pos.count; for (let i = 0; i < n; i++) { v.fromBufferAttribute(pos, idx ? idx.getX(i) : i); if (m) v.applyMatrix4(m); out.push(v.x, v.y, v.z); } return out; };
+    let zUp = false, pts = [];
+    if (ext === 'stl') { const { STLLoader } = await import(base + 'STLLoader.js'); pts = flat(new STLLoader().parse(buf)); zUp = true; }
+    else if (ext === 'ply') { const { PLYLoader } = await import(base + 'PLYLoader.js'); pts = flat(new PLYLoader().parse(buf)); zUp = true; }
+    else if (ext === 'obj') { const { OBJLoader } = await import(base + 'OBJLoader.js'); const g = new OBJLoader().parse(new TextDecoder().decode(buf)); g.updateMatrixWorld(true); g.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) pts.push(...flat(o.geometry, o.matrixWorld)); }); }
+    else if (ext === 'glb' || ext === 'gltf') { const { GLTFLoader } = await import(base + 'GLTFLoader.js'); const gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)); gltf.scene.updateMatrixWorld(true); gltf.scene.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) pts.push(...flat(o.geometry, o.matrixWorld)); }); }
+    else throw new Error('Use an STL, OBJ, PLY or GLB file.');
+    if (!pts.length) throw new Error('No mesh data found in that file.');
+    return partFromPoints(new Float32Array(pts), zUp, file.name);
+  }
+  function partFromPoints(arr, zUp, name) {
+    const THREE = app()?.THREE, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    if (zUp) g.rotateX(-Math.PI / 2);                    // STL/PLY are Z-up, the viewer is Y-up
+    g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()), size = g.boundingBox.getSize(new THREE.Vector3()); g.translate(-c.x, -c.y, -c.z);
+    g.computeVertexNormals(); g.computeBoundingBox();
+    return { geometry: g, height: Math.max(1e-6, size.y), size, name: name || 'part' };
+  }
+  function setPart(part) {
+    editPart = part; const f = editFrame();
+    if (part && f) { const h = Math.max(1, Math.round(f.size.y * f.mm * 0.3 * 10) / 10); $('v2EdPartH').value = String(h); ['X', 'Y', 'Z'].forEach(a => { $('v2EdPart' + a).value = '0'; $('v2EdPartR' + a).value = '0'; }); }
+    $('v2EdPartInfo').textContent = part ? `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.` : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
+    updateEditPreview(); updateGoState();
+  }
+  function partMatrix(offsets = true) {
+    const f = editFrame(); if (!f || !editPart) return null; const THREE = f.THREE;
+    const k = (Math.max(0.1, num('v2EdPartH', 30)) / f.mm) / editPart.height, rad = d => num(d) * Math.PI / 180;
+    const m = new THREE.Matrix4().compose(offsets ? new THREE.Vector3(f.centre.x + num('v2EdPartX') / f.mm, f.centre.y + num('v2EdPartY') / f.mm, f.centre.z + num('v2EdPartZ') / f.mm) : new THREE.Vector3(),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(rad('v2EdPartRX'), rad('v2EdPartRY'), rad('v2EdPartRZ'), 'XYZ')), new THREE.Vector3(k, k, k));
+    return { f, m };
+  }
+  function partPlace(where) {                          // 'top' sits the part on the model's top (sunk 1 mm), 'centre' puts it in the middle
+    const pm = partMatrix(false); if (!pm) return; const { f, m } = pm, THREE = f.THREE;
+    const mesh = new THREE.Mesh(editPart.geometry); mesh.matrixAutoUpdate = false; mesh.matrix.copy(m); mesh.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(mesh, true), bc = b.getCenter(new THREE.Vector3());
+    const offX = -bc.x * f.mm, offZ = -bc.z * f.mm;
+    const offY = where === 'top' ? (f.box.max.y - 1 / f.mm - b.min.y - f.centre.y) * f.mm : -bc.y * f.mm;
+    $('v2EdPartX').value = offX.toFixed(1); $('v2EdPartZ').value = offZ.toFixed(1); $('v2EdPartY').value = offY.toFixed(1); updateEditPreview();
+  }
+  function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
   function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT
     const f = editFrame(); if (!f) return null;
     const ax = $('v2EdAxis').value, i = { x: 0, y: 1, z: 2 }[ax], t = num('v2EdTilt') * Math.PI / 180;
@@ -762,10 +808,14 @@
   function updateEditPreview() {
     removeEditPreview();
     const V = window.__shrinkViewer; if (!editActive() || !V?.scene || $('v2EdTab')?.value === 'brush') return;
-    const sl = $('v2EdTab')?.value === 'slice';
+    const sl = $('v2EdTab')?.value === 'slice', isPart = $('v2EdTab')?.value === 'part';
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
-    if (sl) {
+    if (isPart) {
+      const pm = partMatrix(); if (!pm) return;
+      const m = new THREE.Mesh(editPart.geometry, new THREE.MeshBasicMaterial({ color: $('v2EdMode').value === 'cut' ? 0xff9a2f : 0x35d6a0, transparent: true, opacity: 0.55, depthWrite: false }));
+      m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
+    } else if (sl) {
       const s = sliceSpec(); if (!s) return;
       const d = s.f.size.length() * 1.15, m = new THREE.Mesh(new THREE.PlaneGeometry(d, d), new THREE.MeshBasicMaterial({ color: 0x2f86ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
       m.position.copy(s.c); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...s.n).normalize()); m.raycast = () => {}; g.add(m);
@@ -780,11 +830,11 @@
   const editActive = () => $('v2EditCard')?.closest('.v2-main-card')?.dataset.tab === 'edit';
   function editTabChanged() {
     const t = $('v2EdTab').value, sl = t === 'slice';
-    $('v2EdShapeBox').hidden = t !== 'shape'; $('v2EdSliceBox').hidden = !sl; $('v2EdRun').hidden = t === 'brush';
+    $('v2EdShapeBox').hidden = t !== 'shape'; $('v2EdSliceBox').hidden = !sl; $('v2EdPartBox').hidden = t !== 'part'; $('v2EdModeRow').hidden = !(t === 'shape' || t === 'part'); $('v2EdRun').hidden = t === 'brush'; updateGoState();
     const cc = $('v2ClayCard'); if (cc) cc.hidden = t !== 'brush';
     if (t !== 'brush') { try { window.__shrinkClay?.setTool?.(false); } catch {} }
     { const card = $('v2EditCard'); card?.querySelectorAll('.v2-icon-btn').forEach(b => { const sel = { tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed], on = $(sel)?.value === b.dataset.value; if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on)); }); }
-    $('v2EdGo').textContent = sl ? 'SLICE OFF' : ($('v2EdMode').value === 'cut' ? 'CUT SHAPE OUT' : 'JOIN SHAPE ON');
+    $('v2EdGo').textContent = sl ? 'SLICE OFF' : t === 'part' ? ($('v2EdMode').value === 'cut' ? 'CUT PART OUT' : 'JOIN PART ON') : ($('v2EdMode').value === 'cut' ? 'CUT SHAPE OUT' : 'JOIN SHAPE ON');
     updateEditPreview();
   }
   // v2.308: the two tabs in the side column. EDIT (optional, do it first) and SHRINK & FINISH (shrink, fix, fuse, hollow); one working model, one viewer, one undo chain.
@@ -821,13 +871,16 @@
       if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Press SHRINK first.`);
       const THREE0 = app()?.THREE; let snap = null;
       if (THREE0) { model.updateWorldMatrix(true, true); snap = model.clone(true); snap.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); snap.matrix.copy(model.matrixWorld); snap.matrix.decompose(snap.position, snap.quaternion, snap.scale); snap.updateMatrixWorld(true); }
-      const ops = sl ? (() => { const s = sliceSpec(); return { slice: { normal: s.normal, offset: s.offset } }; })() : (() => { const s = shapeSpec(); return { shapes: [{ kind: s.kind, mode: s.mode, matrix: s.matrix }] }; })();
+      const isPart = $('v2EdTab').value === 'part';
+      if (isPart && !editPart) throw new Error('Choose a part file first.');
+      const ops = isPart ? (() => { const pm = partMatrix(), mesh = new pm.f.THREE.Mesh(editPart.geometry, new pm.f.THREE.MeshStandardMaterial()); mesh.matrixAutoUpdate = false; mesh.matrix.copy(pm.m); const root = new pm.f.THREE.Group(); root.add(mesh); root.updateMatrixWorld(true); return { part: { root, mode: $('v2EdMode').value } }; })() : sl ? (() => { const s = sliceSpec(); return { slice: { normal: s.normal, offset: s.offset } }; })() : (() => { const s = shapeSpec(); return { shapes: [{ kind: s.kind, mode: s.mode, matrix: s.matrix }] }; })();
       progress(card, 40, 'Working…'); await paintNow();
       const r = await window.__shrinkFuse.editModel(model, ops);
       progress(card, 85, 'Checking the result…');
       if (snap) { editStack.push(snap); if (editStack.length > 6) editStack.shift(); }
       removeEditPreview(); installWorkingResult(r.root, 'edit');
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
+      if (isPart) { editPart = null; $('v2EdPartInfo').textContent = 'Done. Choose another part file if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
       res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       $('v2EdUndo').hidden = !editStack.length;
@@ -845,7 +898,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
+  window.__shrinkEdit = { setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -1659,15 +1712,22 @@
             <section id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
               <div class="v2-card-head"><div><h2>Edit model</h2><p>Paint on or carve off material, add a cube or ball, or slice a piece off (shorten a sword, drill a hole).</p></div></div>
               <div id="v2EdHint" class="v2-edit-hint" hidden></div>
-              <div class="v2-icon-row v2-icon-row-3" role="group" aria-label="Edit tool">${iconBtn('tool', 'brush', 'Brush')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'slice', 'Slice off')}</div>
-              <select id="v2EdTab" autocomplete="off" hidden><option value="brush">Brush</option><option value="shape" selected>Shape</option><option value="slice">Slice off</option></select>
+              <div class="v2-icon-row v2-icon-row-4" role="group" aria-label="Edit tool">${iconBtn('tool', 'brush', 'Brush')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
+              <select id="v2EdTab" autocomplete="off" hidden><option value="brush">Brush</option><option value="shape" selected>Shape</option><option value="part">Part</option><option value="slice">Slice off</option></select>
+              <div id="v2EdModeRow"><div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
+                <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>
               <div id="v2EdShapeBox">
                 <div class="v2-icon-row v2-icon-row-4" role="group" aria-label="Shape">${iconBtn('kind', 'cube', 'Cube', true)}${iconBtn('kind', 'ball', 'Ball')}${iconBtn('kind', 'cylinder', 'Cylinder')}${iconBtn('kind', 'cone', 'Cone')}</div>
                 <select id="v2EdKind" autocomplete="off" hidden><option value="cube">Cube</option><option value="ball">Ball</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option></select>
-                <div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
-                <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select>
                 <div class="v2-edit-grid"><span>Size mm</span><input id="v2EdW" type="number" min="0.1" step="1" value="10" title="Width"><input id="v2EdH" type="number" min="0.1" step="1" value="10" title="Height"><input id="v2EdD" type="number" min="0.1" step="1" value="10" title="Depth"></div>
                 <div class="v2-edit-grid"><span>Move mm</span><input id="v2EdX" type="number" step="1" value="0" title="Left / right"><input id="v2EdY" type="number" step="1" value="0" title="Up / down"><input id="v2EdZ" type="number" step="1" value="0" title="Front / back"></div>
+              </div>
+              <div id="v2EdPartBox" hidden>
+                <label class="v2-part-file"><input type="file" id="v2EdPartFile" accept=".stl,.obj,.ply,.glb,.gltf"><span>CHOOSE A PART FILE</span></label>
+                <div id="v2EdPartInfo" class="v2-edit-hint-plain">STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.</div>
+                <div class="v2-edit-grid"><span>Height mm</span><input id="v2EdPartH" type="number" min="0.1" step="1" value="30" title="Part height"><button id="v2EdPartTop" type="button" class="v2-edit-small" title="Put the part on top of the model, centred, sunk in by 1 mm so it joins">SIT ON TOP</button><button id="v2EdPartCentre" type="button" class="v2-edit-small" title="Put the part in the middle of the model">CENTRE</button></div>
+                <div class="v2-edit-grid"><span>Turn °</span><input id="v2EdPartRX" type="number" step="15" value="0" title="Turn about left/right"><input id="v2EdPartRY" type="number" step="15" value="0" title="Turn about up/down"><input id="v2EdPartRZ" type="number" step="15" value="0" title="Turn about front/back"></div>
+                <div class="v2-edit-grid"><span>Move mm</span><input id="v2EdPartX" type="number" step="1" value="0" title="Left / right"><input id="v2EdPartY" type="number" step="1" value="0" title="Up / down"><input id="v2EdPartZ" type="number" step="1" value="0" title="Front / back"></div>
               </div>
               <div id="v2EdSliceBox" hidden>
                 <div class="v2-hollow-row"><label for="v2EdAxis">Cut across</label><select id="v2EdAxis" autocomplete="off"><option value="y" selected>Up / down (height)</option><option value="x">Left / right</option><option value="z">Front / back</option></select></div>
@@ -1785,6 +1845,9 @@
     { const ed = $('v2EditCard'); if (ed) {
       ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode' }[b.dataset.ed]); if (!sel) return; sel.value = b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
       $('v2EdKind').addEventListener('change', editTabChanged);
+      ['v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
+      $('v2EdPartTop').addEventListener('click', () => partPlace('top')); $('v2EdPartCentre').addEventListener('click', () => partPlace('centre'));
+      $('v2EdPartFile').addEventListener('change', async e => { const file = e.target.files?.[0]; if (!file) return; $('v2EdPartInfo').textContent = 'Reading ' + file.name + '…'; try { setPart(await loadPartFile(file)); } catch (err) { editPart = null; $('v2EdPartInfo').textContent = 'Could not read that file: ' + (err?.message || err); updateEditPreview(); updateGoState(); } });
       $('v2EdTab').addEventListener('change', editTabChanged);
       $('v2EdMode').addEventListener('change', editTabChanged);
       ['v2EdKind', 'v2EdW', 'v2EdH', 'v2EdD', 'v2EdX', 'v2EdY', 'v2EdZ', 'v2EdAxis', 'v2EdSide', 'v2EdPos', 'v2EdTilt'].forEach(id => { $(id).addEventListener('input', () => { $('v2EdPosOut').textContent = $('v2EdPos').value + '%'; $('v2EdTiltOut').textContent = $('v2EdTilt').value + '°'; updateEditPreview(); }); $(id).addEventListener('change', updateEditPreview); });

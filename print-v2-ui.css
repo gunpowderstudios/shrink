@@ -832,3 +832,13 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-brush-ring[data-mode="cut"]{border-color:#ff5a1f;background:rgba(255,90,31,.12)}
 .v2-brush-ring span{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);white-space:nowrap;font-size:11px;font-weight:800;padding:1px 6px;border-radius:8px;background:rgba(6,12,20,.85);color:#fff}
 .v2-brush-ring[hidden]{display:none!important}
+
+/* v2.311 Part tool */
+.v2-part-file{display:block;margin:8px 0;text-align:center;border:1px dashed #5d86b8;border-radius:12px;padding:12px;color:#cfe2ff;font-weight:800;cursor:pointer;background:#142033}
+.v2-part-file input{position:absolute;opacity:0;width:1px;height:1px}
+.v2-part-file:hover{border-color:#2f86ff}
+.v2-edit-hint-plain{font-size:12px;line-height:1.4;color:#b8c7d8;margin:4px 0 8px}
+.v2-edit-small{border:1px solid #3a4b61;border-radius:10px;background:#142033;color:#dbe7f5;font:inherit;font-size:11px;font-weight:800;padding:8px 4px;cursor:pointer}.v2-edit-small:hover{border-color:#2f86ff}
+#v2EdGo[data-need-part="true"]{opacity:.5}
+#v2EdPartBox[hidden],#v2EdModeRow[hidden]{display:none!important}
+.v2-icon-row-4 .v2-icon-btn span{font-size:10px}

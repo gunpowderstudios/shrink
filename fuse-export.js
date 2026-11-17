@@ -394,8 +394,13 @@ async function editModel(model, ops) {
   const { solid, components } = await modelToSolid(model);
   try {
     const q = (() => { try { return new URL(import.meta.url).search; } catch { return ''; } })();
-    const { applyShapes, sliceSolid } = await import('./edit-core.js' + q);
-    const r = ops.slice ? sliceSolid(wasm.Manifold, solid, ops.slice.normal, ops.slice.offset) : applyShapes(wasm.Manifold, solid, ops.shapes || []);
+    const { applyShapes, sliceSolid, applySolid } = await import('./edit-core.js' + q);
+    let r;
+    if (ops.part) {                                        // an uploaded part: already placed in world space on ops.part.root
+      let part = null;
+      try { part = (await modelToSolid(ops.part.root)).solid; } catch (e) { throw new Error('The part is not a closed solid, so it cannot be joined (' + (e?.message || e) + ')'); }
+      try { r = applySolid(wasm.Manifold, solid, part, ops.part.mode); } finally { try { part.delete?.(); } catch {} }
+    } else r = ops.slice ? sliceSolid(wasm.Manifold, solid, ops.slice.normal, ops.slice.offset) : applyShapes(wasm.Manifold, solid, ops.shapes || []);
     try { return { root: solidToThree(r), volume: r.volume(), pieces: r.decompose().length, components }; }
     finally { try { r.delete?.(); } catch {} }
   } finally { try { solid.delete?.(); } catch {} }
