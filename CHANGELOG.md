@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.345
+- **UPLOAD A PART** is now the only part-file button and sits at the top of the EDIT card as a wide dashed button. The old CHOOSE A PART FILE button inside Paste part is gone.
+
 ## v2.344
 - **Easier to move a floating part.** The handles now include three flat squares next to the arrows and rings: the flat one slides the part along the ground (left/right and forward/back), the two upright ones slide it up/down with left/right or forward/back. The arrows and rings work as before.
 - **Part looks like the model.** A floating part is the same resin grey as the model with a blue outline (orange outline when set to cut), so it is easy to see against the model. The red overlap marking is unchanged.

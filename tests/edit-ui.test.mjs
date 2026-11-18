@@ -99,7 +99,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   set(page, 'v2EdTab', 'part'); await wait(50);
   ok(page.$('v2EdPartBox').hidden === false && page.$('v2EdModeRow').hidden === false && page.$('v2EdShapeBox').hidden === true, 'ED16 the Part tool shows the file chooser and Join / Cut');
   ok(page.$('v2EdGo').dataset.needPart === 'true', 'ED16 the button waits for a part file');
-  page.$('v2EdGo').click(); await wait(100); ok(/Choose a part file/.test(page.$('v2EdResult').textContent), 'ED16 pressing it with no part says so');
+  page.$('v2EdGo').click(); await wait(100); ok(/Upload a part first/.test(page.$('v2EdResult').textContent), 'ED16 pressing it with no part says so');
   const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
   for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 5));
   w.__shrinkEdit.setPart(new Float32Array(cube), false, 'head.stl'); await wait(100);

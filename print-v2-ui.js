@@ -1663,7 +1663,7 @@
       const THREE0 = app()?.THREE; let snap = null;
       if (THREE0) { model.updateWorldMatrix(true, true); snap = model.clone(true); snap.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); snap.matrix.copy(model.matrixWorld); snap.matrix.decompose(snap.position, snap.quaternion, snap.scale); snap.updateMatrixWorld(true); }
       const isPart = pieceTool();
-      if (isPart && !editPart) throw new Error('Choose a part file first.');
+      if (isPart && !editPart) throw new Error('Upload a part first (UPLOAD A PART at the top of this card).');
       const ops = isPart ? (() => { const pm = partMatrix(), mesh = new pm.f.THREE.Mesh(editPart.geometry, new pm.f.THREE.MeshStandardMaterial()); mesh.matrixAutoUpdate = false; mesh.matrix.copy(pm.m); const root = new pm.f.THREE.Group(); root.add(mesh); root.updateMatrixWorld(true); return { part: { root, mode: $('v2EdMode').value } }; })() : sl ? (() => { const s = sliceSpec(); return { slice: { normal: s.normal, offset: s.offset } }; })() : (() => { const s = shapeSpec(); return { shapes: [{ kind: s.kind, mode: s.mode, matrix: s.matrix }] }; })();
       progress(card, 40, 'Working…'); await paintNow();
       const r = await window.__shrinkFuse.editModel(model, ops);
@@ -1671,7 +1671,7 @@
       if (snap) { if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift(); }
       removeEditPreview(); installWorkingResult(r.root, 'edit');
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
-      if (isPart) { dropSelected(); updatePad(); $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Choose another part file if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
+      if (isPart) { dropSelected(); updatePad(); $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Press UPLOAD A PART (top of this card) if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
       res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       $('v2EdUndo').hidden = !editStack.length;
@@ -2577,7 +2577,7 @@
                 <div class="v2-hollow-row"><label for="v2SculptStrength">Strength</label><input id="v2SculptStrength" type="range" min="1" max="10" step="1" value="5" autocomplete="off"><output id="v2SculptStrengthOut">5</output></div>
               </div>
               <div id="v2EdPartBox" hidden>
-                <label class="v2-part-file"><input type="file" id="v2EdPartFile" accept=".stl,.obj,.ply,.glb,.gltf"><span>CHOOSE A PART FILE</span></label>
+                <input type="file" id="v2EdPartFile" accept=".stl,.obj,.ply,.glb,.gltf" hidden>
                 <div class="v2-edit-hint-plain" id="v2EdPartOr">or use Copy / cut to take a piece from this model.</div>
                 <div id="v2EdPartInfo" class="v2-edit-hint-plain">STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.</div>
                 <details class="v2-advanced v2-exact"><summary>Exact numbers</summary><div class="v2-edit-grid"><span>Height mm</span><input id="v2EdPartH" type="number" min="0.1" step="1" value="30" title="Part height"><button id="v2EdPartTop" type="button" class="v2-edit-small" title="Put the part on top of the model, centred, sunk in by 1 mm so it joins">SIT ON TOP</button><button id="v2EdPartCentre" type="button" class="v2-edit-small" title="Put the part in the middle of the model">CENTRE</button></div>
