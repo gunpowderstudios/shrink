@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.330
+- **Finished height** (the box and its slider, with the RESIZE button) moved out of ADVANCED to the right-hand column, above the green SHRINK button. Uniform, Width and Depth stay in ADVANCED.
+
 ## v2.329
 - New **Select** tool (first in the EDIT tool row). Click a green floating piece to pick it whole (it glows), drag it to move it, and use the pad (**COPY PIECE**, **DELETE PIECE**, **WELD IT**, **WELD ALL**) or Ctrl/Cmd+C, Delete and Ctrl/Cmd+V. Unlike Paste part it has no file chooser and no arrows / rings, so it stays out of the way.
 
