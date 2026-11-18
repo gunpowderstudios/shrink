@@ -452,4 +452,25 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2ShrinkBtn').click(); await wait(30); ok(shrinks === 1, 'ED43 SHRINK works again after a size change');
   w.document.getElementById('fileName').textContent = 'other.stl'; w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await wait(400); ok(!w.document.body.hasAttribute('data-v2-preshrunk'), 'ED43 an ordinary model is never greyed');
 }
+/* v2.338: magic wand */
+{ const page = await makePage({ model: models.multi(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'wand'); await wait(80);
+  ok(page.$('v2EdLassoBox').hidden === false && page.$('v2EdLassoBox').dataset.tool === 'wand', 'ED44 the Wand shows the DELETE / COPY buttons');
+  const tri0 = tris(w.__shrinkWorkingModel()); const n = w.__shrinkEdit.wand(0, 0);
+  let red = 0; w.__shrinkViewer.scene.getObjectByName('shrinkLassoRed')?.traverse(o => { if (o.isMesh) red = o.geometry.attributes.position.count / 3; });
+  ok(n > 0 && n < tri0 && red === n, `ED44 touching one piece selects just that piece (${n} of ${tri0}) and turns it red`);
+  ok(page.$('v2LassoDelBtn').disabled === false, 'ED44 DELETE is enabled');
+  page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Deleted/.test(page.$('v2EdResult').textContent), 'ED44 DELETE removes it: ' + page.$('v2EdResult').textContent.slice(0, 90));
+  ok(Math.abs(tris(w.__shrinkWorkingModel()) - (tri0 - n)) < 2, `ED44 only the touched piece is gone (${tri0} -> ${tris(w.__shrinkWorkingModel())})`);
+}
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'wand'); await wait(80);
+  const tri0 = tris(w.__shrinkWorkingModel()), n = w.__shrinkEdit.wand(0, 0);
+  ok(n === tri0 && /whole model/.test(page.$('v2EdResult').textContent), 'ED44 a piece that is attached to everything selects everything and says so');
+  page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
+  ok(await waitFor(() => /Could not/.test(page.$('v2EdResult').textContent), 30000) && /attached/.test(page.$('v2EdResult').textContent) && tris(w.__shrinkWorkingModel()) === tri0, 'ED44 DELETE refuses and the model is untouched');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

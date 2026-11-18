@@ -920,3 +920,6 @@ body.v2-editing #v2HealthCard,body.v2-editing #v2SideStack{display:none!importan
 .v2-tiny-row button.alt{background:#3a4150}
 
 body[data-v2-preshrunk] :is(#v2MagicBtn,#v2ShrinkBtn){background:#3a414c!important;color:#8a93a0!important;box-shadow:none!important;opacity:1!important;cursor:not-allowed!important;filter:none!important}
+
+#viewer.v2-cur-wand,#viewer.v2-cur-wand canvas{cursor:cell}
+#v2EdLassoBox[data-tool="wand"] label:has(#v2EdWhole),#v2EdLassoBox[data-tool="wand"] .v2-hollow-row{display:none}
