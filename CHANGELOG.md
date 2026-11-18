@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.331
+- **SHRINK now keeps 50% of the triangles** instead of searching for the smallest version that still looks the same (that search lost too much detail). It goes through the same path as the Detail slider, so the slider shows 50 and you can move it up or down afterwards, then download. Do not press SHRINK again after moving the slider: it starts again from the original at 50%.
+- If a model is still too big to fuse after 50%, QUICK-FIX keeps just enough triangles to fuse (about 90% of the fuse limit) and says so.
+- Developers: `window.__shrinkShrinkTarget` sets the percentage; `0` brings back the old automatic search.
+
 ## v2.330
 - **Finished height** (the box and its slider, with the RESIZE button) moved out of ADVANCED to the right-hand column, above the green SHRINK button. Uniform, Width and Depth stay in ADVANCED.
 

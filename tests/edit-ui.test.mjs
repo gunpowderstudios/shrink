@@ -407,4 +407,13 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Delete', bubbles: true })); ok(w.__shrinkEdit.parked() === 1, 'ED39 Delete throws the picked piece away');
   page.$('v2EdResult').textContent = ''; page.$('v2PadPlace').click(); ok(await waitFor(() => /Joined|Cut|Could not/.test(page.$('v2EdResult').textContent), 60000) && !/Could not/.test(page.$('v2EdResult').textContent) && w.__shrinkEdit.parked() === 0, 'ED39 WELD IT works from the Select tool: ' + page.$('v2EdResult').textContent.slice(0, 80));
 }
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  let asked = null, autoClicks = 0; page.$('autoBtn').addEventListener('click', () => { autoClicks++; });
+  w.__shrinkApplyDetail = async v => { asked = v; setTimeout(() => { w.dispatchEvent(new w.CustomEvent('shrink:live-busy', { detail: { busy: true } })); setTimeout(() => w.dispatchEvent(new w.CustomEvent('shrink:live-busy', { detail: { busy: false } })), 60); }, 40); };
+  w.__shrinkLive = { root: w.__shrinkWorkingModel() };
+  page.$('v2ShrinkBtn').click(); await waitFor(() => asked !== null, 20000);
+  ok(asked === 50 && autoClicks === 0, 'ED40 SHRINK keeps 50% through the Detail path and does not run the automatic search (asked ' + asked + ', auto clicks ' + autoClicks + ')');
+  ok(await waitFor(() => /✓|Optimised|kept|%/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 30000), 'ED40 it finishes after the reducer goes idle: ' + page.$('v2ShrinkResult').textContent.slice(0, 80));
+  w.__shrinkShrinkTarget = 0; asked = null; page.$('v2ShrinkBtn').click(); await wait(600); ok(asked === null && autoClicks >= 1, 'ED40 window.__shrinkShrinkTarget = 0 brings back the automatic search');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

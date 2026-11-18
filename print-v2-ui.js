@@ -1568,6 +1568,7 @@
     const src = $('autoBtn'); for (let i = 0; i < 900 && src?.disabled; i++) await wait(100);
     if (src?.disabled) { window.__shrinkShrinkNote = 'skipped: the SHRINK engine button stayed disabled for 90 s'; throw new Error('the shrink engine was not ready'); }
     shrinkRunning = true; setWorking(true, 0, 'Shrinking…'); try { return await shrinkModelInner(...a); } finally { shrinkRunning = false; setWorking(false); const sb = $('v2ShrinkBtn'); if (sb?.dataset.checking) sb.disabled = true; } }
+  const fixedShrinkReady = () => !!(window.__shrinkApplyDetail && window.__shrinkLive?.root && window.__shrinkShrinkTarget !== 0);
   async function shrinkModelInner() {
     const source = $('autoBtn');
     const btn = $('v2ShrinkBtn');
@@ -1600,18 +1601,31 @@
       $('v2ShrinkResult').innerHTML = `<strong>Could not SHRINK</strong><span>${err.message}</span>`;
       return;
     }
-    progress(card, 8, 'Finding the smallest version that still looks the same…');
-    $('v2ShrinkResult').textContent = 'SHRINK is testing different detail levels automatically.';
-    source.click();
+    // v2.331: SHRINK keeps a fixed share of the triangles (50% unless `window.__shrinkShrinkTarget` says otherwise; 0 = the old automatic search),
+    // because the automatic search lost too much detail. The share goes through the same path as the Detail slider, so the slider reads it and can be moved afterwards.
+    const target = fixedShrinkReady() ? Math.max(1, Math.min(100, Number(window.__shrinkShrinkCap) || 100, window.__shrinkShrinkTarget ?? 50)) : null;
     let pct = 8;
+    if (target) { progress(card, 8, `Keeping ${target}% of the triangles…`); $('v2ShrinkResult').textContent = `SHRINK is keeping ${target}% of the triangles.`; }
+    else { progress(card, 8, 'Finding the smallest version that still looks the same…'); $('v2ShrinkResult').textContent = 'SHRINK is testing different detail levels automatically.'; source.click(); }
     const timer = setInterval(() => {
       pct = Math.min(88, pct + 4);
-      progress(card, pct, 'Comparing shape and detail…');
+      progress(card, pct, target ? 'Reducing…' : 'Comparing shape and detail…');
     }, 450);
     try {
-      for (let i = 0; i < 600; i++) {
-        await wait(100);
-        if (!source.disabled) break;
+      if (target) {
+        await window.__shrinkApplyDetail(target, 'shrink');
+        await new Promise(res => {                       // the reducer starts on a timer: wait for its busy -> idle, or carry on if it never started (the value did not change)
+          let started = false; const off = () => { window.removeEventListener('shrink:live-busy', on); clearTimeout(t0); clearTimeout(t1); },
+            on = e => { if (e.detail?.busy) { started = true; clearTimeout(t0); } else if (started) { off(); res(); } },
+            t0 = setTimeout(() => { off(); res(); }, 2500), t1 = setTimeout(() => { off(); res(); }, 240000);
+          window.addEventListener('shrink:live-busy', on);
+        });
+        detailManual = true;
+      } else {
+        for (let i = 0; i < 600; i++) {
+          await wait(100);
+          if (!source.disabled) break;
+        }
       }
       const live = $('liveLine')?.innerText?.replace(/\s+/g, ' ').trim() || '';
       const verdict = $('verdictText')?.textContent || '';
@@ -1920,7 +1934,12 @@
       // 1b. Too detailed to fuse (v2.185). 16K ultra can leave millions of triangles, and FUSE is refused above the limit. Step down one detail level at a time
       //     (16K, 8K fine, 8K, 4K) and shrink again until it fits, and say so. The file name tag then shows the level that was really used.
       const fuseLimit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES; let loweredFrom = null;
-      if (modelTriangles(sourceModel()) > fuseLimit && dashboard) {
+      if (modelTriangles(sourceModel()) > fuseLimit && fixedShrinkReady()) {         // v2.331: a fixed share cannot step down the printer ladder, so keep just enough triangles to fuse
+        const o = modelTriangles(app()?.originalModel || sourceModel()) || 1, cap = Math.max(1, Math.floor(fuseLimit * 0.9 / o * 1000) / 10);
+        btn.textContent = '1/4 Shrinking more…'; show(`Still ${modelTriangles(sourceModel()).toLocaleString()} triangles: too many to fuse. Keeping ${cap}% instead…`); await paintNow(); window.__shrinkShrinkCap = cap;
+        try { await shrinkModel(); } catch (err) { console.warn('second shrink', err); } finally { window.__shrinkShrinkCap = null; }
+        const now = modelTriangles(sourceModel()); done(now > fuseLimit ? 'warn' : 'ok', now > fuseLimit ? '⚠' : '✓', `Shrunk further for fusing: ${cap}% kept (${now.toLocaleString()} triangles)`);
+      } else if (modelTriangles(sourceModel()) > fuseLimit && dashboard) {
         const type0 = dashboard.dataset.printerType || 'resin', ladder = ['ultra', 'fine', 'standard', 'large'].filter(k => PRINTER_LIST.some(x => x.type === type0 && x.quality === k)), q0 = dashboard.dataset.quality || 'standard'; 
         const from = currentPrinter(); let at = ladder.indexOf(q0);
         while (at >= 0 && at < ladder.length - 1 && modelTriangles(sourceModel()) > fuseLimit && type0 !== 'custom') {
@@ -2647,6 +2666,8 @@
       setNative('geometry', String(Math.round(nativeVal * 10) / 10), 'input');
       if (reverted && value < 100) { appliedChanges.add('shrunk'); renderAppliedChanges(); }
     }
+
+    window.__shrinkApplyDetail = applyDetailValue;
 
     // SHRINK found its own level: show it in the slider (no input event, the reducer is already there) and say what limited it.
     window.addEventListener('shrink:auto-found', e => {
