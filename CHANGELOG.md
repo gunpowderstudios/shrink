@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.325
+- The MOVE / TURN / SIZE buttons are gone. The handles are now **on the green piece**: three little arrows (red X, green Y, blue Z) slide it along that axis, three rings turn it (green = yaw, red = pitch, blue = roll), and **−** / **+** sitting on the piece make it smaller or bigger (the + and − keys do the same). Dragging the piece itself still moves it (Shift = nearer / farther).
+
 ## v2.324
 - The first time you open EDIT the **Lasso** is already selected, so you can draw straight away. After that it remembers the tool you last used.
 

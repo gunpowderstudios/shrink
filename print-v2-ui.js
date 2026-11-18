@@ -1135,20 +1135,19 @@
     let pad = $('v2PartPad'); if (pad) return pad; const v = $('viewer'), host = $('v2EditPanel') || v; if (!host) return null;   // v2.322: the pad lives at the top of the EDIT panel (the old bottom-right corner of the 3D view can be below the visible screen)
     pad = document.createElement('div'); pad.id = 'v2PartPad'; pad.className = 'v2-part-pad'; pad.hidden = true;
     const b = (a, t, tip) => `<button type="button" data-pad="${a}" title="${tip}" aria-label="${tip}">${t}</button>`;
-    pad.innerHTML = `<div class="v2-pad-title">Drag the green part</div>
+    pad.innerHTML = `<div class="v2-pad-title">Move the part</div>
+      <div class="v2-pad-hint">Drag the green piece to move it. Arrows slide it along X / Y / Z, the rings turn it (yaw, pitch, roll), − / + on the piece resize it.</div>
       <div id="v2PadJoin" class="v2-pad-join" aria-live="polite"></div>
-      <div class="v2-pad-modes"><button type="button" data-pmode="move" title="Drag the part about (hold Shift to push it nearer or farther)">✥ MOVE</button><button type="button" data-pmode="turn" title="Drag to turn the part">⟳ TURN</button><button type="button" data-pmode="size" title="Drag up to enlarge, down to reduce">⤢ SIZE</button></div>
       <div class="v2-pad-row"><div class="v2-pad-cross">${b('up', '▲', 'Move up')}<span></span>${b('left', '◀', 'Move left')}${b('down', '▼', 'Move down')}${b('right', '▶', 'Move right')}</div>
       <div class="v2-pad-col">${b('near', 'NEARER', 'Move towards you')}${b('far', 'FARTHER', 'Move away from you')}${b('bigger', 'BIGGER +', 'Enlarge')}${b('smaller', 'SMALLER −', 'Reduce')}</div></div>
       <div class="v2-pad-tilt"><span>Tilt</span>${b('tiltU', '⤒', 'Tilt top away')}${b('tiltD', '⤓', 'Tilt top towards you')}${b('tiltL', '↶', 'Tilt left')}${b('tiltR', '↷', 'Tilt right')}${b('spinL', '⟲', 'Spin anticlockwise')}${b('spinR', '⟳', 'Spin clockwise')}</div>
       <div class="v2-pad-foot"><select id="v2PadStep" aria-label="Step size"><option value="s">Fine steps</option><option value="m" selected>Medium steps</option><option value="l">Big steps</option></select><button type="button" id="v2PadPlace" class="v2-pad-go">PLACE IT</button><button type="button" id="v2PadCancel" class="v2-pad-no">CANCEL</button></div>`;
     pad.addEventListener('pointerdown', e => e.stopPropagation()); pad.addEventListener('wheel', e => e.stopPropagation());
-    pad.addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; if (bt.dataset.pmode) { padMode = bt.dataset.pmode; padModeState(); } else if (bt.dataset.pad) padAct(bt.dataset.pad); else if (bt.id === 'v2PadPlace') editModelNow(); else if (bt.id === 'v2PadCancel') { setPart(null); set$tool('none'); $('v2EdResult').innerHTML = '<strong>Part put away</strong><span>Nothing was changed.</span>'; } });
+    pad.addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; if (bt.dataset.pad) padAct(bt.dataset.pad); else if (bt.id === 'v2PadPlace') editModelNow(); else if (bt.id === 'v2PadCancel') { setPart(null); set$tool('none'); $('v2EdResult').innerHTML = '<strong>Part put away</strong><span>Nothing was changed.</span>'; } });
     if (host.id === 'v2EditPanel') host.insertBefore(pad, $('v2EditPane') || null); else host.appendChild(pad); return pad;
   }
   // ---- v2.319: grab the ghost with the mouse. MOVE drags it in the screen plane (Shift = nearer / farther), TURN spins it like a ball, SIZE drags up / down.
-  let padMode = 'move', partDrag = null, hoverAt = 0;
-  function padModeState() { document.querySelectorAll('#v2PartPad [data-pmode]').forEach(b => { const on = String(b.dataset.pmode === padMode); if (b.getAttribute('aria-pressed') !== on) b.setAttribute('aria-pressed', on); }); const v = $('viewer'); if (v) { v.classList.toggle('v2-cur-move', padMode === 'move'); } }
+  let partDrag = null, hoverAt = 0;
   function rayFor(cam, ndc) {
     const e = cam.world, right = [e[0], e[1], e[2]], up = [e[4], e[5], e[6]], fw = [-e[8], -e[9], -e[10]], pos = [e[12], e[13], e[14]];
     if (cam.persp) { const a = ndc[0] * cam.tanY * cam.aspect, b = ndc[1] * cam.tanY, d = [fw[0] + right[0] * a + up[0] * b, fw[1] + right[1] * a + up[1] * b, fw[2] + right[2] * a + up[2] * b], l = Math.hypot(...d) || 1; return { o: pos, d: d.map(v => v / l), fw }; }
@@ -1177,14 +1176,81 @@
     const THREE = app().THREE, r = rayFor(cam, ndc), rc = new THREE.Raycaster(); rc.ray.set(new THREE.Vector3(...r.o), new THREE.Vector3(...r.d)); rc.near = 0; rc.far = Infinity;
     mesh.updateMatrixWorld(true); const hits = []; THREE.Mesh.prototype.raycast.call(mesh, rc, hits); return hits.length > 0;
   }
+  // ---- v2.325: handles ON the green piece: three arrows (slide along X / Y / Z), three rings (yaw about Y, pitch about X, roll about Z) and − / + to resize.
+  const GZ_COL = [0xff4d4d, 0x6dff3a, 0x4d9dff], GZ_NAME = ['x', 'y', 'z'];
+  function gizmoSize(pm) { const g = editPart.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const k = new pm.f.THREE.Vector3().setFromMatrixScale(pm.m).x; return Math.max(1e-6, (g.boundingSphere?.radius || 1) * k); }
+  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  function gizmoPick(ndc, camIn) {
+    const pm = editPart && partMatrix(); const cam = camIn || cameraSnap(); if (!pm || !cam) return null;
+    const R = gizmoSize(pm), c = [pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]], r = rayFor(cam, ndc), L = R * 1.3, Rr = R * 0.8;
+    const depth = Math.max(1e-6, dot3([c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]], r.fw)), perNdc = cam.persp ? cam.tanY * depth : cam.halfH, tol = Math.max(R * 0.07, perNdc * 0.04);
+    let best = null, bd = Infinity;
+    for (let i = 0; i < 3; i++) {                        // arrows: ray against the segment c .. c + L u
+      const u = [0, 0, 0]; u[i] = 1; const w = [c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]], b = dot3(u, r.d), d = dot3(u, w), e = dot3(r.d, w), den = 1 - b * b;
+      let s = den > 1e-9 ? (b * e - d) / den : 0; s = Math.min(L, Math.max(R * 0.12, s)); const t = b * s + e; if (t < 0) continue;
+      const P = [c[0] + u[0] * s, c[1] + u[1] * s, c[2] + u[2] * s], Q = [r.o[0] + r.d[0] * t, r.o[1] + r.d[1] * t, r.o[2] + r.d[2] * t], dist = Math.hypot(P[0] - Q[0], P[1] - Q[1], P[2] - Q[2]) - tol * 0.4;   // a small bias so an arrow wins over a ring it crosses
+      if (dist < bd) { bd = dist; best = { kind: 'arrow', axis: i }; }
+    }
+    for (let i = 0; i < 3; i++) {                        // rings: where the ray meets the ring's plane, how far that is from the ring
+      const n = [0, 0, 0]; n[i] = 1; const den = dot3(n, r.d); if (Math.abs(den) < 0.15) continue;
+      const t = dot3(n, [c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]]) / den; if (t < 0) continue;
+      const p = [r.o[0] + r.d[0] * t - c[0], r.o[1] + r.d[1] * t - c[1], r.o[2] + r.d[2] * t - c[2]], dist = Math.abs(Math.hypot(...p) - Rr);
+      if (dist < bd) { bd = dist; best = { kind: 'ring', axis: i }; }
+    }
+    return bd <= tol ? best : null;
+  }
+  function gizmoApply(kind, axis, from, to, camIn) {
+    const pm = editPart && partMatrix(); const cam = camIn || cameraSnap(); if (!pm || !cam) return false; const { f, m } = pm, THREE = f.THREE, c = [m.elements[12], m.elements[13], m.elements[14]], r0 = rayFor(cam, from), r1 = rayFor(cam, to);
+    if (kind === 'arrow') {
+      const u = [0, 0, 0]; u[axis] = 1; const par = r => { const w = [c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]], b = dot3(u, r.d), den = 1 - b * b; return Math.abs(den) < 1e-6 ? null : (b * dot3(r.d, w) - dot3(u, w)) / den; };
+      const a = par(r0), b = par(r1); if (a === null || b === null) return false; const id = 'v2EdPart' + 'XYZ'[axis]; $(id).value = (num(id) + (b - a) * f.mm).toFixed(2);
+    } else if (kind === 'ring') {
+      const n = [0, 0, 0]; n[axis] = 1; const e1 = axis === 0 ? [0, 1, 0] : axis === 1 ? [0, 0, 1] : [1, 0, 0], e2 = axis === 0 ? [0, 0, 1] : axis === 1 ? [1, 0, 0] : [0, 1, 0];
+      const ang = r => { const den = dot3(n, r.d); if (Math.abs(den) < 0.15) return null; const t = dot3(n, [c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]]) / den, p = [r.o[0] + r.d[0] * t - c[0], r.o[1] + r.d[1] * t - c[1], r.o[2] + r.d[2] * t - c[2]]; return Math.atan2(dot3(p, e2), dot3(p, e1)); };
+      const a = ang(r0), b = ang(r1); if (a === null || b === null) return false; let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+      partRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...n), d).multiply(partRot || new THREE.Quaternion());
+    } else return false;
+    updateEditPreview(); return true;
+  }
+  function gizmoBuild(THREE, pm) {
+    const R = gizmoSize(pm), L = R * 1.3, Rr = R * 0.8, gz = new THREE.Group(); gz.name = 'shrinkPartGizmo'; gz.raycast = () => {};
+    gz.position.set(pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]);
+    const mat = i => new THREE.MeshBasicMaterial({ color: GZ_COL[i], transparent: true, opacity: 0.95, depthTest: false, depthWrite: false }), put = (mesh, i) => { mesh.renderOrder = 1002; mesh.raycast = () => {}; mesh.name = 'gizmo-' + GZ_NAME[i]; return mesh; };
+    for (let i = 0; i < 3; i++) {
+      const u = new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), u), arrow = new THREE.Group(); arrow.quaternion.copy(q); arrow.raycast = () => {};
+      const shaft = put(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.022, R * 0.022, L * 0.8, 10), mat(i)), i); shaft.position.y = L * 0.4;
+      const cone = put(new THREE.Mesh(new THREE.ConeGeometry(R * 0.075, L * 0.22, 14), mat(i)), i); cone.position.y = L * 0.9; arrow.add(shaft, cone); gz.add(arrow);
+      const ring = put(new THREE.Mesh(new THREE.TorusGeometry(Rr, R * 0.016, 8, 72), mat(i)), i); ring.name = 'gizmo-ring-' + GZ_NAME[i]; ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), u); gz.add(ring);
+    }
+    return gz;
+  }
+  function ensureHud() {
+    let h = $('v2PartHud'); if (h) return h; const v = $('viewer'); if (!v) return null;
+    h = document.createElement('div'); h.id = 'v2PartHud'; h.className = 'v2-part-hud'; h.hidden = true;
+    h.innerHTML = '<button type="button" data-hud="smaller" title="Reduce the piece (−)" aria-label="Reduce the piece">−</button><button type="button" data-hud="bigger" title="Enlarge the piece (+)" aria-label="Enlarge the piece">+</button>';
+    h.addEventListener('pointerdown', e => e.stopPropagation(), true); h.addEventListener('wheel', e => e.stopPropagation());
+    h.addEventListener('click', e => { const b = e.target.closest('button'); if (b) partScale(b.dataset.hud === 'bigger' ? 1.1 : 1 / 1.1); });
+    v.appendChild(h); return h;
+  }
+  function partScale(fac) { if (!editPart) return; const id = 'v2EdPartH'; $(id).value = Math.max(0.1, num(id, 30) * fac).toFixed(2); updateEditPreview(); }
+  let hudWired = false;
+  function hudPlace() {
+    const h = $('v2PartHud'); if (!h || h.hidden) return; const V = window.__shrinkViewer, pm = editPart && partMatrix(); if (!V?.camera || !pm) return;
+    const THREE = pm.f.THREE, p = new THREE.Vector3(pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]); V.camera.updateMatrixWorld(true); p.project(V.camera);
+    const x = Math.min(94, Math.max(6, (p.x * 0.5 + 0.5) * 100)).toFixed(1) + '%', y = Math.min(94, Math.max(6, (-p.y * 0.5 + 0.5) * 100)).toFixed(1) + '%'; if (h.style.left !== x) h.style.left = x; if (h.style.top !== y) h.style.top = y;
+  }
+  function hudUpdate(show) {
+    const h = show ? ensureHud() : $('v2PartHud'); setHid(h, !show); if (!show || !h) return;
+    if (!hudWired) { const c = window.__shrinkViewer?.controls; if (c?.addEventListener) { hudWired = true; c.addEventListener('change', hudPlace); } } hudPlace();
+  }
   function wirePartDrag() {
     const v = $('viewer'); if (!v || v.dataset.partWired) return; v.dataset.partWired = '1';
     const act = () => !!editPart && editActive() && $('v2EdTab')?.value === 'part';
     const ndcOf = e => { const r = v.getBoundingClientRect(); return [((e.clientX - r.left) / (r.width || 1)) * 2 - 1, -(((e.clientY - r.top) / (r.height || 1)) * 2 - 1)]; };
-    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey) return; const n = ndcOf(e); if (!ghostHit(n)) return; e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap() }; v.classList.add('v2-cur-grabbing'); }, true);
+    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey) return; const n = ndcOf(e), hz = gizmoPick(n); if (!hz && !ghostHit(n)) return; e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
     v.addEventListener('pointermove', e => {
-      if (partDrag) { e.stopPropagation(); if ((e.buttons & 1) === 0) { partDragEnd(); return; } const n = ndcOf(e); partDragApply(padMode, partDrag.last, n, e.shiftKey, partDrag.cam); partDrag.last = n; return; }
-      const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const on = ghostHit(ndcOf(e)); v.classList.toggle('v2-cur-grab', on);
+      if (partDrag) { e.stopPropagation(); if ((e.buttons & 1) === 0) { partDragEnd(); return; } const n = ndcOf(e); if (partDrag.hz) gizmoApply(partDrag.hz.kind, partDrag.hz.axis, partDrag.last, n, partDrag.cam); else partDragApply('move', partDrag.last, n, e.shiftKey, partDrag.cam); partDrag.last = n; return; }
+      const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const n = ndcOf(e), on = !!gizmoPick(n) || ghostHit(n); v.classList.toggle('v2-cur-grab', on);
     }, true);
     const partDragEnd = () => { if (!partDrag) return; partDrag = null; v.classList.remove('v2-cur-grabbing'); };
     v.addEventListener('pointerup', partDragEnd, true); v.addEventListener('pointercancel', partDragEnd, true); window.addEventListener('pointerup', partDragEnd, true); window.addEventListener('blur', partDragEnd);
@@ -1242,7 +1308,7 @@
     if (!editPart || !editActive() || $('v2EdTab')?.value !== 'part') { removeOverlap(); setJoinNote('', ''); return; }
     ovTimer = setTimeout(overlapUpdate, 160);
   }
-  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); if (show) { wirePartDrag(); padModeState(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
+  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show); if (show) { wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
   function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
   function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
   function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT
@@ -1268,6 +1334,7 @@
         const m = new THREE.Mesh(editPart.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: c.op, depthWrite: false, depthTest: c.test, side: THREE.DoubleSide }));
         m.name = i ? 'shrinkPartGhost' : 'shrinkPartGhostSee'; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
       });
+      g.add(gizmoBuild(THREE, pm));
     } else if (sl) {
       const s = sliceSpec(); if (!s) return;
       const d = s.f.size.length() * 1.15, m = new THREE.Mesh(new THREE.PlaneGeometry(d, d), new THREE.MeshBasicMaterial({ color: 0x2f86ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
@@ -1386,7 +1453,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -2371,6 +2438,7 @@
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && lassoSel && lzTool() && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) { e.preventDefault(); lassoApply(k.toLowerCase() === 'c' ? 'copy' : 'cut'); return; }   // Cmd/Ctrl+C copies the red part, +X cuts it off and keeps it
         if (e.metaKey || e.ctrlKey) return;
         if ($('v2EdTab')?.value === 'sculpt' && /^[-+=_]$/.test(k)) { e.preventDefault(); const r = $('v2SculptSize'), up = k === '+' || k === '=', lo = Number(r.min) || 1, hi = Number(r.max) || 120, cur = Number(r.value) || lo; let nv = Math.round(cur * (up ? 1.15 : 1 / 1.15) * 10) / 10; if (nv === cur) nv += up ? 0.5 : -0.5; r.value = String(Math.min(hi, Math.max(lo, nv))); r.dispatchEvent(new Event('input', { bubbles: true })); return; }
+        if (editPart && $('v2EdTab')?.value === 'part' && /^[-+=_]$/.test(k)) { e.preventDefault(); partScale(k === '+' || k === '=' ? 1.1 : 1 / 1.1); return; }
         if (editPart && $('v2EdTab')?.value === 'part' && /^[xyzXYZ]$/.test(k)) { e.preventDefault(); partTurnWorld('xyz'.indexOf(k.toLowerCase()), k === k.toLowerCase() ? 1 : -1); }
       });
       $('v2EdGo').addEventListener('click', editModelNow); $('v2EdUndo').addEventListener('click', undoEdit); editTabChanged(); } }

@@ -281,8 +281,8 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
   ok(await waitFor(() => /Copied|Could not/.test(page.$('v2EdResult').textContent), 60000) && w.__shrinkEdit.hasPart() && page.$('v2EdTab').value === 'part', 'ED31 COPY hands the piece to the paste tool');
   const st0 = w.__shrinkEdit.partState(); ok(Math.abs(st0.x) > 1, `ED31 a copy starts beside its source, not hidden inside it (x ${st0.x.toFixed(1)} mm)`);
-  ok(w.__shrinkEdit.ghosts() === 2 && !!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview').getObjectByName('shrinkPartGhostSee'), 'ED31 the ghost is drawn twice: solid in front and see-through behind the model');
-  ok(!!page.$('v2PartPad') && page.$('v2PartPad').querySelectorAll('[data-pmode]').length === 3 && page.$('v2PartPad').querySelector('[data-pmode="move"]').getAttribute('aria-pressed') === 'true', 'ED31 the pad has MOVE / TURN / SIZE with MOVE on');
+  ok(w.__shrinkEdit.ghosts() === 3 && !!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview').getObjectByName('shrinkPartGhostSee'), 'ED31 the ghost is drawn twice: solid in front and see-through behind the model');
+  ok(!!page.$('v2PartPad') && page.$('v2PartPad').querySelectorAll('[data-pmode]').length === 0, 'ED31 the MOVE / TURN / SIZE mode buttons are gone from the pad');
   ok(page.$('v2EditPanel').contains(page.$('v2PartPad')) && page.$('v2PartPad').nextElementSibling?.id === 'v2EditPane' && w.__shrinkEdit.padVisible(), 'ED31 the pad sits at the top of the EDIT panel, where it is always in view');
   /* MOVE: dragging right by 0.2 of the screen half-width moves the part right by that much in the view plane */
   const ex = L.cam.halfW * 0.2 * st0.h / st0.h; const mm = w.__shrinkPrint.mmPerUnit();
@@ -292,7 +292,16 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.__shrinkEdit.drag('turn', [0, 0], [0.25, 0], false, L.cam); const st3 = w.__shrinkEdit.partState(); ok(st3.rot && Math.abs(st3.rot[3]) < 0.95 && Math.abs(st3.rot[1]) > 0.2, 'ED31 TURN spins it about the screen-up axis');
   w.__shrinkEdit.drag('size', [0, 0], [0, 0.2], false, L.cam); const st4 = w.__shrinkEdit.partState(); ok(st4.h > st3.h * 1.3, `ED31 SIZE: dragging up enlarges it (${st3.h} -> ${st4.h} mm)`);
   w.__shrinkEdit.drag('size', [0, 0.2], [0, 0], false, L.cam); ok(Math.abs(w.__shrinkEdit.partState().h - st3.h) < 0.05, 'ED31 and dragging back down reduces it to the same size');
-  page.$('v2PartPad').querySelector('[data-pmode="turn"]').click(); ok(page.$('v2PartPad').querySelector('[data-pmode="turn"]').getAttribute('aria-pressed') === 'true' && page.$('v2PartPad').querySelector('[data-pmode="move"]').getAttribute('aria-pressed') === 'false', 'ED31 clicking TURN switches the mode');
+  { const cam = L.cam, picks = new Set(), TH = w.__shrinkApp.THREE, bb = new TH.Box3().setFromObject(w.__shrinkWorkingModel(), true).getCenter(new TH.Vector3()), q = w.__shrinkEdit.partState(), mmu = w.__shrinkPrint.mmPerUnit();
+    const cx = (bb.x + q.x / mmu - cam.world[12]) / cam.halfW, cy = (bb.y + q.y / mmu - cam.world[13]) / cam.halfH;
+    for (let x = cx - 0.3; x <= cx + 0.3; x += 0.004) for (let y = cy - 0.3; y <= cy + 0.3; y += 0.004) { const k = w.__shrinkEdit.gizmoPick([x, y], cam); if (k) picks.add(k.kind + k.axis); }
+    ok([...picks].some(k => k.startsWith('arrow')) && [...picks].some(k => k.startsWith('ring')), 'ED36 the green piece has pickable arrows and rings: ' + [...picks].join(',')); }
+  { const g = w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview'), gz = g.getObjectByName('shrinkPartGizmo'); let n = 0; gz.traverse(o => { if (o.isMesh) n++; }); ok(!!gz && n === 9, 'ED36 the gizmo draws 3 arrows (shaft + head) and 3 rings: ' + n + ' meshes'); }
+  { const a = w.__shrinkEdit.partState(); ok(w.__shrinkEdit.gizmoDrag('arrow', 0, [0, 0], [0.15, 0], L.cam), 'ED36 arrow drag runs'); const b = w.__shrinkEdit.partState(); ok(Math.abs(b.x - a.x) > 0.5 && Math.abs(b.y - a.y) < 0.01 && Math.abs(b.z - a.z) < 0.01, `ED36 the X arrow moves the part along X only (${(b.x - a.x).toFixed(2)} mm)`); }
+  { const a = w.__shrinkEdit.partState(); ok(w.__shrinkEdit.gizmoDrag('ring', 2, [0.2, 0.0], [0.2, 0.15], L.cam) || w.__shrinkEdit.gizmoDrag('ring', 2, [0.3, 0.0], [0.3, 0.2], L.cam), 'ED36 ring drag runs'); const b = w.__shrinkEdit.partState(); ok(b.rot && a.rot && b.rot.some((v, i) => Math.abs(v - a.rot[i]) > 0.02), 'ED36 the roll ring turns the part'); }
+  { const h0 = w.__shrinkEdit.partState().h; page.$('v2PartHud').querySelector('[data-hud="bigger"]').click(); const h1 = w.__shrinkEdit.partState().h; page.$('v2PartHud').querySelector('[data-hud="smaller"]').click(); const h2 = w.__shrinkEdit.partState().h;
+    ok(w.__shrinkEdit.hudVisible() && Math.abs(h1 / h0 - 1.1) < 0.01 && Math.abs(h2 - h0) < 0.05, `ED36 the + / − on the piece enlarge and reduce it (${h0} -> ${h1} -> ${h2} mm)`);
+    w.dispatchEvent(new w.KeyboardEvent('keydown', { key: '+', bubbles: true })); ok(w.__shrinkEdit.partState().h > h2 * 1.05, 'ED36 the + key enlarges it too'); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: '-', bubbles: true })); }
   const t0 = tris(w.__shrinkWorkingModel()); page.$('v2EdResult').textContent = ''; page.$('v2PadPlace').click();
   ok(await waitFor(() => /Joined|Pasted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED31 PLACE IT still pastes the moved part: ' + page.$('v2EdResult').textContent.slice(0, 100));
 }

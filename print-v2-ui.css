@@ -881,8 +881,11 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-ed-toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);max-width:min(560px,86%);z-index:9;background:#b3261e;color:#fff;font:600 13px/1.35 system-ui,sans-serif;padding:10px 14px;border-radius:10px;box-shadow:0 6px 22px rgba(0,0,0,.4);cursor:pointer}
 .v2-ed-toast[hidden]{display:none!important}
 
-.v2-pad-modes{display:flex;gap:4px;margin-bottom:8px}.v2-pad-modes button{flex:1;font-size:10px;font-weight:700;padding:5px 2px}
-.v2-pad-modes button[aria-pressed="true"]{background:#1f9d6b;border-color:#27c088}
+.v2-pad-hint{font-size:11px;line-height:1.35;opacity:.8;margin-bottom:8px}
+.v2-part-hud{position:absolute;z-index:16;transform:translate(-50%,-50%);display:flex;gap:6px;pointer-events:auto}
+.v2-part-hud[hidden]{display:none}
+.v2-part-hud button{width:30px;height:30px;border-radius:50%;border:1px solid #27c088;background:rgba(18,32,28,.88);color:#fff;font-size:18px;font-weight:700;line-height:1;cursor:pointer;padding:0}
+.v2-part-hud button:hover{background:#1f9d6b}
 #viewer.v2-cur-grab{cursor:grab!important}#viewer.v2-cur-grabbing{cursor:grabbing!important}
 
 /* v2.321 — EDIT: a button right of ADVANCED, tools in their own panel dropped down over the viewer */
