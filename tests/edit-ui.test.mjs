@@ -429,4 +429,16 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   set(page, 'v2EdTab', 'select'); await wait(60);
   ok(fire({ altKey: true }) === false, 'ED41 Alt + left press is left alone so the camera can orbit (select)');
 }
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  w.__shrinkPrint = { state: { modelHeightUnits: 12.4 } }; w.__shrinkApp.sourceKind = 'stl'; w.__shrinkFitHeight(); w.__shrinkWireTinyWarning();
+  ok(w.__shrinkTiny().raw === 12.4, 'ED42 a model under 30 mm is remembered as tiny');
+  let shrinks = 0; page.$('v2ShrinkBtn').addEventListener('click', () => { shrinks++; });
+  page.$('v2ShrinkBtn').disabled = false; page.$('v2ShrinkBtn').click(); await wait(50);
+  const box = page.d ? page.d.getElementById('v2TinyBox') : w.document.getElementById('v2TinyBox');
+  ok(box && /only 12 mm high/.test(box.textContent) && /before shrinking/.test(box.textContent) && shrinks === 0, 'ED42 the first SHRINK press shows "This model is only 12 mm high" and does not shrink yet');
+  w.document.getElementById('v2TinyGo').click(); await wait(50);
+  ok(!w.document.getElementById('v2TinyBox') && shrinks === 1, 'ED42 SHRINK ANYWAY closes the pop-up and carries on');
+  page.$('v2ShrinkBtn').click(); await wait(50); ok(!w.document.getElementById('v2TinyBox'), 'ED42 it only asks once');
+  w.__shrinkPrint = { state: { modelHeightUnits: 45 } }; w.__shrinkFitHeight(); ok(w.__shrinkTiny().raw === 0, 'ED42 a 45 mm model gets no pop-up');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

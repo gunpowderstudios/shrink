@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.333
+- **Small-model warning.** If a model reads under 30 mm tall (it is lifted to 30 mm on open), the first press of SHRINK or the green QUICK-FIX button shows a pop-up: "This model is only X mm high. Adjust the height in advance, before shrinking." SET THE HEIGHT jumps to the Finished height box; SHRINK ANYWAY carries on. It asks once per model, never if you have already typed a height, and never in BATCH.
+
 ## v2.332
 - **Alt + left mouse turns the camera while an EDIT tool is on.** A plain left press still belongs to the tool (loop, razor, sculpt, grabbing a piece); with Alt held the drag orbits the model, so you can look around while selecting. Ctrl/Cmd + drag still works too.
 

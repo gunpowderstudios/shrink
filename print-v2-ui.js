@@ -2477,11 +2477,36 @@
     $('v2ScaleDown').addEventListener('click', () => scaleBy(0.9));
     window.addEventListener('shrink:reduced', () => { reducedTick++; refreshDims(); });
     // v2.256: a newly opened model starts at ITS OWN height (STL/OBJ units are mm, a GLB is metres), not at a fixed 75 mm. BATCH sets its own height after this.
+    // v2.333: a model that read under 30 mm was lifted to 30 mm on open; the first SHRINK / QUICK-FIX press asks the person to set the real height first
+    let tinyRawMm = 0, tinyWarned = false;
+    function tinyDialog(btn) {
+      document.getElementById('v2TinyBox')?.remove();
+      const x = tinyRawMm < 10 ? tinyRawMm.toFixed(1) : String(Math.round(tinyRawMm));
+      const box = document.createElement('div'); box.id = 'v2TinyBox'; box.className = 'v2-tiny-box'; box.setAttribute('role', 'dialog');
+      box.innerHTML = `<div class="v2-tiny-card"><strong>This model is only ${x} mm high</strong><p>Adjust the height in advance, before shrinking: type the size you want in the Finished height box, then press RESIZE.</p><div class="v2-tiny-row"><button type="button" id="v2TinySet">SET THE HEIGHT</button><button type="button" id="v2TinyGo" class="alt">SHRINK ANYWAY</button></div></div>`;
+      document.body.appendChild(box);
+      const close = () => box.remove();
+      box.querySelector('#v2TinySet').addEventListener('click', () => { close(); const h = $('v2Height'); try { h?.scrollIntoView?.({ block: 'center' }); h?.focus(); h?.select?.(); } catch (_) {} });
+      box.querySelector('#v2TinyGo').addEventListener('click', () => { close(); btn.click(); });
+      box.addEventListener('click', e => { if (e.target === box) close(); });
+    }
+    function wireTinyWarning() {
+      for (const id of ['v2ShrinkBtn', 'v2MagicBtn']) {
+        const b = $(id); if (!b || b.dataset.tinyWired) continue; b.dataset.tinyWired = '1';
+        b.addEventListener('click', e => {
+          if (!tinyRawMm || tinyWarned || manualHeight || window.__shrinkBatchRunning || window.__shrinkTinyWarn === false) return;
+          tinyWarned = true; e.stopImmediatePropagation(); e.preventDefault(); tinyDialog(b);
+        }, true);
+      }
+    }
+    window.__shrinkWireTinyWarning = wireTinyWarning; window.__shrinkTiny = () => ({ raw: tinyRawMm, warned: tinyWarned });
+    setInterval(wireTinyWarning, 1500); wireTinyWarning();
     function fitHeightToModel() {
       if (manualHeight) return; // Do not overwrite a height entered before the delayed model-open fit.
       const units = window.__shrinkPrint?.state?.modelHeightUnits || 0; if (!(units > 0)) return;
       const glb = window.__shrinkApp?.sourceKind === 'glb', raw = Math.round((glb && units < 10 ? units * 1000 : units) * 10) / 10;
       // v2.274: under 30 mm (including a model in cm/inches/metres that reads as a few units) is brought up to 30 mm; 30 mm and taller keep their own height; over 500 keeps the normal default.
+      tinyRawMm = raw > 0 && raw < 30 ? raw : 0; tinyWarned = false;
       if (raw > 500) return;
       const mm = raw < 30 ? 30 : raw;
       const n = $('v2Height'); if (!n) return;
