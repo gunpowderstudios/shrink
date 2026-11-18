@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.342
+- **Piece library.** With a piece floating (copied with the Lasso, or opened from the library), press **ADD TO LIBRARY** and give it a name, such as "Paul's dagger". **LIBRARY** opens a grid of pictures; click one to add it to the workspace beside the model at the size you saved it, then move, turn, resize and WELD IT as usual. Rename (pencil) and delete (x) are on each tile. The library lives in this browser, so it survives reloads but not a different computer or cleared site data.
+- **COPY works on a model with open edges.** Before, COPY on a leaky sculpt gave a red error and told you to run FIX IT. Now it lifts out the surface under your loop as an open shell, so you can keep it in the library or move it. To weld a piece on, the model it goes onto must be closed (FIX IT first); CUT and the shape tools still need a closed model.
+
 ## v2.341
 - **SAVE PROJECT / LOAD PROJECT** (top of the EDIT panel). One `.shrinkproject` file holds the model as it is now (edits, shrink, hollow and all) and every floating piece you are holding, with their places and sizes. It works at any point, even before a SHRINK. Open it with LOAD PROJECT, or choose / drop it on the start screen. After loading, DOWNLOAD works straight away.
 - SAVE PIECES / LOAD PIECES and the "also save my pieces" tick box are gone: the project holds the pieces.

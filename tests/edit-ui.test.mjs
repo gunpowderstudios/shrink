@@ -482,4 +482,25 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2EdResult').textContent = ''; page.$('v2LassoDelBtn').click();
   ok(await waitFor(() => /Could not/.test(page.$('v2EdResult').textContent), 30000) && /attached/.test(page.$('v2EdResult').textContent) && tris(w.__shrinkWorkingModel()) === tri0, 'ED44 DELETE refuses and the model is untouched');
 }
+/* v2.342: piece library + COPY on an open (leaky) model */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() }; page.$('v2TabEdit').click(); await wait(80);
+  ok(!!page.$('v2LibAdd') && !!page.$('v2LibOpen') && page.$('v2LibAdd').disabled === true, 'ED46 ADD TO LIBRARY and LIBRARY are there; adding waits for a floating piece');
+  const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
+  for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'dagger.stl'); await wait(60); set(page, 'v2EdPartH', 18); await wait(30);
+  ok(page.$('v2LibAdd').disabled === false, 'ED46 with a piece floating, ADD TO LIBRARY is on');
+  const rec = await w.__shrinkEdit.libAdd("Paul's dagger"); ok(rec.name === "Paul's dagger" && rec.hMm === 18 && rec.tris === 12, 'ED46 the piece is stored with its name and size: ' + rec.name + ' ' + rec.hMm + ' mm');
+  ok((await w.__shrinkEdit.libList()).length === 1, 'ED46 the library lists it');
+  w.__shrinkEdit.reset(); await wait(100); ok(!w.__shrinkEdit.hasPart(), 'ED46 nothing floats after a reset');
+  await w.__shrinkEdit.libRender(); ok(page.w.document.querySelectorAll('.v2-lib-tile').length === 1 && /Paul/.test(page.w.document.querySelector('.v2-lib-name').textContent), 'ED46 the library grid shows one tile with the name');
+  await w.__shrinkEdit.libUse(rec.id); await wait(80); ok(w.__shrinkEdit.hasPart() && Math.abs(w.__shrinkEdit.partState().h - 18) < 0.01 && w.__shrinkEdit.partState().x > 0, 'ED46 clicking it adds the piece back at 18 mm, beside the model (x ' + w.__shrinkEdit.partState().x + ')');
+  await w.__shrinkEdit.libDelete(rec.id); ok((await w.__shrinkEdit.libList()).length === 0, 'ED46 deleting empties the library');
+}
+{ const page = await makePage({ model: models.holey(20), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(500);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() }; page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80);
+  w.__shrinkFuse.editModel = async () => { throw new Error('No printable solid parts could be read from this model after detail-preserving repair. Manifold rejected a mesh part after repair: Not manifold Run FIX IT or FUSE IT first.'); };   // what the sword model gives
+  const S = orthoCam(page, 0.55, 0.9); set(page, 'v2EdDepth', 'near'); w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
+  ok(await waitFor(() => /Copied|Could not/.test(page.$('v2EdResult').textContent), 90000) && /open shell/.test(page.$('v2EdResult').textContent) && w.__shrinkEdit.hasPart(), 'ED47 COPY on a leaky model still lifts out the surface as an open shell: ' + page.$('v2EdResult').textContent.slice(0, 120));
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

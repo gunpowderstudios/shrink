@@ -923,3 +923,12 @@ body[data-v2-preshrunk] :is(#v2MagicBtn,#v2ShrinkBtn){background:#3a414c!importa
 
 #viewer.v2-cur-wand,#viewer.v2-cur-wand canvas{cursor:cell}
 #v2EdLassoBox[data-tool="wand"] label:has(#v2EdWhole),#v2EdLassoBox[data-tool="wand"] .v2-hollow-row{display:none}
+/* v2.342 piece library */
+#v2LibPanel{position:fixed;z-index:9000;left:50%;top:50%;transform:translate(-50%,-50%);width:min(720px,92vw);max-height:80vh;overflow:auto;background:#101722;border:1px solid #3b6fd8;border-radius:16px;padding:14px;box-shadow:0 18px 60px rgba(0,0,0,.6)}#v2LibPanel[hidden]{display:none}
+.v2-lib-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}.v2-lib-head span{color:#9fb0c8;font-size:12px;flex:1}.v2-lib-head button{background:none;border:0;color:#cfd8e6;font-size:22px;cursor:pointer}
+.v2-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.v2-lib-empty{grid-column:1/-1;color:#9fb0c8;font-size:13px}
+.v2-lib-tile{position:relative;background:#18202c;border:1px solid #2c3a50;border-radius:12px;padding:8px;cursor:pointer;display:flex;flex-direction:column;gap:4px;text-align:center}.v2-lib-tile:hover{border-color:#5b8cf0;background:#1d2a3d}
+.v2-lib-tile img,.v2-lib-noimg{width:100%;aspect-ratio:1;border-radius:8px;object-fit:cover;background:#18202c}.v2-lib-noimg{display:grid;place-items:center;color:#6f7f96;font-size:11px}
+.v2-lib-name{font-weight:700;font-size:12px;color:#eef3fb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.v2-lib-tile small{color:#8fa0b8;font-size:10px}
+.v2-lib-ren,.v2-lib-del{position:absolute;top:6px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(10,14,22,.8);color:#dfe8f5;cursor:pointer;font-size:13px;line-height:1}.v2-lib-ren{left:6px}.v2-lib-del{right:6px}.v2-lib-del:hover{background:#b3342f}
+#v2LibRow button:disabled{opacity:.45}

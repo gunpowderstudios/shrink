@@ -1138,7 +1138,11 @@
       if (!direct && depthMode() === 'near') { const band = lassoMasks(sel, false)?.band; if (band) { near = band.near; far = band.far; } }
       const snap = op !== 'copy' ? cloneRoot(model) : null;
       progress(card, 40, 'Working…'); await paintNow();
-      const r = direct ? await wholePieceEdit(model, sel, op, whole) : await window.__shrinkFuse.editModel(model, { lasso: { pts: sel.pts, cam: sel.cam, near, far, op } });
+      let r;
+      try { r = direct ? await wholePieceEdit(model, sel, op, whole) : await window.__shrinkFuse.editModel(model, { lasso: { pts: sel.pts, cam: sel.cam, near, far, op } }); }
+      catch (err) {                                      // v2.342: an open (leaky) model cannot go through the solid tools, but COPY only needs the triangles under the loop
+        if (op === 'copy' && !direct && /manifold|printable|watertight|FIX IT|FUSE IT/i.test(String(err?.message || err))) { r = await wholePieceEdit(model, sel, 'copy', false); r.openCopy = true; } else throw err;
+      }
       progress(card, 85, 'Checking the result…');
       if (r.root) { if (snap) { if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift(); } removeEditPreview(); installWorkingResult(r.root, 'edit'); $('v2EdUndo').hidden = !editStack.length; setTimeout(updateHealthCard, 80); }
       const mm = f.mm; let msg;
@@ -1150,7 +1154,7 @@
         if (op === 'copy') { const ax = camAxes(sel.cam), w = bb.getSize(new THREE0.Vector3()).length() * 0.75; ['X', 'Y', 'Z'].forEach((a, i) => { $('v2EdPart' + a).value = (num('v2EdPart' + a) + ax.right[i] * w * f.mm).toFixed(2); }); }   // v2.319: the model is still whole, so the copy starts beside it instead of hidden inside it
         { const md = $('v2EdMode'); md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); }
         set$tool('part');
-        msg = `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. It floats in green and stays there until you press WELD IT, so you can cut or copy more pieces first.</span>`;
+        msg = r.openCopy ? `<strong>✓ Copied (open shell)</strong><span>This model has open edges, so the copy is just the surface under your loop, open at the back. It floats in green: save it to the LIBRARY or move it. To WELD it on later it must be closed, so repair that model first with FIX IT.</span>` : `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. It floats in green and stays there until you press WELD IT, so you can cut or copy more pieces first.</span>`;
       } else msg = r.mesh ? `<strong>✓ Deleted</strong><span>${r.tris.toLocaleString()} triangles removed. The model is too big to close the hole automatically, so it is open there. Press FIX IT (SHRINK & FINISH tab) to close it, or UNDO.</span>` : r.whole ? `<strong>✓ Deleted</strong><span>${r.islands} loose piece${r.islands === 1 ? '' : 's'} removed (${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml). Press UNDO if that is not what you wanted.</span>` : `<strong>✓ Deleted</strong><span>Now ${(r.volume * mm * mm * mm / 1000).toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. The hole is closed flat. Press UNDO if that is not what you wanted.</span>`;
       res.innerHTML = msg; card.dataset.state = 'good'; progress(card, 100, 'Done.');
       lassoSel = null; lassoPaint(null); removeLassoRed();
@@ -1429,12 +1433,88 @@
     return { name: head.name, pieces: n };
   }
   window.__shrinkOpenProject = async file => { try { return await loadProjectBuffer(await file.arrayBuffer()); } catch (err) { console.warn(err); window.__shrinkApp?.setStatus?.(String(err?.message || err), true); edToast?.(String(err?.message || err)); } };
-  function piecesUi() {}                                 // v2.341: the pieces buttons and the tick box under DOWNLOAD IT are gone, the project holds the pieces
+  function piecesUi() { const b = $('v2LibAdd'); if (b && b.disabled === !!editPart) b.disabled = !editPart; }   // v2.341: the pieces buttons and the tick box are gone (the project holds the pieces); v2.342: ADD TO LIBRARY needs a selected piece
   function ensurePiecesRow() {
     const pane = $('v2EditPane'); if (pane && !$('v2PiecesRow')) { const r = document.createElement('div'); r.id = 'v2PiecesRow'; r.className = 'v2-pieces-row';
     r.innerHTML = '<button type="button" id="v2ProjectSave" title="Save your work so far (the model as it is now and any floating pieces) to one file">SAVE PROJECT</button><button type="button" id="v2ProjectLoad" title="Open a saved SHRINK project">LOAD PROJECT</button><input type="file" id="v2ProjectFile" accept=".shrinkproject" hidden>';
     pane.insertBefore(r, pane.firstChild); r.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.id === 'v2ProjectSave') saveProjectFile(); else $('v2ProjectFile').click(); });
     $('v2ProjectFile').addEventListener('change', async e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) window.__shrinkOpenProject(f); }); }
+    ensureLibrary();
+  }
+  // ---- v2.342 PIECE LIBRARY: named pieces kept in this browser (IndexedDB 'shrink-library'; plain memory when IndexedDB is missing). A record is the piece's centred triangle soup + its size in mm + a small picture.
+  const libMem = new Map(); let libDb = null;
+  function libIdb() {
+    if (libDb) return libDb; if (typeof indexedDB === 'undefined') return (libDb = Promise.resolve(null));
+    return (libDb = new Promise(res => { try { const rq = indexedDB.open('shrink-library', 1); rq.onupgradeneeded = () => rq.result.createObjectStore('pieces', { keyPath: 'id' }); rq.onsuccess = () => res(rq.result); rq.onerror = () => res(null); } catch { res(null); } }));
+  }
+  async function libRun(mode, fn) { const db = await libIdb(); return new Promise((res, rej) => { const tx = db.transaction('pieces', mode), rq = fn(tx.objectStore('pieces')); tx.oncomplete = () => res(rq?.result); tx.onerror = tx.onabort = () => rej(tx.error); }); }
+  async function libAll() { const db = await libIdb(); const l = db ? (await libRun('readonly', st => st.getAll())) || [] : [...libMem.values()]; return l.sort((a, b) => b.created - a.created); }
+  async function libPut(rec) { if (!(await libIdb())) { libMem.set(rec.id, rec); return; } await libRun('readwrite', st => st.put(rec)); }
+  async function libDel(id) { if (!(await libIdb())) { libMem.delete(id); return; } await libRun('readwrite', st => st.delete(id)); }
+  function thumbOf(soup) {                              // a flat-shaded picture of the piece, drawn with the 2D canvas (no three.js, so it also works while the viewer is busy)
+    try {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 120; const g = cv.getContext?.('2d'); if (!g) return '';
+      const n = soup.length / 9, stride = Math.max(1, Math.ceil(n / 12000)), yaw = 0.6, pit = 0.45, cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pit), sp = Math.sin(pit), tris = [];
+      const P = (i) => { const x = soup[i], y = soup[i + 1], z = soup[i + 2], x1 = x * cy - z * sy, z1 = x * sy + z * cy; return [x1, y * cp - z1 * sp, y * sp + z1 * cp]; };
+      let x0 = 1e30, x1 = -1e30, y0 = 1e30, y1 = -1e30;
+      for (let t = 0; t < n; t += stride) { const a = P(t * 9), b = P(t * 9 + 3), c = P(t * 9 + 6); tris.push([a, b, c]); for (const q of [a, b, c]) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; } }
+      const k = 104 / (Math.max(x1 - x0, y1 - y0) || 1), ox = 60 - (x0 + x1) / 2 * k, oy = 60 + (y0 + y1) / 2 * k;
+      tris.sort((p, q) => (p[0][2] + p[1][2] + p[2][2]) - (q[0][2] + q[1][2] + q[2][2]));
+      g.fillStyle = '#18202c'; g.fillRect(0, 0, 120, 120);
+      for (const [a, b, c] of tris) {
+        const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+        let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+        const sh = 0.28 + 0.72 * Math.abs(nx * -0.35 + ny * 0.55 + nz * 0.75), v = Math.round(60 + 170 * sh);
+        g.fillStyle = `rgb(${v},${v},${Math.min(255, v + 12)})`; g.beginPath(); g.moveTo(a[0] * k + ox, oy - a[1] * k); g.lineTo(b[0] * k + ox, oy - b[1] * k); g.lineTo(c[0] * k + ox, oy - c[1] * k); g.closePath(); g.fill();
+      }
+      return cv.toDataURL('image/png');
+    } catch { return ''; }
+  }
+  async function libAddCurrent(name) {
+    if (!editPart) throw new Error('Select a floating piece first (copy something with the Lasso, or open a piece from the library).');
+    const soup = soupOf(editPart.geometry), rec = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: String(name || '').trim() || 'Piece', created: Date.now(), hMm: num('v2EdPartH', 30), tris: soup.length / 9, soup, thumb: thumbOf(soup) };
+    await libPut(rec); return rec;
+  }
+  async function libUse(id) {
+    const rec = (await libAll()).find(r => r.id === id); if (!rec) throw new Error('That piece is not in the library any more.');
+    const part = partFromPoints(new Float32Array(rec.soup), false, rec.name); setPart(part);
+    const f = editFrame(); if ($('v2EdPartH')) $('v2EdPartH').value = String(rec.hMm || 30); if (f && $('v2EdPartX')) $('v2EdPartX').value = (f.size.x * f.mm * 0.5 + (rec.hMm || 30) * 0.6).toFixed(2);   // starts beside the model, at the size it was saved at
+    const md = $('v2EdMode'); if (md) { md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); }
+    if (!editActive()) window.__shrinkTab?.('edit'); set$tool('part'); updateEditPreview(); return rec;
+  }
+  async function libRender() {
+    const box = $('v2LibGrid'); if (!box) return; const list = await libAll(); box.innerHTML = '';
+    if (!list.length) { box.innerHTML = '<p class="v2-lib-empty">Nothing here yet. Copy a part with the Lasso, then press ADD TO LIBRARY.</p>'; return; }
+    for (const r of list) {
+      const d = document.createElement('div'); d.className = 'v2-lib-tile'; d.dataset.id = r.id; d.title = `${r.name}: click to add it to the workspace`;
+      d.innerHTML = `${r.thumb ? `<img alt="" src="${r.thumb}">` : '<div class="v2-lib-noimg">no picture</div>'}<span class="v2-lib-name"></span><small>${Math.round(r.hMm)} mm · ${Number(r.tris).toLocaleString()} tris</small><button type="button" class="v2-lib-ren" data-act="ren" title="Rename">✎</button><button type="button" class="v2-lib-del" data-act="del" title="Delete from the library">×</button>`;
+      d.querySelector('.v2-lib-name').textContent = r.name; box.appendChild(d);
+    }
+  }
+  function ensureLibrary() {
+    const pane = $('v2EditPane'); if (!pane || $('v2LibRow')) return;
+    const row = document.createElement('div'); row.id = 'v2LibRow'; row.className = 'v2-pieces-row';
+    row.innerHTML = '<button type="button" id="v2LibAdd" title="Keep the selected floating piece in your library under a name" disabled>ADD TO LIBRARY</button><button type="button" id="v2LibOpen" title="Open your saved pieces">LIBRARY</button>';
+    { const pr = $('v2PiecesRow'); if (pr) pr.after(row); else pane.insertBefore(row, pane.firstChild); }
+    const panel = document.createElement('div'); panel.id = 'v2LibPanel'; panel.hidden = true; panel.innerHTML = '<div class="v2-lib-head"><strong>Piece library</strong><span>Click a piece to add it to the workspace. Saved in this browser.</span><button type="button" id="v2LibClose" title="Close">×</button></div><div id="v2LibGrid" class="v2-lib-grid"></div>';
+    document.body.appendChild(panel);
+    const close = () => { panel.hidden = true; };
+    row.addEventListener('click', async e => {
+      const b = e.target.closest('button'); if (!b || b.disabled) return;
+      if (b.id === 'v2LibOpen') { panel.hidden = !panel.hidden; if (!panel.hidden) libRender(); return; }
+      if (b.id === 'v2LibAdd') { const nm = window.prompt('Name this piece (for example "Paul\'s dagger")', editPart?.name && editPart.name !== 'Copied piece' ? editPart.name : ''); if (nm === null) return;
+        try { const rec = await libAddCurrent(nm); $('v2EdResult').innerHTML = `<strong>✓ Added to the library</strong><span>"${rec.name.replace(/[<>&]/g, '')}" is saved in this browser. Open the LIBRARY any time to bring it back.</span>`; if (!panel.hidden) libRender(); } catch (err) { edToast?.(String(err?.message || err)); } }
+    });
+    panel.addEventListener('click', async e => {
+      if (e.target.closest('#v2LibClose')) { close(); return; }
+      const t = e.target.closest('.v2-lib-tile'); if (!t) return; const id = t.dataset.id, act = e.target.closest('[data-act]')?.dataset.act;
+      try {
+        if (act === 'del') { if (window.confirm('Delete this piece from the library?')) { await libDel(id); libRender(); } return; }
+        if (act === 'ren') { const rec = (await libAll()).find(r => r.id === id), nm = rec && window.prompt('Rename this piece', rec.name); if (nm) { rec.name = nm.trim() || rec.name; await libPut(rec); libRender(); } return; }
+        await libUse(id); close();
+      } catch (err) { edToast?.(String(err?.message || err)); }
+    });
+    window.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) { close(); e.stopPropagation(); } }, true);
   }
   function discardPiece() { if (!editPart) return; dropSelected(); if (!editPart && !parked.length) set$tool('none'); $('v2EdResult').innerHTML = '<strong>Piece thrown away</strong><span>Nothing was changed on the model.</span>'; }
   async function weldAll() { let guard = 0; while (editPart && guard++ < 30) { const cur = editPart; await editModelNow(); if (editPart === cur) break; } }
@@ -1589,7 +1669,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
