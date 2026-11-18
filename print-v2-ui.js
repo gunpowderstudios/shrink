@@ -1207,7 +1207,7 @@
   const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   function gizmoPick(ndc, camIn) {
     const pm = editPart && partMatrix(); const cam = camIn || cameraSnap(); if (!pm || !cam) return null;
-    const R = gizmoSize(pm), c = [pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]], r = rayFor(cam, ndc), L = R * 1.3, Rr = R * 0.8;
+    const R = gizmoSize(pm), c = [pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]], r = rayFor(cam, ndc), L = R * 2.2, Rr = R * 0.8;
     const depth = Math.max(1e-6, dot3([c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]], r.fw)), perNdc = cam.persp ? cam.tanY * depth : cam.halfH, tol = Math.max(R * 0.07, perNdc * 0.04);
     let best = null, bd = Infinity;
     for (let i = 0; i < 3; i++) {                        // arrows: ray against the segment c .. c + L u
@@ -1238,13 +1238,13 @@
     updateEditPreview(); return true;
   }
   function gizmoBuild(THREE, pm) {
-    const R = gizmoSize(pm), L = R * 1.3, Rr = R * 0.8, gz = new THREE.Group(); gz.name = 'shrinkPartGizmo'; gz.raycast = () => {};
+    const R = gizmoSize(pm), L = R * 2.2, Rr = R * 0.8, gz = new THREE.Group(); gz.name = 'shrinkPartGizmo'; gz.raycast = () => {};
     gz.position.set(pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]);
     const mat = i => new THREE.MeshBasicMaterial({ color: GZ_COL[i], transparent: true, opacity: 0.95, depthTest: false, depthWrite: false }), put = (mesh, i) => { mesh.renderOrder = 1002; mesh.raycast = () => {}; mesh.name = 'gizmo-' + GZ_NAME[i]; return mesh; };
     for (let i = 0; i < 3; i++) {
       const u = new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), u), arrow = new THREE.Group(); arrow.quaternion.copy(q); arrow.raycast = () => {};
-      const shaft = put(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.022, R * 0.022, L * 0.8, 10), mat(i)), i); shaft.position.y = L * 0.4;
-      const cone = put(new THREE.Mesh(new THREE.ConeGeometry(R * 0.075, L * 0.22, 14), mat(i)), i); cone.position.y = L * 0.9; arrow.add(shaft, cone); gz.add(arrow);
+      const shaft = put(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.04, R * 0.04, L * 0.8, 10), mat(i)), i); shaft.position.y = L * 0.4;
+      const cone = put(new THREE.Mesh(new THREE.ConeGeometry(R * 0.12, L * 0.22, 14), mat(i)), i); cone.position.y = L * 0.9; arrow.add(shaft, cone); gz.add(arrow);
       const ring = put(new THREE.Mesh(new THREE.TorusGeometry(Rr, R * 0.016, 8, 72), mat(i)), i); ring.name = 'gizmo-ring-' + GZ_NAME[i]; ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), u); gz.add(ring);
     }
     return gz;

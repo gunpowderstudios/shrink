@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.327
+- The X / Y / Z arrows on the green piece are much longer (2.2 x the piece's radius instead of 1.3) and thicker, so they are easier to grab. The rings are unchanged.
+
 ## v2.326
 - Cut or copied pieces now **stay floating in green until you press WELD IT**. Cut or copy as many as you like: each new piece floats beside the others instead of replacing them.
 - **Click a green piece to pick it**: the picked one glows and gets the arrows, rings and − / +. Drag it to move it. The others wait, dimmer.
