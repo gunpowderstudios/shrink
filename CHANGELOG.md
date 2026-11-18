@@ -1,5 +1,11 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.344
+- **Easier to move a floating part.** The handles now include three flat squares next to the arrows and rings: the flat one slides the part along the ground (left/right and forward/back), the two upright ones slide it up/down with left/right or forward/back. The arrows and rings work as before.
+- **Part looks like the model.** A floating part is the same resin grey as the model with a blue outline (orange outline when set to cut), so it is easy to see against the model. The red overlap marking is unchanged.
+- **UPLOAD A PART** is now at the top of the EDIT card whatever tool is open; it switches to Paste part and places the part on top of the model.
+- **Select tool brings the handles back.** With Select (or Paste part) a floating part shows its arrows, rings, squares and +/- again, and a waiting part is picked up automatically when you switch to the tool or click it.
+
 ## v2.343
 - **DOWNLOAD PIECE (STL).** In the EDIT card, under DELETE / COPY: with a loop drawn (or a piece touched with the wand), this saves just the part inside the red area as its own STL, at the size it has on your model. The model is not changed. A floating green piece has the same button on its pad. A piece cut from a model with open edges is an open shell. You can open the saved file again later with Paste part, or add it to the library.
 
