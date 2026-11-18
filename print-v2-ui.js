@@ -1132,7 +1132,7 @@
     partRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...ax), sgn * ang).multiply(partRot || new THREE.Quaternion()); updateEditPreview();
   }
   function ensurePad() {
-    let pad = $('v2PartPad'); if (pad) return pad; const v = $('viewer'); if (!v) return null;
+    let pad = $('v2PartPad'); if (pad) return pad; const v = $('viewer'), host = $('v2EditPanel') || v; if (!host) return null;   // v2.322: the pad lives at the top of the EDIT panel (the old bottom-right corner of the 3D view can be below the visible screen)
     pad = document.createElement('div'); pad.id = 'v2PartPad'; pad.className = 'v2-part-pad'; pad.hidden = true;
     const b = (a, t, tip) => `<button type="button" data-pad="${a}" title="${tip}" aria-label="${tip}">${t}</button>`;
     pad.innerHTML = `<div class="v2-pad-title">Drag the green part</div>
@@ -1143,7 +1143,7 @@
       <div class="v2-pad-foot"><select id="v2PadStep" aria-label="Step size"><option value="s">Fine steps</option><option value="m" selected>Medium steps</option><option value="l">Big steps</option></select><button type="button" id="v2PadPlace" class="v2-pad-go">PLACE IT</button><button type="button" id="v2PadCancel" class="v2-pad-no">CANCEL</button></div>`;
     pad.addEventListener('pointerdown', e => e.stopPropagation()); pad.addEventListener('wheel', e => e.stopPropagation());
     pad.addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; if (bt.dataset.pmode) { padMode = bt.dataset.pmode; padModeState(); } else if (bt.dataset.pad) padAct(bt.dataset.pad); else if (bt.id === 'v2PadPlace') editModelNow(); else if (bt.id === 'v2PadCancel') { setPart(null); set$tool('none'); $('v2EdResult').innerHTML = '<strong>Part put away</strong><span>Nothing was changed.</span>'; } });
-    v.appendChild(pad); return pad;
+    if (host.id === 'v2EditPanel') host.insertBefore(pad, $('v2EditPane') || null); else host.appendChild(pad); return pad;
   }
   // ---- v2.319: grab the ghost with the mouse. MOVE drags it in the screen plane (Shift = nearer / farther), TURN spins it like a ball, SIZE drags up / down.
   let padMode = 'move', partDrag = null, hoverAt = 0;
@@ -1188,7 +1188,7 @@
     const partDragEnd = () => { if (!partDrag) return; partDrag = null; v.classList.remove('v2-cur-grabbing'); };
     v.addEventListener('pointerup', partDragEnd, true); v.addEventListener('pointercancel', partDragEnd, true); window.addEventListener('pointerup', partDragEnd, true); window.addEventListener('blur', partDragEnd);
   }
-  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); if (show) { wirePartDrag(); padModeState(); } }
+  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); if (show) { wirePartDrag(); padModeState(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
   function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
   function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
   function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT

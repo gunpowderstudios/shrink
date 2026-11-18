@@ -893,3 +893,6 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-edit-t
 .v2-edit-panel[hidden]{display:none!important}
 .v2-edit-panel-head{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:#e8eef5;font-size:13px}.v2-edit-panel-head span{opacity:.6;font-size:11px;flex:1}
 .v2-edit-close{border:1px solid #3a4b61;border-radius:8px;background:#142033;color:#cdd6e2;font:inherit;padding:3px 9px;cursor:pointer}.v2-edit-close:hover{border-color:#2f86ff;color:#fff}
+
+/* v2.322 — the part pad sits at the top of the EDIT panel */
+.v2-edit-panel .v2-part-pad{position:static;right:auto;bottom:auto;width:auto;margin:0 0 12px;box-shadow:none;border-color:#27c088}

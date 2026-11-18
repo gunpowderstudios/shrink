@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.322
+- The MOVE / TURN / SIZE pad for a copied or cut part now sits at the top of the EDIT panel instead of the bottom-right corner of the 3D view, which could be below the visible screen. It shows as soon as a part is waiting.
+
 ## v2.321
 - **EDIT** is now a button on the top menu, right of ADVANCED. Its tools (Lasso, Razor, Sculpt, Shape, Paste part, Slice) drop down in their own panel over the viewer, so the ADVANCED column can stay closed and the model keeps the room. Press EDIT again or the ✕ to fold it away. The old "1 · EDIT / 2 · SHRINK & FINISH" tabs in the side card are gone; that card is just the finish tools now.
 

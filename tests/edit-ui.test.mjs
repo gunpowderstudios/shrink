@@ -279,6 +279,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   const st0 = w.__shrinkEdit.partState(); ok(Math.abs(st0.x) > 1, `ED31 a copy starts beside its source, not hidden inside it (x ${st0.x.toFixed(1)} mm)`);
   ok(w.__shrinkEdit.ghosts() === 2 && !!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview').getObjectByName('shrinkPartGhostSee'), 'ED31 the ghost is drawn twice: solid in front and see-through behind the model');
   ok(!!page.$('v2PartPad') && page.$('v2PartPad').querySelectorAll('[data-pmode]').length === 3 && page.$('v2PartPad').querySelector('[data-pmode="move"]').getAttribute('aria-pressed') === 'true', 'ED31 the pad has MOVE / TURN / SIZE with MOVE on');
+  ok(page.$('v2EditPanel').contains(page.$('v2PartPad')) && page.$('v2PartPad').nextElementSibling?.id === 'v2EditPane' && w.__shrinkEdit.padVisible(), 'ED31 the pad sits at the top of the EDIT panel, where it is always in view');
   /* MOVE: dragging right by 0.2 of the screen half-width moves the part right by that much in the view plane */
   const ex = L.cam.halfW * 0.2 * st0.h / st0.h; const mm = w.__shrinkPrint.mmPerUnit();
   ok(w.__shrinkEdit.drag('move', [0, 0], [0.2, 0.1], false, L.cam), 'ED31 MOVE drag runs');
