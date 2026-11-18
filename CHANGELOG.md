@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.324
+- The first time you open EDIT the **Lasso** is already selected, so you can draw straight away. After that it remembers the tool you last used.
+
 ## v2.323
 - Pasting a part: where the floating part overlaps the model it now turns **red**, so you can see it is joined there. A note in the pad says "Red = where it overlaps the model, so it will be joined there", or "Not touching the model yet" when it would stay a separate piece (and, for a Cut part, what will be cut away). It updates a moment after you stop moving the part. Models over 1,000,000 triangles do not show it.
 - While the EDIT panel is open, the right-hand health box, SHRINK and DOWNLOAD modules step aside to give the model more room. They come back when you close EDIT.

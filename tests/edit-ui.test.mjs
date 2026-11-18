@@ -16,7 +16,9 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(!!page.$('v2EdGo') && /CUT SHAPE OUT/.test(page.$('v2EdGo').textContent), 'ED1 the button reads CUT SHAPE OUT for the default (cut a cube)');
   page.$('v2TabEdit').click(); await wait(100);
   ok(page.$('v2EditPanel').hidden === false && page.$('v2TabEdit').getAttribute('aria-pressed') === 'true', 'ED2 clicking EDIT drops the panel down');
-  ok(!!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') || !w.__shrinkViewer, 'ED2 the EDIT tab shows the shape preview');
+  ok(page.$('v2EdTab').value === 'lasso' && page.$('v2EdLassoBox').hidden === false, 'ED2 the first time EDIT opens the Lasso is already selected');
+  set(page, 'v2EdTab', 'shape'); await wait(60);
+  ok(!!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') || !w.__shrinkViewer, 'ED2 the Shape tool shows its preview');
 
   const t0 = tris(w.__shrinkWorkingModel()), m0 = w.__shrinkWorkingModel();
   set(page, 'v2EdKind', 'ball'); set(page, 'v2EdW', 12); set(page, 'v2EdH', 12); set(page, 'v2EdD', 12);
@@ -77,6 +79,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
   page.$('v2TabEdit').click(); await wait(100);
   const pressed = (g, v) => page.$('v2EditCard').querySelector(`.v2-icon-btn[data-ed="${g}"][data-value="${v}"]`)?.getAttribute('aria-pressed');
+  ok(pressed('tool', 'lasso') === 'true', 'ED14 the Lasso icon is highlighted when EDIT first opens'); set(page, 'v2EdTab', 'shape'); await wait(50);
   ok(page.$('v2EditCard').querySelectorAll('.v2-icon-btn svg').length >= 9, 'ED14 the tool, shape and join/cut choices are icon buttons');
   ok(pressed('tool', 'shape') === 'true' && pressed('kind', 'cube') === 'true' && pressed('mode', 'cut') === 'true', 'ED14 the defaults are highlighted');
   page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="kind"][data-value="ball"]').click(); await wait(50);
@@ -146,7 +149,8 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
   page.$('v2TabEdit').click(); await wait(50);
   const tool = v => page.$('v2EditCard').querySelector(`.v2-icon-btn[data-ed="tool"][data-value="${v}"]`);
-  ok(page.$('v2EdTab').value === 'shape', 'ED23 starts on the Shape tool');
+  ok(page.$('v2EdTab').value === 'lasso', 'ED23 EDIT opens on the Lasso'); tool('shape').click(); await wait(50);
+  ok(page.$('v2EdTab').value === 'shape', 'ED23 the Shape tool can be picked');
   tool('shape').click(); await wait(50);
   ok(page.$('v2EdTab').value === 'none' && tool('shape').getAttribute('aria-pressed') === 'false' && page.$('v2EdShapeBox').hidden === true && page.$('v2EdRun').hidden === true, 'ED23 clicking the pressed tool puts it down');
   ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), 'ED23 and removes its preview');
@@ -237,7 +241,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
 }
 /* v2.317: the "too many triangles" warning depends on the tool */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
-  w.__shrinkFuseTriLimit = 100; page.$('v2TabEdit').click(); await wait(80);
+  w.__shrinkFuseTriLimit = 100; page.$('v2TabEdit').click(); await wait(80); set(page, 'v2EdTab', 'shape'); await wait(40);
   const hint = () => page.$('v2EdHint'), tool = v => page.$('v2EditCard').querySelector(`.v2-icon-btn[data-ed="tool"][data-value="${v}"]`);
   ok(!hint().hidden && /Shapes needs under 100/.test(hint().textContent), 'ED29 Shape warns when the model is over the Manifold limit: ' + hint().textContent.slice(0, 90));
   tool('slice').click(); await wait(40); ok(/Slicing needs under/.test(hint().textContent) && /Sculpt tool works on bigger/.test(hint().textContent), 'ED29 Slice names itself and points to Sculpt');

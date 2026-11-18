@@ -1313,9 +1313,11 @@
     }
     if (hint.textContent !== msg) hint.textContent = msg; if (hint.hidden !== !msg) hint.hidden = !msg;
   }
+  let editOpened = false;
   function setMainTab(tab) {
     const pn = $('v2EditPanel'); if (!pn) return;
     tab = tab === 'edit' ? 'edit' : 'finish'; setHid(pn, tab !== 'edit'); $('v2TabEdit')?.setAttribute('aria-pressed', String(tab === 'edit'));
+    if (tab === 'edit' && !editOpened) { editOpened = true; const sel = $('v2EdTab'); if (sel && sel.value !== 'lasso') { sel.value = 'lasso'; sel.dispatchEvent(new Event('change', { bubbles: true })); } }   // v2.325: the first time EDIT opens the Lasso is already selected
     document.body.classList.toggle('v2-editing', tab === 'edit');          // v2.324: while EDIT is open the health box, SHRINK and DOWNLOAD step aside (CSS)
     if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { removeEditPreview(); clearLasso(); updatePad(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-sculpt'); sculptRing(null); }
   }

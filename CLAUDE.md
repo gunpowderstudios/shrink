@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.323** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.324** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -113,6 +113,8 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 (v2.322) `#v2PartPad` is now inserted at the top of `#v2EditPanel` (before `#v2EditPane`), not into `#viewer`: in a real browser the viewer can be taller than the window and its bottom-right corner was off screen. Falls back to `#viewer` when there is no panel. CSS makes it static inside the panel.
 
 (v2.323) Overlap preview: `overlapUpdate()` (debounced 160 ms by `scheduleOverlap()` from `updateEditPreview()`) marks every ghost triangle with at least one vertex inside the model in a red `shrinkPartOverlap` group (depthTest off). Inside = parity of a +Y ray against a cached grid of the model's world triangles (`ovBuild`/`ovInside`, cached per model + `__shrinkStretchTick`, skipped above `FUSE_MAX_TRIANGLES`); no BVH needed. Note text in `#v2PadJoin`. `body.v2-editing` (set by `setMainTab`) hides `#v2HealthCard` and `#v2SideStack` while the EDIT panel is open. Tests: ED34, ED35. The multitool split-download failures (A1-A4) predate this and are still there.
+
+(v2.324) `setMainTab('edit')` selects the Lasso the first time the panel opens (`editOpened`); later opens keep the last tool. Tests that need the Shape tool now pick it explicitly.
 
 ### CLAY / Brush (v2.141; switched off in v2.173; back on in v2.308 as the Brush tool in the EDIT tab, chip BRUSH)
 `clay.js` (ES module, loaded by `ui-mode.js`; card built into `#v2ClayHost`, which `print-v2-ui.js` puts above the Advanced drawer) + `clay-core.js` (no DOM, no three.js: icosphere, `dabSoup`, `dabsAlong`, `thin`, `joinSoups`). Strokes are lists of world-space balls `{x,y,z,r}` kept in `window.__shrinkClay` (`hasClay`, `apply`, `finish`, `addStroke` for tests). The preview is two `InstancedMesh`es in a `shrinkClay` scene group (pink = add, orange = cut); they ignore raycasts. Painting raycasts the working model; Ctrl/Cmd+drag rotates, Esc leaves the tool, as the other brushes do. `fixHealthModel()` calls `__shrinkClay.apply(model)` instead of the gentle repair when clay exists, and `shrinkMyModel()` no longer skips the fix step when clay is present. `apply()`: route A = `modelToSolid` (exact Manifold union/difference, keeps all detail); route B (Manifold rejects a leaky mesh, e.g. piece_55) = add balls to the triangle soup and run `makeWatertight` (balanced, then fast; `high` pinches), then subtract cuts with Manifold. The result must pass `healthOfModel` or nothing is installed. Ball count is thinned and coarsened (`ballLevel`) because the wrap refuses above 1.5M triangles. Tests: `tests/clay.test.mjs`.
