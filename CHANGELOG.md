@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.321
+- **EDIT** is now a button on the top menu, right of ADVANCED. Its tools (Lasso, Razor, Sculpt, Shape, Paste part, Slice) drop down in their own panel over the viewer, so the ADVANCED column can stay closed and the model keeps the room. Press EDIT again or the ✕ to fold it away. The old "1 · EDIT / 2 · SHRINK & FINISH" tabs in the side card are gone; that card is just the finish tools now.
+
 ## v2.320
 - EDIT tab keyboard shortcuts (not while typing in a box): **Ctrl/⌘+Z** undo, **Delete** (or Backspace) removes the red part, **Ctrl/⌘+C** copies it, **Ctrl/⌘+X** cuts it off and keeps it, **Ctrl/⌘+V** places the floating part, **+ / −** make the Sculpt tip larger / smaller, and **X / Y / Z** turn the floating part about that axis (hold Shift for the other way; the step follows the pad's Fine / Medium / Big setting).
 

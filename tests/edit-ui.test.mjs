@@ -12,10 +12,10 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
 
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
   const card = page.$('v2EditCard'); ok(!!card && !!page.$('v2EditPane')?.contains(card), 'ED1 the Edit model card lives in the EDIT pane');
-  ok(page.$('v2EditCard').closest('.v2-main-card').dataset.tab === 'finish' && page.$('v2TabEdit')?.getAttribute('aria-selected') === 'false', 'ED1 the page opens on SHRINK & FINISH, not EDIT');
+  ok(page.$('v2EditPanel').hidden === true && page.$('v2TabEdit')?.getAttribute('aria-pressed') === 'false' && !page.$('v2EditCard').closest('.v2-main-card') && !page.$('v2TabFinish'), 'ED1 the EDIT tools start folded away in their own panel, with an EDIT button of their own');
   ok(!!page.$('v2EdGo') && /CUT SHAPE OUT/.test(page.$('v2EdGo').textContent), 'ED1 the button reads CUT SHAPE OUT for the default (cut a cube)');
   page.$('v2TabEdit').click(); await wait(100);
-  ok(page.$('v2EditCard').closest('.v2-main-card').dataset.tab === 'edit' && page.$('v2TabFinish').getAttribute('aria-selected') === 'false', 'ED2 clicking EDIT switches the tab');
+  ok(page.$('v2EditPanel').hidden === false && page.$('v2TabEdit').getAttribute('aria-pressed') === 'true', 'ED2 clicking EDIT drops the panel down');
   ok(!!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') || !w.__shrinkViewer, 'ED2 the EDIT tab shows the shape preview');
 
   const t0 = tris(w.__shrinkWorkingModel()), m0 = w.__shrinkWorkingModel();
@@ -49,8 +49,8 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(page.$('v2EdDepth').value === 'through' && /CUT OFF$/.test(page.$('v2LassoDelBtn').textContent.trim()) && /CUT OFF & KEEP/.test(page.$('v2LassoKeepBtn').textContent), 'ED10 the Razor cuts right through and reads CUT OFF / CUT OFF & KEEP');
   set(page, 'v2EdTab', 'shape'); await wait(50);
   ok(page.$('v2EdLassoBox').hidden === true && page.$('v2EdRun').hidden === false, 'ED10 going back to Shape hides the lasso controls');
-  page.$('v2TabFinish').click(); await wait(50);
-  ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') && page.$('v2EditCard').closest('.v2-main-card').dataset.tab === 'finish', 'ED11 SHRINK & FINISH removes the edit preview');
+  page.$('v2TabEdit').click(); await wait(50);
+  ok(!w.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview') && page.$('v2EditPanel').hidden === true, 'ED11 pressing EDIT again folds the panel away and removes the edit preview');
   /* an edit after hollowing is refused */
   w.__shrinkMarkApplied('shrunk'); page.$('v2HollowWall').value = '2'; page.$('v2HollowBtn').click();
   await waitFor(() => /Hollowed|Could not/.test(page.$('v2HollowResult').textContent), 110000);
@@ -310,5 +310,16 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(s1 > s0 && s2 < s1, `ED32 + and - change the Sculpt tip size (${s0} -> ${s1} -> ${s2})`);
   set(page, 'v2EdTab', 'lasso'); w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; key('Delete');
   ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Deleted/.test(page.$('v2EdResult').textContent), 'ED32 Delete removes the red part');
+}
+/* v2.321: EDIT has its own button and panel, independent of ADVANCED */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const dash = page.$('v2LeftToggle').closest('.print-v2-dashboard') || w.document.querySelector('.print-v2-dashboard');
+  ok(dash.dataset.left === 'closed' && page.$('v2EditPanel').hidden === true, 'ED33 ADVANCED and the edit panel both start closed');
+  const adv = page.$('v2LeftToggle'), ed = page.$('v2TabEdit'); ok(!!ed && adv.parentElement === ed.parentElement && adv.nextElementSibling === ed, 'ED33 the EDIT button sits right next to ADVANCED');
+  ed.click(); await wait(80);
+  ok(page.$('v2EditPanel').hidden === false && dash.dataset.left === 'closed' && !page.$('v2EditPanel').closest('.v2-left-stack') && page.$('v2EditPanel').contains(page.$('v2EditCard')), 'ED33 EDIT opens its own panel while ADVANCED stays closed');
+  page.$('v2EditPanel').querySelector('.v2-edit-close').click(); await wait(50);
+  ok(page.$('v2EditPanel').hidden === true && ed.getAttribute('aria-pressed') === 'false', 'ED33 the close button folds it away');
+  adv.click(); await wait(50); ed.click(); await wait(50); ok(dash.dataset.left === 'open' && page.$('v2EditPanel').hidden === false, 'ED33 both can be open together');
 }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

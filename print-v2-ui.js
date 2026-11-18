@@ -1226,7 +1226,7 @@
     }
     V.scene.add(g);
   }
-  const editActive = () => $('v2EditCard')?.closest('.v2-main-card')?.dataset.tab === 'edit';
+  const editActive = () => { const p = $('v2EditPanel'); return !!p && !p.hidden; };   // v2.321: the EDIT tools have their own drop-down panel under the EDIT button
   function editTabChanged() {
     const t = $('v2EdTab').value, sl = t === 'slice';
     const lz = t === 'lasso' || t === 'razor';
@@ -1260,9 +1260,8 @@
     if (hint.textContent !== msg) hint.textContent = msg; if (hint.hidden !== !msg) hint.hidden = !msg;
   }
   function setMainTab(tab) {
-    const mc = $('v2EditCard')?.closest('.v2-main-card'); if (!mc) return;
-    tab = tab === 'edit' ? 'edit' : 'finish'; mc.dataset.tab = tab;
-    mc.querySelectorAll('.v2-main-tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    const pn = $('v2EditPanel'); if (!pn) return;
+    tab = tab === 'edit' ? 'edit' : 'finish'; setHid(pn, tab !== 'edit'); $('v2TabEdit')?.setAttribute('aria-pressed', String(tab === 'edit'));
     if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { removeEditPreview(); clearLasso(); updatePad(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-sculpt'); sculptRing(null); }
   }
   window.__shrinkTab = setMainTab;
@@ -2029,8 +2028,10 @@
     if (detail) detailBox.appendChild(detail);
     const actions = document.createElement('div'); actions.className = 'v2-main-actions';
     ['v2ShrinkCard', 'v2FixCard', 'v2FuseCard', 'v2HollowCard'].forEach(id => { const el = $(id); if (el) actions.appendChild(el); });
-    { const pane = document.createElement('div'); pane.id = 'v2EditPane'; pane.className = 'v2-edit-pane';
-      ['v2EditCard', 'v2ClayCard'].forEach(id => { const el = $(id); if (el) pane.appendChild(el); }); actions.appendChild(pane); }
+    { const panel = document.createElement('div'); panel.id = 'v2EditPanel'; panel.className = 'v2-edit-panel'; panel.hidden = true;   // v2.321: dropped down from the EDIT button (moved into the viewer panel below), so ADVANCED can stay closed
+      panel.innerHTML = '<div class="v2-edit-panel-head"><strong>EDIT</strong><span>optional</span><button type="button" class="v2-edit-close" aria-label="Close the edit tools" title="Close">✕</button></div>';
+      const pane = document.createElement('div'); pane.id = 'v2EditPane'; pane.className = 'v2-edit-pane';
+      ['v2EditCard', 'v2ClayCard'].forEach(id => { const el = $(id); if (el) pane.appendChild(el); }); panel.appendChild(pane); dashboard.appendChild(panel); }
     // Keep the native export controls available to BATCH, but show only the
     // one DOWNLOAD beneath MODEL HEALTH to users.
     const dl = document.createElement('div'); dl.className = 'v2-main-download';
@@ -2046,11 +2047,8 @@
     // v2.222: the health box stays in the 3D view on the right, always visible; the tools live in their own foldable card on the left.
     const mainCard = document.createElement('div'); mainCard.className = 'v2-main-card';
     const hdr = document.createElement('div'); hdr.className = 'v2-main-title'; hdr.textContent = 'Pick just what you need, in any order. Or press SHRINK under the health box.';
-    const tabs = document.createElement('div'); tabs.className = 'v2-main-tabs'; tabs.setAttribute('role', 'tablist');
-    tabs.innerHTML = '<button type="button" id="v2TabEdit" data-tab="edit" role="tab" aria-selected="false">1 · EDIT <small>optional</small></button><button type="button" id="v2TabFinish" data-tab="finish" role="tab" aria-selected="true">2 · SHRINK &amp; FINISH</button>';
-    tabs.addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) setMainTab(b.dataset.tab); });
     mainCard.dataset.tab = 'finish';
-    mainCard.append(hdr, tabs, main);
+    mainCard.append(hdr, main);
     const tgl = $('v2LeftToggle');
     while (stack.firstChild) { if (stack.firstChild === tgl) { stack.removeChild(tgl); continue; } hold.appendChild(stack.firstChild); }
     if (tgl) stack.appendChild(tgl);
@@ -2234,6 +2232,11 @@
     const advancedToggle = $('v2LeftToggle');
     const viewerActions = viewerPanel?.querySelector('.viewer-toolbar .viewer-actions');
     if (advancedToggle && viewerActions) viewerActions.insertBefore(advancedToggle, viewerActions.firstChild);
+    // v2.321: EDIT sits right of ADVANCED on the top menu; its tools drop down in their own panel over the viewer, so the ADVANCED column can stay shut and the model keeps the room.
+    { const ed = document.createElement('button'); ed.type = 'button'; ed.id = 'v2TabEdit'; ed.className = 'v2-edit-toggle'; ed.setAttribute('aria-pressed', 'false'); ed.textContent = 'EDIT'; ed.title = 'Lasso, razor, sculpt, shapes and paste a part';
+      if (viewerActions) viewerActions.insertBefore(ed, advancedToggle ? advancedToggle.nextSibling : viewerActions.firstChild); else (viewerPanel || dashboard).appendChild(ed);
+      const pn = $('v2EditPanel'); if (pn) (viewerPanel || dashboard).appendChild(pn);
+      ed.addEventListener('click', () => setMainTab(editActive() ? 'finish' : 'edit')); pn?.querySelector('.v2-edit-close')?.addEventListener('click', () => setMainTab('finish')); }
     // The panel folds away again (as before v2.215); the choice is remembered.
     { const tg = $('v2LeftToggle');
       const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = 'ADVANCED' /* v2.236: just the one word, open or closed */; };

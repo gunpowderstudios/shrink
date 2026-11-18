@@ -884,3 +884,12 @@ body.app-mode-print.print-v2-active .v2-main-download > #v2DownloadGlb{display:n
 .v2-pad-modes{display:flex;gap:4px;margin-bottom:8px}.v2-pad-modes button{flex:1;font-size:10px;font-weight:700;padding:5px 2px}
 .v2-pad-modes button[aria-pressed="true"]{background:#1f9d6b;border-color:#27c088}
 #viewer.v2-cur-grab{cursor:grab!important}#viewer.v2-cur-grabbing{cursor:grabbing!important}
+
+/* v2.321 — EDIT: a button right of ADVANCED, tools in their own panel dropped down over the viewer */
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-edit-toggle{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;padding:9px 16px;border-radius:9px;border:1px solid #2f86ff;background:#1d6bd8;color:#fff;font:inherit;font-size:12px;font-weight:800;line-height:1.2;white-space:nowrap;cursor:pointer}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-edit-toggle:hover{background:#2a7ae8}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-edit-toggle[aria-pressed="true"]{background:#0f4aa0;box-shadow:0 0 0 2px rgba(47,134,255,.45)}
+.v2-edit-panel{position:absolute;z-index:20;top:62px;left:12px;width:min(380px,calc(100% - 24px));max-height:calc(100% - 78px);overflow-y:auto;padding:12px;border-radius:14px;border:1px solid #2f86ff;background:rgba(14,22,34,.97);box-shadow:0 10px 32px rgba(0,0,0,.5)}
+.v2-edit-panel[hidden]{display:none!important}
+.v2-edit-panel-head{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:#e8eef5;font-size:13px}.v2-edit-panel-head span{opacity:.6;font-size:11px;flex:1}
+.v2-edit-close{border:1px solid #3a4b61;border-radius:8px;background:#142033;color:#cdd6e2;font:inherit;padding:3px 9px;cursor:pointer}.v2-edit-close:hover{border-color:#2f86ff;color:#fff}

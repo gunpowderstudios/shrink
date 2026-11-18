@@ -112,7 +112,7 @@ export async function makePage({ model, heightMm = 52, splitMax = 80, live = nul
   const html = `<!doctype html><html><body class="app-mode-print"><header class="topbar"></header>
   <div class="mode-chooser"></div>
   <main id="workspace" class="workspace">
-    <section class="viewer-panel"><div id="viewer" class="viewer"><div class="viewer-help">help</div></div></section>
+    <section class="viewer-panel"><div class="viewer-toolbar"><div class="viewer-actions"></div></div><div id="viewer" class="viewer"><div class="viewer-help">help</div></div></section>
     <section id="stepSave"><div class="export-row"><button id="saveStlBtn">Save STL</button><button id="saveObjBtn">Save OBJ</button></div>
       <label><input id="zUpToggle" type="checkbox" checked></label></section>
     <input id="figureHeightMm" value="${heightMm}"><select id="printerPreset"><option value="0.05">r</option><option value="0.2">f</option><option value="custom">c</option></select>
