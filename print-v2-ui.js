@@ -1006,10 +1006,10 @@
       for (let k = off[g]; k < off[g + 1]; k++) { const n = nbr[k]; if (d.mark[n] !== tag) { d.mark[n] = tag; q.push(n); } }
     }
     if (!G.length) return false;
-    const fall = dist.map(dd => { const t = dd / R, u = 1 - t * t; return mode === 'smooth' ? Math.min(1, u * 1.6) : u * u; });
+    const fall = dist.map(dd => { const t = dd / R, u = 1 - t * t; return mode === 'smooth' ? Math.min(1, u * 3) : u * u; });   // v2.337: smooth is flat across most of the tip so it irons the whole patch
     const smoothPass = lam => { const out = new Float32Array(G.length * 3); G.forEach((g, i) => { let ax = 0, ay = 0, az = 0, c = off[g + 1] - off[g]; if (!c) { out[i * 3] = P[g * 3]; out[i * 3 + 1] = P[g * 3 + 1]; out[i * 3 + 2] = P[g * 3 + 2]; return; } for (let k = off[g]; k < off[g + 1]; k++) { const n = nbr[k]; ax += P[n * 3]; ay += P[n * 3 + 1]; az += P[n * 3 + 2]; } const w = lam * fall[i]; out[i * 3] = P[g * 3] + w * (ax / c - P[g * 3]); out[i * 3 + 1] = P[g * 3 + 1] + w * (ay / c - P[g * 3 + 1]); out[i * 3 + 2] = P[g * 3 + 2] + w * (az / c - P[g * 3 + 2]); }); G.forEach((g, i) => { P[g * 3] = out[i * 3]; P[g * 3 + 1] = out[i * 3 + 1]; P[g * 3 + 2] = out[i * 3 + 2]; }); };
-    if (mode === 'smooth') { smoothPass(0.6 * s); smoothPass(-0.64 * s); }
-    else { const sg = mode === 'pull' ? 1 : -1, amt = sg * s * R * 0.015; G.forEach((g, i) => { P[g * 3] += nrm[0] * amt * fall[i]; P[g * 3 + 1] += nrm[1] * amt * fall[i]; P[g * 3 + 2] += nrm[2] * amt * fall[i]; }); smoothPass(0.3); }
+    if (mode === 'smooth') { const reps = 1 + Math.round(s * 7); for (let i = 0; i < reps; i++) { smoothPass(0.6); smoothPass(-0.63); } }   // v2.337: several passes per dab (1 at strength 1, 6 at 7, 8 at 10)
+    else { const sg = mode === 'pull' ? 1 : -1, amt = sg * s * R * 0.12; /* v2.337: was 0.015, which took dozens of dabs to show */ G.forEach((g, i) => { P[g * 3] += nrm[0] * amt * fall[i]; P[g * 3 + 1] += nrm[1] * amt * fall[i]; P[g * 3 + 2] += nrm[2] * amt * fall[i]; }); smoothPass(0.3); smoothPass(-0.32); }
     const touched = new Set();
     for (const g of G) for (let k = vOff[g]; k < vOff[g + 1]; k++) { const m = meshes[vm[k]], e = m.inv, X = P[g * 3], Y = P[g * 3 + 1], Z = P[g * 3 + 2]; m.mesh.geometry.attributes.position.setXYZ(vi[k], e[0] * X + e[4] * Y + e[8] * Z + e[12], e[1] * X + e[5] * Y + e[9] * Z + e[13], e[2] * X + e[6] * Y + e[10] * Z + e[14]); touched.add(m); }
     touched.forEach(m => { m.mesh.geometry.attributes.position.needsUpdate = true; sculptTouched.add(m); });
@@ -1031,7 +1031,7 @@
     let r = $('v2SculptRing'); if (!r) { r = document.createElement('div'); r.id = 'v2SculptRing'; r.className = 'v2-brush-ring'; r.dataset.mode = 'sculpt'; r.hidden = true; r.innerHTML = '<span></span>'; document.body.appendChild(r); }
     if (!e) { setHid(r, true); return; }
     let px = 14; try { const V = window.__shrinkViewer, THREE = app().THREE, rect = V.renderer.domElement.getBoundingClientRect(), ref = hit ? new THREE.Vector3(...hit.point) : editFrame().centre; V.camera.updateMatrixWorld(); const right = new THREE.Vector3().setFromMatrixColumn(V.camera.matrixWorld, 0).normalize(), a = ref.clone().project(V.camera), b = ref.clone().addScaledVector(right, sculptRadius()).project(V.camera), dd = Math.abs(b.x - a.x) * rect.width / 2; if (Number.isFinite(dd) && dd > 0) px = dd; } catch {}
-    const size = Math.max(8, Math.round(px * 2)); r.style.width = r.style.height = size + 'px'; r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px'; r.firstChild.textContent = num('v2SculptSize', 6).toFixed(1) + ' mm ' + sculptMode(); setHid(r, false);
+    const size = Math.max(3, Math.round(px * 2)); /* v2.337: true size (the old 8 px floor made a 1 mm tip look big) */ r.style.width = r.style.height = size + 'px'; r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px'; r.firstChild.textContent = num('v2SculptSize', 6).toFixed(1) + ' mm ' + sculptMode(); setHid(r, false);
   }
   function sculptStrokeAt(e) {
     const now = performance.now(); if (now - sculptLastAt < 16) return; sculptLastAt = now;
@@ -2379,7 +2379,7 @@
                 <div class="v2-edit-hint-plain">Paint on the model like clay. SMOOTH blends the surface (lined faces, rough scans), PULL raises it, PUSH presses it in. Bigger tip = broader strokes. Ctrl / ⌘ + drag turns the model. It works on the model's own triangles, so keep plenty of them: sculpt before you SHRINK.</div>
                 <div class="v2-icon-row v2-icon-row-3" role="group" aria-label="Sculpt mode">${iconBtn('smode', 'smooth', 'Smooth', true)}${iconBtn('smode', 'pull', 'Pull out')}${iconBtn('smode', 'push', 'Push in')}</div>
                 <select id="v2EdSculptMode" autocomplete="off" hidden><option value="smooth" selected>Smooth</option><option value="pull">Pull out</option><option value="push">Push in</option></select>
-                <div class="v2-hollow-row"><label for="v2SculptSize">Tip size</label><input id="v2SculptSize" type="range" min="1" max="120" step="0.5" value="8" autocomplete="off"><output id="v2SculptSizeOut">8 mm</output></div>
+                <div class="v2-hollow-row"><label for="v2SculptSize">Tip size</label><input id="v2SculptSize" type="range" min="0.2" max="120" step="0.1" value="8" autocomplete="off"><output id="v2SculptSizeOut">8 mm</output></div>
                 <div class="v2-hollow-row"><label for="v2SculptStrength">Strength</label><input id="v2SculptStrength" type="range" min="1" max="10" step="1" value="5" autocomplete="off"><output id="v2SculptStrengthOut">5</output></div>
               </div>
               <div id="v2EdPartBox" hidden>
