@@ -441,4 +441,14 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2ShrinkBtn').click(); await wait(50); ok(!w.document.getElementById('v2TinyBox'), 'ED42 it only asks once');
   w.__shrinkPrint = { state: { modelHeightUnits: 45 } }; w.__shrinkFitHeight(); ok(w.__shrinkTiny().raw === 0, 'ED42 a 45 mm model gets no pop-up');
 }
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  let shrinks = 0; page.$('v2ShrinkBtn').addEventListener('click', () => { shrinks++; });
+  w.__shrinkFreeOpening = true; w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await wait(60);
+  ok(w.document.body.hasAttribute('data-v2-preshrunk') && w.__shrinkPreShrunk(), 'ED43 the FREE model starts greyed (already shrunk)');
+  page.$('v2ShrinkBtn').disabled = false; page.$('v2ShrinkBtn').click(); await wait(30); ok(shrinks === 0, 'ED43 SHRINK does nothing while it is greyed');
+  set(page, 'v2Height', '60'); await wait(60);
+  ok(!w.document.body.hasAttribute('data-v2-preshrunk'), 'ED43 changing the size lifts the grey');
+  page.$('v2ShrinkBtn').click(); await wait(30); ok(shrinks === 1, 'ED43 SHRINK works again after a size change');
+  w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); await wait(60); ok(!w.document.body.hasAttribute('data-v2-preshrunk'), 'ED43 an ordinary model is never greyed');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

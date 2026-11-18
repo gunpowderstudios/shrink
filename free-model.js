@@ -22,9 +22,10 @@ async function openFree(b) {
   try {
     const r = await fetch(new URL(FULL, BASE) + (REL ? '?v=' + REL : '')); if (!r.ok) throw new Error('HTTP ' + r.status);
     const file = new File([await r.blob()], FULL, { type: 'model/stl' });
+    window.__shrinkFreeOpening = true; // print-v2-ui.js greys SHRINK for this already-shrunk model
     document.querySelector('.mode-card[data-mode="print"]')?.click();
     await window.__shrinkApp?.openFile?.(file);
-  } catch (e) { small.textContent = 'Could not load'; console.warn('[SHRINK] free model', e); setTimeout(() => { small.textContent = old; }, 2500); }
+  } catch (e) { window.__shrinkFreeOpening = false; small.textContent = 'Could not load'; console.warn('[SHRINK] free model', e); setTimeout(() => { small.textContent = old; }, 2500); }
   finally { delete b.dataset.busy; if (small.textContent === 'Loading…') small.textContent = old; }
 }
 async function preview(b) {

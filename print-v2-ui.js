@@ -542,7 +542,7 @@
     set(w, sz.x * k); set(d, sz.z * k);
   }
   function setHeightMm(h) {
-    manualHeight = true; // Width/Depth adjustments and +/- scaling are deliberate resizes.
+    manualHeight = true; window.__shrinkSyncPre?.(); // Width/Depth adjustments and +/- scaling are deliberate resizes.
     const v = Math.max(1, Math.min(500, Math.round(h * 100) / 100));
     $('v2Height').value = String(v); updateHeight();
   }
@@ -2462,7 +2462,7 @@
     dashboard.querySelectorAll('[data-printer]').forEach(b => b.addEventListener('click', () => choosePrinter(b.dataset.printer)));
     dashboard.querySelectorAll('[data-quality]').forEach(b => b.addEventListener('click', () => setQuality(b.dataset.quality)));
     $('v2PrinterSel').addEventListener('change', e => { const x = PRINTER_LIST.find(y => y.id === e.target.value); if (!x) return; choosePrinter(x.type); if (x.type !== 'custom') setQuality(x.quality); syncPrinterSel(); });
-    $('v2Height').addEventListener('input', () => { manualHeight = true; updateHeight(); });
+    $('v2Height').addEventListener('input', () => { manualHeight = true; window.__shrinkSyncPre?.(); updateHeight(); });
     // Width / Depth apply when you stop typing (about 0.7 s), on Enter and when you leave the box, so the model follows without having to press Tab (v2.182)
     [['v2Width', 'x'], ['v2Depth', 'z']].forEach(([id, axis]) => {
       const el = $(id); let t = null, last = '';
@@ -2479,6 +2479,12 @@
     // v2.256: a newly opened model starts at ITS OWN height (STL/OBJ units are mm, a GLB is metres), not at a fixed 75 mm. BATCH sets its own height after this.
     // v2.333: a model that read under 30 mm was lifted to 30 mm on open; the first SHRINK / QUICK-FIX press asks the person to set the real height first
     let tinyRawMm = 0, tinyWarned = false;
+    // v2.335: the FREE Model dwarf is already shrunk: SHRINK / QUICK-FIX stay grey until the person changes the size
+    let preShrunk = false;
+    window.__shrinkSyncPre = () => { if (preShrunk && manualHeight) preShrunk = false; document.body.toggleAttribute('data-v2-preshrunk', preShrunk); for (const id of ['v2ShrinkBtn', 'v2MagicBtn']) { const b = $(id); if (b) { if (preShrunk) b.title = 'This model is already shrunk. Change its size to shrink it again.'; else if (b.title && /already shrunk/.test(b.title)) b.removeAttribute('title'); } } };
+    window.__shrinkPreShrunk = () => preShrunk;
+    window.addEventListener('shrink:model-opened', () => { preShrunk = !!window.__shrinkFreeOpening; window.__shrinkFreeOpening = false; setTimeout(() => window.__shrinkSyncPre(), 0); });
+    for (const id of ['v2ShrinkBtn', 'v2MagicBtn']) { const b = $(id); if (b) b.addEventListener('click', e => { if (!preShrunk || manualHeight) return; e.stopImmediatePropagation(); e.preventDefault(); }, true); }
     function tinyDialog(btn) {
       document.getElementById('v2TinyBox')?.remove();
       const x = tinyRawMm < 10 ? tinyRawMm.toFixed(1) : String(Math.round(tinyRawMm));
@@ -2529,7 +2535,7 @@
     window.__shrinkFitHeight = fitHeightToModel;
     window.addEventListener('shrink:model-opened', () => { autoReady = false; settingsDirty = false; detailUpdating = false; updateWorkflowButtons(); manualHeight = false; const u = $('v2Uniform'); if (u) u.checked = true; setTimeout(() => { try { fitHeightToModel(); } catch (e) { console.warn('height from model', e); } refreshDims(); }, 150); [600, 1500].forEach(ms => setTimeout(() => { try { enforceMinHeight(); } catch {} }, ms)); });
     setTimeout(refreshDims, 300);
-    $('v2HeightRange').addEventListener('input', () => { manualHeight = true; $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
+    $('v2HeightRange').addEventListener('input', () => { manualHeight = true; window.__shrinkSyncPre?.(); $('v2Height').value = $('v2HeightRange').value; updateHeight(); });
     $('v2PrinterDetail').addEventListener('input', () => { setNative('printerPreset', 'custom'); setNative('printerDetailMm', $('v2PrinterDetail').value, 'input'); markSettingsChanged(); });
     $('v2FuseBtn').addEventListener('click', fuseCheck);
     /* v2.307: EDIT MODEL wiring */

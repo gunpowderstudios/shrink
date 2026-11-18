@@ -918,3 +918,5 @@ body.v2-editing #v2HealthCard,body.v2-editing #v2SideStack{display:none!importan
 .v2-tiny-row{display:flex;gap:10px;justify-content:center}
 .v2-tiny-row button{flex:1;padding:12px 10px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:#2e9d4f;color:#fff}
 .v2-tiny-row button.alt{background:#3a4150}
+
+body[data-v2-preshrunk] :is(#v2MagicBtn,#v2ShrinkBtn){background:#3a414c!important;color:#8a93a0!important;box-shadow:none!important;opacity:1!important;cursor:not-allowed!important;filter:none!important}
