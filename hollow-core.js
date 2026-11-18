@@ -115,7 +115,10 @@ export function hollowSolid(M, solid, opts = {}) {
     const base = cand.filter(c => c.y0 <= (cand[0]?.y0 ?? 0) + wall * 1.5);
     const picks = [];
     if (base.length) {
-      picks.push(base[Math.floor(base.length / 2)]);
+      // v2.339: holeX / holeZ shift the first hole (fractions of the model size, -0.5..0.5); it lands on the nearest column that has cavity above it
+      const cx = base.reduce((a, c) => a + c.x, 0) / base.length, cz = base.reduce((a, c) => a + c.z, 0) / base.length, mid = base[Math.floor(base.length / 2)], tx = cx + (Number(opts.holeX) || 0) * ext, tz = cz + (Number(opts.holeZ) || 0) * ext;
+      let first = mid, fd = Infinity; for (const c of base) { const d = Math.hypot(c.x - tx, c.z - tz); if (d < fd) { fd = d; first = c; } }
+      picks.push(first);
       while (picks.length < wantHoles) {
         let best = null, bd = -1;
         for (const c of base) { const d = Math.min(...picks.map(p => Math.hypot(p.x - c.x, p.z - c.z))); if (d > bd) { bd = d; best = c; } }

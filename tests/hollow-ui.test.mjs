@@ -73,4 +73,9 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
   await waitFor(() => page.$('v2HollowResult').textContent !== prev && /Hollowed/.test(page.$('v2HollowResult').textContent), 110000);
   ok(/about 5 mm wide/.test(page.$('v2HollowResult').textContent), 'HU13 a 5 mm hole size rebuilds with 5 mm holes: ' + page.$('v2HollowResult').textContent.slice(0, 200));
 }
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); await wait(300);
+  const h = page.$('v2Height'), st = page.$('v2SideStack');
+  ok(!!h && !!st && !!h.closest('#v2SideStack') && !!h.closest('.v2-side-height'), 'HU14 the Finished height box is in the side column, not ADVANCED');
+  ok(!!page.$('v2ResizeBtn')?.closest('.v2-side-height'), 'HU15 RESIZE sits with it');
+  ok(!!page.$('v2HollowHoleX') && !!page.$('v2HollowHoleZ'), 'HU16 hole left/right and forward/back sliders exist'); }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('hollow ui tests passed'); process.exit(0);

@@ -1573,7 +1573,7 @@
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, wallMm = Number($('v2HollowWall')?.value) || 2, holes = Number($('v2HollowHoles')?.value ?? 2);
       progress(card, 35, 'Working out the inside… this can take a moment');
       await paintNow();
-      const r = await window.__shrinkFuse.hollowModel(model, { wall: wallMm / mm, holes, holeRadius: (Number($('v2HollowHoleSize')?.value) || 3) / 2 / mm });
+      const r = await window.__shrinkFuse.hollowModel(model, { wall: wallMm / mm, holes, holeRadius: (Number($('v2HollowHoleSize')?.value) || 3) / 2 / mm, holeX: (Number($('v2HollowHoleX')?.value) || 0) / 100, holeZ: (Number($('v2HollowHoleZ')?.value) || 0) / 100 });
       progress(card, 85, 'Checking the result…');
       removeHollowBlue(); installWorkingResult(r.root, 'hollow'); hollowResult = r.root;
       const ml = v => (v * mm * mm * mm / 1000);
@@ -2104,8 +2104,14 @@
     if (!st._ro && window.ResizeObserver) { st._ro = new ResizeObserver(place); st._ro.observe(card); }
     return st;
   }
+  function placeHeightBox() {   // idempotent: Finished height (+ RESIZE) above the green SHRINK button
+    const st = $('v2SideStack'), mb = $('v2MagicBtn'), hr = $('v2Height')?.closest('.v2-size-row'), rb = $('v2ResizeBtn');
+    if (!st || !mb || !hr || hr.closest('#v2SideStack')) return;
+    const box = document.createElement('div'); box.className = 'v2-side-height'; box.appendChild(hr); if (rb) box.appendChild(rb);
+    st.insertBefore(box, mb);
+  }
   function ensureMagicButton() {
-    if ($('v2MagicBtn')) return;
+    if ($('v2MagicBtn')) { placeHeightBox(); return; }
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
     wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">AUTO-SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button>';
@@ -2439,6 +2445,8 @@
               <div class="v2-hollow-row"><label for="v2HollowWall">Wall</label><input id="v2HollowWall" type="range" min="1" max="5" step="0.5" value="2" autocomplete="off"><output id="v2HollowWallOut">2 mm</output></div>
               <div class="v2-hollow-row"><label for="v2HollowHoles">Drain holes</label><select id="v2HollowHoles" autocomplete="off"><option value="2" selected>2 (recommended)</option><option value="1">1</option><option value="0">None</option></select></div>
               <div class="v2-hollow-row"><label for="v2HollowHoleSize">Hole size</label><input id="v2HollowHoleSize" type="range" min="2" max="8" step="0.5" value="3" autocomplete="off"><output id="v2HollowHoleSizeOut">3 mm</output></div>
+              <div class="v2-hollow-row"><label for="v2HollowHoleX">Holes left / right</label><input id="v2HollowHoleX" type="range" min="-50" max="50" step="1" value="0" autocomplete="off"><output id="v2HollowHoleXOut">0%</output></div>
+              <div class="v2-hollow-row"><label for="v2HollowHoleZ">Holes forward / back</label><input id="v2HollowHoleZ" type="range" min="-50" max="50" step="1" value="0" autocomplete="off"><output id="v2HollowHoleZOut">0%</output></div>
               <button id="v2HollowBtn" class="v2-mega v2-teal" type="button">HOLLOW IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
               <div id="v2HollowResult" class="v2-result">Works best after SHRINK with fix and fuse, on one watertight piece.</div>
@@ -2473,6 +2481,7 @@
 
     // v2.215: the left column is gone. One big MODEL HEALTH card holds the size, detail, tools and download; the old printer, split and peg controls stay in a hidden holder because BATCH and the tests drive them.
     buildMainCard();
+    placeHeightBox();   // v2.339: the first ensureMagicButton() runs before the dashboard exists, so the Height row never left ADVANCED
     // v2.288: ADVANCED shares the viewer toolbar's flex row instead of overlaying Compare.
     const advancedToggle = $('v2LeftToggle');
     const viewerActions = viewerPanel?.querySelector('.viewer-toolbar .viewer-actions');
@@ -2605,6 +2614,7 @@
     /* v2.305: once the model is hollow, letting go of the wall slider (or changing the drain holes) rebuilds it straight away so the new thickness shows in the cut-away */
     { let t = 0; const again = () => { clearTimeout(t); t = setTimeout(() => { if (hollowResult && sourceModel() === hollowResult && !$('v2HollowBtn')?.disabled) hollowModelNow(); }, 350); };
       $('v2HollowWall')?.addEventListener('change', again); $('v2HollowHoles')?.addEventListener('change', again); $('v2HollowHoleSize')?.addEventListener('change', again);
+      ['X', 'Z'].forEach(a => { const s = $('v2HollowHole' + a); s?.addEventListener('change', again); s?.addEventListener('input', () => { $('v2HollowHole' + a + 'Out').textContent = s.value + '%'; }); });
       $('v2HollowHoleSize')?.addEventListener('input', () => { $('v2HollowHoleSizeOut').textContent = $('v2HollowHoleSize').value + ' mm'; }); }
     $('v2HollowCutRange')?.addEventListener('input', e => hollowClip(Number(e.target.value)));
     $('v2FixBigBtn').addEventListener('click', fixHealthModel);

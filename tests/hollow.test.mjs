@@ -18,6 +18,9 @@ ok(r2.solid.status?.() === 0 || r2.solid.status?.() === undefined || true, 'H6 r
 const box = M.cube([30, 20, 30], true);
 const r3 = hollowSolid(M, box, { wall: 3, holes: 2 });
 ok(r3.after < box.volume() * 0.7 && r3.after > box.volume() * 0.3, `H7 box wall 3: ${(r3.saved * 100).toFixed(0)}% saved`);
+{ const bx = M.cube([60, 60, 60], true), c = hollowSolid(M, bx, { wall: 3, holes: 1 }), l = hollowSolid(M, bx, { wall: 3, holes: 1, holeX: -0.25 }), f = hollowSolid(M, bx, { wall: 3, holes: 1, holeZ: 0.25 });
+  ok(l.holes[0].x < c.holes[0].x - 8, `H10 holeX moves the hole left: ${c.holes[0].x.toFixed(1)} -> ${l.holes[0].x.toFixed(1)}`);
+  ok(f.holes[0].z > c.holes[0].z + 8, `H11 holeZ moves the hole along Z: ${c.holes[0].z.toFixed(1)} -> ${f.holes[0].z.toFixed(1)}`); }
 let msg = ''; try { hollowSolid(M, M.cube([4, 4, 4], true), { wall: 2 }); } catch (e) { msg = e.message; }
 ok(/thicker|thin/i.test(msg), 'H8 a model too small for the wall says so in plain English: ' + msg);
 

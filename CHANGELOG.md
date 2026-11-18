@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.339
+- **Finished height is now really above the green button.** It was meant to be there since v2.330 but stayed hidden inside ADVANCED (it was moved before the page had built it). The height box and RESIZE now sit at the top of the right-hand column.
+- **HOLLOW IT: move the drain holes.** New sliders "Holes left / right" and "Holes forward / back" (-50% to +50% of the model size). The first hole lands on the nearest spot on the base with hollow space above it; the second stays as far from it as possible. The default first hole is now centred on the base. Changing a slider re-runs the hollow.
+
 ## v2.333
 - **Small-model warning.** If a model reads under 30 mm tall (it is lifted to 30 mm on open), the first press of SHRINK or the green QUICK-FIX button shows a pop-up: "This model is only X mm high. Adjust the height in advance, before shrinking." SET THE HEIGHT jumps to the Finished height box; SHRINK ANYWAY carries on. It asks once per model, never if you have already typed a height, and never in BATCH.
 
