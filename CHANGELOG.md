@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.343
+- **DOWNLOAD PIECE (STL).** In the EDIT card, under DELETE / COPY: with a loop drawn (or a piece touched with the wand), this saves just the part inside the red area as its own STL, at the size it has on your model. The model is not changed. A floating green piece has the same button on its pad. A piece cut from a model with open edges is an open shell. You can open the saved file again later with Paste part, or add it to the library.
+
 ## v2.342
 - **Piece library.** With a piece floating (copied with the Lasso, or opened from the library), press **ADD TO LIBRARY** and give it a name, such as "Paul's dagger". **LIBRARY** opens a grid of pictures; click one to add it to the workspace beside the model at the size you saved it, then move, turn, resize and WELD IT as usual. Rename (pencil) and delete (x) are on each tile. The library lives in this browser, so it survives reloads but not a different computer or cleared site data.
 - **COPY works on a model with open edges.** Before, COPY on a leaky sculpt gave a red error and told you to run FIX IT. Now it lifts out the surface under your loop as an open shell, so you can keep it in the library or move it. To weld a piece on, the model it goes onto must be closed (FIX IT first); CUT and the shape tools still need a closed model.

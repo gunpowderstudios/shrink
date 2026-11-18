@@ -503,4 +503,20 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   const S = orthoCam(page, 0.55, 0.9); set(page, 'v2EdDepth', 'near'); w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
   ok(await waitFor(() => /Copied|Could not/.test(page.$('v2EdResult').textContent), 90000) && /open shell/.test(page.$('v2EdResult').textContent) && w.__shrinkEdit.hasPart(), 'ED47 COPY on a leaky model still lifts out the surface as an open shell: ' + page.$('v2EdResult').textContent.slice(0, 120));
 }
+/* v2.343: DOWNLOAD PIECE (STL) */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() }; w.__shrinkBuildStl = (await import(new URL('./.build/mt/mesh-tools.js', import.meta.url).href)).buildBinaryStl;
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80);
+  ok(!!page.$('v2PieceStlBtn') && page.$('v2PieceStlBtn').disabled === true, 'ED48 DOWNLOAD PIECE (STL) is in the edit card and waits for a selection');
+  const S = orthoCam(page, 0.55, 0.95); set(page, 'v2EdDepth', 'through'); w.__shrinkEdit.setSel(S.pts, S.cam); await wait(50); ok(page.$('v2PieceStlBtn').disabled === false, 'ED48 with a selection it is on');
+  let got = null, size = 0; w.__shrinkCapture = (b, n) => { got = n; size = b.size; return true; };
+  const t0 = tris(w.__shrinkWorkingModel()); const r = await w.__shrinkEdit.pieceStl('sel');
+  ok(r && /-piece\.stl$/.test(got || '') && size === 84 + r.triangles * 50 && r.triangles > 0 && r.triangles < t0, `ED48 the selection downloads as ${got}: ${r?.triangles} of ${t0} triangles, ${size} bytes`);
+  ok(tris(w.__shrinkWorkingModel()) === t0, 'ED48 the model itself is untouched');
+  const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
+  for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'c.stl'); await wait(60); got = null; const r2 = await w.__shrinkEdit.pieceStl('part');
+  set(page, 'v2EdTab', 'part'); await wait(300); ok(r2 && r2.triangles === 12 && /-piece\.stl$/.test(got || '') && !!page.$('v2PadStl'), 'ED48 a floating piece downloads as its own STL (12 triangles), and the pad has the button too');
+  w.__shrinkCapture = null;
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
