@@ -2483,7 +2483,11 @@
     let preShrunk = false;
     window.__shrinkSyncPre = () => { if (preShrunk && manualHeight) preShrunk = false; document.body.toggleAttribute('data-v2-preshrunk', preShrunk); for (const id of ['v2ShrinkBtn', 'v2MagicBtn']) { const b = $(id); if (b) { if (preShrunk) b.title = 'This model is already shrunk. Change its size to shrink it again.'; else if (b.title && /already shrunk/.test(b.title)) b.removeAttribute('title'); } } };
     window.__shrinkPreShrunk = () => preShrunk;
-    window.addEventListener('shrink:model-opened', () => { preShrunk = !!window.__shrinkFreeOpening; window.__shrinkFreeOpening = false; setTimeout(() => window.__shrinkSyncPre(), 0); });
+    // The dashboard can be built by the very first model-opened event, so this also runs once now (v2.336): the open file's name decides, not a one-shot flag.
+    const FREE_NAME = 'FREE-BOD-Dwarf-Model.stl', isFreeOpen = () => !!sourceModel() && (document.getElementById('fileName')?.textContent || '').trim() === FREE_NAME;
+    const applyPre = () => { preShrunk = isFreeOpen() && !manualHeight; if (preShrunk) { markWorkflowReady(); } window.__shrinkSyncPre(); };
+    window.addEventListener('shrink:model-opened', () => { preShrunk = false; setTimeout(applyPre, 150); setTimeout(applyPre, 1200); });
+    setTimeout(applyPre, 0);
     for (const id of ['v2ShrinkBtn', 'v2MagicBtn']) { const b = $(id); if (b) b.addEventListener('click', e => { if (!preShrunk || manualHeight) return; e.stopImmediatePropagation(); e.preventDefault(); }, true); }
     function tinyDialog(btn) {
       document.getElementById('v2TinyBox')?.remove();
