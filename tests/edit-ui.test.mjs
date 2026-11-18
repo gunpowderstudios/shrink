@@ -416,4 +416,17 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(await waitFor(() => /✓|Optimised|kept|%/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 30000), 'ED40 it finishes after the reducer goes idle: ' + page.$('v2ShrinkResult').textContent.slice(0, 80));
   w.__shrinkShrinkTarget = 0; asked = null; page.$('v2ShrinkBtn').click(); await wait(600); ok(asked === null && autoClicks >= 1, 'ED40 window.__shrinkShrinkTarget = 0 brings back the automatic search');
 }
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  page.$('v2TabEdit').click(); await wait(100);
+  const tool = n => page.d.querySelector('.v2-icon-btn[data-ed="tool"][data-v="' + n + '"]') || [...page.d.querySelectorAll('.v2-icon-btn[data-ed="tool"]')].find(b => b.dataset.val === n || b.dataset.tool === n);
+  set(page, 'v2EdTab', 'lasso'); await wait(60);
+  const v = page.$('viewer'), fire = o => { const ev = new w.MouseEvent('pointerdown', Object.assign({ bubbles: true, cancelable: true, button: 0, clientX: 50, clientY: 50 }, o)); v.dispatchEvent(ev); return ev.defaultPrevented; };
+  ok(fire({}) === true, 'ED41 a plain left press starts the lasso');
+  w.dispatchEvent(new w.MouseEvent('pointerup', { bubbles: true })); await wait(30);
+  ok(fire({ altKey: true }) === false, 'ED41 Alt + left press is left alone so the camera can orbit (lasso)');
+  set(page, 'v2EdTab', 'sculpt'); await wait(60);
+  ok(fire({ altKey: true }) === false, 'ED41 Alt + left press is left alone so the camera can orbit (sculpt)');
+  set(page, 'v2EdTab', 'select'); await wait(60);
+  ok(fire({ altKey: true }) === false, 'ED41 Alt + left press is left alone so the camera can orbit (select)');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.332
+- **Alt + left mouse turns the camera while an EDIT tool is on.** A plain left press still belongs to the tool (loop, razor, sculpt, grabbing a piece); with Alt held the drag orbits the model, so you can look around while selecting. Ctrl/Cmd + drag still works too.
+
 ## v2.331
 - **SHRINK now keeps 50% of the triangles** instead of searching for the smallest version that still looks the same (that search lost too much detail). It goes through the same path as the Detail slider, so the slider shows 50 and you can move it up or down afterwards, then download. Do not press SHRINK again after moving the slider: it starts again from the original at 50%.
 - If a model is still too big to fuse after 50%, QUICK-FIX keeps just enough triangles to fuse (about 90% of the fuse limit) and says so.

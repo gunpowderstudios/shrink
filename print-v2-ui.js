@@ -1042,8 +1042,8 @@
   function wireSculpt() {
     const v = $('viewer'); if (!v || v.dataset.sculptWired) return; v.dataset.sculptWired = '1';
     const active = () => $('v2EdTab')?.value === 'sculpt' && editActive();
-    v.addEventListener('pointerdown', e => { if (!active() || e.button !== 0 || e.ctrlKey || e.metaKey) return; e.stopPropagation(); e.preventDefault(); if (!sculptBegin()) return; sculptDown = true; sculptStrokeAt(e); }, true);
-    v.addEventListener('pointermove', e => { if (!active() || e.ctrlKey || e.metaKey) { sculptRing(null); return; } if (sculptDown) { e.stopPropagation(); if ((e.buttons & 1) === 0) { sculptEnd(); return; } sculptStrokeAt(e); } else sculptRing(e, sculptPick(e)); }, true);
+    v.addEventListener('pointerdown', e => { if (!active() || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return; e.stopPropagation(); e.preventDefault(); if (!sculptBegin()) return; sculptDown = true; sculptStrokeAt(e); }, true);
+    v.addEventListener('pointermove', e => { if (!active() || e.ctrlKey || e.metaKey || e.altKey) { sculptRing(null); return; } if (sculptDown) { e.stopPropagation(); if ((e.buttons & 1) === 0) { sculptEnd(); return; } sculptStrokeAt(e); } else sculptRing(e, sculptPick(e)); }, true);
     v.addEventListener('pointerleave', () => sculptRing(null)); v.addEventListener('pointerup', sculptEnd, true); v.addEventListener('pointercancel', sculptEnd, true); window.addEventListener('pointerup', sculptEnd, true); window.addEventListener('blur', sculptEnd);
     const orbitLeft = pan => { const c = window.__shrinkViewer?.controls; if (c?.mouseButtons) c.mouseButtons.LEFT = pan ? 2 : 0; };
     window.addEventListener('keydown', e => { if (active() && (e.key === 'Meta' || e.key === 'Control')) { orbitLeft(true); sculptEnd(); } }, true);
@@ -1076,7 +1076,7 @@
   }
   function wireLasso() {
     const v = $('viewer'); if (!v || v.dataset.lassoWired) return; v.dataset.lassoWired = '1';
-    const on = e => lzTool() && editActive() && !lassoBusy && e.button === 0 && !e.ctrlKey && !e.metaKey;
+    const on = e => lzTool() && editActive() && !lassoBusy && e.button === 0 && !e.ctrlKey && !e.metaKey && !e.altKey;
     const ndcOf = e => { const r = v.getBoundingClientRect(); return [((e.clientX - r.left) / (r.width || 1)) * 2 - 1, -(((e.clientY - r.top) / (r.height || 1)) * 2 - 1)]; };
     v.addEventListener('pointerdown', e => { if (!on(e)) return; e.stopPropagation(); e.preventDefault(); lassoSel = null; lassoBarState(); const r = v.getBoundingClientRect(); lassoDraw = { px: [[e.clientX - r.left, e.clientY - r.top]], ndc: [ndcOf(e)] }; lassoCanvas(); lassoPaint(lassoDraw.px); }, true);
     v.addEventListener('pointermove', e => { if (!lassoDraw) return; e.stopPropagation(); if ((e.buttons & 1) === 0) { lassoEnd(); return; } const r = v.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, last = lassoDraw.px[lassoDraw.px.length - 1]; if (Math.hypot(x - last[0], y - last[1]) < 3) return; lassoDraw.px.push([x, y]); lassoDraw.ndc.push(ndcOf(e)); lassoPaint(lassoDraw.px); }, true);
@@ -1274,7 +1274,7 @@
     const v = $('viewer'); if (!v || v.dataset.partWired) return; v.dataset.partWired = '1';
     const act = () => !!editPart && editActive() && pieceTool();
     const ndcOf = e => { const r = v.getBoundingClientRect(); return [((e.clientX - r.left) / (r.width || 1)) * 2 - 1, -(((e.clientY - r.top) / (r.height || 1)) * 2 - 1)]; };
-    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey) return; const n = ndcOf(e), hz = gizmoPick(n); let hit = !!hz || ghostHit(n); if (!hit) { const pi = parkedAt(n); if (pi < 0) return; takeParked(pi); hit = true; } e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
+    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return; const n = ndcOf(e), hz = gizmoPick(n); let hit = !!hz || ghostHit(n); if (!hit) { const pi = parkedAt(n); if (pi < 0) return; takeParked(pi); hit = true; } e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
     v.addEventListener('pointermove', e => {
       if (partDrag) { e.stopPropagation(); if ((e.buttons & 1) === 0) { partDragEnd(); return; } const n = ndcOf(e); if (partDrag.hz) gizmoApply(partDrag.hz.kind, partDrag.hz.axis, partDrag.last, n, partDrag.cam); else partDragApply('move', partDrag.last, n, e.shiftKey, partDrag.cam); partDrag.last = n; return; }
       const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const n = ndcOf(e), on = !!gizmoPick(n) || ghostHit(n) || parkedAt(n) >= 0; v.classList.toggle('v2-cur-grab', on);
