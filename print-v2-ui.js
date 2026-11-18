@@ -744,8 +744,8 @@
   }
   // ---- v2.307 EDIT MODEL: basic shapes (join / cut) and a slice-off plane, both through Manifold (edit-core.js) ----
   let editStack = [], editBase = null;               // editBase = a copy of the model from before the FIRST edit, for RESET ALL EDITS                                   // clones of the working model before each edit, for UNDO
-  function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { if (o.geometry !== editPart?.geometry) o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
-  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); partRot = null; islandCache = null; sculptWork = null; sculptData = null; } catch {} });
+  function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { if (o.geometry !== editPart?.geometry && !parked.some(r => r.part.geometry === o.geometry)) o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
+  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); partRot = null; parked = []; islandCache = null; sculptWork = null; sculptData = null; } catch {} });
   function editFrame() {
     const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return null;
     const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return null;
@@ -759,7 +759,7 @@
     return { f, kind: $('v2EdKind').value, mode: $('v2EdMode').value, matrix: [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, px, py, pz, 1] };
   }
   // ---- v2.311: an uploaded part (e.g. a new head). editPart = { geometry (centred, Y-up, raw units), height (raw Y size), name }
-  let editPart = null;
+  let editPart = null, parked = [];                    // v2.326: more floating pieces wait in `parked` (green, not joined) until WELD; editPart is the selected one
   async function loadPartFile(file) {
     const THREE = app()?.THREE; if (!THREE) throw new Error('The viewer is not ready.');
     const ext = (file.name.split('.').pop() || '').toLowerCase(), base = 'https://esm.sh/three@0.180.0/examples/jsm/loaders/', buf = await file.arrayBuffer();
@@ -781,7 +781,25 @@
     g.computeVertexNormals(); g.computeBoundingBox();
     return { geometry: g, height: Math.max(1e-6, size.y), size, name: name || 'part' };
   }
+  function partVals() { const o = {}; ['X', 'Y', 'Z', 'RX', 'RY', 'RZ'].forEach(a => { o[a] = num('v2EdPart' + a); }); o.H = num('v2EdPartH', 30); return o; }
+  function parkCurrent() { if (editPart) parked.push({ part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode')?.value || 'join' }); }
+  function takeParked(i) {                               // make parked piece i the selected one (the selected one goes to the side)
+    const r = parked[i]; if (!r) return false; parked.splice(i, 1); parkCurrent(); editPart = r.part; partRot = r.rot;
+    Object.entries(r.vals).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); });
+    const md = $('v2EdMode'); if (md && md.value !== r.mode) { md.value = r.mode; md.dispatchEvent(new Event('change', { bubbles: true })); }
+    updateEditPreview(); updateGoState(); return true;
+  }
+  function dropSelected() {                              // the selected piece is gone (welded or deleted): pick the last one that is waiting, if any
+    editPart = null; partRot = null; if (parked.length) { const r = parked.pop(); editPart = r.part; partRot = r.rot; Object.entries(r.vals).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); }); const md = $('v2EdMode'); if (md && md.value !== r.mode) { md.value = r.mode; md.dispatchEvent(new Event('change', { bubbles: true })); } }
+    updateEditPreview(); updateGoState();
+  }
+  function dupPart() {                                   // COPY PIECE: another green piece beside this one, the first stays where it is
+    const pm = editPart && partMatrix(); if (!pm) return false; const cam = cameraSnap(), ax = camAxes(cam), k = new pm.f.THREE.Vector3().setFromMatrixScale(pm.m).x, w = (editPart.size?.length?.() || 1) * k * 0.75;
+    parkCurrent(); editPart = { ...editPart, copied: true, origin: undefined }; ['X', 'Y', 'Z'].forEach((a, i) => { $('v2EdPart' + a).value = (num('v2EdPart' + a) + ax.right[i] * w * pm.f.mm).toFixed(2); });
+    updateEditPreview(); updateGoState(); return true;
+  }
   function setPart(part) {
+    if (part && editPart) parkCurrent();                // v2.326: a new piece never replaces the one already floating
     editPart = part; partRot = null; const f = editFrame();
     if (part && f) {
       ['X', 'Y', 'Z'].forEach(a => { $('v2EdPartR' + a).value = '0'; });
@@ -790,16 +808,17 @@
         $('v2EdPartX').value = ((part.origin.x - f.centre.x) * f.mm).toFixed(2); $('v2EdPartY').value = ((part.origin.y - f.centre.y) * f.mm).toFixed(2); $('v2EdPartZ').value = ((part.origin.z - f.centre.z) * f.mm).toFixed(2);
       } else { const h = Math.max(1, Math.round(f.size.y * f.mm * 0.3 * 10) / 10); $('v2EdPartH').value = String(h); ['X', 'Y', 'Z'].forEach(a => { $('v2EdPart' + a).value = '0'; }); }
     }
-    $('v2EdPartInfo').textContent = part ? (part.copied ? 'Copied piece ready (the green ghost). Drag it with the mouse: MOVE, TURN or SIZE on the pad, then PLACE IT.' : `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.`) : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
+    $('v2EdPartInfo').textContent = part ? (part.copied ? 'Copied piece ready (the green ghost). Drag it, use the arrows and rings on it, then press WELD IT.' : `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.`) : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
     updateEditPreview(); updateGoState();
   }
-  function partMatrix(offsets = true) {
-    const f = editFrame(); if (!f || !editPart) return null; const THREE = f.THREE;
-    const k = (Math.max(0.1, num('v2EdPartH', 30)) / f.mm) / editPart.height, rad = d => num(d) * Math.PI / 180;
-    const m = new THREE.Matrix4().compose(offsets ? new THREE.Vector3(f.centre.x + num('v2EdPartX') / f.mm, f.centre.y + num('v2EdPartY') / f.mm, f.centre.z + num('v2EdPartZ') / f.mm) : new THREE.Vector3(),
-      (partRot ? partRot.clone() : new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rad('v2EdPartRX'), rad('v2EdPartRY'), rad('v2EdPartRZ'), 'XYZ'))), new THREE.Vector3(k, k, k));
+  function partMatrixOf(part, vals, rot, offsets = true) {
+    const f = editFrame(); if (!f || !part) return null; const THREE = f.THREE;
+    const k = (Math.max(0.1, vals.H) / f.mm) / part.height, rad = d => (vals[d] || 0) * Math.PI / 180;
+    const m = new THREE.Matrix4().compose(offsets ? new THREE.Vector3(f.centre.x + vals.X / f.mm, f.centre.y + vals.Y / f.mm, f.centre.z + vals.Z / f.mm) : new THREE.Vector3(),
+      (rot ? rot.clone() : new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rad('RX'), rad('RY'), rad('RZ'), 'XYZ'))), new THREE.Vector3(k, k, k));
     return { f, m };
   }
+  function partMatrix(offsets = true) { return editPart ? partMatrixOf(editPart, partVals(), partRot, offsets) : null; }
   function partPlace(where) {                          // 'top' sits the part on the model's top (sunk 1 mm), 'centre' puts it in the middle
     const pm = partMatrix(false); if (!pm) return; const { f, m } = pm, THREE = f.THREE;
     const mesh = new THREE.Mesh(editPart.geometry); mesh.matrixAutoUpdate = false; mesh.matrix.copy(m); mesh.updateMatrixWorld(true);
@@ -1100,7 +1119,7 @@
         if (op === 'copy') { const ax = camAxes(sel.cam), w = bb.getSize(new THREE0.Vector3()).length() * 0.75; ['X', 'Y', 'Z'].forEach((a, i) => { $('v2EdPart' + a).value = (num('v2EdPart' + a) + ax.right[i] * w * f.mm).toFixed(2); }); }   // v2.319: the model is still whole, so the copy starts beside it instead of hidden inside it
         { const md = $('v2EdMode'); md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); }
         set$tool('part');
-        msg = `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. Drag the green piece with the mouse (MOVE, TURN or SIZE on the pad, or the arrows), then press PLACE IT.</span>`;
+        msg = `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml piece ready. It floats in green and stays there until you press WELD IT, so you can cut or copy more pieces first.</span>`;
       } else msg = r.mesh ? `<strong>✓ Deleted</strong><span>${r.tris.toLocaleString()} triangles removed. The model is too big to close the hole automatically, so it is open there. Press FIX IT (SHRINK & FINISH tab) to close it, or UNDO.</span>` : r.whole ? `<strong>✓ Deleted</strong><span>${r.islands} loose piece${r.islands === 1 ? '' : 's'} removed (${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml). Press UNDO if that is not what you wanted.</span>` : `<strong>✓ Deleted</strong><span>Now ${(r.volume * mm * mm * mm / 1000).toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. The hole is closed flat. Press UNDO if that is not what you wanted.</span>`;
       res.innerHTML = msg; card.dataset.state = 'good'; progress(card, 100, 'Done.');
       lassoSel = null; lassoPaint(null); removeLassoRed();
@@ -1136,14 +1155,15 @@
     pad = document.createElement('div'); pad.id = 'v2PartPad'; pad.className = 'v2-part-pad'; pad.hidden = true;
     const b = (a, t, tip) => `<button type="button" data-pad="${a}" title="${tip}" aria-label="${tip}">${t}</button>`;
     pad.innerHTML = `<div class="v2-pad-title">Move the part</div>
-      <div class="v2-pad-hint">Drag the green piece to move it. Arrows slide it along X / Y / Z, the rings turn it (yaw, pitch, roll), − / + on the piece resize it.</div>
+      <div class="v2-pad-hint">Green pieces float here until you press WELD IT. Click a piece to pick it (it glows), drag it to move it. Arrows slide it along X / Y / Z, rings turn it (yaw, pitch, roll), − / + resize it.</div>
       <div id="v2PadJoin" class="v2-pad-join" aria-live="polite"></div>
       <div class="v2-pad-row"><div class="v2-pad-cross">${b('up', '▲', 'Move up')}<span></span>${b('left', '◀', 'Move left')}${b('down', '▼', 'Move down')}${b('right', '▶', 'Move right')}</div>
       <div class="v2-pad-col">${b('near', 'NEARER', 'Move towards you')}${b('far', 'FARTHER', 'Move away from you')}${b('bigger', 'BIGGER +', 'Enlarge')}${b('smaller', 'SMALLER −', 'Reduce')}</div></div>
       <div class="v2-pad-tilt"><span>Tilt</span>${b('tiltU', '⤒', 'Tilt top away')}${b('tiltD', '⤓', 'Tilt top towards you')}${b('tiltL', '↶', 'Tilt left')}${b('tiltR', '↷', 'Tilt right')}${b('spinL', '⟲', 'Spin anticlockwise')}${b('spinR', '⟳', 'Spin clockwise')}</div>
-      <div class="v2-pad-foot"><select id="v2PadStep" aria-label="Step size"><option value="s">Fine steps</option><option value="m" selected>Medium steps</option><option value="l">Big steps</option></select><button type="button" id="v2PadPlace" class="v2-pad-go">PLACE IT</button><button type="button" id="v2PadCancel" class="v2-pad-no">CANCEL</button></div>`;
+      <div class="v2-pad-foot"><select id="v2PadStep" aria-label="Step size"><option value="s">Fine steps</option><option value="m" selected>Medium steps</option><option value="l">Big steps</option></select><button type="button" id="v2PadPlace" class="v2-pad-go" title="Weld this piece onto the model (Ctrl/Cmd+V)">WELD IT</button><button type="button" id="v2PadCopy" title="Make another green piece like this one (Ctrl/Cmd+C)">COPY PIECE</button><button type="button" id="v2PadCancel" class="v2-pad-no" title="Throw this piece away (Delete)">DELETE PIECE</button></div>
+      <div class="v2-pad-foot"><button type="button" id="v2PadAll" class="v2-pad-go" hidden>WELD ALL</button></div>`;
     pad.addEventListener('pointerdown', e => e.stopPropagation()); pad.addEventListener('wheel', e => e.stopPropagation());
-    pad.addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; if (bt.dataset.pad) padAct(bt.dataset.pad); else if (bt.id === 'v2PadPlace') editModelNow(); else if (bt.id === 'v2PadCancel') { setPart(null); set$tool('none'); $('v2EdResult').innerHTML = '<strong>Part put away</strong><span>Nothing was changed.</span>'; } });
+    pad.addEventListener('click', e => { const bt = e.target.closest('button'); if (!bt) return; if (bt.dataset.pad) padAct(bt.dataset.pad); else if (bt.id === 'v2PadPlace') editModelNow(); else if (bt.id === 'v2PadCopy') dupPart(); else if (bt.id === 'v2PadAll') weldAll(); else if (bt.id === 'v2PadCancel') discardPiece();  });
     if (host.id === 'v2EditPanel') host.insertBefore(pad, $('v2EditPane') || null); else host.appendChild(pad); return pad;
   }
   // ---- v2.319: grab the ghost with the mouse. MOVE drags it in the screen plane (Shift = nearer / farther), TURN spins it like a ball, SIZE drags up / down.
@@ -1171,6 +1191,11 @@
     } else return false;
     updateEditPreview(); return true;
   }
+  function recHit(ndc, geometry, m, camIn) {
+    const cam = camIn || cameraSnap(), THREE = app()?.THREE; if (!cam || !THREE) return false; const r = rayFor(cam, ndc), rc = new THREE.Raycaster(); rc.ray.set(new THREE.Vector3(...r.o), new THREE.Vector3(...r.d)); rc.near = 0; rc.far = Infinity;
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); mesh.matrixAutoUpdate = false; mesh.matrix.copy(m); mesh.updateMatrixWorld(true); const hits = []; THREE.Mesh.prototype.raycast.call(mesh, rc, hits); mesh.material.dispose(); return hits.length > 0;
+  }
+  function parkedAt(ndc, camIn) { for (let i = parked.length - 1; i >= 0; i--) { const r = parked[i], pm = partMatrixOf(r.part, r.vals, r.rot); if (pm && recHit(ndc, r.part.geometry, pm.m, camIn)) return i; } return -1; }
   function ghostHit(ndc) {
     const cam = cameraSnap(), g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'), mesh = g?.getObjectByName('shrinkPartGhost'); if (!cam || !mesh) return false;
     const THREE = app().THREE, r = rayFor(cam, ndc), rc = new THREE.Raycaster(); rc.ray.set(new THREE.Vector3(...r.o), new THREE.Vector3(...r.d)); rc.near = 0; rc.far = Infinity;
@@ -1247,10 +1272,10 @@
     const v = $('viewer'); if (!v || v.dataset.partWired) return; v.dataset.partWired = '1';
     const act = () => !!editPart && editActive() && $('v2EdTab')?.value === 'part';
     const ndcOf = e => { const r = v.getBoundingClientRect(); return [((e.clientX - r.left) / (r.width || 1)) * 2 - 1, -(((e.clientY - r.top) / (r.height || 1)) * 2 - 1)]; };
-    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey) return; const n = ndcOf(e), hz = gizmoPick(n); if (!hz && !ghostHit(n)) return; e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
+    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey) return; const n = ndcOf(e), hz = gizmoPick(n); let hit = !!hz || ghostHit(n); if (!hit) { const pi = parkedAt(n); if (pi < 0) return; takeParked(pi); hit = true; } e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
     v.addEventListener('pointermove', e => {
       if (partDrag) { e.stopPropagation(); if ((e.buttons & 1) === 0) { partDragEnd(); return; } const n = ndcOf(e); if (partDrag.hz) gizmoApply(partDrag.hz.kind, partDrag.hz.axis, partDrag.last, n, partDrag.cam); else partDragApply('move', partDrag.last, n, e.shiftKey, partDrag.cam); partDrag.last = n; return; }
-      const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const n = ndcOf(e), on = !!gizmoPick(n) || ghostHit(n); v.classList.toggle('v2-cur-grab', on);
+      const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const n = ndcOf(e), on = !!gizmoPick(n) || ghostHit(n) || parkedAt(n) >= 0; v.classList.toggle('v2-cur-grab', on);
     }, true);
     const partDragEnd = () => { if (!partDrag) return; partDrag = null; v.classList.remove('v2-cur-grabbing'); };
     v.addEventListener('pointerup', partDragEnd, true); v.addEventListener('pointercancel', partDragEnd, true); window.addEventListener('pointerup', partDragEnd, true); window.addEventListener('blur', partDragEnd);
@@ -1308,7 +1333,9 @@
     if (!editPart || !editActive() || $('v2EdTab')?.value !== 'part') { removeOverlap(); setJoinNote('', ''); return; }
     ovTimer = setTimeout(overlapUpdate, 160);
   }
-  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show); if (show) { wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
+  function discardPiece() { if (!editPart) return; dropSelected(); if (!editPart && !parked.length) set$tool('none'); $('v2EdResult').innerHTML = '<strong>Piece thrown away</strong><span>Nothing was changed on the model.</span>'; }
+  async function weldAll() { let guard = 0; while (editPart && guard++ < 30) { const cur = editPart; await editModelNow(); if (editPart === cur) break; } }
+  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show); if (show) { const t = $('v2PartPad').querySelector('.v2-pad-title'), txt = parked.length ? `Move the part (${parked.length + 1} floating)` : 'Move the part'; if (t && t.textContent !== txt) t.textContent = txt; setHid($('v2PadAll'), !parked.length); wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
   function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
   function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
   function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT
@@ -1323,18 +1350,22 @@
   }
   function updateEditPreview() {
     removeEditPreview();
-    updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; if (!editActive() || !V?.scene || ['lasso', 'razor', 'sculpt', 'none'].includes($('v2EdTab')?.value)) return;
-    const sl = $('v2EdTab')?.value === 'slice', isPart = $('v2EdTab')?.value === 'part';
+    updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; const tool = $('v2EdTab')?.value, floating = !!editPart || parked.length > 0; if (!editActive() || !V?.scene || (['lasso', 'razor', 'sculpt', 'none'].includes(tool) && !floating)) return;
+    const sl = tool === 'slice', isPart = tool === 'part';
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
-    if (isPart) {
-      const pm = partMatrix(); if (!pm) return;
-      const col = $('v2EdMode').value === 'cut' ? 0xff9a2f : 0x35d6a0;      // v2.319: one pass is seen through the model (so a part sitting inside or behind it is never hidden), one is solid where it is in front
-      [{ test: false, op: 0.4, ro: 998 }, { test: true, op: 0.85, ro: 999 }].forEach((c, i) => {
-        const m = new THREE.Mesh(editPart.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: c.op, depthWrite: false, depthTest: c.test, side: THREE.DoubleSide }));
-        m.name = i ? 'shrinkPartGhost' : 'shrinkPartGhostSee'; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
+    const ghost = (part, pm, mode, sel, tag) => {      // v2.326: every floating piece is drawn the same way; the selected one glows
+      const col = mode === 'cut' ? 0xff9a2f : 0x35d6a0;
+      [{ test: false, op: sel ? 0.4 : 0.28, ro: 998 }, { test: true, op: sel ? 0.85 : 0.6, ro: 999 }].forEach((c, i) => {
+        const m = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: c.op, depthWrite: false, depthTest: c.test, side: THREE.DoubleSide }));
+        m.name = (sel ? 'shrinkPartGhost' : 'shrinkParkedGhost') + (i ? '' : 'See'); m.userData.tag = tag; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
       });
-      g.add(gizmoBuild(THREE, pm));
+      if (sel) { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: 0xd8fff0, transparent: true, opacity: 0.4, depthWrite: false, depthTest: false, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(1.06, 1.06, 1.06)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
+    };
+    parked.forEach((r, i) => { const pm = partMatrixOf(r.part, r.vals, r.rot); if (pm) ghost(r.part, pm, r.mode, false, i); });
+    if (editPart) { const pm = partMatrix(); if (pm) { ghost(editPart, pm, $('v2EdMode').value, true, -1); if (isPart) g.add(gizmoBuild(THREE, pm)); } }
+    if (isPart || ['lasso', 'razor', 'sculpt', 'none'].includes(tool)) {
+      if (!g.children.length) return;
     } else if (sl) {
       const s = sliceSpec(); if (!s) return;
       const d = s.f.size.length() * 1.15, m = new THREE.Mesh(new THREE.PlaneGeometry(d, d), new THREE.MeshBasicMaterial({ color: 0x2f86ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
@@ -1413,7 +1444,7 @@
       if (snap) { if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift(); }
       removeEditPreview(); installWorkingResult(r.root, 'edit');
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
-      if (isPart) { editPart = null; partRot = null; updatePad(); $('v2EdPartInfo').textContent = 'Done. Choose another part file if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
+      if (isPart) { dropSelected(); updatePad(); $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Choose another part file if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
       res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       $('v2EdUndo').hidden = !editStack.length;
@@ -1431,6 +1462,7 @@
   function resetEdits() {
     const res = $('v2EdResult'); let did = false;
     try { if (window.__shrinkClay?.hasClay?.()) { window.__shrinkClay.clear(); did = true; } } catch {}
+    if (parked.length) { parked = []; did = true; }
     if (editPart) { editPart = null; did = true; try { $('v2EdPartFile').value = ''; } catch {} $('v2EdPartInfo').textContent = 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.'; }
     if (editBase) {
       const base = editBase; editBase = null; editStack = []; removeEditPreview();
@@ -1453,7 +1485,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -2435,8 +2467,10 @@
         if (!editActive() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '') || e.altKey) return; const k = e.key;
         if ((e.metaKey || e.ctrlKey) && (k === 'z' || k === 'Z') && !e.shiftKey) { e.preventDefault(); if (editStack.length && !lassoBusy) undoEdit(); return; }
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'v' || k === 'V') && editPart && $('v2EdTab')?.value === 'part') { e.preventDefault(); editModelNow(); return; }   // Cmd/Ctrl+V pastes (places) the floating part
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'c' || k === 'C') && editPart && $('v2EdTab')?.value === 'part') { e.preventDefault(); dupPart(); return; }
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && lassoSel && lzTool() && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) { e.preventDefault(); lassoApply(k.toLowerCase() === 'c' ? 'copy' : 'cut'); return; }   // Cmd/Ctrl+C copies the red part, +X cuts it off and keeps it
         if (e.metaKey || e.ctrlKey) return;
+        if ((k === 'Delete' || k === 'Backspace') && editPart && $('v2EdTab')?.value === 'part') { e.preventDefault(); discardPiece(); return; }
         if ($('v2EdTab')?.value === 'sculpt' && /^[-+=_]$/.test(k)) { e.preventDefault(); const r = $('v2SculptSize'), up = k === '+' || k === '=', lo = Number(r.min) || 1, hi = Number(r.max) || 120, cur = Number(r.value) || lo; let nv = Math.round(cur * (up ? 1.15 : 1 / 1.15) * 10) / 10; if (nv === cur) nv += up ? 0.5 : -0.5; r.value = String(Math.min(hi, Math.max(lo, nv))); r.dispatchEvent(new Event('input', { bubbles: true })); return; }
         if (editPart && $('v2EdTab')?.value === 'part' && /^[-+=_]$/.test(k)) { e.preventDefault(); partScale(k === '+' || k === '=' ? 1.1 : 1 / 1.1); return; }
         if (editPart && $('v2EdTab')?.value === 'part' && /^[xyzXYZ]$/.test(k)) { e.preventDefault(); partTurnWorld('xyz'.indexOf(k.toLowerCase()), k === k.toLowerCase() ? 1 : -1); }

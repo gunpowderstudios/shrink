@@ -1,5 +1,11 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.326
+- Cut or copied pieces now **stay floating in green until you press WELD IT**. Cut or copy as many as you like: each new piece floats beside the others instead of replacing them.
+- **Click a green piece to pick it**: the picked one glows and gets the arrows, rings and − / +. Drag it to move it. The others wait, dimmer.
+- New buttons: **COPY PIECE** (Ctrl/Cmd+C) makes another green piece like the picked one, **DELETE PIECE** (Delete) throws it away, **WELD IT** (Ctrl/Cmd+V) joins the picked piece on, **WELD ALL** joins every floating piece. The pad says how many are floating.
+- The floating pieces stay on screen while you use the Lasso, Razor or other tools. (To grab one with the mouse, pick the Paste part tool.)
+
 ## v2.325
 - The MOVE / TURN / SIZE buttons are gone. The handles are now **on the green piece**: three little arrows (red X, green Y, blue Z) slide it along that axis, three rings turn it (green = yaw, red = pitch, blue = roll), and **−** / **+** sitting on the piece make it smaller or bigger (the + and − keys do the same). Dragging the piece itself still moves it (Shift = nearer / farther).
 

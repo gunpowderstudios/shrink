@@ -281,7 +281,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
   ok(await waitFor(() => /Copied|Could not/.test(page.$('v2EdResult').textContent), 60000) && w.__shrinkEdit.hasPart() && page.$('v2EdTab').value === 'part', 'ED31 COPY hands the piece to the paste tool');
   const st0 = w.__shrinkEdit.partState(); ok(Math.abs(st0.x) > 1, `ED31 a copy starts beside its source, not hidden inside it (x ${st0.x.toFixed(1)} mm)`);
-  ok(w.__shrinkEdit.ghosts() === 3 && !!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview').getObjectByName('shrinkPartGhostSee'), 'ED31 the ghost is drawn twice: solid in front and see-through behind the model');
+  ok(w.__shrinkEdit.ghosts() === 4 && !!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview').getObjectByName('shrinkPartGhostSee'), 'ED31 the ghost is drawn twice: solid in front and see-through behind the model');
   ok(!!page.$('v2PartPad') && page.$('v2PartPad').querySelectorAll('[data-pmode]').length === 0, 'ED31 the MOVE / TURN / SIZE mode buttons are gone from the pad');
   ok(page.$('v2EditPanel').contains(page.$('v2PartPad')) && page.$('v2PartPad').nextElementSibling?.id === 'v2EditPane' && w.__shrinkEdit.padVisible(), 'ED31 the pad sits at the top of the EDIT panel, where it is always in view');
   /* MOVE: dragging right by 0.2 of the screen half-width moves the part right by that much in the view plane */
@@ -359,5 +359,20 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2TabEdit').click(); await wait(50); ok(b.classList.contains('v2-editing'), 'ED35 opening EDIT hides the health box, SHRINK and DOWNLOAD (body.v2-editing)');
   page.$('v2EditPanel').querySelector('.v2-edit-close').click(); await wait(50); ok(!b.classList.contains('v2-editing'), 'ED35 closing EDIT brings them back');
   const css = (await import('node:fs')).readFileSync(new URL('../print-v2-ui.css', import.meta.url), 'utf8'); ok(/body\.v2-editing #v2HealthCard,body\.v2-editing #v2SideStack\{display:none!important\}/.test(css), 'ED35 the stylesheet hides both modules');
+}
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  w.__shrinkViewer = { scene: new w.__shrinkApp.THREE.Scene() }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);
+  const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
+  for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'a.stl'); await wait(50); set(page, 'v2EdPartX', 6); w.__shrinkEdit.preview?.();
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'b.stl'); await wait(50);
+  ok(w.__shrinkEdit.parked() === 1 && w.__shrinkEdit.hasPart(), 'ED37 a second piece does not replace the first: it floats beside it');
+  const sc = w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview'); ok(!!sc.getObjectByName('shrinkParkedGhost') && !!sc.getObjectByName('shrinkPartGlow') && !!sc.getObjectByName('shrinkPartGhost'), 'ED37 both pieces are drawn green and the selected one glows');
+  w.__shrinkEdit.dup(); ok(w.__shrinkEdit.parked() === 2, 'ED37 COPY PIECE makes another floating piece');
+  ok(w.__shrinkEdit.select(0) && w.__shrinkEdit.parked() === 2 && Math.abs(w.__shrinkEdit.partState().x - 6) < 0.01, 'ED37 selecting a waiting piece brings it back with its own position (x 6)');
+  ok(/3 floating/.test(page.$('v2PartPad').querySelector('.v2-pad-title').textContent) && page.$('v2PadAll').hidden === false, 'ED37 the pad counts the floating pieces and offers WELD ALL');
+  w.__shrinkEdit.setSel(null); set(page, 'v2EdTab', 'lasso'); await wait(50); ok(!!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview')?.getObjectByName('shrinkParkedGhost'), 'ED37 the pieces stay on screen while another tool is used'); set(page, 'v2EdTab', 'part'); await wait(50);
+  page.$('v2EdResult').textContent = ''; page.$('v2PadAll').click(); ok(await waitFor(() => !w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 0, 90000), 'ED37 WELD ALL joins every floating piece: ' + page.$('v2EdResult').textContent.slice(0, 100));
+  ok(!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview')?.getObjectByName('shrinkPartGhost'), 'ED37 nothing is left floating afterwards');
 }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
