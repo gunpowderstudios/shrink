@@ -905,3 +905,6 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-edit-t
 
 /* v2.324 — the right-hand health / SHRINK / DOWNLOAD modules step aside while the EDIT panel is open */
 body.v2-editing #v2HealthCard,body.v2-editing #v2SideStack{display:none!important}
+
+.v2-pieces-row{display:flex;gap:6px;margin-bottom:8px}.v2-pieces-row button{flex:1;font-size:11px;font-weight:700;padding:6px 4px}.v2-pieces-row button:disabled{opacity:.45}
+.v2-save-pieces{display:flex;gap:6px;align-items:center;font-size:12px;margin-top:6px}.v2-save-pieces[hidden]{display:none}

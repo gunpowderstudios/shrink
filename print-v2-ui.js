@@ -745,7 +745,7 @@
   // ---- v2.307 EDIT MODEL: basic shapes (join / cut) and a slice-off plane, both through Manifold (edit-core.js) ----
   let editStack = [], editBase = null;               // editBase = a copy of the model from before the FIRST edit, for RESET ALL EDITS                                   // clones of the working model before each edit, for UNDO
   function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { if (o.geometry !== editPart?.geometry && !parked.some(r => r.part.geometry === o.geometry)) o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
-  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); partRot = null; parked = []; islandCache = null; sculptWork = null; sculptData = null; } catch {} });
+  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); if (!editPart) partRot = null; islandCache = null; if (editPart || parked.length) setTimeout(updateEditPreview, 500); sculptWork = null; sculptData = null; } catch {} });
   function editFrame() {
     const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return null;
     const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return null;
@@ -1333,6 +1333,42 @@
     if (!editPart || !editActive() || $('v2EdTab')?.value !== 'part') { removeOverlap(); setJoinNote('', ''); return; }
     ovTimer = setTimeout(overlapUpdate, 160);
   }
+  // ---- v2.328: save / load the floating pieces. One small file: "SHRINKPARTS1\n", 4-byte header length, JSON header, then every piece's triangle soup as raw float32 (exact, no rounding).
+  function allPieces() { const l = parked.map(r => ({ part: r.part, vals: r.vals, rot: r.rot, mode: r.mode })); if (editPart) l.push({ part: editPart, vals: partVals(), rot: partRot, mode: $('v2EdMode')?.value || 'join' }); return l; }
+  function soupOf(g) { const pos = g.attributes.position, idx = g.index, n = idx ? idx.count : pos.count, out = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const j = idx ? idx.getX(i) : i; out[i * 3] = pos.getX(j); out[i * 3 + 1] = pos.getY(j); out[i * 3 + 2] = pos.getZ(j); } return out; }
+  function buildPiecesFile() {
+    const list = allPieces(); if (!list.length) return null; const bufs = [], head = { app: 'SHRINK 3D', kind: 'floating-pieces', v: 1, pieces: [] }; let off = 0;
+    list.forEach((it, i) => { const a = soupOf(it.part.geometry); bufs.push(a); head.pieces.push({ name: it.part.name || 'piece ' + (i + 1), height: it.part.height, mode: it.mode, vals: it.vals, rot: it.rot ? it.rot.toArray() : null, off, count: a.length }); off += a.length; });
+    const enc = new TextEncoder(), hj = enc.encode(JSON.stringify(head)), magic = enc.encode('SHRINKPARTS1\n'), out = new Uint8Array(magic.length + 4 + hj.length + off * 4);
+    out.set(magic, 0); new DataView(out.buffer).setUint32(magic.length, hj.length, true); out.set(hj, magic.length + 4); let o = magic.length + 4 + hj.length;
+    bufs.forEach(a => { out.set(new Uint8Array(a.buffer, a.byteOffset, a.byteLength), o); o += a.byteLength; }); return out;
+  }
+  function loadPiecesBuffer(ab) {
+    const u8 = new Uint8Array(ab), dec = new TextDecoder(), magic = 'SHRINKPARTS1\n'; if (dec.decode(u8.subarray(0, magic.length)) !== magic) throw new Error('That is not a SHRINK floating-pieces file.');
+    const hl = new DataView(u8.buffer, u8.byteOffset).getUint32(magic.length, true), head = JSON.parse(dec.decode(u8.subarray(magic.length + 4, magic.length + 4 + hl))), base = magic.length + 4 + hl; let n = 0;
+    for (const pc of head.pieces) {
+      const arr = new Float32Array(u8.slice(base + pc.off * 4, base + (pc.off + pc.count) * 4).buffer), part = partFromPoints(arr, false, pc.name); part.copied = true; setPart(part);
+      Object.entries(pc.vals).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); }); partRot = pc.rot ? new (app().THREE.Quaternion)(...pc.rot) : null;
+      const md = $('v2EdMode'); if (md) { md.value = pc.mode || 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); } n++;
+    }
+    if (n) { if (!editActive()) window.__shrinkTab?.('edit'); set$tool('part'); updateEditPreview(); }
+    return n;
+  }
+  function savePiecesFile() {
+    const data = buildPiecesFile(); if (!data) { edToast?.('There are no floating pieces to save.'); return false; }
+    const name = `${(window.__shrinkDownloadStem?.(document.getElementById('fileName')?.textContent || 'model') || 'model')}-pieces.shrinkparts`, blob = new Blob([data], { type: 'application/octet-stream' });
+    if (window.__shrinkCapture?.(blob, name)) return true; const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000); return true;
+  }
+  function piecesUi() {                                  // buttons in the EDIT panel, and the tick box under DOWNLOAD IT
+    const have = !!editPart || parked.length > 0, row = $('v2SavePiecesRow'); setHid(row, !have); const sv = $('v2PiecesSave'); if (sv && sv.disabled === have) sv.disabled = !have;
+  }
+  function ensurePiecesRow() {
+    const pane = $('v2EditPane'); if (pane && !$('v2PiecesRow')) { const r = document.createElement('div'); r.id = 'v2PiecesRow'; r.className = 'v2-pieces-row';
+    r.innerHTML = '<button type="button" id="v2PiecesSave" title="Save the floating green pieces to a file, to use on another model later" disabled>SAVE PIECES</button><button type="button" id="v2PiecesLoad" title="Bring saved floating pieces back">LOAD PIECES</button><input type="file" id="v2PiecesFile" accept=".shrinkparts" hidden>';
+    pane.insertBefore(r, pane.firstChild); r.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.id === 'v2PiecesSave') savePiecesFile(); else $('v2PiecesFile').click(); });
+    $('v2PiecesFile').addEventListener('change', async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const n = loadPiecesBuffer(await f.arrayBuffer()); $('v2EdResult').innerHTML = `<strong>✓ ${n} piece${n === 1 ? '' : 's'} loaded</strong><span>They float in green where they were saved, relative to the middle of this model. Move them, then WELD IT.</span>`; } catch (err) { edToast?.(String(err?.message || err)); } }); }
+    const dl = document.querySelector('.v2-main-download'); if (dl && !$('v2SavePiecesRow')) { const lab = document.createElement('label'); lab.id = 'v2SavePiecesRow'; lab.className = 'v2-save-pieces'; lab.hidden = true; lab.innerHTML = '<input type="checkbox" id="v2SavePieces" checked> Also save my floating pieces (.shrinkparts)'; const b = $('v2DownloadBtn'); if (b && b.parentNode === dl) b.after(lab); else dl.appendChild(lab); }
+  }
   function discardPiece() { if (!editPart) return; dropSelected(); if (!editPart && !parked.length) set$tool('none'); $('v2EdResult').innerHTML = '<strong>Piece thrown away</strong><span>Nothing was changed on the model.</span>'; }
   async function weldAll() { let guard = 0; while (editPart && guard++ < 30) { const cur = editPart; await editModelNow(); if (editPart === cur) break; } }
   function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show); if (show) { const t = $('v2PartPad').querySelector('.v2-pad-title'), txt = parked.length ? `Move the part (${parked.length + 1} floating)` : 'Move the part'; if (t && t.textContent !== txt) t.textContent = txt; setHid($('v2PadAll'), !parked.length); wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
@@ -1350,7 +1386,7 @@
   }
   function updateEditPreview() {
     removeEditPreview();
-    updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; const tool = $('v2EdTab')?.value, floating = !!editPart || parked.length > 0; if (!editActive() || !V?.scene || (['lasso', 'razor', 'sculpt', 'none'].includes(tool) && !floating)) return;
+    ensurePiecesRow(); piecesUi(); updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; const tool = $('v2EdTab')?.value, floating = !!editPart || parked.length > 0; if (!editActive() || !V?.scene || (['lasso', 'razor', 'sculpt', 'none'].includes(tool) && !floating)) return;
     const sl = tool === 'slice', isPart = tool === 'part';
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
@@ -1485,7 +1521,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), savePieces: savePiecesFile, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -2164,6 +2200,7 @@
     if ($('fuseSolidToggle')) setNative('fuseSolidToggle', false, 'change');
     markStep(4, 'done');
     $('saveStlBtn')?.click();
+    if ($('v2SavePieces')?.checked && (editPart || parked.length)) setTimeout(savePiecesFile, 400);   // v2.328: the solid STL as usual, plus the floating pieces in their own file
   }
 
   function buildMainCard() {

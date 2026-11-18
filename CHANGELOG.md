@@ -1,5 +1,11 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.328
+- **Floating pieces survive.** Opening another model no longer throws the green floating pieces away, so you can cut pieces off one model and weld them onto the next.
+- **SAVE PIECES / LOAD PIECES** at the top of the EDIT panel save every floating piece (shape, size, turn, position, Join/Cut) to a `.shrinkparts` file and bring them back in any later session.
+- **DOWNLOAD IT keeps them too.** While pieces are floating a tick box "Also save my floating pieces" appears under DOWNLOAD IT (ticked). The solid STL downloads exactly as before (the floating pieces are never in it) and the `.shrinkparts` file downloads beside it.
+- Positions are relative to the middle of the model they were saved against.
+
 ## v2.327
 - The X / Y / Z arrows on the green piece are much longer (2.2 x the piece's radius instead of 1.3) and thicker, so they are easier to grab. The rings are unchanged.
 

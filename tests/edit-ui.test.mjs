@@ -375,4 +375,20 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2EdResult').textContent = ''; page.$('v2PadAll').click(); ok(await waitFor(() => !w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 0, 90000), 'ED37 WELD ALL joins every floating piece: ' + page.$('v2EdResult').textContent.slice(0, 100));
   ok(!w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview')?.getObjectByName('shrinkPartGhost'), 'ED37 nothing is left floating afterwards');
 }
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  w.__shrinkViewer = { scene: new w.__shrinkApp.THREE.Scene() }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);
+  const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
+  for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
+  ok(page.$('v2PiecesSave')?.disabled === true && !!page.$('v2PiecesLoad'), 'ED38 SAVE PIECES waits until there is a piece; LOAD PIECES is always there');
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'a.stl'); await wait(50); set(page, 'v2EdPartX', 6); set(page, 'v2EdPartH', 12);
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'b.stl'); await wait(50); set(page, 'v2EdPartX', -4);
+  ok(page.$('v2PiecesSave').disabled === false && page.$('v2SavePiecesRow')?.hidden === false, 'ED38 with pieces floating, SAVE PIECES is on and DOWNLOAD IT offers to save them too');
+  const bytes = w.__shrinkEdit.piecesFile(); ok(bytes && bytes.length > 100, 'ED38 the pieces file is built (' + (bytes?.length) + ' bytes)');
+  let got = null; w.__shrinkCapture = (b, n) => { got = n; return true; }; w.__shrinkEdit.savePieces(); ok(/-pieces\.shrinkparts$/.test(got || ''), 'ED38 it downloads as ' + got); w.__shrinkCapture = null;
+  w.__shrinkEdit.reset(); await wait(100); ok(w.__shrinkEdit.parked() === 0 && !w.__shrinkEdit.hasPart(), 'ED38 reset clears the floating pieces');
+  const n = w.__shrinkEdit.loadPieces(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)); await wait(50);
+  ok(n === 2 && w.__shrinkEdit.parked() === 1 && w.__shrinkEdit.hasPart(), 'ED38 loading brings both pieces back');
+  ok(Math.abs(w.__shrinkEdit.partState().x - -4) < 0.01, 'ED38 the selected piece is where it was saved (x -4)'); w.__shrinkEdit.select(0); ok(Math.abs(w.__shrinkEdit.partState().x - 6) < 0.01 && Math.abs(w.__shrinkEdit.partState().h - 12) < 0.01, 'ED38 the other piece kept its place and size (x 6, 12 mm)');
+  let bad = ''; try { w.__shrinkEdit.loadPieces(new TextEncoder().encode('nonsense nonsense').buffer); } catch (e) { bad = String(e.message); } ok(/not a SHRINK/.test(bad), 'ED38 a wrong file is refused politely');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
