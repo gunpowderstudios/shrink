@@ -1136,6 +1136,7 @@
     pad = document.createElement('div'); pad.id = 'v2PartPad'; pad.className = 'v2-part-pad'; pad.hidden = true;
     const b = (a, t, tip) => `<button type="button" data-pad="${a}" title="${tip}" aria-label="${tip}">${t}</button>`;
     pad.innerHTML = `<div class="v2-pad-title">Drag the green part</div>
+      <div id="v2PadJoin" class="v2-pad-join" aria-live="polite"></div>
       <div class="v2-pad-modes"><button type="button" data-pmode="move" title="Drag the part about (hold Shift to push it nearer or farther)">✥ MOVE</button><button type="button" data-pmode="turn" title="Drag to turn the part">⟳ TURN</button><button type="button" data-pmode="size" title="Drag up to enlarge, down to reduce">⤢ SIZE</button></div>
       <div class="v2-pad-row"><div class="v2-pad-cross">${b('up', '▲', 'Move up')}<span></span>${b('left', '◀', 'Move left')}${b('down', '▼', 'Move down')}${b('right', '▶', 'Move right')}</div>
       <div class="v2-pad-col">${b('near', 'NEARER', 'Move towards you')}${b('far', 'FARTHER', 'Move away from you')}${b('bigger', 'BIGGER +', 'Enlarge')}${b('smaller', 'SMALLER −', 'Reduce')}</div></div>
@@ -1188,6 +1189,59 @@
     const partDragEnd = () => { if (!partDrag) return; partDrag = null; v.classList.remove('v2-cur-grabbing'); };
     v.addEventListener('pointerup', partDragEnd, true); v.addEventListener('pointercancel', partDragEnd, true); window.addEventListener('pointerup', partDragEnd, true); window.addEventListener('blur', partDragEnd);
   }
+  // ---- v2.323: where the floating part overlaps the model it turns red, so you can see it is joined there. Point-in-mesh by a ray up the Y axis through a grid of the model's triangles (no BVH needed).
+  let ovIndex = null, ovTimer = 0;
+  function removeOverlap() { const V = window.__shrinkViewer, g = V?.scene?.getObjectByName?.('shrinkPartOverlap'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
+  function ovBuild(model) {
+    const THREE = app().THREE, nt0 = modelTriangles(model), A = new Float32Array(nt0 * 9), v = new THREE.Vector3(); let k = 0; model.updateWorldMatrix(true, true);
+    model.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count;
+      for (let i = 0; i + 2 < n && k + 9 <= A.length; i += 3) for (let c = 0; c < 3; c++) { v.fromBufferAttribute(pos, idx ? idx.getX(i + c) : i + c).applyMatrix4(o.matrixWorld); A[k++] = v.x; A[k++] = v.y; A[k++] = v.z; } });
+    const nt = k / 9; let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity;
+    for (let i = 0; i < k; i += 3) { const x = A[i], z = A[i + 2]; if (x < minx) minx = x; if (x > maxx) maxx = x; if (z < minz) minz = z; if (z > maxz) maxz = z; }
+    const G = Math.max(8, Math.min(256, Math.round(Math.sqrt(nt) / 2))), cw = (maxx - minx) / G || 1, cd = (maxz - minz) / G || 1, cnt = new Int32Array(G * G + 1);
+    const span = (a, b, c, lo, w) => [Math.max(0, Math.min(G - 1, Math.floor((Math.min(a, b, c) - lo) / w))), Math.max(0, Math.min(G - 1, Math.floor((Math.max(a, b, c) - lo) / w)))];
+    for (let t = 0; t < nt; t++) { const o = t * 9, [x0, x1] = span(A[o], A[o + 3], A[o + 6], minx, cw), [z0, z1] = span(A[o + 2], A[o + 5], A[o + 8], minz, cd); for (let zz = z0; zz <= z1; zz++) for (let xx = x0; xx <= x1; xx++) cnt[zz * G + xx + 1]++; }
+    for (let i = 0; i < G * G; i++) cnt[i + 1] += cnt[i];
+    const fill = cnt.slice(0, G * G), list = new Int32Array(cnt[G * G]);
+    for (let t = 0; t < nt; t++) { const o = t * 9, [x0, x1] = span(A[o], A[o + 3], A[o + 6], minx, cw), [z0, z1] = span(A[o + 2], A[o + 5], A[o + 8], minz, cd); for (let zz = z0; zz <= z1; zz++) for (let xx = x0; xx <= x1; xx++) list[fill[zz * G + xx]++] = t; }
+    return { model, tick: window.__shrinkStretchTick || 0, A, G, minx, maxx, minz, maxz, cw, cd, start: cnt, list, jx: (maxx - minx) * 1.7e-6 + 1e-9, jz: (maxz - minz) * 2.3e-6 + 1e-9 };
+  }
+  function ovInside(ix, x, y, z) {
+    x += ix.jx; z += ix.jz; if (x < ix.minx || x > ix.maxx || z < ix.minz || z > ix.maxz) return false;
+    const G = ix.G, cx = Math.min(G - 1, Math.floor((x - ix.minx) / ix.cw)), cz = Math.min(G - 1, Math.floor((z - ix.minz) / ix.cd)), cell = cz * G + cx, A = ix.A; let hits = 0;
+    for (let p = ix.start[cell]; p < ix.start[cell + 1]; p++) {
+      const t = ix.list[p] * 9, ax = A[t], ay = A[t + 1], az = A[t + 2], bx = A[t + 3], by = A[t + 4], bz = A[t + 5], qx = A[t + 6], qy = A[t + 7], qz = A[t + 8];
+      const d = (bz - qz) * (ax - qx) + (qx - bx) * (az - qz); if (Math.abs(d) < 1e-18) continue;
+      const l1 = ((bz - qz) * (x - qx) + (qx - bx) * (z - qz)) / d, l2 = ((qz - az) * (x - qx) + (ax - qx) * (z - qz)) / d, l3 = 1 - l1 - l2;
+      if (l1 < 0 || l2 < 0 || l3 < 0) continue; if (l1 * ay + l2 * by + l3 * qy > y) hits++;
+    }
+    return (hits & 1) === 1;
+  }
+  function setJoinNote(text, state) { const e = $('v2PadJoin'); if (!e) return; if (e.textContent !== text) e.textContent = text; if (e.dataset.state !== state) e.dataset.state = state; }
+  function overlapUpdate() {
+    clearTimeout(ovTimer); removeOverlap(); const V = window.__shrinkViewer, model = sourceModel(), pm = partMatrix(); const on = editPart && editActive() && $('v2EdTab')?.value === 'part';
+    if (!on || !V?.scene || !model || !pm) { setJoinNote('', ''); return 0; }
+    if (modelTriangles(model) > (window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES)) { setJoinNote('', ''); return 0; }
+    if (!ovIndex || ovIndex.model !== model || ovIndex.tick !== (window.__shrinkStretchTick || 0)) ovIndex = ovBuild(model);
+    const THREE = pm.f.THREE, g = editPart.geometry, pos = g.attributes.position, idx = g.index, n = idx ? idx.count : pos.count, nt = Math.floor(n / 3), step = Math.max(1, Math.ceil(nt / 200000)), m = pm.m, out = [], v = new THREE.Vector3(), w = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let t = 0; t < nt; t += step) {
+      let any = false; for (let c = 0; c < 3; c++) { const i = idx ? idx.getX(t * 3 + c) : t * 3 + c; v.fromBufferAttribute(pos, i).applyMatrix4(m); w[c * 3] = v.x; w[c * 3 + 1] = v.y; w[c * 3 + 2] = v.z; if (!any && ovInside(ovIndex, v.x, v.y, v.z)) any = true; }
+      if (any) out.push(...w);
+    }
+    const cut = $('v2EdMode')?.value === 'cut', joined = out.length / 9;
+    if (joined) {
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(out), 3));
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.8, depthTest: false, depthWrite: false, side: THREE.DoubleSide })); mesh.renderOrder = 1001; mesh.raycast = () => {};
+      const grp = new THREE.Group(); grp.name = 'shrinkPartOverlap'; grp.raycast = () => {}; grp.add(mesh); V.scene.add(grp);
+    }
+    setJoinNote(joined ? (cut ? 'Red = the part of the model this will cut away.' : 'Red = where it overlaps the model, so it will be joined there.') : (cut ? 'It is not touching the model, so nothing would be cut.' : 'Not touching the model yet. Move it so a little of it overlaps, or it will stay a separate piece.'), joined ? 'joined' : 'apart');
+    return joined;
+  }
+  function scheduleOverlap() {
+    clearTimeout(ovTimer); const V = window.__shrinkViewer, g = V?.scene?.getObjectByName?.('shrinkPartOverlap'); if (g) g.visible = false;
+    if (!editPart || !editActive() || $('v2EdTab')?.value !== 'part') { removeOverlap(); setJoinNote('', ''); return; }
+    ovTimer = setTimeout(overlapUpdate, 160);
+  }
   function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); if (show) { wirePartDrag(); padModeState(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
   function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
   function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
@@ -1203,7 +1257,7 @@
   }
   function updateEditPreview() {
     removeEditPreview();
-    updatePad(); const V = window.__shrinkViewer; if (!editActive() || !V?.scene || ['lasso', 'razor', 'sculpt', 'none'].includes($('v2EdTab')?.value)) return;
+    updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; if (!editActive() || !V?.scene || ['lasso', 'razor', 'sculpt', 'none'].includes($('v2EdTab')?.value)) return;
     const sl = $('v2EdTab')?.value === 'slice', isPart = $('v2EdTab')?.value === 'part';
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
@@ -1262,6 +1316,7 @@
   function setMainTab(tab) {
     const pn = $('v2EditPanel'); if (!pn) return;
     tab = tab === 'edit' ? 'edit' : 'finish'; setHid(pn, tab !== 'edit'); $('v2TabEdit')?.setAttribute('aria-pressed', String(tab === 'edit'));
+    document.body.classList.toggle('v2-editing', tab === 'edit');          // v2.324: while EDIT is open the health box, SHRINK and DOWNLOAD step aside (CSS)
     if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { removeEditPreview(); clearLasso(); updatePad(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-sculpt'); sculptRing(null); }
   }
   window.__shrinkTab = setMainTab;
@@ -1329,7 +1384,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');

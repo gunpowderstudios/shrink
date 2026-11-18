@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.323
+- Pasting a part: where the floating part overlaps the model it now turns **red**, so you can see it is joined there. A note in the pad says "Red = where it overlaps the model, so it will be joined there", or "Not touching the model yet" when it would stay a separate piece (and, for a Cut part, what will be cut away). It updates a moment after you stop moving the part. Models over 1,000,000 triangles do not show it.
+- While the EDIT panel is open, the right-hand health box, SHRINK and DOWNLOAD modules step aside to give the model more room. They come back when you close EDIT.
+
 ## v2.322
 - The MOVE / TURN / SIZE pad for a copied or cut part now sits at the top of the EDIT panel instead of the bottom-right corner of the 3D view, which could be below the visible screen. It shows as soon as a part is waiting.
 

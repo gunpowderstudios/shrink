@@ -896,3 +896,9 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-edit-t
 
 /* v2.322 — the part pad sits at the top of the EDIT panel */
 .v2-edit-panel .v2-part-pad{position:static;right:auto;bottom:auto;width:auto;margin:0 0 12px;box-shadow:none;border-color:#27c088}
+
+.v2-pad-join{font-size:11px;line-height:1.35;margin:0 0 8px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.06);color:#cdd6e2}.v2-pad-join:empty{display:none}
+.v2-pad-join[data-state="joined"]{background:rgba(255,42,42,.18);color:#ffb4b4;border:1px solid rgba(255,42,42,.5)}
+
+/* v2.324 — the right-hand health / SHRINK / DOWNLOAD modules step aside while the EDIT panel is open */
+body.v2-editing #v2HealthCard,body.v2-editing #v2SideStack{display:none!important}

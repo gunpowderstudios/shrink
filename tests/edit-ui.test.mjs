@@ -323,4 +323,28 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(page.$('v2EditPanel').hidden === true && ed.getAttribute('aria-pressed') === 'false', 'ED33 the close button folds it away');
   adv.click(); await wait(50); ed.click(); await wait(50); ok(dash.dataset.left === 'open' && page.$('v2EditPanel').hidden === false, 'ED33 both can be open together');
 }
+/* v2.323: the overlap with the model turns red */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80); set(page, 'v2EdDepth', 'through');
+  const L = orthoCam(page, 0.6, 1.3), S = { cam: L.cam, pts: L.pts.map(([x, y]) => [x * 0.3, y]) };
+  w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2LassoKeepBtn').click(); await waitFor(() => w.__shrinkEdit.hasPart(), 60000);
+  const red = () => { let n = 0; w.__shrinkViewer.scene.getObjectByName('shrinkPartOverlap')?.traverse(o => { if (o.isMesh) n = o.geometry.attributes.position.count / 3; }); return n; };
+  set(page, 'v2EdPartX', 500); const apart = w.__shrinkEdit.overlap();
+  ok(apart === 0 && red() === 0 && /Not touching/.test(page.$('v2PadJoin').textContent), 'ED34 far from the model: nothing red, and it says it is not touching');
+  w.__shrinkEdit.place('centre'); const inside = w.__shrinkEdit.overlap(), nAll = (() => { const g = w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview'); let n = 0; g?.getObjectByName('shrinkPartGhost')?.geometry && (n = g.getObjectByName('shrinkPartGhost').geometry.attributes.position.count / 3); return n; })();
+  ok(inside > 0 && red() === inside && page.$('v2PadJoin').dataset.state === 'joined' && /Red = where it overlaps/.test(page.$('v2PadJoin').textContent), `ED34 sunk into the model: the overlap turns red (${inside} of ${nAll} triangles) and the note says it will join`);
+  ok(inside >= nAll * 0.9, 'ED34 a part sitting wholly inside the model is red all over');
+  /* straddling the surface: only part of it is red */
+  w.__shrinkEdit.place('centre'); const st = w.__shrinkEdit.partState(); let part = -1, shift = 0; for (const dy of [6, 8, 10, 11, 12, 13, 14]) { set(page, 'v2EdPartY', st.y + dy); const n = w.__shrinkEdit.overlap(); if (n > 0 && n < nAll) { part = n; shift = dy; break; } }
+  ok(part > 0 && part < nAll, `ED34 half in, half out: only the buried part is red (${part} of ${nAll}, raised ${shift} mm)`);
+  set(page, 'v2EdPartX', 500); w.__shrinkEdit.overlap(); ok(red() === 0, 'ED34 moving it away clears the red');
+}
+/* v2.324: the right-hand modules step aside while EDIT is open */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const b = w.document.body; ok(!b.classList.contains('v2-editing'), 'ED35 the side modules show while EDIT is closed');
+  page.$('v2TabEdit').click(); await wait(50); ok(b.classList.contains('v2-editing'), 'ED35 opening EDIT hides the health box, SHRINK and DOWNLOAD (body.v2-editing)');
+  page.$('v2EditPanel').querySelector('.v2-edit-close').click(); await wait(50); ok(!b.classList.contains('v2-editing'), 'ED35 closing EDIT brings them back');
+  const css = (await import('node:fs')).readFileSync(new URL('../print-v2-ui.css', import.meta.url), 'utf8'); ok(/body\.v2-editing #v2HealthCard,body\.v2-editing #v2SideStack\{display:none!important\}/.test(css), 'ED35 the stylesheet hides both modules');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
