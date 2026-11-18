@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.329
+- New **Select** tool (first in the EDIT tool row). Click a green floating piece to pick it whole (it glows), drag it to move it, and use the pad (**COPY PIECE**, **DELETE PIECE**, **WELD IT**, **WELD ALL**) or Ctrl/Cmd+C, Delete and Ctrl/Cmd+V. Unlike Paste part it has no file chooser and no arrows / rings, so it stays out of the way.
+
 ## v2.328
 - **Floating pieces survive.** Opening another model no longer throws the green floating pieces away, so you can cut pieces off one model and weld them onto the next.
 - **SAVE PIECES / LOAD PIECES** at the top of the EDIT panel save every floating piece (shape, size, turn, position, Join/Cut) to a `.shrinkparts` file and bring them back in any later session.

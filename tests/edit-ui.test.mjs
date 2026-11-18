@@ -391,4 +391,20 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(Math.abs(w.__shrinkEdit.partState().x - -4) < 0.01, 'ED38 the selected piece is where it was saved (x -4)'); w.__shrinkEdit.select(0); ok(Math.abs(w.__shrinkEdit.partState().x - 6) < 0.01 && Math.abs(w.__shrinkEdit.partState().h - 12) < 0.01, 'ED38 the other piece kept its place and size (x 6, 12 mm)');
   let bad = ''; try { w.__shrinkEdit.loadPieces(new TextEncoder().encode('nonsense nonsense').buffer); } catch (e) { bad = String(e.message); } ok(/not a SHRINK/.test(bad), 'ED38 a wrong file is refused politely');
 }
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  w.__shrinkViewer = { scene: new w.__shrinkApp.THREE.Scene() }; page.$('v2TabEdit').click(); await wait(50);
+  ok(!!page.$('v2EditCard').querySelector('[data-ed="tool"][data-value="select"]'), 'ED39 there is a Select tool button');
+  set(page, 'v2EdTab', 'select'); await wait(50); ok(/Nothing is floating yet/.test(page.$('v2EdHint').textContent), 'ED39 with nothing floating the hint says how to get a piece');
+  const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
+  for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'a.stl'); await wait(50); set(page, 'v2EdPartX', 6);
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'b.stl'); await wait(50); set(page, 'v2EdTab', 'select'); await wait(50);
+  const sc = () => w.__shrinkViewer.scene.getObjectByName('shrinkEditPreview');
+  ok(w.__shrinkEdit.padVisible() && !!sc().getObjectByName('shrinkPartGlow') && !!sc().getObjectByName('shrinkParkedGhost') && !sc().getObjectByName('shrinkPartGizmo') && !w.__shrinkEdit.hudVisible(), 'ED39 Select shows the pad and the glow on the picked piece, but no arrows / rings / + -');
+  ok(page.$('v2EdGo').hidden === true && page.$('v2EdModeRow').hidden === true, 'ED39 the shape / paste buttons are hidden');
+  w.__shrinkEdit.select(0); ok(Math.abs(w.__shrinkEdit.partState().x - 6) < 0.01, 'ED39 picking a piece selects it');
+  w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true })); ok(w.__shrinkEdit.parked() === 2, 'ED39 Ctrl+C copies the picked piece');
+  w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Delete', bubbles: true })); ok(w.__shrinkEdit.parked() === 1, 'ED39 Delete throws the picked piece away');
+  page.$('v2EdResult').textContent = ''; page.$('v2PadPlace').click(); ok(await waitFor(() => /Joined|Cut|Could not/.test(page.$('v2EdResult').textContent), 60000) && !/Could not/.test(page.$('v2EdResult').textContent) && w.__shrinkEdit.parked() === 0, 'ED39 WELD IT works from the Select tool: ' + page.$('v2EdResult').textContent.slice(0, 80));
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

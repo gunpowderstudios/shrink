@@ -65,6 +65,7 @@
     lasso: '<path d="M12 4C6.5 4 3 6.2 3 9s3.5 5 9 5 9-2.2 9-5-3.5-5-9-5z" stroke-dasharray="3 2"/><path d="M8.5 13.5c-1.2 2-1.2 4.2.8 5.2 1.3.6 2.6-.4 2.1-2"/>',
     razor: '<rect x="3" y="8" width="18" height="8" rx="1"/><path d="M3 12h18"/><circle cx="7" cy="10" r="1"/><circle cx="12" cy="10" r="1"/><circle cx="17" cy="10" r="1"/>',
     copy: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
+    select: '<path d="M6 3l13 8-6 2-3.5 6z"/>',
     part: '<rect x="5" y="12" width="14" height="8" rx="1"/><rect x="8.5" y="3" width="7" height="9" rx="1"/>'
   };
   const icon = k => `<svg class="v2-ico" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
@@ -759,6 +760,7 @@
     return { f, kind: $('v2EdKind').value, mode: $('v2EdMode').value, matrix: [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, px, py, pz, 1] };
   }
   // ---- v2.311: an uploaded part (e.g. a new head). editPart = { geometry (centred, Y-up, raw units), height (raw Y size), name }
+  const pieceTool = () => { const t = $('v2EdTab')?.value; return t === 'part' || t === 'select'; };   // v2.329: both tools work on the floating pieces (Select has no file chooser and no handles)
   let editPart = null, parked = [];                    // v2.326: more floating pieces wait in `parked` (green, not joined) until WELD; editPart is the selected one
   async function loadPartFile(file) {
     const THREE = app()?.THREE; if (!THREE) throw new Error('The viewer is not ready.');
@@ -1270,7 +1272,7 @@
   }
   function wirePartDrag() {
     const v = $('viewer'); if (!v || v.dataset.partWired) return; v.dataset.partWired = '1';
-    const act = () => !!editPart && editActive() && $('v2EdTab')?.value === 'part';
+    const act = () => !!editPart && editActive() && pieceTool();
     const ndcOf = e => { const r = v.getBoundingClientRect(); return [((e.clientX - r.left) / (r.width || 1)) * 2 - 1, -(((e.clientY - r.top) / (r.height || 1)) * 2 - 1)]; };
     v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey) return; const n = ndcOf(e), hz = gizmoPick(n); let hit = !!hz || ghostHit(n); if (!hit) { const pi = parkedAt(n); if (pi < 0) return; takeParked(pi); hit = true; } e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
     v.addEventListener('pointermove', e => {
@@ -1310,7 +1312,7 @@
   }
   function setJoinNote(text, state) { const e = $('v2PadJoin'); if (!e) return; if (e.textContent !== text) e.textContent = text; if (e.dataset.state !== state) e.dataset.state = state; }
   function overlapUpdate() {
-    clearTimeout(ovTimer); removeOverlap(); const V = window.__shrinkViewer, model = sourceModel(), pm = partMatrix(); const on = editPart && editActive() && $('v2EdTab')?.value === 'part';
+    clearTimeout(ovTimer); removeOverlap(); const V = window.__shrinkViewer, model = sourceModel(), pm = partMatrix(); const on = editPart && editActive() && pieceTool();
     if (!on || !V?.scene || !model || !pm) { setJoinNote('', ''); return 0; }
     if (modelTriangles(model) > (window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES)) { setJoinNote('', ''); return 0; }
     if (!ovIndex || ovIndex.model !== model || ovIndex.tick !== (window.__shrinkStretchTick || 0)) ovIndex = ovBuild(model);
@@ -1330,7 +1332,7 @@
   }
   function scheduleOverlap() {
     clearTimeout(ovTimer); const V = window.__shrinkViewer, g = V?.scene?.getObjectByName?.('shrinkPartOverlap'); if (g) g.visible = false;
-    if (!editPart || !editActive() || $('v2EdTab')?.value !== 'part') { removeOverlap(); setJoinNote('', ''); return; }
+    if (!editPart || !editActive() || !pieceTool()) { removeOverlap(); setJoinNote('', ''); return; }
     ovTimer = setTimeout(overlapUpdate, 160);
   }
   // ---- v2.328: save / load the floating pieces. One small file: "SHRINKPARTS1\n", 4-byte header length, JSON header, then every piece's triangle soup as raw float32 (exact, no rounding).
@@ -1371,7 +1373,7 @@
   }
   function discardPiece() { if (!editPart) return; dropSelected(); if (!editPart && !parked.length) set$tool('none'); $('v2EdResult').innerHTML = '<strong>Piece thrown away</strong><span>Nothing was changed on the model.</span>'; }
   async function weldAll() { let guard = 0; while (editPart && guard++ < 30) { const cur = editPart; await editModelNow(); if (editPart === cur) break; } }
-  function updatePad() { const show = !!editPart && editActive() && $('v2EdTab')?.value === 'part'; const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show); if (show) { const t = $('v2PartPad').querySelector('.v2-pad-title'), txt = parked.length ? `Move the part (${parked.length + 1} floating)` : 'Move the part'; if (t && t.textContent !== txt) t.textContent = txt; setHid($('v2PadAll'), !parked.length); wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
+  function updatePad() { const show = !!editPart && editActive() && pieceTool(); const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show && $('v2EdTab')?.value === 'part'); if (show) { const t = $('v2PartPad').querySelector('.v2-pad-title'), txt = parked.length ? `Move the part (${parked.length + 1} floating)` : 'Move the part'; if (t && t.textContent !== txt) t.textContent = txt; setHid($('v2PadAll'), !parked.length); wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
   function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
   function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
   function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT
@@ -1387,7 +1389,7 @@
   function updateEditPreview() {
     removeEditPreview();
     ensurePiecesRow(); piecesUi(); updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; const tool = $('v2EdTab')?.value, floating = !!editPart || parked.length > 0; if (!editActive() || !V?.scene || (['lasso', 'razor', 'sculpt', 'none'].includes(tool) && !floating)) return;
-    const sl = tool === 'slice', isPart = tool === 'part';
+    const sl = tool === 'slice', isPart = tool === 'part', isSel = tool === 'select';
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
     const ghost = (part, pm, mode, sel, tag) => {      // v2.326: every floating piece is drawn the same way; the selected one glows
@@ -1400,7 +1402,7 @@
     };
     parked.forEach((r, i) => { const pm = partMatrixOf(r.part, r.vals, r.rot); if (pm) ghost(r.part, pm, r.mode, false, i); });
     if (editPart) { const pm = partMatrix(); if (pm) { ghost(editPart, pm, $('v2EdMode').value, true, -1); if (isPart) g.add(gizmoBuild(THREE, pm)); } }
-    if (isPart || ['lasso', 'razor', 'sculpt', 'none'].includes(tool)) {
+    if (isPart || isSel || ['lasso', 'razor', 'sculpt', 'none'].includes(tool)) {
       if (!g.children.length) return;
     } else if (sl) {
       const s = sliceSpec(); if (!s) return;
@@ -1418,7 +1420,7 @@
   function editTabChanged() {
     const t = $('v2EdTab').value, sl = t === 'slice';
     const lz = t === 'lasso' || t === 'razor';
-    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2EdGo'), lz || t === 'sculpt'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
+    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2EdGo'), lz || t === 'sculpt' || t === 'select'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
     { const tip = $('v2EdTip'); const msg = t === 'none' ? 'No tool selected. Pick one above.' : 'Click the tool again or press Esc to put it down.'; if (tip && tip.textContent !== msg) tip.textContent = msg; updateGoState(); }
     if (lz && t !== lastLz) { clearLasso(); const dp = $('v2EdDepth'); if (dp) dp.value = t === 'razor' ? 'through' : 'near'; const k = $('v2LassoKeepBtn'); if (k) { k.dataset.op = t === 'razor' ? 'cut' : 'copy'; k.querySelector('span').textContent = t === 'razor' ? 'CUT OFF & KEEP' : 'COPY'; } const d = $('v2LassoDelBtn'); if (d) d.querySelector('span').textContent = t === 'razor' ? 'CUT OFF' : 'DELETE'; const h = $('v2LassoHelp'); if (h) h.textContent = t === 'razor' ? 'The razor cuts straight through. Draw a loop round the piece you want off. The hole is always closed flat. Ctrl / ⌘ + drag turns the model.' : 'Hold the mouse button down and draw a loop round the part on the model. Ctrl / ⌘ + drag still turns the model.'; }
     if (!lz && lastLz) clearLasso(); lastLz = lz ? t : '';
@@ -1439,6 +1441,7 @@
       const tris = modelTriangles(m), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES, t = $('v2EdTab')?.value || 'none';
       const meshOnly = t === 'sculpt' || (t === 'lasso' && wholeOn());          // these work on the triangles themselves, no Manifold
       if (t === 'none') msg = '';
+      else if (t === 'select') msg = (editPart || parked.length) ? 'Click a green piece to pick it (it glows). Drag it to move it. DELETE PIECE, COPY PIECE and WELD IT are on the pad.' : 'Nothing is floating yet. Cut or copy a piece with the Lasso or Razor first, then come back and pick it here.';
       else if (appliedChanges.has('hollowed') && sourceModel() === hollowResult) msg = 'This model is already hollow. Edit the solid model before you hollow it.';
       else if (meshOnly && tris > SCULPT_MAX_TRIANGLES) msg = `This model has ${tris.toLocaleString()} triangles, too many for this tool in the browser. Go to SHRINK & FINISH and press SHRINK first.`;
       else if (t === 'lasso' && !meshOnly && tris > limit && tris <= SCULPT_MAX_TRIANGLES) msg = `This model has ${tris.toLocaleString()} triangles. DELETE works on the triangles directly and leaves an open hole, which FIX IT closes. COPY needs under ${limit.toLocaleString()}, so press SHRINK first for that.`;
@@ -1471,7 +1474,7 @@
       if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Press SHRINK first.`);
       const THREE0 = app()?.THREE; let snap = null;
       if (THREE0) { model.updateWorldMatrix(true, true); snap = model.clone(true); snap.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); snap.matrix.copy(model.matrixWorld); snap.matrix.decompose(snap.position, snap.quaternion, snap.scale); snap.updateMatrixWorld(true); }
-      const isPart = $('v2EdTab').value === 'part';
+      const isPart = pieceTool();
       if (isPart && !editPart) throw new Error('Choose a part file first.');
       const ops = isPart ? (() => { const pm = partMatrix(), mesh = new pm.f.THREE.Mesh(editPart.geometry, new pm.f.THREE.MeshStandardMaterial()); mesh.matrixAutoUpdate = false; mesh.matrix.copy(pm.m); const root = new pm.f.THREE.Group(); root.add(mesh); root.updateMatrixWorld(true); return { part: { root, mode: $('v2EdMode').value } }; })() : sl ? (() => { const s = sliceSpec(); return { slice: { normal: s.normal, offset: s.offset } }; })() : (() => { const s = shapeSpec(); return { shapes: [{ kind: s.kind, mode: s.mode, matrix: s.matrix }] }; })();
       progress(card, 40, 'Working…'); await paintNow();
@@ -2335,8 +2338,8 @@
             <section id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
               <div class="v2-card-head"><div><h2>Edit model</h2><p>Lasso a part to delete or copy it, cut a piece off with the razor, add a shape, paste a part, or slice a piece off.</p></div></div>
               <div id="v2EdHint" class="v2-edit-hint" hidden></div>
-              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
-              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
+              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'select', 'Select')}${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
+              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="select">Select</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
               <div id="v2EdTip" class="v2-edit-hint-plain">Click the tool again or press Esc to put it down.</div>
               <div id="v2EdModeRow"><div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
                 <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>
@@ -2503,11 +2506,11 @@
       window.addEventListener('keydown', e => {
         if (!editActive() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '') || e.altKey) return; const k = e.key;
         if ((e.metaKey || e.ctrlKey) && (k === 'z' || k === 'Z') && !e.shiftKey) { e.preventDefault(); if (editStack.length && !lassoBusy) undoEdit(); return; }
-        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'v' || k === 'V') && editPart && $('v2EdTab')?.value === 'part') { e.preventDefault(); editModelNow(); return; }   // Cmd/Ctrl+V pastes (places) the floating part
-        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'c' || k === 'C') && editPart && $('v2EdTab')?.value === 'part') { e.preventDefault(); dupPart(); return; }
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'v' || k === 'V') && editPart && pieceTool()) { e.preventDefault(); editModelNow(); return; }   // Cmd/Ctrl+V pastes (places) the floating part
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'c' || k === 'C') && editPart && pieceTool()) { e.preventDefault(); dupPart(); return; }
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && lassoSel && lzTool() && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) { e.preventDefault(); lassoApply(k.toLowerCase() === 'c' ? 'copy' : 'cut'); return; }   // Cmd/Ctrl+C copies the red part, +X cuts it off and keeps it
         if (e.metaKey || e.ctrlKey) return;
-        if ((k === 'Delete' || k === 'Backspace') && editPart && $('v2EdTab')?.value === 'part') { e.preventDefault(); discardPiece(); return; }
+        if ((k === 'Delete' || k === 'Backspace') && editPart && pieceTool()) { e.preventDefault(); discardPiece(); return; }
         if ($('v2EdTab')?.value === 'sculpt' && /^[-+=_]$/.test(k)) { e.preventDefault(); const r = $('v2SculptSize'), up = k === '+' || k === '=', lo = Number(r.min) || 1, hi = Number(r.max) || 120, cur = Number(r.value) || lo; let nv = Math.round(cur * (up ? 1.15 : 1 / 1.15) * 10) / 10; if (nv === cur) nv += up ? 0.5 : -0.5; r.value = String(Math.min(hi, Math.max(lo, nv))); r.dispatchEvent(new Event('input', { bubbles: true })); return; }
         if (editPart && $('v2EdTab')?.value === 'part' && /^[-+=_]$/.test(k)) { e.preventDefault(); partScale(k === '+' || k === '=' ? 1.1 : 1 / 1.1); return; }
         if (editPart && $('v2EdTab')?.value === 'part' && /^[xyzXYZ]$/.test(k)) { e.preventDefault(); partTurnWorld('xyz'.indexOf(k.toLowerCase()), k === k.toLowerCase() ? 1 : -1); }
