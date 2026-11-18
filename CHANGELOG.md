@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.340
+- **The Lasso / Razor selection now stays when you turn the camera.** The red area stays on the model while you orbit, so you can look round the back before pressing DELETE, COPY or CUT OFF. Only the flat outline you drew on the screen disappears. The cut still uses the view you drew it in. Draw a new loop, press Esc or change tool to clear it.
+
 ## v2.339
 - **Finished height is now really above the green button.** It was meant to be there since v2.330 but stayed hidden inside ADVANCED (it was moved before the page had built it). The height box and RESIZE now sit at the top of the right-hand column.
 - **HOLLOW IT: move the drain holes.** New sliders "Holes left / right" and "Holes forward / back" (-50% to +50% of the model size). The first hole lands on the nearest spot on the base with hollow space above it; the second stays as far from it as possible. The default first hole is now centred on the base. Changing a slider re-runs the hollow.

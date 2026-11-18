@@ -1110,10 +1110,10 @@
     v.addEventListener('pointermove', e => { if (!lassoDraw) return; e.stopPropagation(); if ((e.buttons & 1) === 0) { lassoEnd(); return; } const r = v.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, last = lassoDraw.px[lassoDraw.px.length - 1]; if (Math.hypot(x - last[0], y - last[1]) < 3) return; lassoDraw.px.push([x, y]); lassoDraw.ndc.push(ndcOf(e)); lassoPaint(lassoDraw.px); }, true);
     v.addEventListener('pointerup', lassoEnd, true); v.addEventListener('pointercancel', lassoEnd, true); window.addEventListener('pointerup', lassoEnd, true); window.addEventListener('blur', lassoEnd);
     const orbitLeft = pan => { const c = window.__shrinkViewer?.controls; if (c?.mouseButtons) c.mouseButtons.LEFT = pan ? 2 : 0; };
-    window.addEventListener('keydown', e => { if (lzTool() && (e.key === 'Meta' || e.key === 'Control')) { orbitLeft(true); lassoDraw = null; lassoPaint(lassoSel ? lassoSel.px : null, !!lassoSel); } }, true);
+    window.addEventListener('keydown', e => { if (lzTool() && (e.key === 'Meta' || e.key === 'Control')) { orbitLeft(true); lassoDraw = null; lassoPaint(lassoSel && !lassoSel.moved ? lassoSel.px : null, !!lassoSel && !lassoSel.moved); } }, true);
     window.addEventListener('keyup', e => { if (e.key === 'Meta' || e.key === 'Control') orbitLeft(false); }, true);
     // the loop belongs to the view it was drawn in: turning the model clears it
-    const ctl = window.__shrinkViewer?.controls; ctl?.addEventListener?.('change', () => { if (!lassoSel || lassoSel.wand) return; const c = window.__shrinkViewer.camera; c.updateMatrixWorld(true); const a = c.matrixWorld.elements, b = lassoSel.cam.world; for (let i = 0; i < 16; i++) if (Math.abs(a[i] - b[i]) > 1e-6) { clearLasso(); return; } });
+    const ctl = window.__shrinkViewer?.controls; ctl?.addEventListener?.('change', () => { if (!lassoSel || lassoSel.wand) return; const c = window.__shrinkViewer.camera; c.updateMatrixWorld(true); const a = c.matrixWorld.elements, b = lassoSel.cam.world; for (let i = 0; i < 16; i++) if (Math.abs(a[i] - b[i]) > 1e-6) { lassoSel.moved = true; lassoPaint(null); return; } });   /* v2.339: the red selection stays on the model when you orbit; only the flat outline goes (it was drawn on the screen) */
   }
   async function lassoApply(op, override) {
     const card = $('v2EditCard'), res = $('v2EdResult'), sel = override || lassoSel;
