@@ -787,6 +787,7 @@ async function convertMeshToGlb(file, ext) {
 
 async function openFile(file) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'shrinkproject') { if (window.__shrinkOpenProject) await window.__shrinkOpenProject(file); else setStatus('Open a project from the 3D Printing tab.', true); return; }   // v2.341
   if (!['glb', 'stl', 'obj', 'ply'].includes(ext)) { setStatus('Please choose a .glb, .stl, .obj or .ply file.', true); return; }
   try {
     setStatus(ext === 'glb' ? 'Opening model…' : `Converting ${ext.toUpperCase()} for editing…`);

@@ -379,12 +379,21 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.__shrinkViewer = { scene: new w.__shrinkApp.THREE.Scene() }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);
   const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
   for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
-  ok(page.$('v2PiecesSave')?.disabled === true && !!page.$('v2PiecesLoad'), 'ED38 SAVE PIECES waits until there is a piece; LOAD PIECES is always there');
+  ok(!!page.$('v2ProjectSave') && !!page.$('v2ProjectLoad') && !page.$('v2PiecesSave') && !page.$('v2SavePiecesRow'), 'ED38 the pieces buttons and the tick box are gone: SAVE PROJECT / LOAD PROJECT take over');
   w.__shrinkEdit.setPart(new Float32Array(cube), false, 'a.stl'); await wait(50); set(page, 'v2EdPartX', 6); set(page, 'v2EdPartH', 12);
   w.__shrinkEdit.setPart(new Float32Array(cube), false, 'b.stl'); await wait(50); set(page, 'v2EdPartX', -4);
-  ok(page.$('v2PiecesSave').disabled === false && page.$('v2SavePiecesRow')?.hidden === false, 'ED38 with pieces floating, SAVE PIECES is on and DOWNLOAD IT offers to save them too');
-  const bytes = w.__shrinkEdit.piecesFile(); ok(bytes && bytes.length > 100, 'ED38 the pieces file is built (' + (bytes?.length) + ' bytes)');
-  let got = null; w.__shrinkCapture = (b, n) => { got = n; return true; }; w.__shrinkEdit.savePieces(); ok(/-pieces\.shrinkparts$/.test(got || ''), 'ED38 it downloads as ' + got); w.__shrinkCapture = null;
+    const bytes = w.__shrinkEdit.piecesFile(); ok(bytes && bytes.length > 100, 'ED38 the pieces file is built (' + (bytes?.length) + ' bytes)');
+  w.__shrinkBuildStl = (await import(new URL('./.build/mt/mesh-tools.js', import.meta.url).href)).buildBinaryStl;   // print-tools.js sets this in the real app
+  let got = null; w.__shrinkCapture = (b, n) => { got = n; return true; }; await w.__shrinkEdit.saveProject(); ok(/-project\.shrinkproject$/.test(got || ''), 'ED45 SAVE PROJECT downloads as ' + got); w.__shrinkCapture = null;
+  { const pf = await w.__shrinkEdit.projectFile(), pr = w.__shrinkEdit.parseProject(pf.buffer.slice(pf.byteOffset, pf.byteOffset + pf.byteLength));
+    ok(pr.head.kind === 'project' && pr.head.stl > 84 && pr.stl.length === pr.head.stl && pr.pieces && pr.pieces.length === pr.head.pieces, 'ED45 the project holds the model STL (' + pr.head.stl + ' bytes) and both floating pieces (' + pr.head.pieces + ' bytes)');
+    let opened = null; w.__shrinkApp.openFile = async f => { opened = f; w.dispatchEvent(new w.CustomEvent('shrink:model-opened')); };
+    w.__shrinkEdit.reset(); await wait(100); ok(w.__shrinkEdit.parked() === 0, 'ED45 pieces cleared before loading');
+    const r = await w.__shrinkEdit.loadProject(pf.buffer.slice(pf.byteOffset, pf.byteOffset + pf.byteLength)); await wait(50);
+    ok(opened && /\.stl$/.test(opened.name) && opened.size === pr.head.stl, 'ED45 LOAD PROJECT opens the saved model: ' + opened?.name + ' ' + opened?.size);
+    ok(r.pieces === 2 && w.__shrinkEdit.parked() === 1 && w.__shrinkEdit.hasPart(), 'ED45 both floating pieces come back with the project');
+    let bad2 = ''; try { w.__shrinkEdit.parseProject(new TextEncoder().encode('nonsense nonsense nonsense').buffer); } catch (e) { bad2 = String(e.message); } ok(/not a SHRINK project/.test(bad2), 'ED45 a wrong file is refused politely');
+    w.__shrinkEdit.reset(); await wait(100); }
   w.__shrinkEdit.reset(); await wait(100); ok(w.__shrinkEdit.parked() === 0 && !w.__shrinkEdit.hasPart(), 'ED38 reset clears the floating pieces');
   const n = w.__shrinkEdit.loadPieces(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)); await wait(50);
   ok(n === 2 && w.__shrinkEdit.parked() === 1 && w.__shrinkEdit.hasPart(), 'ED38 loading brings both pieces back');

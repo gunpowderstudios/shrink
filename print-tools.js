@@ -535,6 +535,7 @@ window.addEventListener('shrink:ui-mode', () => { if (P.heat.on) { if (P.heat.di
 els.compareBtn.disabled = true;
 els.heatBtn.disabled = true;
 
+window.__shrinkBuildStl = buildBinaryStl;   // v2.341: SAVE PROJECT writes the working model through the same STL builder
 window.__shrinkPrint = {
   getReduceOptions() { return { dabs: P.dabs.slice(), protectKeep: Number(els.protectKeep.value) / 100 }; },
   mmPerUnit, printMmPerUnit, detailMM, unitLabel,

@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.340';
+  const PRINT_RELEASE = '2.341';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -47,7 +47,7 @@
   chooser.innerHTML = `
     <h2 class="mode-start-title">Open a model</h2>
     <button type="button" class="start-open" id="startOpenBtn"><strong>Choose a model file</strong><small>or drop it here · STL, OBJ, PLY or GLB · SHRINK picks the game or 3D print tools for you</small></button>
-    <input type="file" id="startOpenInput" accept=".glb,.gltf,.stl,.obj,.ply,model/gltf-binary" hidden>
+    <input type="file" id="startOpenInput" accept=".glb,.gltf,.stl,.obj,.ply,.shrinkproject,model/gltf-binary" hidden>
     <button type="button" class="mode-card" data-mode="game" aria-pressed="false"><span class="mode-icon">🎮</span><span><strong>Gaming</strong><small>Keep textures, make the GLB light enough for a game.</small></span></button>
     <button type="button" class="mode-card" data-mode="print" aria-pressed="false"><span class="mode-icon mode-icon-svg"><svg viewBox="0 0 48 56" width="100%" height="100%" aria-hidden="true" focusable="false"><defs><linearGradient id="rpBase" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9dde2"/><stop offset="1" stop-color="#8b9198"/></linearGradient><linearGradient id="rpHood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7be04f"/><stop offset="1" stop-color="#3fae27"/></linearGradient></defs><rect x="11" y="51" width="7" height="3.5" rx="1.2" fill="#222a33"/><rect x="30" y="51" width="7" height="3.5" rx="1.2" fill="#222a33"/><rect x="5" y="35" width="38" height="17" rx="3" fill="url(#rpBase)"/><rect x="24.5" y="39.5" width="12" height="9" rx="1.6" fill="#18212b"/><rect x="27" y="42" width="3" height="3" rx=".6" fill="#46d796"/><rect x="31.5" y="42" width="3" height="3" rx=".6" fill="#8fb4d8"/><path d="M6 35V10q0-5 5-5h26q5 0 5 5v25z" fill="url(#rpHood)" opacity=".92" stroke="#2c8a1a" stroke-width="1.2"/><rect x="14" y="9" width="3.2" height="24" rx="1" fill="#1f6a14" opacity=".75"/><rect x="10" y="12" width="15" height="3.2" rx="1" fill="#1b5a11" opacity=".85"/><rect x="8" y="30" width="32" height="4" fill="#2c8a1a" opacity=".8"/><rect x="27" y="9" width="11" height="24" rx="1.5" fill="none" stroke="#c8f5b4" stroke-width=".9" opacity=".6"/><path d="M9 8l3-2" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".45"/></svg></span><span><strong>3D Printing</strong><small>Make it printable, shrink it, split it and export.</small></span></button>`;
   header?.insertAdjacentElement('afterend', chooser);
@@ -62,7 +62,7 @@
   const HASH = { home: 'home', print: '3d-printing', game: 'gaming' }, FROM_HASH = { '#home': 'home', '#3d-printing': 'print', '#gaming': 'game' };
   const TEXT = {
     game: { subtitle:'Make a model light enough for a game — and see exactly what you gave up.', steps:'<b>Gaming</b><span>1&nbsp; Target</span><i>→</i><span>2&nbsp; Detail</span><i>→</i><span>3&nbsp; Touch up</span><i>→</i><span>4&nbsp; Save</span>', setupTitle:'Where will it be used?', setupSub:'Pick one — it sets sensible limits for you.', detailSub:'Drag the slider — the model on the right updates live.', extraNum:'3', extraTitle:'Touch up (optional)', extraSub:'Paint out stickers, plates or marks on the textures.', saveNum:'4', saveTitle:'Save', saveSub:'Builds the final GLB (resized textures, compressed mesh) and downloads it.', btn:'Save game GLB', drop:['Drop a model here','GLB for games · STL, OBJ or PLY for 3D printing'], accept:'.glb,.stl,.obj,.ply,model/gltf-binary' },
-    print: { subtitle:'Make big 3D models printable without needing to know the technical stuff.', steps:'<b>3D Printing</b><span>1&nbsp; Set up</span><i>→</i><span>Use any tool you need</span>', setupTitle:'Choose your printer & size', setupSub:'Tell us what kind of printer you have and how tall the finished model should be.', detailSub:'SHRINK can find the smallest version that still looks the same.', extraNum:'3', extraTitle:'Protect key details (optional)', extraSub:'Paint faces or fine ornament you want to keep sharp. Everything else is reduced first.', saveNum:'4', saveTitle:'Download', saveSub:'Save one STL or split it into sections with pegs.', btn:'Also save GLB (keeps colours)', drop:['Drop a model here','GLB for games · STL, OBJ or PLY for 3D printing'], accept:'.stl,.obj,.ply,.glb,model/gltf-binary' }
+    print: { subtitle:'Make big 3D models printable without needing to know the technical stuff.', steps:'<b>3D Printing</b><span>1&nbsp; Set up</span><i>→</i><span>Use any tool you need</span>', setupTitle:'Choose your printer & size', setupSub:'Tell us what kind of printer you have and how tall the finished model should be.', detailSub:'SHRINK can find the smallest version that still looks the same.', extraNum:'3', extraTitle:'Protect key details (optional)', extraSub:'Paint faces or fine ornament you want to keep sharp. Everything else is reduced first.', saveNum:'4', saveTitle:'Download', saveSub:'Save one STL or split it into sections with pegs.', btn:'Also save GLB (keeps colours)', drop:['Drop a model here','GLB for games · STL, OBJ or PLY for 3D printing'], accept:'.stl,.obj,.ply,.glb,.shrinkproject,model/gltf-binary' }
   };
 
   const setText = (id,v) => { const el=$(id); if(el) el.textContent=v; };
@@ -82,7 +82,7 @@
   const GO_KEY='shrink-go';   /* v2.281: set only so a tab/logo switch with a model open survives its own reload; a plain reload always lands on Home */
   /* v2.281: one button on the start screen. The file type picks the tools (GLB = game, anything else = print), then the file opens as if dropped in the normal zone. */
   { const inp=chooser.querySelector('#startOpenInput'), btn=chooser.querySelector('#startOpenBtn');
-    const openIt=f=>{ if(!f) return; const chosen=location.hash==='#3d-printing'?'print':location.hash==='#gaming'?'game':currentMode(); setMode(/\.(stl|obj|ply)$/i.test(f.name)?'print':chosen,true); window.__shrinkApp?.openFile?.(f); };
+    const openIt=f=>{ if(!f) return; const chosen=location.hash==='#3d-printing'?'print':location.hash==='#gaming'?'game':currentMode(); setMode(/\.(stl|obj|ply|shrinkproject)$/i.test(f.name)?'print':chosen,true); window.__shrinkApp?.openFile?.(f); };
     btn.addEventListener('click',()=>inp.click());
     inp.addEventListener('change',()=>{ const f=inp.files[0]; inp.value=''; openIt(f); });
     chooser.addEventListener('dragover',e=>{ e.preventDefault(); btn.classList.add('drag'); });

@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.341
+- **SAVE PROJECT / LOAD PROJECT** (top of the EDIT panel). One `.shrinkproject` file holds the model as it is now (edits, shrink, hollow and all) and every floating piece you are holding, with their places and sizes. It works at any point, even before a SHRINK. Open it with LOAD PROJECT, or choose / drop it on the start screen. After loading, DOWNLOAD works straight away.
+- SAVE PIECES / LOAD PIECES and the "also save my pieces" tick box are gone: the project holds the pieces.
+- Not in a project: undo history, and the original upload (so Compare and RESET ALL EDITS treat the saved model as the starting point).
+
 ## v2.340
 - **The Lasso / Razor selection now stays when you turn the camera.** The red area stays on the model while you orbit, so you can look round the back before pressing DELETE, COPY or CUT OFF. Only the flat outline you drew on the screen disappears. The cut still uses the view you drew it in. Draw a new loop, press Esc or change tool to clear it.
 
