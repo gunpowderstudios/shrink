@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.320
+- EDIT tab keyboard shortcuts (not while typing in a box): **Ctrl/⌘+Z** undo, **Delete** (or Backspace) removes the red part, **Ctrl/⌘+C** copies it, **Ctrl/⌘+X** cuts it off and keeps it, **Ctrl/⌘+V** places the floating part, **+ / −** make the Sculpt tip larger / smaller, and **X / Y / Z** turn the floating part about that axis (hold Shift for the other way; the step follows the pad's Fine / Medium / Big setting).
+
 ## v2.319
 - Pasting a part: the green ghost is now always visible (a see-through copy shows even where the part sits inside or behind the model, a solid one where it is in front). A COPY now starts beside its source instead of hidden inside it; CUT OFF & KEEP still starts in its own hole.
 - You can now grab the ghost with the mouse. The pad has **MOVE / TURN / SIZE**: MOVE drags it across the screen (hold Shift to push it nearer or farther), TURN spins it like a ball, SIZE enlarges (drag up) or reduces (drag down). The arrow buttons still work. Click and drag anywhere else to turn the model as usual.

@@ -1127,6 +1127,10 @@
     }
     updateEditPreview();
   }
+  function partTurnWorld(i, sgn) {                     // v2.320: X / Y / Z keys turn the floating part about the world axis (Shift = the other way)
+    const f = editFrame(); if (!f || !editPart) return; const THREE = f.THREE, ang = { s: 5, m: 15, l: 45 }[$('v2PadStep')?.value || 'm'] * Math.PI / 180, ax = [0, 0, 0]; ax[i] = 1;
+    partRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...ax), sgn * ang).multiply(partRot || new THREE.Quaternion()); updateEditPreview();
+  }
   function ensurePad() {
     let pad = $('v2PartPad'); if (pad) return pad; const v = $('viewer'); if (!v) return null;
     pad = document.createElement('div'); pad.id = 'v2PartPad'; pad.className = 'v2-part-pad'; pad.hidden = true;
@@ -1326,7 +1330,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { reset: resetEdits, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -2299,6 +2303,16 @@
       ['v2EdKind', 'v2EdW', 'v2EdH', 'v2EdD', 'v2EdX', 'v2EdY', 'v2EdZ', 'v2EdAxis', 'v2EdSide', 'v2EdPos', 'v2EdTilt'].forEach(id => { $(id).addEventListener('input', () => { $('v2EdPosOut').textContent = $('v2EdPos').value + '%'; $('v2EdTiltOut').textContent = $('v2EdTilt').value + '°'; updateEditPreview(); }); $(id).addEventListener('change', updateEditPreview); });
       window.addEventListener('keydown', e => { if (e.key === 'Escape' && editActive() && lassoSel) { clearLasso(); return; } if ((e.key === 'Delete' || e.key === 'Backspace') && editActive() && lassoSel && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { e.preventDefault(); lassoApply('delete'); return; } if (e.key === 'Escape' && editActive() && $('v2EdTab').value !== 'none') { $('v2EdTab').value = 'none'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); } });
       $('v2EdReset').addEventListener('click', resetEdits);
+      // v2.320: keyboard shortcuts in the EDIT tab (never while typing in a box)
+      window.addEventListener('keydown', e => {
+        if (!editActive() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '') || e.altKey) return; const k = e.key;
+        if ((e.metaKey || e.ctrlKey) && (k === 'z' || k === 'Z') && !e.shiftKey) { e.preventDefault(); if (editStack.length && !lassoBusy) undoEdit(); return; }
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'v' || k === 'V') && editPart && $('v2EdTab')?.value === 'part') { e.preventDefault(); editModelNow(); return; }   // Cmd/Ctrl+V pastes (places) the floating part
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && lassoSel && lzTool() && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) { e.preventDefault(); lassoApply(k.toLowerCase() === 'c' ? 'copy' : 'cut'); return; }   // Cmd/Ctrl+C copies the red part, +X cuts it off and keeps it
+        if (e.metaKey || e.ctrlKey) return;
+        if ($('v2EdTab')?.value === 'sculpt' && /^[-+=_]$/.test(k)) { e.preventDefault(); const r = $('v2SculptSize'), up = k === '+' || k === '=', lo = Number(r.min) || 1, hi = Number(r.max) || 120, cur = Number(r.value) || lo; let nv = Math.round(cur * (up ? 1.15 : 1 / 1.15) * 10) / 10; if (nv === cur) nv += up ? 0.5 : -0.5; r.value = String(Math.min(hi, Math.max(lo, nv))); r.dispatchEvent(new Event('input', { bubbles: true })); return; }
+        if (editPart && $('v2EdTab')?.value === 'part' && /^[xyzXYZ]$/.test(k)) { e.preventDefault(); partTurnWorld('xyz'.indexOf(k.toLowerCase()), k === k.toLowerCase() ? 1 : -1); }
+      });
       $('v2EdGo').addEventListener('click', editModelNow); $('v2EdUndo').addEventListener('click', undoEdit); editTabChanged(); } }
     $('v2HollowBtn')?.addEventListener('click', hollowModelNow);
     $('v2HollowWall')?.addEventListener('input', () => { $('v2HollowWallOut').textContent = $('v2HollowWall').value + ' mm'; });

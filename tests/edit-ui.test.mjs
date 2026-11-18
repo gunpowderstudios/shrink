@@ -291,4 +291,24 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   const t0 = tris(w.__shrinkWorkingModel()); page.$('v2EdResult').textContent = ''; page.$('v2PadPlace').click();
   ok(await waitFor(() => /Joined|Pasted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED31 PLACE IT still pastes the moved part: ' + page.$('v2EdResult').textContent.slice(0, 100));
 }
+/* v2.320: keyboard shortcuts */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
+  const key = (k, o = {}) => w.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...o }));
+  page.$('v2TabEdit').click(); set(page, 'v2EdTab', 'lasso'); await wait(80); set(page, 'v2EdDepth', 'through');
+  const L = orthoCam(page, 0.6, 1.3), S = { cam: L.cam, pts: L.pts.map(([x, y]) => [x * 0.3, y]) }, t0 = tris(w.__shrinkWorkingModel());
+  w.__shrinkEdit.setSel(S.pts, S.cam); key('c', { ctrlKey: true });
+  ok(await waitFor(() => w.__shrinkEdit.hasPart(), 60000) && page.$('v2EdTab').value === 'part', 'ED32 Ctrl+C copies the red part');
+  const r0 = w.__shrinkEdit.partState().rot; key('x'); const r1 = w.__shrinkEdit.partState().rot; key('X'); const r2 = w.__shrinkEdit.partState().rot;
+  ok(r1 && Math.abs(r1[0]) > 0.1 && (!r2 || Math.abs(r2[0]) < 0.01), 'ED32 X turns the floating part about X, Shift+X turns it back');
+  key('y'); const r3 = w.__shrinkEdit.partState().rot; ok(r3 && Math.abs(r3[1]) > 0.1, 'ED32 Y turns it about Y'); key('z'); ok(Math.abs(w.__shrinkEdit.partState().rot[2]) > 0.05, 'ED32 Z turns it about Z');
+  page.$('v2EdResult').textContent = ''; key('v', { ctrlKey: true });
+  ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED32 Ctrl+V places the part');
+  key('z', { ctrlKey: true }); await wait(250); ok(Math.abs(tris(w.__shrinkWorkingModel()) - t0) < 2 && w.__shrinkEdit.depth() === 0, 'ED32 Ctrl+Z undoes it');
+  page.$('v2EdTab').value = 'sculpt'; page.$('v2EdTab').dispatchEvent(new w.Event('change', { bubbles: true })); await wait(40);
+  const s0 = Number(page.$('v2SculptSize').value); key('+'); const s1 = Number(page.$('v2SculptSize').value); key('-'); key('-'); const s2 = Number(page.$('v2SculptSize').value);
+  ok(s1 > s0 && s2 < s1, `ED32 + and - change the Sculpt tip size (${s0} -> ${s1} -> ${s2})`);
+  set(page, 'v2EdTab', 'lasso'); w.__shrinkEdit.setSel(S.pts, S.cam); page.$('v2EdResult').textContent = ''; key('Delete');
+  ok(await waitFor(() => /Deleted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Deleted/.test(page.$('v2EdResult').textContent), 'ED32 Delete removes the red part');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
