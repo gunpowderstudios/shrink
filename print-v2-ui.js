@@ -1386,6 +1386,13 @@
     const h = show ? ensureHud() : $('v2PartHud'); setHid(h, !show); if (!show || !h) return;
     if (!hudWired) { const c = window.__shrinkViewer?.controls; if (c?.addEventListener) { hudWired = true; c.addEventListener('change', hudPlace); } } hudPlace();
   }
+  function openOnPiece(n, cam) {                                // v2.354: true when the click landed on a floating piece and EDIT opened on it
+    if (editActive() || !(editPart || parked.length)) return false;
+    let hit = !!editPart && ghostHit(n);
+    if (!hit) { const pi = parkedAt(n, cam); if (pi < 0) return false; takeParked(pi); }
+    const sel = $('v2EdTab'); if (sel && sel.value !== 'select') { sel.value = 'select'; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+    editOpened = true; setMainTab('edit'); return true;
+  }
   function wirePartDrag() {
     const v = $('viewer'); if (!v || v.dataset.partWired) return; v.dataset.partWired = '1';
     const act = () => (!!editPart || parked.length > 0) && editActive() && pieceTool();
@@ -1395,6 +1402,10 @@
       if (partDrag) { e.stopPropagation(); if ((e.buttons & 1) === 0) { partDragEnd(); return; } const n = ndcOf(e); if (partDrag.hz) gizmoApply(partDrag.hz.kind, partDrag.hz.axis, partDrag.last, n, partDrag.cam); else partDragApply('move', partDrag.last, n, e.shiftKey, partDrag.cam); partDrag.last = n; return; }
       const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const n = ndcOf(e), hz = gizmoPick(n); gizmoHot(hz); const on = !!hz || ghostHit(n) || parkedAt(n) >= 0; v.classList.toggle('v2-cur-grab', on);
     }, true);
+    // v2.354: with the EDIT panel closed, a plain click on a floating piece opens EDIT with the Select tool and that piece selected (a drag still orbits)
+    let closedDown = null;
+    v.addEventListener('pointerdown', e => { closedDown = null; if (editActive() || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey || !(editPart || parked.length)) return; closedDown = { x: e.clientX, y: e.clientY, n: ndcOf(e) }; }, true);
+    v.addEventListener('pointerup', e => { const d = closedDown; closedDown = null; if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) openOnPiece(d.n); }, true);
     const partDragEnd = () => { if (!partDrag) return; partDrag = null; gizmoHot(null); v.classList.remove('v2-cur-grabbing'); };
     v.addEventListener('pointerup', partDragEnd, true); v.addEventListener('pointercancel', partDragEnd, true); window.addEventListener('pointerup', partDragEnd, true); window.addEventListener('blur', partDragEnd);
   }
@@ -1649,7 +1660,7 @@
   }
   function updateEditPreview() {
     removeEditPreview();
-    ensurePiecesRow(); piecesUi(); updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; const tool = $('v2EdTab')?.value, floating = !!editPart || parked.length > 0; const act = editActive();   // v2.351: floating pieces stay drawn (plain grey, no handles) when the EDIT panel is closed
+    ensurePiecesRow(); piecesUi(); updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; const tool = $('v2EdTab')?.value, floating = !!editPart || parked.length > 0; const act = editActive(); if (floating) wirePartDrag();   // v2.354: clicking a piece while EDIT is closed opens EDIT on it // v2.351: floating pieces stay drawn (plain grey, no handles) when the EDIT panel is closed
     if ((!act && !floating) || !V?.scene || (['lasso', 'razor', 'sculpt', 'none'].includes(tool) && !floating)) return;
     const sl = act && tool === 'slice', isPart = act && tool === 'part', isSel = act && tool === 'select';
     const THREE = app()?.THREE; if (!THREE) return;
@@ -1790,7 +1801,7 @@
     if (wd) { parked.push(wd); takeParked(parked.length - 1); const tab = $('v2EdTab'); if (tab && !pieceTool()) { tab.value = 'part'; try { editTabChanged(); } catch {} } }
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), gizmoHot: h => gizmoHot(h), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, pieceLasso: (op, pts, cam) => pieceLassoApply(op, { pts, cam, px: [] }), upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { openOn: (n, cam) => openOnPiece(n, cam), reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), gizmoHot: h => gizmoHot(h), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, pieceLasso: (op, pts, cam) => pieceLassoApply(op, { pts, cam, px: [] }), upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');

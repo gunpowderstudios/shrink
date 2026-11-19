@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.354
+- With the EDIT panel closed, clicking a floating piece (a plain click; dragging still orbits) opens EDIT with the Select tool and that piece selected, ready to move, cut or weld.
+
 ## v2.353
 - The piece library now says plainly where it lives: a "Where is my library saved?" drop-down under ADD TO LIBRARY / LIBRARY, and the same note at the top of the library panel (saved in this browser only, not in the project, not online; clearing site data deletes it; use DOWNLOAD PIECE (STL) or a project to move a piece).
 
