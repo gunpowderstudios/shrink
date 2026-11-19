@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.360
+- New paint bucket tool (Fill holes) in the EDIT tools. Open holes show as a red outline; click the model next to a hole to close it with a flat cap, or press FILL ALL HOLES. Works like closing the inside of an orange cut in half, and makes the model watertight so Fuse, Hollow, Shape and Slice can use it. One undo step. (Main model only; floating pieces are not covered yet.)
+- REDO: a REDO button next to UNDO LAST EDIT, and Ctrl/Cmd+Shift+Z (or Ctrl+Y). It puts back whatever UNDO took off, including welds and piece moves. A new edit clears the redo list.
+- Floating pieces are drawn solid, no see-through copy behind the model (the red overlap still shows where a piece is inside the model).
+
 ## v2.359
 - Esc now lets go of the selected piece (a second Esc puts the tool down). A click on empty background deselects it more reliably: it no longer depends on exactly which element sits under the pointer, only that it is not a button or box.
 

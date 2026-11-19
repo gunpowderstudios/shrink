@@ -2,6 +2,7 @@ import * as THREE from 'https://esm.sh/three@0.180.0';
 import { buildBinaryStl, buildObjBlob } from './mesh-tools.js?v=2.18';
 import { gatherWorld, repairMesh } from './repair-core.js?v=2.196';
 import { creaseSplit } from './crease-normals.js?v=2.57';
+import { fillOpenEdges, openEdgeSegments } from './fill-core.js?v=2.360';
 
 // SHRINK 3D v2.55 — gentle repair + optional Boolean union / make-manifold pass (inside-out parts turned outward; multi-piece results allowed),
 // with a best-effort cleanup repair before Manifold gives up.
@@ -415,4 +416,13 @@ async function editModel(model, ops) {
     finally { try { r.delete?.(); } catch {} }
   } finally { try { solid.delete?.(); } catch {} }
 }
-window.__shrinkFuse = { editModel, hollowModel, fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };
+// v2.360 FILL (paint bucket): close open holes with flat caps. opts.point = [x,y,z] closes only the nearest hole, otherwise all of them.
+function fillModel(model, opts = {}) {
+  const raw = gatherWorld(THREE, model), r = fillOpenEdges(raw.positions, raw.indices, opts);
+  if (!r.stats.filled) return { root: null, stats: r.stats };
+  const mesh = new THREE.Mesh(displayGeometry(r.positions, r.indices), new THREE.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72, metalness: 0 }));
+  const root = new THREE.Group(); root.name = 'SHRINK fill'; root.add(mesh); root.updateMatrixWorld(true);
+  return { root, stats: r.stats };
+}
+function openEdgesOfModel(model) { const raw = gatherWorld(THREE, model); return openEdgeSegments(raw.positions, raw.indices); }
+window.__shrinkFuse = { fillModel, openEdgesOfModel, editModel, hollowModel, fuseModel, modelToSolid, loadManifold, solidToThree, repairModel: repairedRootFromModel };

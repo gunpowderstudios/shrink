@@ -67,6 +67,7 @@
     copy: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
     select: '<path d="M6 3l13 8-6 2-3.5 6z"/>',
     wand: '<path d="M4 20L14 10"/><path d="M14 10l2-2"/><path d="M17 3v3M15.5 4.5h3M20 8v2M19 9h2M12 4v2M11 5h2"/>',
+    fill: '<path d="M5.5 11.5l6-6.5 7 7-6 6.5a2 2 0 0 1-2.8 0l-4.2-4.2a2 2 0 0 1 0-2.8z"/><path d="M11.5 5L9 2.5"/><path d="M5.5 11.5h13"/><path d="M20.5 15c1 1.4 1.7 2.4 1.7 3.4a1.7 1.7 0 0 1-3.4 0c0-1 .7-2 1.7-3.4z"/>',
     part: '<rect x="5" y="12" width="14" height="8" rx="1"/><rect x="8.5" y="3" width="7" height="9" rx="1"/>'
   };
   const icon = k => `<svg class="v2-ico" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
@@ -746,9 +747,9 @@
   }
   // ---- v2.307 EDIT MODEL: basic shapes (join / cut) and a slice-off plane, both through Manifold (edit-core.js) ----
   const UNDO_MAX = 50, UNDO_TRIS = 8e6;                // v2.358: up to 50 undo steps; whole-model copies are limited by size (8 million triangles in all, at least 3), the cheap piece moves are not
-  let editStack = [], editBase = null;               // editBase = a copy of the model from before the FIRST edit, for RESET ALL EDITS                                   // clones of the working model before each edit, for UNDO
+  let editStack = [], editBase = null, redoStack = [], inRedo = false;   // v2.360: REDO = what UNDO took off, kept until a new edit is made               // editBase = a copy of the model from before the FIRST edit, for RESET ALL EDITS                                   // clones of the working model before each edit, for UNDO
   function removeEditPreview() { const V = window.__shrinkViewer; const g = V?.scene?.getObjectByName?.('shrinkEditPreview'); if (!g) return; V.scene.remove(g); g.traverse(o => { if (o.geometry !== editPart?.geometry && !parked.some(r => r.part.geometry === o.geometry)) o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
-  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); editStack = []; editBase = null; try { clearLasso(); if (!editPart) partRot = null; islandCache = null; if (editPart || parked.length) setTimeout(updateEditPreview, 500); sculptWork = null; sculptData = null; } catch {} });
+  window.addEventListener('shrink:model-opened', () => { removeEditPreview(); removeFillLines(); editStack = []; redoStack = []; redoBtn(); editBase = null; try { clearLasso(); if (!editPart) partRot = null; islandCache = null; if (editPart || parked.length) setTimeout(updateEditPreview, 500); sculptWork = null; sculptData = null; } catch {} });
   function editFrame() {
     const THREE = app()?.THREE, model = sourceModel(); if (!THREE || !model) return null;
     const box = new THREE.Box3().setFromObject(model, true); if (box.isEmpty()) return null;
@@ -987,6 +988,40 @@
     if (op !== 'delete') out.piece = grp;
     return out;
   }
+  // ---- v2.360 FILL (paint bucket): close open holes with a flat cap. Red outline = the holes that are open right now.
+  function removeFillLines() { const V = window.__shrinkViewer, g = V?.scene?.getObjectByName?.('shrinkFillLines'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); }
+  async function fillLinesUpdate() {
+    removeFillLines(); const V = window.__shrinkViewer, model = sourceModel(), THREE = app()?.THREE; if (!V?.scene || !model || !THREE || $('v2EdTab')?.value !== 'fill' || !editActive()) return 0;
+    if (modelTriangles(model) > SCULPT_MAX_TRIANGLES) return 0;
+    for (let i = 0; i < 30 && !window.__shrinkFuse?.openEdgesOfModel; i++) await wait(100); if (!window.__shrinkFuse?.openEdgesOfModel) return 0;
+    if (sourceModel() !== model || $('v2EdTab')?.value !== 'fill') return 0;
+    const r = window.__shrinkFuse.openEdgesOfModel(model); removeFillLines(); fillCount = r.loops;
+    if (r.loops) { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(r.segments, 3)); const ln = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xff2a2a, depthTest: false, transparent: true })); ln.renderOrder = 1003; ln.raycast = () => {}; const g = new THREE.Group(); g.name = 'shrinkFillLines'; g.raycast = () => {}; g.add(ln); V.scene.add(g); }
+    const info = $('v2FillAllBtn'); if (info) info.disabled = !r.loops; const hint = $('v2EdResult'); if (hint && !hint.textContent) hint.innerHTML = r.loops ? `<strong>${r.loops} open hole${r.loops === 1 ? '' : 's'}</strong><span>Shown in red. Click next to one to close it.</span>` : '<strong>No open holes</strong><span>This model is already closed.</span>';
+    return r.loops;
+  }
+  let fillCount = 0, fillWired = false;
+  async function fillNow(point) {
+    const model = sourceModel(), res = $('v2EdResult'); if (!model) return false;
+    const tris = modelTriangles(model); if (tris > SCULPT_MAX_TRIANGLES) { res.innerHTML = '<strong>Could not fill</strong><span>This model has ' + tris.toLocaleString() + ' triangles, too many for the paint bucket in the browser. Press SHRINK first.</span>'; return false; }
+    setWorking(true, 0, 'Filling…');
+    try {
+      for (let i = 0; i < 50 && !window.__shrinkFuse?.fillModel; i++) await wait(100);
+      if (!window.__shrinkFuse?.fillModel) throw new Error('The fill tool is still loading. Try again in a moment.');
+      await paintNow(); const r = window.__shrinkFuse.fillModel(model, point ? { point } : {});
+      if (!r.root) { res.innerHTML = '<strong>Nothing to fill</strong><span>' + (r.stats.holes ? 'The hole could not be closed.' : 'This model has no open holes.') + '</span>'; return false; }
+      const snap = cloneRoot(model); if (snap) { if (!editBase) editBase = cloneRoot(snap); undoPush(snap); }
+      removeEditPreview(); removeFillLines(); installWorkingResult(r.root, 'edit');
+      res.innerHTML = `<strong>✓ Filled ${r.stats.filled} hole${r.stats.filled === 1 ? '' : 's'}</strong><span>${r.stats.triangles} triangles added. ${r.stats.holes > r.stats.filled ? (r.stats.holes - r.stats.filled) + ' more still open. ' : ''}Press UNDO LAST EDIT if that is not what you wanted.</span>`;
+      $('v2EdUndo').hidden = !editStack.length; setTimeout(() => { updateHealthCard(); fillLinesUpdate(); }, 80); return true;
+    } catch (err) { res.innerHTML = `<strong>Could not fill</strong><span>${err?.message || err}</span>`; return false; } finally { setWorking(false); }
+  }
+  function wireFill() {
+    const v = $('viewer'), btn = $('v2FillAllBtn'); if (btn && !btn.dataset.wired) { btn.dataset.wired = '1'; btn.addEventListener('click', () => fillNow(null)); }
+    if (!v || fillWired) return; fillWired = true; let d = null;
+    v.addEventListener('pointerdown', e => { d = null; if (!editActive() || $('v2EdTab')?.value !== 'fill' || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return; if (e.target?.closest?.('button,input,select,textarea,a,label,summary,#v2EdToast')) return; d = { x: e.clientX, y: e.clientY }; }, true);
+    v.addEventListener('pointerup', e => { const s = d; d = null; if (!s || Math.hypot(e.clientX - s.x, e.clientY - s.y) >= 5) return; const hit = sculptPick(e); if (!hit) { edToast('Click on the model, close to the hole.'); return; } fillNow(hit.point); }, true);
+  }
   // ---- v2.316 SCULPT brush: smooth / pull / push the surface like clay. Works on the mesh itself (no Manifold), on a private copy that becomes the working model.
   let sculptWork = null, sculptData = null, sculptDown = false, sculptTouched = new Set(), sculptNormAt = 0, sculptLastAt = 0, sculptSized = false;
   const sculptMode = () => $('v2EdSculptMode')?.value || 'smooth';
@@ -1133,11 +1168,12 @@
   }
   function floatSigOf(sn) { const r = q => q ? q.toArray().map(v => Math.round(v * 1e6)) : null; return JSON.stringify([sn.sel && [sn.sel.vals, r(sn.sel.rot), sn.sel.mode, sn.sel.part?.name], sn.parked.map(p => [p.vals, r(p.rot), p.mode, p.part?.name])]); }
   function undoPush(entry) {
-    editStack.push(entry); const model = sourceModel(), cap = Math.max(3, Math.min(UNDO_MAX, Math.floor(UNDO_TRIS / Math.max(1, model ? modelTriangles(model) : 1))));
+    editStack.push(entry); if (!inRedo) redoStack.length = 0; const model = sourceModel(), cap = Math.max(3, Math.min(UNDO_MAX, Math.floor(UNDO_TRIS / Math.max(1, model ? modelTriangles(model) : 1))));
     const models = () => editStack.reduce((n, e) => n + (e.pieceSnap ? 0 : 1), 0);
     while (editStack.length > UNDO_MAX || models() > cap) editStack.shift();
-    const u = $('v2EdUndo'); if (u) u.hidden = !editStack.length;
+    const u = $('v2EdUndo'); if (u) u.hidden = !editStack.length; redoBtn();
   }
+  function redoBtn() { const b = $('v2EdRedo'); if (b) b.hidden = !redoStack.length; }
   let inputSnap = null;
   function noteTransform(kind) {                         // v2.358: call at the START of a move / turn / stretch / resize so UNDO puts the floating pieces back
     if (!editPart && !parked.length) return; const sn = floatSnap(), sig = floatSigOf(sn), top = editStack[editStack.length - 1], now = performance.now();
@@ -1718,9 +1754,9 @@
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
     const ghost = (part, pm, mode, sel, tag) => {      // v2.326: every floating piece is drawn the same way; the selected one glows
       const col = mode === 'cut' ? 0xff9a2f : 0x2f86ff;      // v2.344: the piece is resin grey like the model, only the outline is coloured (blue = join, orange = cut)
-      [{ test: false, op: sel ? 0.12 : 0.08, ro: 998 }, { test: true, op: 1, ro: 999 }].forEach((c, i) => {
+      [{ test: true, op: 1, ro: 999 }].forEach((c, i) => {   // v2.360: solid only, no see-through pass
         const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: new THREE.Color(0xc9cacd).lerp(new THREE.Color(0x36d88a), 0.1), roughness: 0.75, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
-        m.name = (sel ? 'shrinkPartGhost' : 'shrinkParkedGhost') + (i ? '' : 'See'); m.userData.tag = tag; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
+        m.name = (sel ? 'shrinkPartGhost' : 'shrinkParkedGhost'); m.userData.tag = tag; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
       });
       { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, depthTest: true, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(sel ? 1.015 : 1.01, sel ? 1.015 : 1.01, sel ? 1.015 : 1.01)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
     };
@@ -1745,12 +1781,13 @@
     if (pieceTool() && !editPart && parked.length) takeParked(parked.length - 1);   // v2.344: Select / Paste part always has a piece in hand when anything floats
     const t = $('v2EdTab').value, sl = t === 'slice';
     const lz = t === 'lasso' || t === 'razor' || t === 'wand';
-    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2EdGo'), lz || t === 'sculpt' || t === 'select'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
+    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2EdFillBox'), t !== 'fill'); setHid($('v2EdGo'), lz || t === 'sculpt' || t === 'select' || t === 'fill'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
     { const tip = $('v2EdTip'); const msg = t === 'none' ? 'No tool selected. Pick one above.' : 'Click the tool again or press Esc to put it down.'; if (tip && tip.textContent !== msg) tip.textContent = msg; updateGoState(); }
     if (lz && t !== lastLz) { clearLasso(); const dp = $('v2EdDepth'); if (dp) dp.value = t === 'razor' ? 'through' : 'near'; const k = $('v2LassoKeepBtn'); if (k) { k.dataset.op = t === 'razor' ? 'cut' : 'copy'; k.querySelector('span').textContent = t === 'razor' ? 'CUT OFF & KEEP' : 'COPY'; } const d = $('v2LassoDelBtn'); if (d) d.querySelector('span').textContent = t === 'razor' ? 'CUT OFF' : 'DELETE'; { const bx = $('v2EdLassoBox'); if (bx) bx.dataset.tool = t; } const h = $('v2LassoHelp'); if (h) h.textContent = t === 'wand' ? 'Touch a piece to select it, like a bucket fill: the whole connected piece turns red. A loose floating piece is picked on its own. If it is attached to the rest of the model it will select everything, so cut it off with the Lasso or Razor first. Then DELETE it or COPY it. Alt + drag turns the model.' : t === 'razor' ? 'The razor cuts straight through. Draw a loop round the piece you want off. The hole is always closed flat. Ctrl / ⌘ + drag turns the model.' : 'Hold the mouse button down and draw a loop round the part on the model. Ctrl / ⌘ + drag still turns the model.'; }
     if (!lz && lastLz) clearLasso(); lastLz = lz ? t : '';
     { const v = $('viewer'); if (v) { v.classList.toggle('v2-cur-lasso', t === 'lasso' && editActive()); v.classList.toggle('v2-cur-razor', t === 'razor' && editActive()); v.classList.toggle('v2-cur-wand', t === 'wand' && editActive()); } }
     if (lz) wireLasso();
+    if (t === 'fill' && editActive()) { wireFill(); fillLinesUpdate(); } else removeFillLines();
     updateEditHint();
     if (t === 'sculpt') { wireSculpt(); if (!sculptSized) { const f = editFrame(); if (f) { sculptSized = true; const v = Math.min(60, Math.max(2, Math.round(f.size.y * f.mm * 0.06 * 2) / 2)); $('v2SculptSize').value = String(v); $('v2SculptSizeOut').textContent = v + ' mm'; } } } else sculptRing(null);
     { const vw = $('viewer'); if (vw) vw.classList.toggle('v2-cur-sculpt', t === 'sculpt' && editActive()); }
@@ -1766,6 +1803,7 @@
       const tris = modelTriangles(m), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES, t = $('v2EdTab')?.value || 'none';
       const meshOnly = t === 'sculpt' || (t === 'lasso' && wholeOn());          // these work on the triangles themselves, no Manifold
       if (t === 'none') msg = '';
+      else if (t === 'fill') msg = tris > SCULPT_MAX_TRIANGLES ? `This model has ${tris.toLocaleString()} triangles, too many for the paint bucket in the browser. Go to SHRINK & FINISH and press SHRINK first.` : 'Click the model next to a hole (the red outline) to close it, or press FILL ALL HOLES.';
       else if (t === 'select') msg = (editPart || parked.length) ? 'Click a green piece to pick it (it glows). Drag it to move it. DELETE PIECE, COPY PIECE and WELD IT are on the pad.' : 'Nothing is floating yet. Cut or copy a piece with the Lasso or Razor first, then come back and pick it here.';
       else if (appliedChanges.has('hollowed') && sourceModel() === hollowResult) msg = 'This model is already hollow. Edit the solid model before you hollow it.';
       else if (meshOnly && tris > SCULPT_MAX_TRIANGLES) msg = `This model has ${tris.toLocaleString()} triangles, too many for this tool in the browser. Go to SHRINK & FINISH and press SHRINK first.`;
@@ -1781,7 +1819,7 @@
     tab = tab === 'edit' ? 'edit' : 'finish'; setHid(pn, tab !== 'edit'); $('v2TabEdit')?.setAttribute('aria-pressed', String(tab === 'edit'));
     if (tab === 'edit' && !editOpened) { editOpened = true; const sel = $('v2EdTab'); if (sel && sel.value !== 'lasso') { sel.value = 'lasso'; sel.dispatchEvent(new Event('change', { bubbles: true })); } }   // v2.325: the first time EDIT opens the Lasso is already selected
     document.body.classList.toggle('v2-editing', tab === 'edit');          // v2.324: while EDIT is open the health box, SHRINK and DOWNLOAD step aside (CSS)
-    if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { clearLasso(); updatePad(); updateEditPreview(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-wand', 'v2-cur-sculpt'); sculptRing(null); }
+    if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { clearLasso(); removeFillLines(); updatePad(); updateEditPreview(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-wand', 'v2-cur-sculpt'); sculptRing(null); }
   }
   window.__shrinkTab = setMainTab;
   async function editModelNow() {
@@ -1830,7 +1868,7 @@
     if (parked.length) { parked = []; did = true; }
     if (editPart) { editPart = null; did = true; try { $('v2EdPartFile').value = ''; } catch {} $('v2EdPartInfo').textContent = 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.'; }
     if (editBase) {
-      const base = editBase; editBase = null; editStack = []; removeEditPreview();
+      const base = editBase; editBase = null; editStack = []; redoStack = []; redoBtn(); removeEditPreview();
       const fresh = cloneRoot(base) || base; installWorkingResult(fresh, 'edit');
       appliedChanges.delete('edited'); renderAppliedChanges(); $('v2EdUndo').hidden = true; did = true; setTimeout(updateHealthCard, 80);
     }
@@ -1844,15 +1882,28 @@
   }
   function undoEdit() {
     const snap = editStack.pop(); if (!snap) return;
-    if (snap.pieceSnap) { floatRestore(snap.pieceSnap); $('v2EdUndo').hidden = !editStack.length; $('v2EdResult').innerHTML = '<strong>Undone</strong><span>The floating pieces are back as they were.</span>'; updateEditPreview(); updateGoState(); return; }
+    if (snap.pieceSnap) { redoStack.push({ pieceSnap: floatSnap() }); redoBtn(); floatRestore(snap.pieceSnap); $('v2EdUndo').hidden = !editStack.length; $('v2EdResult').innerHTML = '<strong>Undone</strong><span>The floating pieces are back as they were.</span>'; updateEditPreview(); updateGoState(); return; }
+    { const cur = sourceModel(), leaving = cur ? cloneRoot(cur) : null; if (leaving) { leaving.userData.shrinkFloat = floatSnap(); redoStack.push({ model: leaving, wd: snap.userData?.shrinkWeld || null }); } redoBtn(); }   // v2.360: remember where we were so REDO can come back
     removeEditPreview(); installWorkingResult(snap, 'edit');
     if (!editStack.length) { appliedChanges.delete('edited'); renderAppliedChanges(); }
     $('v2EdUndo').hidden = !editStack.length;
     const wd = snap.userData?.shrinkWeld; $('v2EdResult').innerHTML = '<strong>Undone</strong><span>' + (wd ? 'The piece is floating again. Move it and weld it when it is right.' : 'Back to how it was before the last edit.') + '</span>';
     if (wd) { parked.push(wd); takeParked(parked.length - 1); const tab = $('v2EdTab'); if (tab && !pieceTool()) { tab.value = 'part'; try { editTabChanged(); } catch {} } }
-    setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
+    setTimeout(() => { updateHealthCard(); updateEditPreview(); fillLinesUpdate(); }, 80);
   }
-  window.__shrinkEdit = { note: noteTransform, centreView: centreViewOnPiece, stackDepth: () => editStack.length, modelDepth: () => editStack.filter(e => !e.pieceSnap).length, undoCap: () => UNDO_MAX, dragging: on => { partDrag = on ? { last: [0, 0] } : null; }, deselect: deselectPiece, openOn: (n, cam) => openOnPiece(n, cam), reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), gizmoHot: h => gizmoHot(h), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, pieceLasso: (op, pts, cam) => pieceLassoApply(op, { pts, cam, px: [] }), upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  function redoEdit() {                                  // v2.360
+    const r = redoStack.pop(); if (!r) return; inRedo = true;
+    try {
+      if (r.pieceSnap) { undoPush({ pieceSnap: floatSnap(), sig: floatSigOf(floatSnap()), kind: 'redo', t: performance.now() }); floatRestore(r.pieceSnap); updateEditPreview(); updateGoState(); $('v2EdResult').innerHTML = '<strong>Redone</strong><span>The floating pieces are as they were before you pressed UNDO.</span>'; }
+      else if (r.model) {
+        const cur = sourceModel(), back = cur ? cloneRoot(cur) : null; if (back) { if (r.wd) back.userData.shrinkWeld = r.wd; undoPush(back); }
+        removeEditPreview(); removeFillLines(); installWorkingResult(r.model, 'edit'); if (r.model.userData?.shrinkFloat) floatRestore(r.model.userData.shrinkFloat);
+        updatePad(); updateGoState(); $('v2EdResult').innerHTML = '<strong>Redone</strong><span>The edit is back. UNDO takes it off again.</span>';
+        setTimeout(() => { updateHealthCard(); updateEditPreview(); fillLinesUpdate(); }, 80);
+      }
+    } finally { inRedo = false; redoBtn(); const u = $('v2EdUndo'); if (u) u.hidden = !editStack.length; }
+  }
+  window.__shrinkEdit = { redo: redoEdit, redoDepth: () => redoStack.length, fill: p => fillNow(p || null), fillLines: () => fillLinesUpdate(), fillCount: () => fillCount, note: noteTransform, centreView: centreViewOnPiece, stackDepth: () => editStack.length, modelDepth: () => editStack.filter(e => !e.pieceSnap).length, undoCap: () => UNDO_MAX, dragging: on => { partDrag = on ? { last: [0, 0] } : null; }, deselect: deselectPiece, openOn: (n, cam) => openOnPiece(n, cam), reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), gizmoHot: h => gizmoHot(h), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, pieceLasso: (op, pts, cam) => pieceLassoApply(op, { pts, cam, px: [] }), upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
@@ -2691,8 +2742,8 @@
             <section id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
               <div class="v2-card-head"><div><h2>Edit model</h2><p>Lasso a part to delete or copy it, cut a piece off with the razor, add a shape, paste a part, or slice a piece off.</p></div></div>
               <div id="v2EdHint" class="v2-edit-hint" hidden></div>
-              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'select', 'Select')}${iconBtn('tool', 'wand', 'Wand')}${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
-              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="select">Select</option><option value="wand">Wand</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
+              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'select', 'Select')}${iconBtn('tool', 'wand', 'Wand')}${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'fill', 'Fill holes')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}${iconBtn('tool', 'slice', 'Slice off')}</div>
+              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="select">Select</option><option value="wand">Wand</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="fill">Fill holes</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
               <div id="v2EdTip" class="v2-edit-hint-plain">Click the tool again or press Esc to put it down.</div>
               <div id="v2EdModeRow"><div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
                 <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>
@@ -2708,6 +2759,10 @@
                 <div class="v2-hollow-row"><label for="v2EdDepth">Which part</label><select id="v2EdDepth" autocomplete="off" title="Nearest part: only the part closest to you under the loop (a hand held up in front of a body). Everything under the loop: all the way through the model."><option value="near" selected>Nearest part (auto)</option><option value="through">Everything under the loop</option><option value="front">Half way through</option></select></div>
                 <div class="v2-icon-row v2-icon-row-2"><button id="v2LassoDelBtn" type="button" class="v2-icon-btn v2-lasso-act" data-op="delete" disabled>${icon('cut')}<span>DELETE</span></button><button id="v2LassoKeepBtn" type="button" class="v2-icon-btn v2-lasso-act" data-op="copy" disabled>${icon('copy')}<span>COPY</span></button></div>
                 <div class="v2-icon-row"><button id="v2PieceStlBtn" type="button" class="v2-icon-btn v2-lasso-act v2-wide-btn" title="Save just the part inside the red loop as its own STL file (the model is not changed)" disabled>${icon('copy')}<span>DOWNLOAD PIECE (STL)</span></button></div>
+              </div>
+              <div id="v2EdFillBox" hidden>
+                <div class="v2-edit-hint-plain">The paint bucket closes open holes, like the inside of an orange cut in half. Open holes show as a red outline. Click on the model next to a hole to close that one, or press FILL ALL HOLES. The cap is flat. UNDO LAST EDIT puts it back.</div>
+                <button id="v2FillAllBtn" type="button" class="v2-edit-small">FILL ALL HOLES</button>
               </div>
               <div id="v2EdSculptBox" hidden>
                 <div class="v2-edit-hint-plain">Paint on the model like clay. SMOOTH blends the surface (lined faces, rough scans), PULL raises it, PUSH presses it in. Bigger tip = broader strokes. Ctrl / ⌘ + drag turns the model. It works on the model's own triangles, so keep plenty of them: sculpt before you SHRINK.</div>
@@ -2731,7 +2786,7 @@
                 <div class="v2-hollow-row"><label for="v2EdTilt">Tilt</label><input id="v2EdTilt" type="range" min="-60" max="60" step="1" value="0" autocomplete="off"><output id="v2EdTiltOut">0°</output></div>
                 <div class="v2-hollow-row"><label for="v2EdSide">Remove</label><select id="v2EdSide" autocomplete="off"><option value="high" selected>the top / far side</option><option value="low">the bottom / near side</option></select></div>
               </div>
-              <div class="v2-edit-actions"><button id="v2EdUndo" class="v2-edit-undo" type="button" hidden>UNDO LAST EDIT</button><button id="v2EdReset" class="v2-edit-undo v2-edit-reset" type="button" title="Undo every edit, clear the lasso loop and the loaded part, and put the tools back to normal">RESET ALL EDITS</button></div>
+              <div class="v2-edit-actions"><button id="v2EdUndo" class="v2-edit-undo" type="button" hidden>UNDO LAST EDIT</button><button id="v2EdRedo" class="v2-edit-undo" type="button" title="Put back what UNDO took off (Ctrl / ⌘ + Shift + Z)" hidden>REDO</button><button id="v2EdReset" class="v2-edit-undo v2-edit-reset" type="button" title="Undo every edit, clear the lasso loop and the loaded part, and put the tools back to normal">RESET ALL EDITS</button></div>
               <div id="v2EdRun">
                 <button id="v2EdGo" class="v2-mega v2-teal" type="button">CUT SHAPE OUT</button>
                 <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
@@ -2899,6 +2954,7 @@
       window.addEventListener('keydown', e => {
         if (!editActive() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '') || e.altKey) return; const k = e.key;
         if ((e.metaKey || e.ctrlKey) && (k === 'z' || k === 'Z') && !e.shiftKey) { e.preventDefault(); if (editStack.length && !lassoBusy) undoEdit(); return; }
+        if ((e.metaKey || e.ctrlKey) && (((k === 'z' || k === 'Z') && e.shiftKey) || k === 'y' || k === 'Y')) { e.preventDefault(); if (redoStack.length && !lassoBusy) redoEdit(); return; }   // v2.360
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'v' || k === 'V') && editPart && pieceTool()) { e.preventDefault(); editModelNow(); return; }   // Cmd/Ctrl+V pastes (places) the floating part
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'c' || k === 'C') && editPart && pieceTool()) { e.preventDefault(); dupPart(); return; }
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && lassoSel && lzTool() && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) { e.preventDefault(); lassoApply(k.toLowerCase() === 'c' ? 'copy' : 'cut'); return; }   // Cmd/Ctrl+C copies the red part, +X cuts it off and keeps it
@@ -2909,7 +2965,7 @@
         if (editPart && $('v2EdTab')?.value === 'part' && /^[-+=_]$/.test(k)) { e.preventDefault(); partScale(k === '+' || k === '=' ? 1.1 : 1 / 1.1); return; }
         if (editPart && $('v2EdTab')?.value === 'part' && /^[xyzXYZ]$/.test(k)) { e.preventDefault(); partTurnWorld('xyz'.indexOf(k.toLowerCase()), k === k.toLowerCase() ? 1 : -1); }
       });
-      $('v2EdGo').addEventListener('click', editModelNow); $('v2EdUndo').addEventListener('click', undoEdit); editTabChanged(); } }
+      $('v2EdGo').addEventListener('click', editModelNow); $('v2EdUndo').addEventListener('click', undoEdit); $('v2EdRedo').addEventListener('click', redoEdit); editTabChanged(); } }
     $('v2HollowBtn')?.addEventListener('click', hollowModelNow);
     $('v2HollowWall')?.addEventListener('input', () => { $('v2HollowWallOut').textContent = $('v2HollowWall').value + ' mm'; });
     /* v2.305: once the model is hollow, letting go of the wall slider (or changing the drain holes) rebuilds it straight away so the new thickness shows in the cut-away */
