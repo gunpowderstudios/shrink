@@ -1,4 +1,4 @@
-# SHRINK 3D v2.371
+# SHRINK 3D v2.372
 
 Browser tool (everything runs locally). 3D Print now uses one full workflow interface: Printer & size → Fuse/repair → SHRINK → Download/split.
 

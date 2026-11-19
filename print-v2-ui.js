@@ -1184,9 +1184,11 @@
   }
   function pruneNoopTransform() { const top = editStack[editStack.length - 1]; if (top && top.pieceSnap && top.sig && top.sig === floatSigOf(floatSnap())) { editStack.pop(); const u = $('v2EdUndo'); if (u) u.hidden = !editStack.length; } }
   function centreViewOnPiece() {                        // v2.358: keypad 0 = bring the chosen piece to the middle of the screen (the view moves, the piece does not)
-    const V = window.__shrinkViewer, pm = editPart && partMatrix(); if (!pm) { edToast('Choose a floating piece first, then press 0 on the keypad.'); return false; }
+    const V = window.__shrinkViewer, pm = editPart && partMatrix(); if (!pm) { edToast('Choose a floating piece first, then press 0.'); return false; }
     if (!V?.camera || !V?.controls) return false; const c = new pm.f.THREE.Vector3(pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]), d = c.clone().sub(V.controls.target);
-    V.camera.position.add(d); V.controls.target.copy(c); V.controls.update?.(); V.camera.updateMatrixWorld?.(true); hudPlace(); return true;
+    const dir = V.camera.position.clone().sub(V.controls.target), k = new pm.f.THREE.Vector3().setFromMatrixScale(pm.m).x, r = (editPart.size?.length?.() || 0) * k * 0.5;   // v2.372: also close in so the piece fills the view
+    if (!V.camera.isOrthographic && r > 0 && dir.length() > 1e-9) { const want = Math.max(r * 3.2, 1e-6); dir.setLength(want); V.camera.position.copy(c).add(dir); } else V.camera.position.add(d);
+    V.controls.target.copy(c); V.controls.update?.(); V.camera.updateMatrixWorld?.(true); hudPlace(); return true;
   }
   function floatSnap() { return { sel: editPart ? { part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode')?.value || 'join' } : null, parked: parked.map(r => ({ ...r })) }; }
   function floatSelect(r) {
@@ -2986,7 +2988,7 @@
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (k === 'c' || k === 'C') && editPart && pieceTool()) { e.preventDefault(); dupPart(); return; }
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && lassoSel && lzTool() && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) { e.preventDefault(); lassoApply(k.toLowerCase() === 'c' ? 'copy' : 'cut'); return; }   // Cmd/Ctrl+C copies the red part, +X cuts it off and keeps it
         if (e.metaKey || e.ctrlKey) return;
-        if (e.code === 'Numpad0') { e.preventDefault(); centreViewOnPiece(); return; }   // v2.358
+        if (e.code === 'Numpad0' || e.code === 'Digit0') { e.preventDefault(); centreViewOnPiece(); return; }   // v2.358
         if ((k === 'Delete' || k === 'Backspace') && editPart && pieceTool()) { e.preventDefault(); discardPiece(); return; }
         if ($('v2EdTab')?.value === 'sculpt' && /^[-+=_]$/.test(k)) { e.preventDefault(); const r = $('v2SculptSize'), up = k === '+' || k === '=', lo = Number(r.min) || 1, hi = Number(r.max) || 120, cur = Number(r.value) || lo; let nv = Math.round(cur * (up ? 1.15 : 1 / 1.15) * 10) / 10; if (nv === cur) nv += up ? 0.5 : -0.5; r.value = String(Math.min(hi, Math.max(lo, nv))); r.dispatchEvent(new Event('input', { bubbles: true })); return; }
         if (editPart && $('v2EdTab')?.value === 'part' && /^[-+=_]$/.test(k)) { e.preventDefault(); partScale(k === '+' || k === '=' ? 1.1 : 1 / 1.1); return; }

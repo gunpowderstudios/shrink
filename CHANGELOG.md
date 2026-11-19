@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.372
+- Press 0 (top row or keypad) with a part selected: the view moves so the part is in the middle and closes in so it fills the view (perspective camera; orthographic only pans).
+
 ## v2.371
 - Sub-title under SHRINK 3D is now "Edit, Sculpt, Hollow and SHRINK right in your browser!".
 
