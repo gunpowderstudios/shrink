@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.374
+- BOOLE (CUT OUT) button on the Floating part card: cuts the selected shape out of the model wherever they overlap (the red part), leaving a clean surface in the shape's outline. It works whatever the Join/Cut switch says, and the shape is used up.
+
 ## v2.373
 - Making a shape (cube, ball, cylinder, cone) now floats it as a piece with the move / turn / stretch handles, in Join or Cut mode as chosen. Press WELD IT to join or cut it into the model. It no longer changes the model at once.
 

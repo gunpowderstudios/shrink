@@ -32,6 +32,10 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2EdUndo').click(); await wait(200);
   ok(Math.abs(tris(w.__shrinkWorkingModel()) - t0) < 2 && !/EDITED/.test(page.$('v2HealthChanges').textContent) && page.$('v2EdUndo').hidden, 'ED6 UNDO restores the model, chip and button');
   w.__shrinkEdit.discard();   // v2.373: UNDO of a weld floats the shape again; drop it so the next tests start clean
+  { set(page, 'v2EdTab', 'shape'); set(page, 'v2EdKind', 'ball'); set(page, 'v2EdMode', 'join'); set(page, 'v2EdW', 12); set(page, 'v2EdH', 12); set(page, 'v2EdD', 12); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click(); await wait(100);
+    const mb = w.__shrinkWorkingModel(), tb = tris(mb); ok(w.__shrinkEdit.hasPart() && page.$('v2EdMode').value === 'join', 'ED69 set up: a JOIN shape floats'); await w.__shrinkEdit.boole();
+    ok(await waitFor(() => /Cut|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Cut/.test(page.$('v2EdResult').textContent) && w.__shrinkWorkingModel() !== mb && tris(w.__shrinkWorkingModel()) > tb && !w.__shrinkEdit.hasPart(), 'ED69 BOOLE cuts the shape out whatever the Join/Cut switch said, and uses the shape up (' + tb + ' -> ' + tris(w.__shrinkWorkingModel()) + ')');
+    page.$('v2EdUndo').click(); await wait(200); w.__shrinkEdit.discard(); }
 
   /* slice off the top half: the model gets shorter */
   const h0 = height(page);
