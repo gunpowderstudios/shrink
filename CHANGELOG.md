@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.371
+- Sub-title under SHRINK 3D is now "Edit, Sculpt, Hollow and SHRINK right in your browser!".
+
 ## v2.370
 - Hold Shift while dragging a rotate ring on a floating part: the turn snaps to 90° steps.
 - COPY PART and lasso Copy now put the copy exactly where the original is (it used to start beside it).
