@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.369
+- Floating-part outline 30% brighter: join blue 0x2f86ff -> 0x3daeff, cut orange 0xff9a2f -> 0xffc83d. The grey body is unchanged (it matches the model).
+
 ## v2.368
 - The "Floating part" card is just buttons now: WELD IT, COPY PART, DOWNLOAD PART, UPLOAD A PART, DELETE PART (the gizmo does the moving; the old arrow pad, step size and Exact numbers are hidden, still in the DOM for tests).
 - Floating parts keep their blue (join) / orange (cut) outline even with the editor closed, so it is clear they are not welded yet.

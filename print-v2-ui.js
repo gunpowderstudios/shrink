@@ -1771,7 +1771,7 @@
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
     const ghost = (part, pm, mode, sel, tag) => {      // v2.326: every floating piece is drawn the same way; the selected one glows
-      const col = mode === 'cut' ? 0xff9a2f : 0x2f86ff;      // v2.344: the piece is resin grey like the model, only the outline is coloured (blue = join, orange = cut)
+      const col = mode === 'cut' ? 0xffc83d : 0x3daeff;      // v2.344: the piece is resin grey like the model, only the outline is coloured (blue = join, orange = cut)
       [{ test: true, op: 1, ro: 999 }].forEach((c, i) => {   // v2.360: solid only, no see-through pass
         const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: editActive() ? new THREE.Color(0xc9cacd).lerp(new THREE.Color(0x36d88a), 0.1) : new THREE.Color(0xc9cacd), roughness: 0.75, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
         m.name = (sel ? 'shrinkPartGhost' : 'shrinkParkedGhost'); m.userData.tag = tag; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
