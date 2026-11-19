@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.352
+- **Lasso and Razor work on floating pieces.** Draw a loop round a bit of a floating piece (e.g. the back of a loaded head) when the loop catches none of the main model: it turns red, then DELETE removes it from the piece, COPY makes it its own floating piece and CUT OFF takes it off as a new piece. The 'Which part' choice still applies (nearest layer / half way / everything). UNDO (button or Ctrl/⌘ + Z) puts the pieces back.
+
 ## v2.351
 - **Floating pieces stay on screen when you close EDIT.** They are drawn plain (no handles) so you can cut a piece off, close the panel, work on the model, then reopen EDIT, pick the Select tool, click a piece and move or weld it later.
 

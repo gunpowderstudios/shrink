@@ -531,5 +531,20 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   set(page, 'v2EdTab', 'part'); await wait(300); ok(r2 && r2.triangles === 12 && /-piece\.stl$/.test(got || '') && !!page.$('v2PadStl'), 'ED48 a floating piece downloads as its own STL (12 triangles), and the pad has the button too');
   w.__shrinkCapture = null;
 }
+/* v2.352: lasso on floating pieces */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  w.__shrinkViewer = { scene: new w.__shrinkApp.THREE.Scene() }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);
+  const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]], cube = [];
+  for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'head.stl'); await wait(50); set(page, 'v2EdPartX', 6); w.__shrinkEdit.preview?.();
+  const L = orthoCam(page, 0.5, 1.3), all = [[-1, -1], [1, -1], [1, 1], [-1, 1]], t0 = tris(w.__shrinkWorkingModel());
+  w.__shrinkEdit.pieceLasso('copy', all, L.cam); await wait(80);
+  ok(w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 1, 'ED54 COPY with a loop on a floating piece makes the bit its own floating piece (2 pieces)');
+  ok(tris(w.__shrinkWorkingModel()) === t0, 'ED54 the main model is untouched');
+  set(page, 'v2EdDepth', 'through'); w.__shrinkEdit.pieceLasso('delete', all, L.cam); await wait(80);
+  ok(!w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 0, 'ED54 DELETE through the whole piece removes the floating pieces');
+  page.$('v2EdUndo').click(); await wait(100);
+  ok(w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 1, 'ED54 UNDO brings the floating pieces back');
+}
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
 

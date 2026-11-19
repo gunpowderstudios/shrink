@@ -1093,13 +1093,76 @@
   }
   function clearLasso() { lassoSel = null; lassoDraw = null; lassoPaint(null); removeLassoRed(); lassoBarState(); }
   function lassoBarState() { document.querySelectorAll('#v2EditCard .v2-lasso-act').forEach(b => { const off = !lassoSel || lassoBusy; if (b.disabled !== off) b.disabled = off; }); }
+
+  // ---- v2.352: the Lasso / Razor also work on FLOATING pieces (cut a bit off a loaded head, delete a bit, or copy it as a new piece). Pure triangle work on the piece's own soup, no Manifold.
+  function ndcOfWorld(cam, p) {
+    const e = cam.world, right = [e[0], e[1], e[2]], up = [e[4], e[5], e[6]], fw = [-e[8], -e[9], -e[10]], d = [p[0] - e[12], p[1] - e[13], p[2] - e[14]], z = dot3(d, fw);
+    if (cam.persp) { if (z <= 1e-9) return null; return [dot3(d, right) / (z * cam.tanY * cam.aspect), dot3(d, up) / (z * cam.tanY), z]; }
+    return [dot3(d, right) / cam.halfW, dot3(d, up) / cam.halfH, z];
+  }
+  function inPoly(x, y, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
+  function floatItems() { const o = []; if (editPart) o.push({ sel: true, part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode')?.value || 'join' }); parked.forEach((r, i) => o.push({ sel: false, i, part: r.part, vals: r.vals, rot: r.rot, mode: r.mode })); return o; }
+  function pieceHits(sel) {
+    const cam = sel?.cam; if (!cam || !sel.pts?.length || (!editPart && !parked.length)) return [];
+    const mode = $('v2EdDepth')?.value || 'near', reach = mode === 'through' ? Infinity : mode === 'front' ? 0.5 : 0.35, out = [];
+    for (const it of floatItems()) {
+      const pm = partMatrixOf(it.part, it.vals, it.rot); if (!pm) continue; const m = pm.m.elements, soup = soupOf(it.part.geometry), world = new Float32Array(soup.length);
+      for (let i = 0; i < soup.length; i += 3) { const x = soup[i], y = soup[i + 1], z = soup[i + 2]; world[i] = m[0] * x + m[4] * y + m[8] * z + m[12]; world[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13]; world[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14]; }
+      const n = world.length / 9, mask = new Uint8Array(n), zs = new Float32Array(n); let zmin = Infinity, zmax = -Infinity, hmin = Infinity;
+      for (let t = 0; t < n; t++) {
+        const o = t * 9, c = [(world[o] + world[o + 3] + world[o + 6]) / 3, (world[o + 1] + world[o + 4] + world[o + 7]) / 3, (world[o + 2] + world[o + 5] + world[o + 8]) / 3], q = ndcOfWorld(cam, c); if (!q) { zs[t] = NaN; continue; }
+        zs[t] = q[2]; if (q[2] < zmin) zmin = q[2]; if (q[2] > zmax) zmax = q[2]; if (inPoly(q[0], q[1], sel.pts)) { mask[t] = 1; if (q[2] < hmin) hmin = q[2]; }
+      }
+      if (hmin === Infinity) continue; const lim = hmin + reach * Math.max(1e-9, zmax - zmin); let count = 0;
+      for (let t = 0; t < n; t++) if (mask[t] && zs[t] > lim) mask[t] = 0; else if (mask[t]) count++;
+      if (count) out.push({ it, world, mask, count });
+    }
+    return out;
+  }
+  function pieceRed(hits) {
+    removeLassoRed(); const V = window.__shrinkViewer, THREE = app()?.THREE; if (!V?.scene || !THREE) return; let k = 0; hits.forEach(h => { k += h.count; }); const pos = new Float32Array(k * 9); let w = 0;
+    hits.forEach(h => { for (let t = 0; t < h.mask.length; t++) if (h.mask[t]) { pos.set(h.world.subarray(t * 9, t * 9 + 9), w); w += 9; } });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+    mesh.renderOrder = 1003; mesh.raycast = () => {}; const grp = new THREE.Group(); grp.name = 'shrinkLassoRed'; grp.raycast = () => {}; grp.add(mesh); V.scene.add(grp);
+  }
+  function floatSnap() { return { sel: editPart ? { part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode')?.value || 'join' } : null, parked: parked.map(r => ({ ...r })) }; }
+  function floatSelect(r) {
+    editPart = r.part; partRot = r.rot ? r.rot.clone() : null; Object.entries(r.vals).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); });
+    const md = $('v2EdMode'); if (md && md.value !== r.mode) { md.value = r.mode; md.dispatchEvent(new Event('change', { bubbles: true })); }
+  }
+  function floatRestore(snap) { parked = snap.parked.map(r => ({ ...r })); if (snap.sel) floatSelect(snap.sel); else { editPart = null; partRot = null; } }
+  function pieceLassoApply(op, sel) {
+    const hits = pieceHits(sel), res = $('v2EdResult'); if (!hits.length) { res.innerHTML = '<strong>Nothing under the loop</strong><span>The loop did not catch any floating piece.</span>'; return; }
+    const f = editFrame(); if (!f) return; const snap = floatSnap(); editStack.push({ pieceSnap: snap }); if (editStack.length > 6) editStack.shift(); $('v2EdUndo').hidden = false;
+    const mk = (arr, name) => {
+      let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity]; for (let i = 0; i < arr.length; i += 3) for (let a = 0; a < 3; a++) { if (arr[i + a] < mn[a]) mn[a] = arr[i + a]; if (arr[i + a] > mx[a]) mx[a] = arr[i + a]; }
+      const c = [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2], part = partFromPoints(arr, false, name);
+      return { part, vals: { X: (c[0] - f.centre.x) * f.mm, Y: (c[1] - f.centre.y) * f.mm, Z: (c[2] - f.centre.z) * f.mm, RX: 0, RY: 0, RZ: 0, H: part.height * f.mm }, rot: null, mode: 'join' };
+    };
+    const list = [], fresh = []; let selected = null, removed = 0;
+    floatItems().forEach(it => {
+      const h = hits.find(x => x.it === it || (x.it.sel === it.sel && x.it.i === it.i && x.it.part === it.part)); let keep = it;
+      if (h) {
+        const remain = [], cut = []; for (let t = 0; t < h.mask.length; t++) (h.mask[t] ? cut : remain).push(...h.world.subarray(t * 9, t * 9 + 9));
+        if (op !== 'copy') { removed += cut.length / 9; keep = remain.length ? mk(Float32Array.from(remain), it.part.name) : null; }
+        if (op !== 'delete') fresh.push(mk(Float32Array.from(cut), (it.part.name || 'piece').replace(/\.[a-z0-9]+$/i, '') + ' piece'));
+      }
+      if (keep) { list.push(keep); if (it.sel) selected = keep; }
+    });
+    let pick = fresh.length ? fresh[fresh.length - 1] : (selected || list[list.length - 1] || null); list.push(...fresh);
+    parked = list.filter(r => r !== pick); if (pick) floatSelect(pick); else { editPart = null; partRot = null; }
+    clearLasso(); const tab = $('v2EdTab'); if (op !== 'delete' && tab && tab.value !== 'part') { tab.value = 'part'; try { editTabChanged(); } catch {} }
+    updateEditPreview(); updateGoState();
+    res.innerHTML = op === 'delete' ? `<strong>✓ Deleted</strong><span>${Math.round(removed).toLocaleString()} triangles removed from the floating piece. UNDO brings them back.</span>` : `<strong>✓ ${op === 'copy' ? 'Copied' : 'Cut off'}</strong><span>The bit is now its own floating piece. Move it with the handles, then WELD IT, or leave it floating.</span>`;
+  }
   function lassoEnd() {
     const d = lassoDraw; if (!d) return; lassoDraw = null;
     let area = 0; const p = d.px; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; area += a[0] * b[1] - b[0] * a[1]; }
     if (p.length < 4 || Math.abs(area / 2) < 150) { lassoPaint(null); $('v2EdResult').innerHTML = '<strong>Draw a bigger loop</strong><span>Hold the mouse button down and go all the way round the part.</span>'; lassoBarState(); return; }
     const cam = cameraSnap(); if (!cam) { lassoPaint(null); return; }
     lassoSel = { pts: d.ndc, cam, px: p }; lassoPaint(p, true); lassoBarState(); const nRed = lassoRed(lassoSel);
-    if (!nRed) { $('v2EdResult').innerHTML = '<strong>Nothing under the loop</strong><span>The loop did not catch any of the model. Press Esc and draw it round the part (or choose "Everything under the loop" if the part is further back).</span>'; edToast('Nothing under the loop. Draw it round the part.'); return; }
+    if (!nRed) { const ph = pieceHits(lassoSel); if (ph.length) { lassoSel.onPieces = true; pieceRed(ph); $('v2EdResult').innerHTML = '<strong>Red = what goes (floating piece)</strong><span>Press DELETE to remove it from the piece, COPY to make it its own piece, or CUT OFF to take it off. UNDO brings it back. Esc clears the loop.</span>'; return; }
+      $('v2EdResult').innerHTML = '<strong>Nothing under the loop</strong><span>The loop did not catch any of the model. Press Esc and draw it round the part (or choose "Everything under the loop" if the part is further back).</span>'; edToast('Nothing under the loop. Draw it round the part.'); return; }
     $('v2EdResult').innerHTML = lzTool() === 'razor' ? '<strong>Red = what goes</strong><span>Press CUT OFF to remove it (the hole is closed flat), or CUT OFF & KEEP to take it with you. Esc clears the loop.</span>' : '<strong>Red = what goes</strong><span>Press DELETE (or the Delete key) to remove it, or COPY to paste it somewhere else. Esc clears the loop.</span>';
   }
   function wireLasso() {
@@ -1119,6 +1182,7 @@
     const card = $('v2EditCard'), res = $('v2EdResult'), sel = override || lassoSel;
     if (lassoBusy) return;
     if (!sel) { res.innerHTML = '<strong>Draw a loop first</strong><span>Hold the mouse button down and go round the part.</span>'; return; }
+    if (sel.onPieces) { pieceLassoApply(op, sel); return; }
     lassoBusy = true; lassoBarState(); setWorking(true, 0, op === 'delete' ? 'Cutting…' : 'Copying…');
     try {
       const model = sourceModel(); if (!model) throw new Error('Load a model first.');
@@ -1714,6 +1778,7 @@
   }
   function undoEdit() {
     const snap = editStack.pop(); if (!snap) return;
+    if (snap.pieceSnap) { floatRestore(snap.pieceSnap); $('v2EdUndo').hidden = !editStack.length; $('v2EdResult').innerHTML = '<strong>Undone</strong><span>The floating pieces are back as they were.</span>'; updateEditPreview(); updateGoState(); return; }
     removeEditPreview(); installWorkingResult(snap, 'edit');
     if (!editStack.length) { appliedChanges.delete('edited'); renderAppliedChanges(); }
     $('v2EdUndo').hidden = !editStack.length;
@@ -1721,7 +1786,7 @@
     if (wd) { parked.push(wd); takeParked(parked.length - 1); const tab = $('v2EdTab'); if (tab && !pieceTool()) { tab.value = 'part'; try { editTabChanged(); } catch {} } }
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), gizmoHot: h => gizmoHot(h), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), gizmoHot: h => gizmoHot(h), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, pieceLasso: (op, pts, cam) => pieceLassoApply(op, { pts, cam, px: [] }), upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');
