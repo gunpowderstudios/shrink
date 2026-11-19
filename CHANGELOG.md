@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.368
+- The "Floating part" card is just buttons now: WELD IT, COPY PART, DOWNLOAD PART, UPLOAD A PART, DELETE PART (the gizmo does the moving; the old arrow pad, step size and Exact numbers are hidden, still in the DOM for tests).
+- Floating parts keep their blue (join) / orange (cut) outline even with the editor closed, so it is clear they are not welded yet.
+
 ## v2.367
 - Every new floating piece, including ones from a loaded project, starts as JOIN (it used to inherit whatever the Join/Cut switch was last left on, which is how a sword ended up orange/CUT).
 

@@ -939,3 +939,8 @@ body[data-v2-preshrunk] :is(#v2MagicBtn,#v2ShrinkBtn){background:#3a414c!importa
 .v2-pieces-row button:not(#v2UpPart){font:inherit;font-size:12px;font-weight:800;color:#e8eef5;background:#2a3342;border:1px solid #3d4a60;border-radius:9px;padding:9px 6px;cursor:pointer}
 .v2-pieces-row button:not(#v2UpPart):hover:not(:disabled){background:#34425a;border-color:#2f86ff}
 .v2-pieces-row button:disabled{opacity:.5;cursor:default}
+
+/* v2.368: the part card is just buttons now, the gizmo does the moving */
+#v2PartPad .v2-pad-row,#v2PartPad .v2-pad-tilt,#v2PartPad #v2PadStep{display:none!important}
+#v2EdPartBox .v2-exact,#v2EdPartBox .v2-edit-grid,#v2EdPartBox #v2EdPartOr{display:none!important}
+#v2PartPad .v2-pad-foot{flex-wrap:wrap}
