@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.370
+- Hold Shift while dragging a rotate ring on a floating part: the turn snaps to 90° steps.
+- COPY PART and lasso Copy now put the copy exactly where the original is (it used to start beside it).
+
 ## v2.369
 - Floating-part outline 30% brighter: join blue 0x2f86ff -> 0x3daeff, cut orange 0xff9a2f -> 0xffc83d. The grey body is unchanged (it matches the model).
 
