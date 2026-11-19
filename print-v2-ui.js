@@ -1742,7 +1742,7 @@
     let guard = 0, failed = 0;
     while ((editPart || parked.length) && guard++ < 60) {
       if (!editPart) takeParked(parked.length - 1);
-      const cur = editPart; if ($('v2EdMode').value === 'cut') weldCuts++; await editModelNow();
+      const cur = editPart; { const md = $('v2EdMode'); if (md.value !== 'join') { weldCuts++; md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); } } await editModelNow();   // v2.366: finishing the model always ADDS floating parts
       if (editPart === cur) { failed = 1 + parked.length; break; }
     }
     return failed;
@@ -2313,7 +2313,7 @@
         btn.textContent = 'Welding parts…'; show('Welding the floating parts into the model…');
         const bad = await weldEverything();
         if (bad) done('warn', '!', `${bad} floating part${bad === 1 ? '' : 's'} could not be welded and will be left out. Open EDIT to see why (the model must be a closed solid).`);
-        else if (weldCuts) done('warn', '!', `${weldCuts} floating part${weldCuts === 1 ? ' was' : 's were'} set to CUT (orange outline), so ${weldCuts === 1 ? 'it was' : 'they were'} subtracted instead of added. Set ${weldCuts === 1 ? 'it' : 'them'} to JOIN in EDIT if you wanted ${weldCuts === 1 ? 'it' : 'them'} attached.`);
+        else if (weldCuts) done('ok', '✓', `Floating parts welded into the model (${weldCuts} set to CUT, added as JOIN).`);
         else done('ok', '✓', 'Floating parts welded into the model.');
       }
       const startTris = modelTriangles(sourceModel());
@@ -2623,7 +2623,7 @@
   }
 
   async function download() {
-    if (editPart || parked.length) { const bad = await weldEverything(); if (!bad) { try { weldCuts ? edToast(`${weldCuts} part${weldCuts === 1 ? ' was' : 's were'} set to CUT (orange outline), so ${weldCuts === 1 ? 'it was' : 'they were'} subtracted from the model instead of added. Open EDIT, switch ${weldCuts === 1 ? 'it' : 'them'} to JOIN and undo if you wanted ${weldCuts === 1 ? 'it' : 'them'} attached.`) : edToast('Floating parts welded into the model.', true); } catch {} } if (bad) { try { edToast(`${bad} floating part${bad === 1 ? '' : 's'} could not be welded, so ${bad === 1 ? 'it is' : 'they are'} not in the file. Open EDIT to see why (the model must be a closed solid).`); } catch {} } }   // v2.362
+    if (editPart || parked.length) { const bad = await weldEverything(); if (!bad) { try { weldCuts ? edToast(`${weldCuts} part${weldCuts === 1 ? ' was' : 's were'} set to CUT, but ${weldCuts === 1 ? 'it was' : 'they were'} welded in as JOIN so ${weldCuts === 1 ? 'it appears' : 'they appear'} in the file.`, true) : edToast('Floating parts welded into the model.', true); } catch {} } if (bad) { try { edToast(`${bad} floating part${bad === 1 ? '' : 's'} could not be welded, so ${bad === 1 ? 'it is' : 'they are'} not in the file. Open EDIT to see why (the model must be a closed solid).`); } catch {} } }   // v2.362
     window.__shrinkEnforceMinHeight?.(); // Synchronise the native STL exporter before saving.
     syncAdvancedToNative();
     chooseSplit();

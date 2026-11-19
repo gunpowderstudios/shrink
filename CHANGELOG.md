@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.366
+- AUTO-SHRINK and DOWNLOAD IT now always weld floating parts in as JOIN, even if a part was left on CUT, so a floating sword can no longer vanish into a cut.
+
 ## v2.365
 - A floating part set to CUT (orange outline) is subtracted when welded, so it did not appear in the file. AUTO-SHRINK and DOWNLOAD now say so plainly when parts were welded as CUT, and cut parts keep their orange outline even with the editor closed.
 
