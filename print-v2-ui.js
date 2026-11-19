@@ -810,6 +810,7 @@
   function setPart(part) {
     if (part && editPart) parkCurrent();                // v2.326: a new piece never replaces the one already floating
     editPart = part; partRot = null; const f = editFrame();
+    if (part) { const md = $('v2EdMode'); if (md && md.value !== 'join') { md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); } }   // v2.367: every new piece starts as JOIN
     if (part && f) {
       ['X', 'Y', 'Z'].forEach(a => { $('v2EdPartR' + a).value = '0'; $('v2EdPartS' + a).value = '100'; });
       if (part.origin) {                                // a copied piece starts exactly where it came from, at its own size
@@ -1564,7 +1565,8 @@
     for (const pc of head.pieces) {
       const arr = new Float32Array(u8.slice(base + pc.off * 4, base + (pc.off + pc.count) * 4).buffer), part = partFromPoints(arr, false, pc.name); part.copied = true; setPart(part);
       Object.entries(valsDef(pc.vals)).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); }); partRot = pc.rot ? new (app().THREE.Quaternion)(...pc.rot) : null;
-      const md = $('v2EdMode'); if (md) { md.value = pc.mode || 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); } n++;
+      const md = $('v2EdMode'); if (md) { md.value = 'join';   // v2.367: saved CUT is ignored on load, loaded pieces always start as JOIN
+         md.dispatchEvent(new Event('change', { bubbles: true })); } n++;
     }
     if (n) { if (!editActive()) window.__shrinkTab?.('edit'); set$tool('part'); updateEditPreview(); }
     return n;

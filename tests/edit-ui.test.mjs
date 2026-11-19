@@ -369,6 +369,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
   w.__shrinkEdit.setPart(new Float32Array(cube), false, 'a.stl'); await wait(50); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'b.stl'); await wait(50);
   ok(w.__shrinkEdit.parked() === 1 && w.__shrinkEdit.hasPart(), 'ED66 setup: two pieces float');
+  ok(page.$('v2EdMode').value === 'join', 'ED66 a new piece starts as JOIN');
   set(page, 'v2EdMode', 'cut'); await wait(30);
   page.$('v2EditPanel').hidden || page.$('v2TabEdit').click(); await wait(50);
   page.$('v2MagicBtn').click(); await wait(6000);

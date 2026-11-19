@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.367
+- Every new floating piece, including ones from a loaded project, starts as JOIN (it used to inherit whatever the Join/Cut switch was last left on, which is how a sword ended up orange/CUT).
+
 ## v2.366
 - AUTO-SHRINK and DOWNLOAD IT now always weld floating parts in as JOIN, even if a part was left on CUT, so a floating sword can no longer vanish into a cut.
 
