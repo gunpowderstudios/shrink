@@ -1731,6 +1731,18 @@
     } catch (err) { edToast?.(String(err?.message || err)); if (res) res.innerHTML = `<strong>Could not save that piece</strong><span>${String(err?.message || err).replace(/[<>&]/g, '')}</span>`; return null; }
   }
   function discardPiece() { if (!editPart) return; dropSelected(); if (!editPart && !parked.length) set$tool('none'); $('v2EdResult').innerHTML = '<strong>Piece thrown away</strong><span>Nothing was changed on the model.</span>'; }
+  // v2.362: weld every floating piece (selected or waiting) into the model; returns how many could not be welded
+  async function weldEverything() {
+    if (!editPart && !parked.length) return 0;
+    if (!pieceTool()) { $('v2EdTab').value = 'select'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); }
+    let guard = 0, failed = 0;
+    while ((editPart || parked.length) && guard++ < 60) {
+      if (!editPart) takeParked(parked.length - 1);
+      const cur = editPart; await editModelNow();
+      if (editPart === cur) { failed = 1 + parked.length; break; }
+    }
+    return failed;
+  }
   async function weldAll() { let guard = 0; while (editPart && guard++ < 30) { const cur = editPart; await editModelNow(); if (editPart === cur) break; } }
   function updatePad() { if (parked.length && editActive() && pieceTool()) wirePartDrag(); const show = !!editPart && editActive() && pieceTool(); const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show); if (show) { const t = $('v2PartPad').querySelector('.v2-pad-title'), txt = parked.length ? `Move the part (${parked.length + 1} floating)` : 'Move the part'; if (t && t.textContent !== txt) t.textContent = txt; setHid($('v2PadAll'), !parked.length); wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
   function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
@@ -2293,6 +2305,12 @@
     window.__shrinkLastVerdict = null; let verdict = null; const rows = []; const show = (busy) => { note.hidden = false; note.innerHTML = rows.map(r => `<div class="${r.cls}"><i>${r.icon}</i><span>${r.text}</span></div>`).join('') + (busy ? `<div class="busy"><i>…</i><span>${busy}</span></div>` : '') + '<button type="button" class="v2-magic-x" aria-label="Close" title="Close">×</button>'; };
     const done = (cls, icon, text) => { rows.push({ cls, icon, text }); show(); };
     try {
+      if (editPart || parked.length) {                    // v2.362: floating pieces are welded in first, otherwise they are left out of the file
+        btn.textContent = 'Welding parts…'; show('Welding the floating parts into the model…');
+        const bad = await weldEverything();
+        if (bad) done('warn', '!', `${bad} floating part${bad === 1 ? '' : 's'} could not be welded and will be left out. Open EDIT to see why (the model must be a closed solid).`);
+        else done('ok', '✓', 'Floating parts welded into the model.');
+      }
       const startTris = modelTriangles(sourceModel());
       // 0. REPAIR FIRST, at full detail (v2.147). Shrinking a model that still has holes bakes the holes into a coarse mesh that is much harder to
       //    close, so a model under FIX_FIRST_MAX triangles is repaired before it is reduced. Bigger ones are shrunk first (repair runs on the main thread).
@@ -2948,7 +2966,7 @@
       $('v2EdTab').addEventListener('change', editTabChanged);
       $('v2EdMode').addEventListener('change', editTabChanged);
       ['v2EdKind', 'v2EdW', 'v2EdH', 'v2EdD', 'v2EdX', 'v2EdY', 'v2EdZ', 'v2EdAxis', 'v2EdSide', 'v2EdPos', 'v2EdTilt'].forEach(id => { $(id).addEventListener('input', () => { $('v2EdPosOut').textContent = $('v2EdPos').value + '%'; $('v2EdTiltOut').textContent = $('v2EdTilt').value + '°'; updateEditPreview(); }); $(id).addEventListener('change', updateEditPreview); });
-      window.addEventListener('keydown', e => { if (e.key === 'Escape' && editActive() && lassoSel) { clearLasso(); return; } if ((e.key === 'Delete' || e.key === 'Backspace') && editActive() && lassoSel && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { e.preventDefault(); lassoApply('delete'); return; } if (e.key === 'Escape' && editActive() && editPart && pieceTool() && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { deselectPiece(); return; } if (e.key === 'Escape' && editActive() && $('v2EdTab').value !== 'none') { $('v2EdTab').value = 'none'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); return; } if (e.key === 'Escape' && editActive() && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { setMainTab('finish'); return; } if ((e.key === 'e' || e.key === 'E') && !e.ctrlKey && !e.metaKey && !e.altKey && !editActive() && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '') && !document.activeElement?.isContentEditable) { const b = $('v2TabEdit'); if (b && !b.disabled) { e.preventDefault(); b.click(); } } });
+      window.addEventListener('keydown', e => { if (e.key === 'Escape' && editActive() && lassoSel) { clearLasso(); return; } if ((e.key === 'Delete' || e.key === 'Backspace') && editActive() && lassoSel && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { e.preventDefault(); lassoApply('delete'); return; } if (e.key === 'Escape' && !editActive() && editPart && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { deselectPiece(); return; } if (e.key === 'Escape' && editActive() && editPart && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { deselectPiece(); return; } if (e.key === 'Escape' && editActive() && $('v2EdTab').value !== 'none') { $('v2EdTab').value = 'none'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); return; } if (e.key === 'Escape' && editActive() && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { setMainTab('finish'); return; } if ((e.key === 'e' || e.key === 'E') && !e.ctrlKey && !e.metaKey && !e.altKey && !editActive() && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '') && !document.activeElement?.isContentEditable) { const b = $('v2TabEdit'); if (b && !b.disabled) { e.preventDefault(); b.click(); } } });
       $('v2EdReset').addEventListener('click', resetEdits);
       // v2.320: keyboard shortcuts in the EDIT tab (never while typing in a box)
       window.addEventListener('keydown', e => {

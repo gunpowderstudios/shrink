@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.362
+- AUTO-SHRINK now welds every floating piece into the model first (they used to be left out of the file); pieces that cannot be welded are reported.
+- Esc lets go of the selected piece with any tool active, and also when the editor is closed.
+
 ## v2.361
 - EDIT: Esc now steps down: lets go of the loop / piece, then drops the tool, then closes the editor. E opens the editor (not while typing).
 

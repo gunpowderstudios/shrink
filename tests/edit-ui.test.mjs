@@ -362,6 +362,16 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     ed.click(); await wait(50); ok(page.$('v2EditPanel').hidden === true, 'ED65 setup: panel closed'); key('e'); await wait(50); ok(page.$('v2EditPanel').hidden === false, 'ED65 E opens the editor');
     key('Escape'); await wait(30); key('Escape'); await wait(30); ok(page.$('v2EditPanel').hidden === true, 'ED65 Esc with nothing left to deselect closes the editor'); }
 }
+/* v2.362: AUTO-SHRINK welds floating pieces in first */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
+  w.__shrinkViewer = { scene: new w.__shrinkApp.THREE.Scene() }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);
+  const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
+  for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'a.stl'); await wait(50); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'b.stl'); await wait(50);
+  ok(w.__shrinkEdit.parked() === 1 && w.__shrinkEdit.hasPart(), 'ED66 setup: two pieces float');
+  page.$('v2EditPanel').hidden || page.$('v2TabEdit').click(); await wait(50);
+  page.$('v2MagicBtn').click(); await wait(6000);
+  ok(w.__shrinkEdit.parked() === 0 && !w.__shrinkEdit.hasPart(), 'ED66 AUTO-SHRINK welded every floating piece into the model'); }
 /* v2.358: undo for moving / turning / stretching floating pieces, and keypad 0 */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400); const TH = w.__shrinkApp.THREE;
   w.__shrinkViewer = { scene: new TH.Scene(), camera: new TH.PerspectiveCamera(), controls: { target: new TH.Vector3(), update() {} } }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);
