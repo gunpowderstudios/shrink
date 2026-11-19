@@ -384,7 +384,11 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2EditPanel').hidden || page.$('v2TabEdit').click(); await wait(50);
   page.$('v2MagicBtn').click(); await wait(6000);
   ok(w.__shrinkEdit.parked() === 0 && !w.__shrinkEdit.hasPart(), 'ED66 AUTO-SHRINK welded every floating piece into the model');
-  ok(page.$('v2EdMode').value === 'join', 'ED66 a piece left on CUT is still added (JOIN) when finishing the model'); }
+  ok(page.$('v2EdMode').value === 'join', 'ED66 a piece left on CUT is still added (JOIN) when finishing the model');
+  /* v2.375: WELD ALL */
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'c.stl'); await wait(50); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'd.stl'); await wait(50); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'e.stl'); await wait(50);
+  ok(w.__shrinkEdit.parked() === 2 && w.__shrinkEdit.hasPart(), 'ED70 setup: three pieces float');
+  { const bad = await w.__shrinkEdit.weldAllBtn(); ok(!bad && w.__shrinkEdit.parked() === 0 && !w.__shrinkEdit.hasPart(), 'ED70 WELD ALL welds every floating piece, not just the selected one'); } }
 /* v2.358: undo for moving / turning / stretching floating pieces, and keypad 0 */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400); const TH = w.__shrinkApp.THREE;
   w.__shrinkViewer = { scene: new TH.Scene(), camera: new TH.PerspectiveCamera(), controls: { target: new TH.Vector3(), update() {} } }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);

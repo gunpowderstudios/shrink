@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.375
+- WELD ALL button on the Floating part card, next to WELD IT, shows the number of parts. It welds every floating part (selected and waiting) and then fuses the model so it is one piece. Shows only when two or more parts float.
+
 ## v2.374
 - BOOLE (CUT OUT) button on the Floating part card: cuts the selected shape out of the model wherever they overlap (the red part), leaving a clean surface in the shape's outline. It works whatever the Join/Cut switch says, and the shape is used up.
 
