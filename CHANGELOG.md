@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.356
+- The red overlap now updates live while you drag a piece (about 20 times a second), instead of appearing only after you let go.
+
 ## v2.355
 - Clicking the empty background with a piece selected lets go of it (a plain click; dragging still orbits). The piece keeps floating, grey and without handles; click it again to pick it up.
 

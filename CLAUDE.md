@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.355** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.356** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -171,6 +171,8 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 (v2.354) `openOnPiece(ndc, cam)` + two capture listeners in `wirePartDrag` (pointerdown/up, only while `!editActive()`, < 5 px movement): a click on the selected piece (`ghostHit`) or a waiting one (`parkedAt` + `takeParked`) sets `#v2EdTab` to select and calls `setMainTab('edit')`. `updateEditPreview()` wires it whenever pieces float. Test ED56 (`__shrinkEdit.openOn`). Real-mouse click untested.
 
 (v2.355) `deselectPiece()` parks the selected piece (`editPart = null`); `wirePartDrag` notes a background pointerdown (target `#viewer` or its canvas, no gizmo/ghost/parked hit) and deselects on pointerup under 5 px movement while a piece tool is active. Test ED57 (`__shrinkEdit.deselect`). Real-mouse click untested.
+
+(v2.356) `scheduleOverlap()` no longer debounces while `partDrag` is set: it runs `overlapUpdate()` at most every 50 ms (plus a trailing run) and leaves the old red on screen until the new one replaces it. Cost grows with the piece's triangles (capped at 200k per pass) and the model grid is cached, but a very heavy piece on a big model is untested in a real browser. Test ED58 (`__shrinkEdit.dragging`).
 
 ### CLAY / Brush (v2.141; switched off in v2.173; back on in v2.308 as the Brush tool in the EDIT tab, chip BRUSH)
 `clay.js` (ES module, loaded by `ui-mode.js`; card built into `#v2ClayHost`, which `print-v2-ui.js` puts above the Advanced drawer) + `clay-core.js` (no DOM, no three.js: icosphere, `dabSoup`, `dabsAlong`, `thin`, `joinSoups`). Strokes are lists of world-space balls `{x,y,z,r}` kept in `window.__shrinkClay` (`hasClay`, `apply`, `finish`, `addStroke` for tests). The preview is two `InstancedMesh`es in a `shrinkClay` scene group (pink = add, orange = cut); they ignore raycasts. Painting raycasts the working model; Ctrl/Cmd+drag rotates, Esc leaves the tool, as the other brushes do. `fixHealthModel()` calls `__shrinkClay.apply(model)` instead of the gentle repair when clay exists, and `shrinkMyModel()` no longer skips the fix step when clay is present. `apply()`: route A = `modelToSolid` (exact Manifold union/difference, keeps all detail); route B (Manifold rejects a leaky mesh, e.g. piece_55) = add balls to the triangle soup and run `makeWatertight` (balanced, then fast; `high` pinches), then subtract cuts with Manifold. The result must pass `healthOfModel` or nothing is installed. Ball count is thinned and coarsened (`ballLevel`) because the wrap refuses above 1.5M triangles. Tests: `tests/clay.test.mjs`.

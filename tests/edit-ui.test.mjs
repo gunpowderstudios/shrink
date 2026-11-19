@@ -361,6 +361,10 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.__shrinkEdit.place('centre'); const st = w.__shrinkEdit.partState(); let part = -1, shift = 0; for (const dy of [6, 8, 10, 11, 12, 13, 14]) { set(page, 'v2EdPartY', st.y + dy); const n = w.__shrinkEdit.overlap(); if (n > 0 && n < nAll) { part = n; shift = dy; break; } }
   ok(part > 0 && part < nAll, `ED34 half in, half out: only the buried part is red (${part} of ${nAll}, raised ${shift} mm)`);
   set(page, 'v2EdPartX', 500); w.__shrinkEdit.overlap(); ok(red() === 0, 'ED34 moving it away clears the red');
+  /* v2.356: the red updates while the piece is still being dragged (before the mouse is let go) */
+  w.__shrinkEdit.dragging(true); set(page, 'v2EdPartX', 500); w.__shrinkEdit.overlap(); w.__shrinkEdit.place('centre'); w.__shrinkEdit.preview(); await wait(120);
+  ok(red() > 0, 'ED58 while dragging, moving into the model turns it red at once (' + red() + ' triangles), without letting go');
+  set(page, 'v2EdPartX', 500); w.__shrinkEdit.preview(); await wait(120); ok(red() === 0, 'ED58 and dragging it out again clears the red while still dragging'); w.__shrinkEdit.dragging(false);
 }
 /* v2.324: the right-hand modules step aside while EDIT is open */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
