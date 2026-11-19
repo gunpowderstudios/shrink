@@ -22,6 +22,8 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
 
   const t0 = tris(w.__shrinkWorkingModel()), m0 = w.__shrinkWorkingModel();
   set(page, 'v2EdKind', 'ball'); set(page, 'v2EdW', 12); set(page, 'v2EdH', 12); set(page, 'v2EdD', 12);
+  page.$('v2EdGo').click(); await wait(100);
+  ok(w.__shrinkWorkingModel() === m0 && w.__shrinkEdit.hasPart() && page.$('v2EdTab').value === 'select' && page.$('v2EdMode').value === 'cut' && Math.abs(Number(page.$('v2EdPartH').value) - 12) < 0.01, 'ED68 MAKE A SHAPE floats a piece with handles (select tool, cut mode, 12 mm) and leaves the model alone');
   page.$('v2EdGo').click();
   ok(await waitFor(() => /Cut|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Cut/.test(page.$('v2EdResult').textContent), 'ED3 a ball cut finishes: ' + page.$('v2EdResult').textContent.slice(0, 140));
   ok(w.__shrinkWorkingModel() !== m0 && tris(w.__shrinkWorkingModel()) > t0, `ED3 the result is the new working model with more triangles (${t0} -> ${tris(w.__shrinkWorkingModel())})`);
@@ -29,6 +31,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(page.$('v2EdUndo').hidden === false && w.__shrinkEdit.depth() === 1, 'ED5 UNDO appears');
   page.$('v2EdUndo').click(); await wait(200);
   ok(Math.abs(tris(w.__shrinkWorkingModel()) - t0) < 2 && !/EDITED/.test(page.$('v2HealthChanges').textContent) && page.$('v2EdUndo').hidden, 'ED6 UNDO restores the model, chip and button');
+  w.__shrinkEdit.discard();   // v2.373: UNDO of a weld floats the shape again; drop it so the next tests start clean
 
   /* slice off the top half: the model gets shorter */
   const h0 = height(page);
@@ -167,7 +170,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   const m0 = w.__shrinkWorkingModel(), h0 = height(page);
   tool('slice').click(); set(page, 'v2EdPos', 50); set(page, 'v2EdSide', 'high'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click();
   await waitFor(() => /Sliced|Could not/.test(page.$('v2EdResult').textContent), 60000);
-  tool('shape').click(); set(page, 'v2EdKind', 'ball'); set(page, 'v2EdMode', 'cut'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click();
+  tool('shape').click(); set(page, 'v2EdKind', 'ball'); set(page, 'v2EdMode', 'cut'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click(); await wait(100); page.$('v2EdGo').click();   // v2.373: first click floats the shape, second welds it
   await waitFor(() => /Cut|Could not/.test(page.$('v2EdResult').textContent), 60000);
   w.__shrinkEdit.setPart(new Float32Array([0,0,0, 1,0,0, 0,1,0, 0,0,1, 1,0,0, 0,0,0]), false, 'x.stl');
   ok(w.__shrinkEdit.depth() === 2 && height(page) < h0 * 0.6 && w.__shrinkEdit.hasPart(), 'ED25 set up: two edits and a part');

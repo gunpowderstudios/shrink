@@ -1747,7 +1747,7 @@
     let guard = 0, failed = 0;
     while ((editPart || parked.length) && guard++ < 60) {
       if (!editPart) takeParked(parked.length - 1);
-      const cur = editPart; { const md = $('v2EdMode'); if (md.value !== 'join') { weldCuts++; md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); } } await editModelNow();   // v2.366: finishing the model always ADDS floating parts
+      const cur = editPart; if (!cur.isShape) { const md = $('v2EdMode'); if (md.value !== 'join') { weldCuts++; md.value = 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); } } await editModelNow();   // v2.366: finishing the model always ADDS floating parts
       if (editPart === cur) { failed = 1 + parked.length; break; }
     }
     return failed;
@@ -1843,10 +1843,29 @@
     if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { clearLasso(); removeFillLines(); updatePad(); updateEditPreview(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-wand', 'v2-cur-sculpt'); sculptRing(null); }
   }
   window.__shrinkTab = setMainTab;
+  // v2.373 (Tim): MAKE A SHAPE floats a unit shape as a piece (gizmo, WELD IT) instead of joining/cutting the model at once.
+  function shapeSoup(kind) {
+    const THREE = app()?.THREE; if (!THREE) return null;
+    const g = kind === 'ball' ? new THREE.SphereGeometry(0.5, 32, 20) : kind === 'cylinder' ? new THREE.CylinderGeometry(0.5, 0.5, 1, 40) : kind === 'cone' ? new THREE.CylinderGeometry(0, 0.5, 1, 40) : new THREE.BoxGeometry(1, 1, 1);
+    const ng = g.index ? g.toNonIndexed() : g, a = ng.getAttribute('position').array.slice(); g.dispose(); return a;
+  }
+  function makeShapePiece() {
+    const f = editFrame(); if (!f) return false; const sp = shapeSpec(); if (!sp) return false;
+    const arr = shapeSoup(sp.kind); if (!arr) return false;
+    const w = Math.max(0.1, num('v2EdW', 10)), h = Math.max(0.1, num('v2EdH', 10)), d = Math.max(0.1, num('v2EdD', 10)), mode = sp.mode, x = num('v2EdX'), y = num('v2EdY'), z = num('v2EdZ');
+    const part = partFromPoints(arr, false, sp.kind); part.isShape = true; setPart(part);
+    $('v2EdPartH').value = String(h); $('v2EdPartSX').value = String(Math.round(w / h * 10000) / 100); $('v2EdPartSY').value = '100'; $('v2EdPartSZ').value = String(Math.round(d / h * 10000) / 100);
+    $('v2EdPartX').value = String(x); $('v2EdPartY').value = String(y); $('v2EdPartZ').value = String(z);
+    { const md = $('v2EdMode'); if (md && md.value !== mode) { md.value = mode; md.dispatchEvent(new Event('change', { bubbles: true })); } }
+    set$tool('select'); updateEditPreview(); updateGoState(); updatePad();
+    try { edToast(mode === 'cut' ? 'Shape ready. Move it with the handles, then WELD IT to cut it out of the model.' : 'Shape ready. Move it with the handles, then WELD IT to join it to the model.', true); } catch {}
+    return true;
+  }
   async function editModelNow() {
     const btn = $('v2EdGo'), card = $('v2EditCard'), res = $('v2EdResult');
     if (!btn || btn.disabled) return;
     const sl = $('v2EdTab').value === 'slice';
+    if ($('v2EdTab').value === 'shape' && makeShapePiece()) return;   // v2.373: a new shape floats with handles instead of welding at once
     btn.disabled = true; setWorking(true, 0, 'Editing…');
     try {
       progress(card, 10, 'Loading the solid tools…');

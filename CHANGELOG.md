@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.373
+- Making a shape (cube, ball, cylinder, cone) now floats it as a piece with the move / turn / stretch handles, in Join or Cut mode as chosen. Press WELD IT to join or cut it into the model. It no longer changes the model at once.
+
 ## v2.372
 - Press 0 (top row or keypad) with a part selected: the view moves so the part is in the middle and closes in so it fills the view (perspective camera; orthographic only pans).
 
