@@ -1767,10 +1767,10 @@
     const ghost = (part, pm, mode, sel, tag) => {      // v2.326: every floating piece is drawn the same way; the selected one glows
       const col = mode === 'cut' ? 0xff9a2f : 0x2f86ff;      // v2.344: the piece is resin grey like the model, only the outline is coloured (blue = join, orange = cut)
       [{ test: true, op: 1, ro: 999 }].forEach((c, i) => {   // v2.360: solid only, no see-through pass
-        const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: new THREE.Color(0xc9cacd).lerp(new THREE.Color(0x36d88a), 0.1), roughness: 0.75, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
+        const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: editActive() ? new THREE.Color(0xc9cacd).lerp(new THREE.Color(0x36d88a), 0.1) : new THREE.Color(0xc9cacd), roughness: 0.75, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
         m.name = (sel ? 'shrinkPartGhost' : 'shrinkParkedGhost'); m.userData.tag = tag; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
       });
-      { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, depthTest: true, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(sel ? 1.015 : 1.01, sel ? 1.015 : 1.01, sel ? 1.015 : 1.01)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
+      if (editActive()) { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, depthTest: true, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(sel ? 1.015 : 1.01, sel ? 1.015 : 1.01, sel ? 1.015 : 1.01)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
     };
     parked.forEach((r, i) => { const pm = partMatrixOf(r.part, r.vals, r.rot); if (pm) ghost(r.part, pm, r.mode, false, i); });
     if (editPart) { const pm = partMatrix(); if (pm) { ghost(editPart, pm, $('v2EdMode').value, true, -1); if (isPart || isSel) g.add(gizmoBuild(THREE, pm)); } }
@@ -2617,7 +2617,8 @@
     if ($('v2Zup')) setNative('zUpToggle', $('v2Zup').checked, 'change');
   }
 
-  function download() {
+  async function download() {
+    if (editPart || parked.length) { const bad = await weldEverything(); if (bad) { try { edToast(`${bad} floating part${bad === 1 ? '' : 's'} could not be welded, so ${bad === 1 ? 'it is' : 'they are'} not in the file. Open EDIT to see why (the model must be a closed solid).`); } catch {} } }   // v2.362
     window.__shrinkEnforceMinHeight?.(); // Synchronise the native STL exporter before saving.
     syncAdvancedToNative();
     chooseSplit();

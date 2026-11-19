@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.363
+- DOWNLOAD IT welds any floating pieces into the model first (same as AUTO-SHRINK), so what is on screen is what is saved.
+- With the editor closed, floating pieces look like the model (no green tint, no outline). Open EDIT and they are tinted/outlined and selectable again.
+
 ## v2.362
 - AUTO-SHRINK now welds every floating piece into the model first (they used to be left out of the file); pieces that cannot be welded are reported.
 - Esc lets go of the selected piece with any tool active, and also when the editor is closed.
