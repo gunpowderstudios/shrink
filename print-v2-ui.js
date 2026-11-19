@@ -1237,7 +1237,7 @@
     mesh.updateMatrixWorld(true); const hits = []; THREE.Mesh.prototype.raycast.call(mesh, rc, hits); return hits.length > 0;
   }
   // ---- v2.325: handles ON the green piece: three arrows (slide along X / Y / Z), three rings (yaw about Y, pitch about X, roll about Z) and − / + to resize.
-  const GZ_COL = [0x36d88a, 0x89efbb, 0x1fa86a], GZ_NAME = ['x', 'y', 'z'];
+  const GZ_COL = [0x4d9dff, 0x7fbaff, 0x2f6fd6], GZ_HOT = 0x36d88a, GZ_NAME = ['x', 'y', 'z'];
   function gizmoSize(pm) { const g = editPart.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const k = new pm.f.THREE.Vector3().setFromMatrixScale(pm.m).x; return Math.max(1e-6, (g.boundingSphere?.radius || 1) * k * 0.55); }   // v2.346: small, tidy handles
   const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   function gizmoPick(ndc, camIn) {
@@ -1283,6 +1283,12 @@
     } else return false;
     updateEditPreview(); return true;
   }
+  let gzHot = null;                                     // v2.347: the handle under the pointer (or being dragged) turns green
+  function gizmoPaint(gz) {
+    gz.traverse(o => { if (!o.isMesh) return; const m = /^gizmo-(ring-|plane-)?([xyz])$/.exec(o.name); if (!m) return; const kind = m[1] === 'ring-' ? 'ring' : m[1] === 'plane-' ? 'plane' : 'arrow', ax = 'xyz'.indexOf(m[2]), hot = !!gzHot && gzHot.kind === kind && gzHot.axis === ax;
+      o.material.color.setHex(hot ? GZ_HOT : GZ_COL[ax]); if (kind === 'plane') o.material.opacity = hot ? 0.6 : 0.3; });
+  }
+  function gizmoHot(h) { if ((!h && !gzHot) || (h && gzHot && h.kind === gzHot.kind && h.axis === gzHot.axis)) return; gzHot = h || null; const gz = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkPartGizmo'); if (gz) gizmoPaint(gz); }
   function gizmoBuild(THREE, pm) {
     const R = gizmoSize(pm), L = R * 2.2, Rr = R * 0.8, gz = new THREE.Group(); gz.name = 'shrinkPartGizmo'; gz.raycast = () => {};
     gz.position.set(pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]);
@@ -1295,7 +1301,7 @@
       const side = R * 0.45, mid = R * 0.425, pl = put(new THREE.Mesh(new THREE.PlaneGeometry(side, side), new THREE.MeshBasicMaterial({ color: GZ_COL[i], transparent: true, opacity: 0.3, depthTest: false, depthWrite: false, side: THREE.DoubleSide })), i);   // v2.344 plane handle (normal = axis i)
       pl.name = 'gizmo-plane-' + GZ_NAME[i]; pl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), u); const pp = [0, 0, 0]; pp[(i + 1) % 3] = mid; pp[(i + 2) % 3] = mid; pl.position.set(pp[0], pp[1], pp[2]); gz.add(pl);
     }
-    return gz;
+    gizmoPaint(gz); return gz;
   }
   function ensureHud() {
     let h = $('v2PartHud'); if (h) return h; const v = $('viewer'); if (!v) return null;
@@ -1320,12 +1326,12 @@
     const v = $('viewer'); if (!v || v.dataset.partWired) return; v.dataset.partWired = '1';
     const act = () => (!!editPart || parked.length > 0) && editActive() && pieceTool();
     const ndcOf = e => { const r = v.getBoundingClientRect(); return [((e.clientX - r.left) / (r.width || 1)) * 2 - 1, -(((e.clientY - r.top) / (r.height || 1)) * 2 - 1)]; };
-    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return; const n = ndcOf(e), hz = gizmoPick(n); let hit = !!hz || ghostHit(n); if (!hit) { const pi = parkedAt(n); if (pi < 0) return; takeParked(pi); hit = true; } e.stopPropagation(); e.preventDefault(); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
+    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return; const n = ndcOf(e), hz = gizmoPick(n); let hit = !!hz || ghostHit(n); if (!hit) { const pi = parkedAt(n); if (pi < 0) return; takeParked(pi); hit = true; } e.stopPropagation(); e.preventDefault(); gizmoHot(hz); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
     v.addEventListener('pointermove', e => {
       if (partDrag) { e.stopPropagation(); if ((e.buttons & 1) === 0) { partDragEnd(); return; } const n = ndcOf(e); if (partDrag.hz) gizmoApply(partDrag.hz.kind, partDrag.hz.axis, partDrag.last, n, partDrag.cam); else partDragApply('move', partDrag.last, n, e.shiftKey, partDrag.cam); partDrag.last = n; return; }
-      const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const n = ndcOf(e), on = !!gizmoPick(n) || ghostHit(n) || parkedAt(n) >= 0; v.classList.toggle('v2-cur-grab', on);
+      const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const n = ndcOf(e), hz = gizmoPick(n); gizmoHot(hz); const on = !!hz || ghostHit(n) || parkedAt(n) >= 0; v.classList.toggle('v2-cur-grab', on);
     }, true);
-    const partDragEnd = () => { if (!partDrag) return; partDrag = null; v.classList.remove('v2-cur-grabbing'); };
+    const partDragEnd = () => { if (!partDrag) return; partDrag = null; gizmoHot(null); v.classList.remove('v2-cur-grabbing'); };
     v.addEventListener('pointerup', partDragEnd, true); v.addEventListener('pointercancel', partDragEnd, true); window.addEventListener('pointerup', partDragEnd, true); window.addEventListener('blur', partDragEnd);
   }
   // ---- v2.323: where the floating part overlaps the model it turns red, so you can see it is joined there. Point-in-mesh by a ray up the Y axis through a grid of the model's triangles (no BVH needed).
@@ -1712,7 +1718,7 @@
     $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
-  window.__shrinkEdit = { reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
+  window.__shrinkEdit = { reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), gizmoHot: h => gizmoHot(h), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };
 
   async function hollowModelNow() {
     const btn = $('v2HollowBtn'), card = $('v2HollowCard'), res = $('v2HollowResult');

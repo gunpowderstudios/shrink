@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.347
+- **Handle highlight.** The part handles (arrows, rings, flat squares) are blue; the one under the mouse turns green before you click, and stays green while you drag it.
+
 ## v2.346
 - **Tidier part handles.** The arrows, rings and squares are about half the size, thinner and in the site green (three shades for the three directions).
 - **Floating parts look like the model.** Same light grey and matt finish as the model, solid (no more see-through blue/green), with only a thin blue outline; the red overlap marking stays.
