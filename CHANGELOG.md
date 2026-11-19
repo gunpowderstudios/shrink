@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.355
+- Clicking the empty background with a piece selected lets go of it (a plain click; dragging still orbits). The piece keeps floating, grey and without handles; click it again to pick it up.
+
 ## v2.354
 - With the EDIT panel closed, clicking a floating piece (a plain click; dragging still orbits) opens EDIT with the Select tool and that piece selected, ready to move, cut or weld.
 
