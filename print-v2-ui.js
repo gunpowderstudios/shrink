@@ -811,7 +811,7 @@
         $('v2EdPartX').value = ((part.origin.x - f.centre.x) * f.mm).toFixed(2); $('v2EdPartY').value = ((part.origin.y - f.centre.y) * f.mm).toFixed(2); $('v2EdPartZ').value = ((part.origin.z - f.centre.z) * f.mm).toFixed(2);
       } else { const h = Math.max(1, Math.round(f.size.y * f.mm * 0.3 * 10) / 10); $('v2EdPartH').value = String(h); ['X', 'Y', 'Z'].forEach(a => { $('v2EdPart' + a).value = '0'; }); }
     }
-    $('v2EdPartInfo').textContent = part ? (part.copied ? 'Copied piece ready (the green ghost). Drag it, use the arrows and rings on it, then press WELD IT.' : `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.`) : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
+    $('v2EdPartInfo').textContent = part ? (part.copied ? 'Copied piece ready (the ghost). Drag it, use the arrows and rings on it, then press WELD IT.' : `${part.name}: loaded. Set its height, turn and move it (the green ghost shows where it goes), then join it on.`) : 'STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.';
     updateEditPreview(); updateGoState();
   }
   function partMatrixOf(part, vals, rot, offsets = true) {
@@ -1190,7 +1190,7 @@
     pad = document.createElement('div'); pad.id = 'v2PartPad'; pad.className = 'v2-part-pad'; pad.hidden = true;
     const b = (a, t, tip) => `<button type="button" data-pad="${a}" title="${tip}" aria-label="${tip}">${t}</button>`;
     pad.innerHTML = `<div class="v2-pad-title">Move the part</div>
-      <div class="v2-pad-hint">Green pieces float here until you press WELD IT. Click a piece to pick it (it glows), drag it to move it. Arrows slide it along X / Y / Z, rings turn it (yaw, pitch, roll), − / + resize it.</div>
+      <div class="v2-pad-hint">Pieces float here until you press WELD IT. Click a piece to pick it (it glows), drag it to move it. Arrows slide it along X / Y / Z, rings turn it (yaw, pitch, roll), − / + resize it.</div>
       <div id="v2PadJoin" class="v2-pad-join" aria-live="polite"></div>
       <div class="v2-pad-row"><div class="v2-pad-cross">${b('up', '▲', 'Move up')}<span></span>${b('left', '◀', 'Move left')}${b('down', '▼', 'Move down')}${b('right', '▶', 'Move right')}</div>
       <div class="v2-pad-col">${b('near', 'NEARER', 'Move towards you')}${b('far', 'FARTHER', 'Move away from you')}${b('bigger', 'BIGGER +', 'Enlarge')}${b('smaller', 'SMALLER −', 'Reduce')}</div></div>
@@ -1237,8 +1237,8 @@
     mesh.updateMatrixWorld(true); const hits = []; THREE.Mesh.prototype.raycast.call(mesh, rc, hits); return hits.length > 0;
   }
   // ---- v2.325: handles ON the green piece: three arrows (slide along X / Y / Z), three rings (yaw about Y, pitch about X, roll about Z) and − / + to resize.
-  const GZ_COL = [0xff4d4d, 0x6dff3a, 0x4d9dff], GZ_NAME = ['x', 'y', 'z'];
-  function gizmoSize(pm) { const g = editPart.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const k = new pm.f.THREE.Vector3().setFromMatrixScale(pm.m).x; return Math.max(1e-6, (g.boundingSphere?.radius || 1) * k); }
+  const GZ_COL = [0x36d88a, 0x89efbb, 0x1fa86a], GZ_NAME = ['x', 'y', 'z'];
+  function gizmoSize(pm) { const g = editPart.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const k = new pm.f.THREE.Vector3().setFromMatrixScale(pm.m).x; return Math.max(1e-6, (g.boundingSphere?.radius || 1) * k * 0.55); }   // v2.346: small, tidy handles
   const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   function gizmoPick(ndc, camIn) {
     const pm = editPart && partMatrix(); const cam = camIn || cameraSnap(); if (!pm || !cam) return null;
@@ -1289,10 +1289,10 @@
     const mat = i => new THREE.MeshBasicMaterial({ color: GZ_COL[i], transparent: true, opacity: 0.95, depthTest: false, depthWrite: false }), put = (mesh, i) => { mesh.renderOrder = 1002; mesh.raycast = () => {}; mesh.name = 'gizmo-' + GZ_NAME[i]; return mesh; };
     for (let i = 0; i < 3; i++) {
       const u = new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), u), arrow = new THREE.Group(); arrow.quaternion.copy(q); arrow.raycast = () => {};
-      const shaft = put(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.04, R * 0.04, L * 0.8, 10), mat(i)), i); shaft.position.y = L * 0.4;
-      const cone = put(new THREE.Mesh(new THREE.ConeGeometry(R * 0.12, L * 0.22, 14), mat(i)), i); cone.position.y = L * 0.9; arrow.add(shaft, cone); gz.add(arrow);
-      const ring = put(new THREE.Mesh(new THREE.TorusGeometry(Rr, R * 0.016, 8, 72), mat(i)), i); ring.name = 'gizmo-ring-' + GZ_NAME[i]; ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), u); gz.add(ring);
-      const side = R * 0.45, mid = R * 0.425, pl = put(new THREE.Mesh(new THREE.PlaneGeometry(side, side), new THREE.MeshBasicMaterial({ color: GZ_COL[i], transparent: true, opacity: 0.55, depthTest: false, depthWrite: false, side: THREE.DoubleSide })), i);   // v2.344 plane handle (normal = axis i)
+      const shaft = put(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.02, R * 0.02, L * 0.8, 8), mat(i)), i); shaft.position.y = L * 0.4;
+      const cone = put(new THREE.Mesh(new THREE.ConeGeometry(R * 0.07, L * 0.16, 12), mat(i)), i); cone.position.y = L * 0.9; arrow.add(shaft, cone); gz.add(arrow);
+      const ring = put(new THREE.Mesh(new THREE.TorusGeometry(Rr, R * 0.009, 6, 72), mat(i)), i); ring.name = 'gizmo-ring-' + GZ_NAME[i]; ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), u); gz.add(ring);
+      const side = R * 0.45, mid = R * 0.425, pl = put(new THREE.Mesh(new THREE.PlaneGeometry(side, side), new THREE.MeshBasicMaterial({ color: GZ_COL[i], transparent: true, opacity: 0.3, depthTest: false, depthWrite: false, side: THREE.DoubleSide })), i);   // v2.344 plane handle (normal = axis i)
       pl.name = 'gizmo-plane-' + GZ_NAME[i]; pl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), u); const pp = [0, 0, 0]; pp[(i + 1) % 3] = mid; pp[(i + 2) % 3] = mid; pl.position.set(pp[0], pp[1], pp[2]); gz.add(pl);
     }
     return gz;
@@ -1581,11 +1581,11 @@
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
     const ghost = (part, pm, mode, sel, tag) => {      // v2.326: every floating piece is drawn the same way; the selected one glows
       const col = mode === 'cut' ? 0xff9a2f : 0x2f86ff;      // v2.344: the piece is resin grey like the model, only the outline is coloured (blue = join, orange = cut)
-      [{ test: false, op: sel ? 0.35 : 0.25, ro: 998 }, { test: true, op: 1, ro: 999 }].forEach((c, i) => {
-        const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: 0xa9adb3, roughness: 0.55, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
+      [{ test: false, op: sel ? 0.12 : 0.08, ro: 998 }, { test: true, op: 1, ro: 999 }].forEach((c, i) => {
+        const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: 0xc9cacd, roughness: 0.75, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
         m.name = (sel ? 'shrinkPartGhost' : 'shrinkParkedGhost') + (i ? '' : 'See'); m.userData.tag = tag; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
       });
-      { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, depthTest: false, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(sel ? 1.045 : 1.03, sel ? 1.045 : 1.03, sel ? 1.045 : 1.03)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
+      { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, depthTest: true, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(sel ? 1.015 : 1.01, sel ? 1.015 : 1.01, sel ? 1.015 : 1.01)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
     };
     parked.forEach((r, i) => { const pm = partMatrixOf(r.part, r.vals, r.rot); if (pm) ghost(r.part, pm, r.mode, false, i); });
     if (editPart) { const pm = partMatrix(); if (pm) { ghost(editPart, pm, $('v2EdMode').value, true, -1); if (isPart || isSel) g.add(gizmoBuild(THREE, pm)); } }

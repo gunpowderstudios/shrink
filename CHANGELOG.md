@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.346
+- **Tidier part handles.** The arrows, rings and squares are about half the size, thinner and in the site green (three shades for the three directions).
+- **Floating parts look like the model.** Same light grey and matt finish as the model, solid (no more see-through blue/green), with only a thin blue outline; the red overlap marking stays.
+
 ## v2.345
 - **UPLOAD A PART** is now the only part-file button and sits at the top of the EDIT card as a wide dashed button. The old CHOOSE A PART FILE button inside Paste part is gone.
 
