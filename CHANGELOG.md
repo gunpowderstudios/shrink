@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.364
+- The editor message toast is green for good news (it was always red, so a successful weld looked like an error). During AUTO-SHRINK / DOWNLOAD the per-piece 'Welded. Wrong place?' toast is replaced by one green 'Floating parts welded into the model.'
+
 ## v2.363
 - DOWNLOAD IT welds any floating pieces into the model first (same as AUTO-SHRINK), so what is on screen is what is saved.
 - With the editor closed, floating pieces look like the model (no green tint, no outline). Open EDIT and they are tinted/outlined and selectable again.

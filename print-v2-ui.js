@@ -1127,10 +1127,10 @@
   }
   // v2.318: a failure shows in the viewer too (the text under the tool is easy to miss)
   let toastTimer = 0;
-  function edToast(text) {
+  function edToast(text, good) {
     const v = $('viewer'); if (!v) return; let t = $('v2EdToast');
     if (!t) { t = document.createElement('div'); t.id = 'v2EdToast'; t.className = 'v2-ed-toast'; t.setAttribute('role', 'alert'); t.hidden = true; v.appendChild(t); t.addEventListener('click', () => setHid(t, true)); }
-    if (t.textContent !== text) t.textContent = text; setHid(t, false); clearTimeout(toastTimer); toastTimer = setTimeout(() => setHid(t, true), 12000);
+    if (t.textContent !== text) t.textContent = text; t.classList.toggle('good', !!good); setHid(t, false); clearTimeout(toastTimer); toastTimer = setTimeout(() => setHid(t, true), 12000);
   }
   function clearLasso() { lassoSel = null; lassoDraw = null; lassoPaint(null); removeLassoRed(); lassoBarState(); }
   function lassoBarState() { document.querySelectorAll('#v2EditCard .v2-lasso-act').forEach(b => { const off = !lassoSel || lassoBusy; if (b.disabled !== off) b.disabled = off; }); }
@@ -1732,8 +1732,12 @@
   }
   function discardPiece() { if (!editPart) return; dropSelected(); if (!editPart && !parked.length) set$tool('none'); $('v2EdResult').innerHTML = '<strong>Piece thrown away</strong><span>Nothing was changed on the model.</span>'; }
   // v2.362: weld every floating piece (selected or waiting) into the model; returns how many could not be welded
+  let autoWelding = false;
   async function weldEverything() {
     if (!editPart && !parked.length) return 0;
+    autoWelding = true; try { return await weldEverything2(); } finally { autoWelding = false; }
+  }
+  async function weldEverything2() {
     if (!pieceTool()) { $('v2EdTab').value = 'select'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); }
     let guard = 0, failed = 0;
     while ((editPart || parked.length) && guard++ < 60) {
@@ -1859,7 +1863,7 @@
       if (snap) { if (!editBase) editBase = cloneRoot(snap); undoPush(snap); }
       removeEditPreview(); installWorkingResult(r.root, 'edit');
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
-      if (isPart) { dropSelected(); updatePad(); try { edToast('Welded. Wrong place? Press Ctrl / ⌘ + Z (or UNDO LAST EDIT) and the piece floats again.'); } catch {} $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Press UPLOAD A PART (top of this card) if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
+      if (isPart) { dropSelected(); updatePad(); if (!autoWelding) try { edToast('Welded. Wrong place? Press Ctrl / ⌘ + Z (or UNDO LAST EDIT) and the piece floats again.', true); } catch {} $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Press UPLOAD A PART (top of this card) if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
       res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       $('v2EdUndo').hidden = !editStack.length;
@@ -2618,7 +2622,7 @@
   }
 
   async function download() {
-    if (editPart || parked.length) { const bad = await weldEverything(); if (bad) { try { edToast(`${bad} floating part${bad === 1 ? '' : 's'} could not be welded, so ${bad === 1 ? 'it is' : 'they are'} not in the file. Open EDIT to see why (the model must be a closed solid).`); } catch {} } }   // v2.362
+    if (editPart || parked.length) { const bad = await weldEverything(); if (!bad) { try { edToast('Floating parts welded into the model.', true); } catch {} } if (bad) { try { edToast(`${bad} floating part${bad === 1 ? '' : 's'} could not be welded, so ${bad === 1 ? 'it is' : 'they are'} not in the file. Open EDIT to see why (the model must be a closed solid).`); } catch {} } }   // v2.362
     window.__shrinkEnforceMinHeight?.(); // Synchronise the native STL exporter before saving.
     syncAdvancedToNative();
     chooseSplit();
