@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.376** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.377** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -201,6 +201,8 @@ Floating pieces are solid (the `shrinkPartGhostSee` pass was removed); the red o
 (v2.375) `#v2PadAll` (WELD ALL (N), same row as WELD IT, shown while `parked.length`) calls `weldAllButton()`: `weldEverything()`, then `fuseCheck()` so the model ends as one piece, then a toast (`one` read from `#v2FuseCard` `data-state === 'good'`). The older `weldAll()` loop stays for tests. Test ED70 (`__shrinkEdit.weldAllBtn`). The button only shows while a piece is selected; with nothing selected the pad is hidden.
 
 (v2.376) Tab / Shift+Tab (EDIT open, not typing, a piece floats) call `cyclePiece(dir)`: forward = `takeParked(0)` (the selected piece goes to the end of `parked`, so the order is stable); backward re-orders `parked` so the previous piece is selected and the order stays the same. Switches to the Select tool if a non-piece tool is active. Test ED71 (`__shrinkEdit.cycle/selName`). Real-browser focus behaviour of Tab is untested.
+
+(v2.377) A click on a `.v2-icon-btn[data-ed=kind]` while the Shape tool is active calls `addShapeFromIcon()`: sets W/H/D to 25% of the model's biggest side, X to the right of the model, Y on the ground, then `makeShapePiece()`. Test ED72 (`__shrinkEdit.addShape`).
 
 ### CLAY / Brush (v2.141; switched off in v2.173; back on in v2.308 as the Brush tool in the EDIT tab, chip BRUSH)
 `clay.js` (ES module, loaded by `ui-mode.js`; card built into `#v2ClayHost`, which `print-v2-ui.js` puts above the Advanced drawer) + `clay-core.js` (no DOM, no three.js: icosphere, `dabSoup`, `dabsAlong`, `thin`, `joinSoups`). Strokes are lists of world-space balls `{x,y,z,r}` kept in `window.__shrinkClay` (`hasClay`, `apply`, `finish`, `addStroke` for tests). The preview is two `InstancedMesh`es in a `shrinkClay` scene group (pink = add, orange = cut); they ignore raycasts. Painting raycasts the working model; Ctrl/Cmd+drag rotates, Esc leaves the tool, as the other brushes do. `fixHealthModel()` calls `__shrinkClay.apply(model)` instead of the gentle repair when clay exists, and `shrinkMyModel()` no longer skips the fix step when clay is present. `apply()`: route A = `modelToSolid` (exact Manifold union/difference, keeps all detail); route B (Manifold rejects a leaky mesh, e.g. piece_55) = add balls to the triangle soup and run `makeWatertight` (balanced, then fast; `high` pinches), then subtract cuts with Manifold. The result must pass `healthOfModel` or nothing is installed. Ball count is thinned and coarsened (`ballLevel`) because the wrap refuses above 1.5M triangles. Tests: `tests/clay.test.mjs`.

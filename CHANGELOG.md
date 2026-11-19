@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.377
+- Clicking a shape icon (cube, ball, cylinder, cone) in the Shape tool now puts that shape in the scene straight away: a quarter of the model's size, standing on the ground beside it, selected, with the gizmo up. Before, it only showed an orange preview until you pressed the big button. The Join / Cut switch still decides what WELD IT does.
+
 ## v2.376
 - Tab (with the editor open) selects the next floating piece and brings up its gizmo; Shift+Tab goes back. It goes round every piece in a fixed order. Typing in a box still uses Tab normally.
 

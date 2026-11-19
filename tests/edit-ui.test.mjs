@@ -36,6 +36,10 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     const mb = w.__shrinkWorkingModel(), tb = tris(mb); ok(w.__shrinkEdit.hasPart() && page.$('v2EdMode').value === 'join', 'ED69 set up: a JOIN shape floats'); await w.__shrinkEdit.boole();
     ok(await waitFor(() => /Cut|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Cut/.test(page.$('v2EdResult').textContent) && w.__shrinkWorkingModel() !== mb && tris(w.__shrinkWorkingModel()) > tb && !w.__shrinkEdit.hasPart(), 'ED69 BOOLE cuts the shape out whatever the Join/Cut switch said, and uses the shape up (' + tb + ' -> ' + tris(w.__shrinkWorkingModel()) + ')');
     page.$('v2EdUndo').click(); await wait(200); w.__shrinkEdit.discard(); }
+  { set(page, 'v2EdTab', 'shape'); await wait(60); const before = w.__shrinkEdit.parked() + (w.__shrinkEdit.hasPart() ? 1 : 0); page.$('v2EditCard').querySelector('[data-ed=kind][data-value=cylinder]').click(); await wait(100);
+    const ps = w.__shrinkEdit.partState();
+    ok(w.__shrinkEdit.hasPart() && page.$('v2EdTab').value === 'select' && w.__shrinkEdit.selName() === 'cylinder' && ps.h >= 2 && Math.abs(ps.x) > 1 && before === 0, 'ED72 clicking a shape icon puts a floating shape beside the model, selected with the gizmo tool (x ' + ps.x + ', h ' + ps.h + ')');
+    w.__shrinkEdit.discard(); }
 
   /* slice off the top half: the model gets shorter */
   const h0 = height(page);
