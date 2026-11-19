@@ -497,6 +497,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
 /* v2.342: piece library + COPY on an open (leaky) model */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
   const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() }; page.$('v2TabEdit').click(); await wait(80);
+  ok(!!page.$('v2LibInfo') && /this web browser only/.test(page.$('v2LibInfo').textContent) && /browser only/i.test(page.$('v2LibInfo2').textContent), 'ED55 the library says it is saved in this browser only (drop-down under the buttons and in the panel)');
   ok(!!page.$('v2LibAdd') && !!page.$('v2LibOpen') && page.$('v2LibAdd').disabled === true, 'ED46 ADD TO LIBRARY and LIBRARY are there; adding waits for a floating piece');
   const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]];
   for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));

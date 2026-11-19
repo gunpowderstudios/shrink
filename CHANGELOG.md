@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.353
+- The piece library now says plainly where it lives: a "Where is my library saved?" drop-down under ADD TO LIBRARY / LIBRARY, and the same note at the top of the library panel (saved in this browser only, not in the project, not online; clearing site data deletes it; use DOWNLOAD PIECE (STL) or a project to move a piece).
+
 ## v2.352
 - **Lasso and Razor work on floating pieces.** Draw a loop round a bit of a floating piece (e.g. the back of a loaded head) when the loop catches none of the main model: it turns red, then DELETE removes it from the piece, COPY makes it its own floating piece and CUT OFF takes it off as a new piece. The 'Which part' choice still applies (nearest layer / half way / everything). UNDO (button or Ctrl/⌘ + Z) puts the pieces back.
 

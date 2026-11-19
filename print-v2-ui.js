@@ -1585,7 +1585,11 @@
     const row = document.createElement('div'); row.id = 'v2LibRow'; row.className = 'v2-pieces-row';
     row.innerHTML = '<button type="button" id="v2LibAdd" title="Keep the selected floating piece in your library under a name" disabled>ADD TO LIBRARY</button><button type="button" id="v2LibOpen" title="Open your saved pieces">LIBRARY</button>';
     { const pr = $('v2PiecesRow'); if (pr) pr.after(row); else pane.insertBefore(row, pane.firstChild); }
-    const panel = document.createElement('div'); panel.id = 'v2LibPanel'; panel.hidden = true; panel.innerHTML = '<div class="v2-lib-head"><strong>Piece library</strong><span>Click a piece to add it to the workspace. Saved in this browser.</span><button type="button" id="v2LibClose" title="Close">×</button></div><div id="v2LibGrid" class="v2-lib-grid"></div>';
+    const LIB_NOTE = '<b>Your library is saved in this web browser only.</b> It is kept on this computer, not in the project file and not online, so it will not appear on another computer or another browser. Clearing your browser\'s site data deletes it. To move a piece somewhere else, download it as an STL (DOWNLOAD PIECE (STL)) or save it in a project.';
+    const info = document.createElement('details'); info.id = 'v2LibInfo'; info.className = 'v2-lib-info';
+    info.innerHTML = '<summary>Where is my library saved?</summary><p>' + LIB_NOTE + '</p>';
+    row.after(info);
+    const panel = document.createElement('div'); panel.id = 'v2LibPanel'; panel.hidden = true; panel.innerHTML = '<div class="v2-lib-head"><strong>Piece library</strong><span>Click a piece to add it to the workspace.</span><button type="button" id="v2LibClose" title="Close">×</button></div><details class="v2-lib-info" id="v2LibInfo2" open><summary>Saved in this browser only</summary><p>' + LIB_NOTE + '</p></details><div id="v2LibGrid" class="v2-lib-grid"></div>';
     document.body.appendChild(panel);
     const close = () => { panel.hidden = true; };
     row.addEventListener('click', async e => {
