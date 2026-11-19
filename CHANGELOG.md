@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.349
+- **Red overlap is 50% see-through** (was 80% solid), so you can still see the part and model underneath while judging the join.
+
 ## v2.348
 - **Undo a paste.** After WELD IT a message reminds you that Ctrl / ⌘ + Z (or UNDO LAST EDIT) undoes it, and undoing a weld now makes the piece float again where you left it, so you can nudge it and weld again.
 
