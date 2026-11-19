@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.376
+- Tab (with the editor open) selects the next floating piece and brings up its gizmo; Shift+Tab goes back. It goes round every piece in a fixed order. Typing in a box still uses Tab normally.
+
 ## v2.375
 - WELD ALL button on the Floating part card, next to WELD IT, shows the number of parts. It welds every floating part (selected and waiting) and then fuses the model so it is one piece. Shows only when two or more parts float.
 

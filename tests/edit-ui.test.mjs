@@ -388,7 +388,16 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   /* v2.375: WELD ALL */
   w.__shrinkEdit.setPart(new Float32Array(cube), false, 'c.stl'); await wait(50); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'd.stl'); await wait(50); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'e.stl'); await wait(50);
   ok(w.__shrinkEdit.parked() === 2 && w.__shrinkEdit.hasPart(), 'ED70 setup: three pieces float');
-  { const bad = await w.__shrinkEdit.weldAllBtn(); ok(!bad && w.__shrinkEdit.parked() === 0 && !w.__shrinkEdit.hasPart(), 'ED70 WELD ALL welds every floating piece, not just the selected one'); } }
+  { const bad = await w.__shrinkEdit.weldAllBtn(); ok(!bad && w.__shrinkEdit.parked() === 0 && !w.__shrinkEdit.hasPart(), 'ED70 WELD ALL welds every floating piece, not just the selected one'); }
+  /* v2.376: Tab cycles the floating pieces */
+  { page.$('v2EditPanel').hidden && page.$('v2TabEdit').click(); await wait(50); for (const n of ['p.stl', 'q.stl', 'r.stl']) { w.__shrinkEdit.setPart(new Float32Array(cube), false, n); await wait(40); }
+    const tab = sh => w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', shiftKey: !!sh, bubbles: true, cancelable: true }));
+    const seen = [w.__shrinkEdit.selName()]; for (let i = 0; i < 3; i++) { tab(false); await wait(30); seen.push(w.__shrinkEdit.selName()); }
+    ok(seen[3] === seen[0] && new Set(seen.slice(0, 3)).size === 3, 'ED71 Tab visits every floating piece once and comes back to the start (' + seen.join(' > ') + ')');
+    const back = [w.__shrinkEdit.selName()]; for (let i = 0; i < 3; i++) { tab(true); await wait(30); back.push(w.__shrinkEdit.selName()); }
+    ok(back[3] === back[0] && new Set(back.slice(0, 3)).size === 3, 'ED71 Shift+Tab goes round the other way (' + back.join(' > ') + ')');
+    tab(false); await wait(30); const f = w.__shrinkEdit.selName(); tab(true); await wait(30); tab(false); await wait(30);
+    ok(w.__shrinkEdit.selName() === f && w.__shrinkEdit.parked() === 2, 'ED71 Shift+Tab undoes a Tab'); } }
 /* v2.358: undo for moving / turning / stretching floating pieces, and keypad 0 */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400); const TH = w.__shrinkApp.THREE;
   w.__shrinkViewer = { scene: new TH.Scene(), camera: new TH.PerspectiveCamera(), controls: { target: new TH.Vector3(), update() {} } }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);
