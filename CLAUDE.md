@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.347** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.348** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -159,6 +159,8 @@ The repair fallback in `modelToSolid()` (`repairWholeModelSolid`, used when a me
 (v2.346) `gizmoSize()` is 0.55 x the part's bounding radius (pick and build share it); handles are thin and green (`GZ_COL`). Ghost material 0xc9cacd roughness 0.75 (the model's look), see-through pass only 8-12% opacity, outline shell depth-tested at scale 1.015. Looks untested in a real browser.
 
 (v2.347) Gizmo handles are blue (`GZ_COL`); `gizmoHot({kind, axis})` (set from the pointer-move hover, the drag start and cleared on drag end) paints that handle `GZ_HOT` green through `gizmoPaint`, which `gizmoBuild` also applies so the highlight survives rebuilds while dragging. Test ED51. Real-mouse hover untested in a browser.
+
+(v2.348) A weld stores the piece on the pre-edit snapshot (`snap.userData.shrinkWeld = {part, vals, rot, mode}`); `undoEdit()` pushes it back into `parked`, selects it and switches to Paste part, so undo returns the piece floating. A toast after WELD IT mentions Ctrl/Cmd+Z. Test ED52.
 
 ### CLAY / Brush (v2.141; switched off in v2.173; back on in v2.308 as the Brush tool in the EDIT tab, chip BRUSH)
 `clay.js` (ES module, loaded by `ui-mode.js`; card built into `#v2ClayHost`, which `print-v2-ui.js` puts above the Advanced drawer) + `clay-core.js` (no DOM, no three.js: icosphere, `dabSoup`, `dabsAlong`, `thin`, `joinSoups`). Strokes are lists of world-space balls `{x,y,z,r}` kept in `window.__shrinkClay` (`hasClay`, `apply`, `finish`, `addStroke` for tests). The preview is two `InstancedMesh`es in a `shrinkClay` scene group (pink = add, orange = cut); they ignore raycasts. Painting raycasts the working model; Ctrl/Cmd+drag rotates, Esc leaves the tool, as the other brushes do. `fixHealthModel()` calls `__shrinkClay.apply(model)` instead of the gentle repair when clay exists, and `shrinkMyModel()` no longer skips the fix step when clay is present. `apply()`: route A = `modelToSolid` (exact Manifold union/difference, keeps all detail); route B (Manifold rejects a leaky mesh, e.g. piece_55) = add balls to the triangle soup and run `makeWatertight` (balanced, then fast; `high` pinches), then subtract cuts with Manifold. The result must pass `healthOfModel` or nothing is installed. Ball count is thinned and coarsened (`ballLevel`) because the wrap refuses above 1.5M triangles. Tests: `tests/clay.test.mjs`.

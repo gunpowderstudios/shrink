@@ -1674,10 +1674,11 @@
       progress(card, 40, 'Working…'); await paintNow();
       const r = await window.__shrinkFuse.editModel(model, ops);
       progress(card, 85, 'Checking the result…');
+      if (snap && isPart && editPart) snap.userData.shrinkWeld = { part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode').value };   // v2.348: UNDO floats the piece again
       if (snap) { if (!editBase) editBase = cloneRoot(snap); editStack.push(snap); if (editStack.length > 6) editStack.shift(); }
       removeEditPreview(); installWorkingResult(r.root, 'edit');
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
-      if (isPart) { dropSelected(); updatePad(); $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Press UPLOAD A PART (top of this card) if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
+      if (isPart) { dropSelected(); updatePad(); try { edToast('Welded. Wrong place? Press Ctrl / ⌘ + Z (or UNDO LAST EDIT) and the piece floats again.'); } catch {} $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Press UPLOAD A PART (top of this card) if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
       res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       $('v2EdUndo').hidden = !editStack.length;
@@ -1715,7 +1716,8 @@
     removeEditPreview(); installWorkingResult(snap, 'edit');
     if (!editStack.length) { appliedChanges.delete('edited'); renderAppliedChanges(); }
     $('v2EdUndo').hidden = !editStack.length;
-    $('v2EdResult').innerHTML = '<strong>Undone</strong><span>Back to how it was before the last edit.</span>';
+    const wd = snap.userData?.shrinkWeld; $('v2EdResult').innerHTML = '<strong>Undone</strong><span>' + (wd ? 'The piece is floating again. Move it and weld it when it is right.' : 'Back to how it was before the last edit.') + '</span>';
+    if (wd) { parked.push(wd); takeParked(parked.length - 1); const tab = $('v2EdTab'); if (tab && !pieceTool()) { tab.value = 'part'; try { editTabChanged(); } catch {} } }
     setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
   }
   window.__shrinkEdit = { reset: resetEdits, wand: (meshIndex, tri) => { const list = []; sourceModel()?.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) list.push(o); }); return wandSelect(list[meshIndex || 0], tri || 0); }, sculpt: sculptAt, lasso: lassoApply, hasSel: () => !!lassoSel, setSel: (pts, cam) => { lassoSel = pts ? { pts, cam, px: [] } : null; lassoBarState(); return lassoSel ? lassoRed(lassoSel) : (removeLassoRed(), 0); }, padVisible: () => { const e = $('v2PartPad'); return !!e && !e.hidden; }, pad: padAct, setPart: (pts, zUp, name) => setPart(partFromPoints(pts, !!zUp, name)), place: partPlace, hasPart: () => !!editPart, run: editModelNow, undo: undoEdit, depth: () => editStack.length, preview: updateEditPreview, overlap: overlapUpdate, turnWorld: partTurnWorld, drag: (mode, from, to, shift, cam) => partDragApply(mode, from, to, !!shift, cam), parked: () => parked.length, piecesFile: () => buildPiecesFile(), loadPieces: ab => loadPiecesBuffer(ab), pieceStl: from => downloadPieceStl(from), libAdd: n => libAddCurrent(n), libList: () => libAll(), libUse: id => libUse(id), libDelete: id => libDel(id), libRender, saveProject: saveProjectFile, projectFile: async () => (await buildProjectFile()).data, loadProject: ab => loadProjectBuffer(ab), parseProject, select: i => takeParked(i), dup: dupPart, weldAll, discard: discardPiece, parkedAt: (ndc, cam) => parkedAt(ndc, cam), gizmoDrag: (kind, axis, from, to, cam) => gizmoApply(kind, axis, from, to, cam), gizmoPick: (ndc, cam) => gizmoPick(ndc, cam), gizmoHot: h => gizmoHot(h), scale: fac => partScale(fac), hudVisible: () => { const h = $('v2PartHud'); return !!h && !h.hidden; }, partState: () => editPart ? { x: num('v2EdPartX'), y: num('v2EdPartY'), z: num('v2EdPartZ'), h: num('v2EdPartH'), rot: partRot ? partRot.toArray() : null } : null, upload: f => uploadPart(f), ghosts: () => { const g = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkEditPreview'); return g ? g.children.length : 0; } };

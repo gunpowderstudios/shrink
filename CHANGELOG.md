@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.348
+- **Undo a paste.** After WELD IT a message reminds you that Ctrl / ⌘ + Z (or UNDO LAST EDIT) undoes it, and undoing a weld now makes the piece float again where you left it, so you can nudge it and weld again.
+
 ## v2.347
 - **Handle highlight.** The part handles (arrows, rings, flat squares) are blue; the one under the mouse turns green before you click, and stays green while you drag it.
 

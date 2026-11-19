@@ -136,7 +136,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED21 PLACE IT joins it: ' + page.$('v2EdResult').textContent.slice(0, 110));
   ok(height(page) > h0 + 5, `ED21 the pasted copy made the model taller (${h0.toFixed(1)} -> ${height(page).toFixed(1)})`);
   if (w.document.getElementById('viewer')) ok(!w.__shrinkEdit.padVisible(), 'ED21 the pad goes away once the part is placed');
-  page.$('v2EdUndo').click(); await wait(200);
+  page.$('v2EdUndo').click(); await wait(200); while (w.__shrinkEdit.hasPart()) w.__shrinkEdit.discard();   // v2.348: undoing a weld floats the piece again
   /* razor: cut off and keep */
   page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="razor"]').click(); await wait(50);
   const h1 = height(page), R = orthoCam(page, 0.5, 1.3); w.__shrinkEdit.setSel(R.pts, R.cam); page.$('v2EdResult').textContent = ''; page.$('v2LassoKeepBtn').click();
@@ -311,6 +311,8 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     w.dispatchEvent(new w.KeyboardEvent('keydown', { key: '+', bubbles: true })); ok(w.__shrinkEdit.partState().h > h2 * 1.05, 'ED36 the + key enlarges it too'); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: '-', bubbles: true })); }
   const t0 = tris(w.__shrinkWorkingModel()); page.$('v2EdResult').textContent = ''; page.$('v2PadPlace').click();
   ok(await waitFor(() => /Joined|Pasted|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED31 PLACE IT still pastes the moved part: ' + page.$('v2EdResult').textContent.slice(0, 100));
+  ok(!w.__shrinkEdit.hasPart(), 'ED52 after WELD IT nothing floats'); page.$('v2EdUndo').click(); await wait(300);
+  ok(w.__shrinkEdit.hasPart() && tris(w.__shrinkWorkingModel()) === t0, 'ED52 UNDO after a weld brings the piece back floating and the model back as it was');
 }
 /* v2.320: keyboard shortcuts */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
@@ -527,3 +529,4 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.__shrinkCapture = null;
 }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
+
