@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.351
+- **Floating pieces stay on screen when you close EDIT.** They are drawn plain (no handles) so you can cut a piece off, close the panel, work on the model, then reopen EDIT, pick the Select tool, click a piece and move or weld it later.
+
 ## v2.350
 - **SAVE PROJECT / LOAD PROJECT / ADD TO LIBRARY / LIBRARY buttons are readable.** They were white with white text; they now match the other dark buttons in the EDIT card.
 

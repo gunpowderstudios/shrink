@@ -1581,8 +1581,9 @@
   }
   function updateEditPreview() {
     removeEditPreview();
-    ensurePiecesRow(); piecesUi(); updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; const tool = $('v2EdTab')?.value, floating = !!editPart || parked.length > 0; if (!editActive() || !V?.scene || (['lasso', 'razor', 'sculpt', 'none'].includes(tool) && !floating)) return;
-    const sl = tool === 'slice', isPart = tool === 'part', isSel = tool === 'select';
+    ensurePiecesRow(); piecesUi(); updatePad(); scheduleOverlap(); const V = window.__shrinkViewer; const tool = $('v2EdTab')?.value, floating = !!editPart || parked.length > 0; const act = editActive();   // v2.351: floating pieces stay drawn (plain grey, no handles) when the EDIT panel is closed
+    if ((!act && !floating) || !V?.scene || (['lasso', 'razor', 'sculpt', 'none'].includes(tool) && !floating)) return;
+    const sl = act && tool === 'slice', isPart = act && tool === 'part', isSel = act && tool === 'select';
     const THREE = app()?.THREE; if (!THREE) return;
     const g = new THREE.Group(); g.name = 'shrinkEditPreview'; g.raycast = () => {};
     const ghost = (part, pm, mode, sel, tag) => {      // v2.326: every floating piece is drawn the same way; the selected one glows
@@ -1595,7 +1596,7 @@
     };
     parked.forEach((r, i) => { const pm = partMatrixOf(r.part, r.vals, r.rot); if (pm) ghost(r.part, pm, r.mode, false, i); });
     if (editPart) { const pm = partMatrix(); if (pm) { ghost(editPart, pm, $('v2EdMode').value, true, -1); if (isPart || isSel) g.add(gizmoBuild(THREE, pm)); } }
-    if (isPart || isSel || ['lasso', 'razor', 'wand', 'sculpt', 'none'].includes(tool)) {
+    if (!act || isPart || isSel || ['lasso', 'razor', 'wand', 'sculpt', 'none'].includes(tool)) {
       if (!g.children.length) return;
     } else if (sl) {
       const s = sliceSpec(); if (!s) return;
@@ -1650,7 +1651,7 @@
     tab = tab === 'edit' ? 'edit' : 'finish'; setHid(pn, tab !== 'edit'); $('v2TabEdit')?.setAttribute('aria-pressed', String(tab === 'edit'));
     if (tab === 'edit' && !editOpened) { editOpened = true; const sel = $('v2EdTab'); if (sel && sel.value !== 'lasso') { sel.value = 'lasso'; sel.dispatchEvent(new Event('change', { bubbles: true })); } }   // v2.325: the first time EDIT opens the Lasso is already selected
     document.body.classList.toggle('v2-editing', tab === 'edit');          // v2.324: while EDIT is open the health box, SHRINK and DOWNLOAD step aside (CSS)
-    if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { removeEditPreview(); clearLasso(); updatePad(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-wand', 'v2-cur-sculpt'); sculptRing(null); }
+    if (tab === 'edit') { editTabChanged(); updateEditHint(); } else { clearLasso(); updatePad(); updateEditPreview(); const v = $('viewer'); v?.classList.remove('v2-cur-lasso', 'v2-cur-razor', 'v2-cur-wand', 'v2-cur-sculpt'); sculptRing(null); }
   }
   window.__shrinkTab = setMainTab;
   async function editModelNow() {
