@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.358
+- UNDO now also covers moving, turning, stretching and resizing floating pieces (gizmo drags, mouse drags, + / − and the X / Y / Z keys, SIT ON TOP / CENTRE, and typed numbers). Quick repeated clicks or key presses count as one step.
+- The undo list holds up to 50 steps (it was 6). Piece moves are tiny; whole-model steps (cuts, welds, sculpt strokes) are limited by size to about 8 million triangles in total, never fewer than 3 (so about 50 on a 100k model, about 21 on the 369k dwarf, about 8 on a 1M model).
+- Keypad 0 brings the chosen floating piece to the middle of the screen (the view moves, the piece stays).
+
 ## v2.357
 - Stretch handles on the gizmo: three small cubes on the piece's own axes (width, height, depth). Pull one out to widen that direction, push in to make it thinner. A "Stretch %" row (W / H / D) in Exact numbers does the same by number. Weld, library, projects and pieces files keep the stretch.
 - Floating pieces carry a very light (10 %) green tint so they read as pieces you can pick.

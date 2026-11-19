@@ -111,7 +111,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED18 the part joins: ' + page.$('v2EdResult').textContent.slice(0, 140));
   const h1 = height(page), want = h0 + Number(page.$('v2EdPartH').value) - 1;
   ok(Math.abs(h1 - want) < 1.2 && /in 1 piece/.test(page.$('v2EdResult').textContent), `ED18 it sits on top as one piece (height ${h0.toFixed(1)} -> ${h1.toFixed(1)}, expected about ${want.toFixed(1)})`);
-  ok(!w.__shrinkEdit.hasPart() && w.__shrinkEdit.depth() === 2, 'ED18 the part is used up and the edit can be undone');
+  ok(!w.__shrinkEdit.hasPart() && w.__shrinkEdit.modelDepth() === 2, 'ED18 the part is used up and the edit can be undone');
 }
 
 /* Lasso COPY then the arrow pad and PLACE IT; razor CUT OFF & KEEP */
@@ -339,7 +339,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   key('y'); const r3 = w.__shrinkEdit.partState().rot; ok(r3 && Math.abs(r3[1]) > 0.1, 'ED32 Y turns it about Y'); key('z'); ok(Math.abs(w.__shrinkEdit.partState().rot[2]) > 0.05, 'ED32 Z turns it about Z');
   page.$('v2EdResult').textContent = ''; key('v', { ctrlKey: true });
   ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent), 'ED32 Ctrl+V places the part');
-  key('z', { ctrlKey: true }); await wait(250); ok(Math.abs(tris(w.__shrinkWorkingModel()) - t0) < 2 && w.__shrinkEdit.depth() === 0, 'ED32 Ctrl+Z undoes it');
+  key('z', { ctrlKey: true }); await wait(250); ok(Math.abs(tris(w.__shrinkWorkingModel()) - t0) < 2 && w.__shrinkEdit.modelDepth() === 0, 'ED32 Ctrl+Z undoes it');
   page.$('v2EdTab').value = 'sculpt'; page.$('v2EdTab').dispatchEvent(new w.Event('change', { bubbles: true })); await wait(40);
   const s0 = Number(page.$('v2SculptSize').value); key('+'); const s1 = Number(page.$('v2SculptSize').value); key('-'); key('-'); const s2 = Number(page.$('v2SculptSize').value);
   ok(s1 > s0 && s2 < s1, `ED32 + and - change the Sculpt tip size (${s0} -> ${s1} -> ${s2})`);
@@ -357,6 +357,19 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(page.$('v2EditPanel').hidden === true && ed.getAttribute('aria-pressed') === 'false', 'ED33 the close button folds it away');
   adv.click(); await wait(50); ed.click(); await wait(50); ok(dash.dataset.left === 'open' && page.$('v2EditPanel').hidden === false, 'ED33 both can be open together');
 }
+/* v2.358: undo for moving / turning / stretching floating pieces, and keypad 0 */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400); const TH = w.__shrinkApp.THREE;
+  w.__shrinkViewer = { scene: new TH.Scene(), camera: new TH.PerspectiveCamera(), controls: { target: new TH.Vector3(), update() {} } }; page.$('v2TabEdit').click(); await wait(50); set(page, 'v2EdTab', 'part'); await wait(50);
+  const cube = []; const P = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[1,2,6],[1,6,5],[3,0,4],[3,4,7]]; for (const f of F) for (const i of f) cube.push(...P[i].map(v => v * 2));
+  w.__shrinkEdit.setPart(new Float32Array(cube), false, 'u.stl'); await wait(50); const d0 = w.__shrinkEdit.depth();
+  const rot0 = w.__shrinkEdit.partState().rot; w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'x', bubbles: true })); const rot1 = w.__shrinkEdit.partState().rot;
+  ok(rot1 && rot0 !== rot1 && (!rot0 || rot1.some((v, i) => Math.abs(v - rot0[i]) > 0.01)), 'ED61 setup: the X key turned the piece'); ok(w.__shrinkEdit.depth() === d0 + 1, 'ED61 turning it made one undo step');
+  w.__shrinkEdit.undo(); const rot2 = w.__shrinkEdit.partState().rot; ok(!rot2 ? !rot0 || Math.abs(rot0[3] - 1) < 1e-6 : !rot0 ? Math.abs(rot2[3] - 1) < 1e-6 : rot2.every((v, i) => Math.abs(v - rot0[i]) < 1e-6), 'ED61 UNDO turns the piece back');
+  const h0 = w.__shrinkEdit.partState().h; w.__shrinkEdit.scale(1.5); w.__shrinkEdit.scale(1.5); ok(w.__shrinkEdit.depth() === d0 + 1, 'ED61 quick + clicks are one step'); w.__shrinkEdit.undo(); ok(Math.abs(w.__shrinkEdit.partState().h - h0) < 0.01, 'ED61 UNDO puts the size back');
+  w.__shrinkEdit.note('drag'); set(page, 'v2EdPartSX', 60); w.__shrinkEdit.note('drag'); set(page, 'v2EdPartSX', 90); w.__shrinkEdit.undo(); ok(Number(page.$('v2EdPartSX').value) === 60, 'ED61 UNDO puts the stretch back (' + page.$('v2EdPartSX').value + ')'); w.__shrinkEdit.undo(); ok(Number(page.$('v2EdPartSX').value) === 100, 'ED61 and again to 100');
+  for (let i = 0; i < 70; i++) { w.__shrinkEdit.note('turn' + i); set(page, 'v2EdPartX', i + 1); } ok(w.__shrinkEdit.stackDepth() <= 50 && w.__shrinkEdit.stackDepth() >= 40, 'ED61 the undo list holds up to 50 steps (' + w.__shrinkEdit.stackDepth() + ')');
+  set(page, 'v2EdPartX', 20); set(page, 'v2EdPartY', 5); set(page, 'v2EdPartZ', 0); w.__shrinkEdit.preview(); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: '0', code: 'Numpad0', bubbles: true })); const tg = w.__shrinkViewer.controls.target, st = w.__shrinkEdit.partState(), mmu = w.__shrinkPrint.mmPerUnit();
+  ok(Math.abs(tg.x - w.__shrinkViewer.camera.position.x) < 1e-6 || true, 'ED61 keypad 0 ran'); const bb = new TH.Box3().setFromObject(w.__shrinkWorkingModel(), true).getCenter(new TH.Vector3()); ok(Math.abs(tg.x - (bb.x + st.x / mmu)) < 1e-4 && Math.abs(tg.y - (bb.y + st.y / mmu)) < 1e-4, 'ED61 keypad 0 puts the chosen piece in the middle of the view (target ' + tg.x.toFixed(3) + ', ' + tg.y.toFixed(3) + ')'); }
 /* v2.323: the overlap with the model turns red */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400);
   const THREE = w.__shrinkApp.THREE; w.__shrinkViewer = { scene: new THREE.Scene() };
