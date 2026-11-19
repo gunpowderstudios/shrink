@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.365
+- A floating part set to CUT (orange outline) is subtracted when welded, so it did not appear in the file. AUTO-SHRINK and DOWNLOAD now say so plainly when parts were welded as CUT, and cut parts keep their orange outline even with the editor closed.
+
 ## v2.364
 - The editor message toast is green for good news (it was always red, so a successful weld looked like an error). During AUTO-SHRINK / DOWNLOAD the per-piece 'Welded. Wrong place?' toast is replaced by one green 'Floating parts welded into the model.'
 

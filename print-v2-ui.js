@@ -1732,17 +1732,17 @@
   }
   function discardPiece() { if (!editPart) return; dropSelected(); if (!editPart && !parked.length) set$tool('none'); $('v2EdResult').innerHTML = '<strong>Piece thrown away</strong><span>Nothing was changed on the model.</span>'; }
   // v2.362: weld every floating piece (selected or waiting) into the model; returns how many could not be welded
-  let autoWelding = false;
+  let autoWelding = false, weldCuts = 0;
   async function weldEverything() {
     if (!editPart && !parked.length) return 0;
-    autoWelding = true; try { return await weldEverything2(); } finally { autoWelding = false; }
+    autoWelding = true; weldCuts = 0; try { return await weldEverything2(); } finally { autoWelding = false; }
   }
   async function weldEverything2() {
     if (!pieceTool()) { $('v2EdTab').value = 'select'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); }
     let guard = 0, failed = 0;
     while ((editPart || parked.length) && guard++ < 60) {
       if (!editPart) takeParked(parked.length - 1);
-      const cur = editPart; await editModelNow();
+      const cur = editPart; if ($('v2EdMode').value === 'cut') weldCuts++; await editModelNow();
       if (editPart === cur) { failed = 1 + parked.length; break; }
     }
     return failed;
@@ -1774,7 +1774,7 @@
         const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: editActive() ? new THREE.Color(0xc9cacd).lerp(new THREE.Color(0x36d88a), 0.1) : new THREE.Color(0xc9cacd), roughness: 0.75, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
         m.name = (sel ? 'shrinkPartGhost' : 'shrinkParkedGhost'); m.userData.tag = tag; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
       });
-      if (editActive()) { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, depthTest: true, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(sel ? 1.015 : 1.01, sel ? 1.015 : 1.01, sel ? 1.015 : 1.01)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
+      if (editActive() || mode === 'cut') { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, depthTest: true, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(sel ? 1.015 : 1.01, sel ? 1.015 : 1.01, sel ? 1.015 : 1.01)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
     };
     parked.forEach((r, i) => { const pm = partMatrixOf(r.part, r.vals, r.rot); if (pm) ghost(r.part, pm, r.mode, false, i); });
     if (editPart) { const pm = partMatrix(); if (pm) { ghost(editPart, pm, $('v2EdMode').value, true, -1); if (isPart || isSel) g.add(gizmoBuild(THREE, pm)); } }
@@ -2313,6 +2313,7 @@
         btn.textContent = 'Welding parts…'; show('Welding the floating parts into the model…');
         const bad = await weldEverything();
         if (bad) done('warn', '!', `${bad} floating part${bad === 1 ? '' : 's'} could not be welded and will be left out. Open EDIT to see why (the model must be a closed solid).`);
+        else if (weldCuts) done('warn', '!', `${weldCuts} floating part${weldCuts === 1 ? ' was' : 's were'} set to CUT (orange outline), so ${weldCuts === 1 ? 'it was' : 'they were'} subtracted instead of added. Set ${weldCuts === 1 ? 'it' : 'them'} to JOIN in EDIT if you wanted ${weldCuts === 1 ? 'it' : 'them'} attached.`);
         else done('ok', '✓', 'Floating parts welded into the model.');
       }
       const startTris = modelTriangles(sourceModel());
@@ -2622,7 +2623,7 @@
   }
 
   async function download() {
-    if (editPart || parked.length) { const bad = await weldEverything(); if (!bad) { try { edToast('Floating parts welded into the model.', true); } catch {} } if (bad) { try { edToast(`${bad} floating part${bad === 1 ? '' : 's'} could not be welded, so ${bad === 1 ? 'it is' : 'they are'} not in the file. Open EDIT to see why (the model must be a closed solid).`); } catch {} } }   // v2.362
+    if (editPart || parked.length) { const bad = await weldEverything(); if (!bad) { try { weldCuts ? edToast(`${weldCuts} part${weldCuts === 1 ? ' was' : 's were'} set to CUT (orange outline), so ${weldCuts === 1 ? 'it was' : 'they were'} subtracted from the model instead of added. Open EDIT, switch ${weldCuts === 1 ? 'it' : 'them'} to JOIN and undo if you wanted ${weldCuts === 1 ? 'it' : 'them'} attached.`) : edToast('Floating parts welded into the model.', true); } catch {} } if (bad) { try { edToast(`${bad} floating part${bad === 1 ? '' : 's'} could not be welded, so ${bad === 1 ? 'it is' : 'they are'} not in the file. Open EDIT to see why (the model must be a closed solid).`); } catch {} } }   // v2.362
     window.__shrinkEnforceMinHeight?.(); // Synchronise the native STL exporter before saving.
     syncAdvancedToNative();
     chooseSplit();
