@@ -358,6 +358,9 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   page.$('v2EditPanel').querySelector('.v2-edit-close').click(); await wait(50);
   ok(page.$('v2EditPanel').hidden === true && ed.getAttribute('aria-pressed') === 'false', 'ED33 the close button folds it away');
   adv.click(); await wait(50); ed.click(); await wait(50); ok(dash.dataset.left === 'open' && page.$('v2EditPanel').hidden === false, 'ED33 both can be open together');
+  { const w = page.w, key = k => w.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, bubbles: true }));
+    ed.click(); await wait(50); ok(page.$('v2EditPanel').hidden === true, 'ED65 setup: panel closed'); key('e'); await wait(50); ok(page.$('v2EditPanel').hidden === false, 'ED65 E opens the editor');
+    key('Escape'); await wait(30); key('Escape'); await wait(30); ok(page.$('v2EditPanel').hidden === true, 'ED65 Esc with nothing left to deselect closes the editor'); }
 }
 /* v2.358: undo for moving / turning / stretching floating pieces, and keypad 0 */
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(400); const TH = w.__shrinkApp.THREE;
