@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.350
+- **SAVE PROJECT / LOAD PROJECT / ADD TO LIBRARY / LIBRARY buttons are readable.** They were white with white text; they now match the other dark buttons in the EDIT card.
+
 ## v2.349
 - **Red overlap is 50% see-through** (was 80% solid), so you can still see the part and model underneath while judging the join.
 
