@@ -1437,15 +1437,18 @@
     const v = $('viewer'); if (!v || v.dataset.partWired) return; v.dataset.partWired = '1';
     const act = () => (!!editPart || parked.length > 0) && editActive() && pieceTool();
     const ndcOf = e => { const r = v.getBoundingClientRect(); return [((e.clientX - r.left) / (r.width || 1)) * 2 - 1, -(((e.clientY - r.top) / (r.height || 1)) * 2 - 1)]; };
-    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return; const n = ndcOf(e), hz = gizmoPick(n); let hit = !!hz || ghostHit(n); if (!hit) { const pi = parkedAt(n); if (pi < 0) { if (e.target === v || e.target?.tagName === 'CANVAS') bgDown = { x: e.clientX, y: e.clientY }; return; } takeParked(pi); hit = true; } noteTransform('drag'); e.stopPropagation(); e.preventDefault(); gizmoHot(hz); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
+    v.addEventListener('pointerdown', e => { if (!act() || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return; const n = ndcOf(e), hz = gizmoPick(n); let hit = !!hz || ghostHit(n); if (!hit) { const pi = parkedAt(n); if (pi < 0) return; takeParked(pi); hit = true; } noteTransform('drag'); e.stopPropagation(); e.preventDefault(); gizmoHot(hz); partDrag = { last: n, cam: cameraSnap(), hz }; v.classList.add('v2-cur-grabbing'); }, true);
     v.addEventListener('pointermove', e => {
       if (partDrag) { e.stopPropagation(); if ((e.buttons & 1) === 0) { partDragEnd(); return; } const n = ndcOf(e); if (partDrag.hz) gizmoApply(partDrag.hz.kind, partDrag.hz.axis, partDrag.last, n, partDrag.cam); else partDragApply('move', partDrag.last, n, e.shiftKey, partDrag.cam); partDrag.last = n; return; }
       const now = performance.now(); if (!act() || now - hoverAt < 80) return; hoverAt = now; const n = ndcOf(e), hz = gizmoPick(n); gizmoHot(hz); const on = !!hz || ghostHit(n) || parkedAt(n) >= 0; v.classList.toggle('v2-cur-grab', on);
     }, true);
     // v2.354: with the EDIT panel closed, a plain click on a floating piece opens EDIT with the Select tool and that piece selected (a drag still orbits)
-    let closedDown = null, bgDown = null;
+    let closedDown = null, bg = null;
+    // v2.359: a plain click on empty background lets go of the selected piece (any target inside the viewer except buttons / boxes, so overlays cannot block it)
+    v.addEventListener('pointerdown', e => { bg = null; if (!editActive() || !pieceTool() || !editPart || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return; if (e.target?.closest?.('button,input,select,textarea,a,label,summary,#v2PartHud,#v2PartPad,#v2EdToast')) return; const n = ndcOf(e); if (gizmoPick(n) || ghostHit(n) || parkedAt(n) >= 0) return; bg = { x: e.clientX, y: e.clientY }; }, true);
+    v.addEventListener('pointerup', e => { const b = bg; bg = null; if (b && Math.hypot(e.clientX - b.x, e.clientY - b.y) < 5 && editPart) deselectPiece(); }, true);
     v.addEventListener('pointerdown', e => { closedDown = null; if (editActive() || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey || !(editPart || parked.length)) return; closedDown = { x: e.clientX, y: e.clientY, n: ndcOf(e) }; }, true);
-    v.addEventListener('pointerup', e => { const b = bgDown; bgDown = null; if (b && Math.hypot(e.clientX - b.x, e.clientY - b.y) < 5 && act()) deselectPiece(); const d = closedDown; closedDown = null; if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) openOnPiece(d.n); }, true);
+    v.addEventListener('pointerup', e => { const d = closedDown; closedDown = null; if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) openOnPiece(d.n); }, true);
     const partDragEnd = () => { if (!partDrag) return; partDrag = null; pruneNoopTransform(); gizmoHot(null); v.classList.remove('v2-cur-grabbing'); };
     v.addEventListener('pointerup', partDragEnd, true); v.addEventListener('pointercancel', partDragEnd, true); window.addEventListener('pointerup', partDragEnd, true); window.addEventListener('blur', partDragEnd);
   }
@@ -2890,7 +2893,7 @@
       $('v2EdTab').addEventListener('change', editTabChanged);
       $('v2EdMode').addEventListener('change', editTabChanged);
       ['v2EdKind', 'v2EdW', 'v2EdH', 'v2EdD', 'v2EdX', 'v2EdY', 'v2EdZ', 'v2EdAxis', 'v2EdSide', 'v2EdPos', 'v2EdTilt'].forEach(id => { $(id).addEventListener('input', () => { $('v2EdPosOut').textContent = $('v2EdPos').value + '%'; $('v2EdTiltOut').textContent = $('v2EdTilt').value + '°'; updateEditPreview(); }); $(id).addEventListener('change', updateEditPreview); });
-      window.addEventListener('keydown', e => { if (e.key === 'Escape' && editActive() && lassoSel) { clearLasso(); return; } if ((e.key === 'Delete' || e.key === 'Backspace') && editActive() && lassoSel && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { e.preventDefault(); lassoApply('delete'); return; } if (e.key === 'Escape' && editActive() && $('v2EdTab').value !== 'none') { $('v2EdTab').value = 'none'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); } });
+      window.addEventListener('keydown', e => { if (e.key === 'Escape' && editActive() && lassoSel) { clearLasso(); return; } if ((e.key === 'Delete' || e.key === 'Backspace') && editActive() && lassoSel && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { e.preventDefault(); lassoApply('delete'); return; } if (e.key === 'Escape' && editActive() && editPart && pieceTool() && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) { deselectPiece(); return; } if (e.key === 'Escape' && editActive() && $('v2EdTab').value !== 'none') { $('v2EdTab').value = 'none'; $('v2EdTab').dispatchEvent(new Event('change', { bubbles: true })); } });
       $('v2EdReset').addEventListener('click', resetEdits);
       // v2.320: keyboard shortcuts in the EDIT tab (never while typing in a box)
       window.addEventListener('keydown', e => {

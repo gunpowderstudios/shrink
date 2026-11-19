@@ -415,7 +415,8 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     ok(w.__shrinkEdit.openOn([5, 5], cam) === false && page.$('v2EditPanel').hidden, 'ED56 a click on empty space leaves EDIT closed');
     ok(w.__shrinkEdit.openOn(found, cam) === true && !page.$('v2EditPanel').hidden && page.$('v2EdTab').value === 'select', 'ED56 a click on a floating piece opens EDIT with the Select tool'); page.$('v2EditPanel').querySelector('.v2-edit-close').click(); await wait(30); page.$('v2TabEdit').click(); await wait(60); w.__shrinkEdit.select(0);
     ok(w.__shrinkEdit.hasPart() && w.__shrinkEdit.deselect() === true && !w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 2 && !w.__shrinkViewer.scene.getObjectByName('shrinkPartGizmo'), 'ED57 clicking the background lets go of the selected piece: it keeps floating, no handles');
-    w.__shrinkEdit.select(1); ok(w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 1, 'ED57 a piece can be picked again afterwards'); } }
+    w.__shrinkEdit.select(1); ok(w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 1, 'ED57 a piece can be picked again afterwards');
+    w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); ok(!w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 2 && page.$('v2EdTab').value === 'select', 'ED57 Esc lets go of the selected piece and keeps the tool'); w.__shrinkEdit.select(1); } }
   w.__shrinkEdit.dup(); ok(w.__shrinkEdit.parked() === 2, 'ED37 COPY PIECE makes another floating piece');
   ok(w.__shrinkEdit.select(0) && w.__shrinkEdit.parked() === 2 && Math.abs(w.__shrinkEdit.partState().x - 6) < 0.01, 'ED37 selecting a waiting piece brings it back with its own position (x 6)');
   ok(/3 floating/.test(page.$('v2PartPad').querySelector('.v2-pad-title').textContent) && page.$('v2PadAll').hidden === false, 'ED37 the pad counts the floating pieces and offers WELD ALL');

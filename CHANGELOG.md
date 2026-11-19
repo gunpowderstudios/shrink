@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.359
+- Esc now lets go of the selected piece (a second Esc puts the tool down). A click on empty background deselects it more reliably: it no longer depends on exactly which element sits under the pointer, only that it is not a button or box.
+
 ## v2.358
 - UNDO now also covers moving, turning, stretching and resizing floating pieces (gizmo drags, mouse drags, + / − and the X / Y / Z keys, SIT ON TOP / CENTRE, and typed numbers). Quick repeated clicks or key presses count as one step.
 - The undo list holds up to 50 steps (it was 6). Piece moves are tiny; whole-model steps (cuts, welds, sculpt strokes) are limited by size to about 8 million triangles in total, never fewer than 3 (so about 50 on a 100k model, about 21 on the 369k dwarf, about 8 on a 1M model).
