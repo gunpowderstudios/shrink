@@ -784,11 +784,12 @@
     g.computeVertexNormals(); g.computeBoundingBox();
     return { geometry: g, height: Math.max(1e-6, size.y), size, name: name || 'part' };
   }
-  function partVals() { const o = {}; ['X', 'Y', 'Z', 'RX', 'RY', 'RZ'].forEach(a => { o[a] = num('v2EdPart' + a); }); o.H = num('v2EdPartH', 30); return o; }
+  function partVals() { const o = {}; ['X', 'Y', 'Z', 'RX', 'RY', 'RZ'].forEach(a => { o[a] = num('v2EdPart' + a); }); o.H = num('v2EdPartH', 30); ['SX', 'SY', 'SZ'].forEach(a => { o[a] = num('v2EdPart' + a, 100); }); return o; }
+  const valsDef = v => ({ SX: 100, SY: 100, SZ: 100, ...v });   // v2.357: width / height / depth stretch in % (100 = as made); older saved pieces have none
   function parkCurrent() { if (editPart) parked.push({ part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode')?.value || 'join' }); }
   function takeParked(i) {                               // make parked piece i the selected one (the selected one goes to the side)
     const r = parked[i]; if (!r) return false; parked.splice(i, 1); parkCurrent(); editPart = r.part; partRot = r.rot;
-    Object.entries(r.vals).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); });
+    Object.entries(valsDef(r.vals)).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); });
     const md = $('v2EdMode'); if (md && md.value !== r.mode) { md.value = r.mode; md.dispatchEvent(new Event('change', { bubbles: true })); }
     updateEditPreview(); updateGoState(); return true;
   }
@@ -796,7 +797,7 @@
     if (!editPart) return false; parkCurrent(); editPart = null; partRot = null; updatePad(); updateEditPreview(); updateGoState(); return true;
   }
   function dropSelected() {                              // the selected piece is gone (welded or deleted): pick the last one that is waiting, if any
-    editPart = null; partRot = null; if (parked.length) { const r = parked.pop(); editPart = r.part; partRot = r.rot; Object.entries(r.vals).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); }); const md = $('v2EdMode'); if (md && md.value !== r.mode) { md.value = r.mode; md.dispatchEvent(new Event('change', { bubbles: true })); } }
+    editPart = null; partRot = null; if (parked.length) { const r = parked.pop(); editPart = r.part; partRot = r.rot; Object.entries(valsDef(r.vals)).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); }); const md = $('v2EdMode'); if (md && md.value !== r.mode) { md.value = r.mode; md.dispatchEvent(new Event('change', { bubbles: true })); } }
     updateEditPreview(); updateGoState();
   }
   function dupPart() {                                   // COPY PIECE: another green piece beside this one, the first stays where it is
@@ -808,7 +809,7 @@
     if (part && editPart) parkCurrent();                // v2.326: a new piece never replaces the one already floating
     editPart = part; partRot = null; const f = editFrame();
     if (part && f) {
-      ['X', 'Y', 'Z'].forEach(a => { $('v2EdPartR' + a).value = '0'; });
+      ['X', 'Y', 'Z'].forEach(a => { $('v2EdPartR' + a).value = '0'; $('v2EdPartS' + a).value = '100'; });
       if (part.origin) {                                // a copied piece starts exactly where it came from, at its own size
         $('v2EdPartH').value = String(Math.round(part.height * f.mm * 100) / 100);
         $('v2EdPartX').value = ((part.origin.x - f.centre.x) * f.mm).toFixed(2); $('v2EdPartY').value = ((part.origin.y - f.centre.y) * f.mm).toFixed(2); $('v2EdPartZ').value = ((part.origin.z - f.centre.z) * f.mm).toFixed(2);
@@ -821,7 +822,7 @@
     const f = editFrame(); if (!f || !part) return null; const THREE = f.THREE;
     const k = (Math.max(0.1, vals.H) / f.mm) / part.height, rad = d => (vals[d] || 0) * Math.PI / 180;
     const m = new THREE.Matrix4().compose(offsets ? new THREE.Vector3(f.centre.x + vals.X / f.mm, f.centre.y + vals.Y / f.mm, f.centre.z + vals.Z / f.mm) : new THREE.Vector3(),
-      (rot ? rot.clone() : new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rad('RX'), rad('RY'), rad('RZ'), 'XYZ'))), new THREE.Vector3(k, k, k));
+      (rot ? rot.clone() : new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rad('RX'), rad('RY'), rad('RZ'), 'XYZ'))), new THREE.Vector3(k * (vals.SX ?? 100) / 100, k * (vals.SY ?? 100) / 100, k * (vals.SZ ?? 100) / 100));
     return { f, m };
   }
   function partMatrix(offsets = true) { return editPart ? partMatrixOf(editPart, partVals(), partRot, offsets) : null; }
@@ -1130,7 +1131,7 @@
   }
   function floatSnap() { return { sel: editPart ? { part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode')?.value || 'join' } : null, parked: parked.map(r => ({ ...r })) }; }
   function floatSelect(r) {
-    editPart = r.part; partRot = r.rot ? r.rot.clone() : null; Object.entries(r.vals).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); });
+    editPart = r.part; partRot = r.rot ? r.rot.clone() : null; Object.entries(valsDef(r.vals)).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); });
     const md = $('v2EdMode'); if (md && md.value !== r.mode) { md.value = r.mode; md.dispatchEvent(new Event('change', { bubbles: true })); }
   }
   function floatRestore(snap) { parked = snap.parked.map(r => ({ ...r })); if (snap.sel) floatSelect(snap.sel); else { editPart = null; partRot = null; } }
@@ -1305,12 +1306,18 @@
   }
   // ---- v2.325: handles ON the green piece: three arrows (slide along X / Y / Z), three rings (yaw about Y, pitch about X, roll about Z) and − / + to resize.
   const GZ_COL = [0x4d9dff, 0x7fbaff, 0x2f6fd6], GZ_HOT = 0x36d88a, GZ_NAME = ['x', 'y', 'z'];
-  function gizmoSize(pm) { const g = editPart.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const k = new pm.f.THREE.Vector3().setFromMatrixScale(pm.m).x; return Math.max(1e-6, (g.boundingSphere?.radius || 1) * k * 0.55); }   // v2.346: small, tidy handles
+  function gizmoSize(pm) { const g = editPart.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const k = Math.max(1e-9, (num('v2EdPartH', 30) / pm.f.mm) / (editPart.height || 1)); return Math.max(1e-6, (g.boundingSphere?.radius || 1) * k * 0.55); }   // v2.346: small, tidy handles
   const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const localAxis = (m, i) => { const e = m.elements, o = [e[i * 4], e[i * 4 + 1], e[i * 4 + 2]], l = Math.hypot(...o) || 1; return [o[0] / l, o[1] / l, o[2] / l]; };   // the part's own axis i in world space (v2.357 stretch handles)
+  const SC_AT = 1.3;                                    // stretch cubes sit at -SC_AT * R along each local axis (keep in step with gizmoBuild)
   function gizmoPick(ndc, camIn) {
     const pm = editPart && partMatrix(); const cam = camIn || cameraSnap(); if (!pm || !cam) return null;
     const R = gizmoSize(pm), c = [pm.m.elements[12], pm.m.elements[13], pm.m.elements[14]], r = rayFor(cam, ndc), L = R * 2.2, Rr = R * 0.8;
     const depth = Math.max(1e-6, dot3([c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]], r.fw)), perNdc = cam.persp ? cam.tanY * depth : cam.halfH, tol = Math.max(R * 0.07, perNdc * 0.04);
+    for (let i = 0; i < 3; i++) {                        // v2.357 stretch cubes on the part's own axes (minus side): ray against a small ball
+      const u = localAxis(pm.m, i), p = [c[0] - u[0] * R * SC_AT, c[1] - u[1] * R * SC_AT, c[2] - u[2] * R * SC_AT], w = [p[0] - r.o[0], p[1] - r.o[1], p[2] - r.o[2]], t = dot3(w, r.d); if (t < 0) continue;
+      if (Math.hypot(w[0] - r.d[0] * t, w[1] - r.d[1] * t, w[2] - r.d[2] * t) <= Math.max(R * 0.13, tol * 0.7)) return { kind: 'scale', axis: i };
+    }
     let best = null, bd = Infinity;
     for (let i = 0; i < 3; i++) {                        // arrows: ray against the segment c .. c + L u
       const u = [0, 0, 0]; u[i] = 1; const w = [c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]], b = dot3(u, r.d), d = dot3(u, w), e = dot3(r.d, w), den = 1 - b * b;
@@ -1338,6 +1345,10 @@
     if (kind === 'arrow') {
       const u = [0, 0, 0]; u[axis] = 1; const par = r => { const w = [c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]], b = dot3(u, r.d), den = 1 - b * b; return Math.abs(den) < 1e-6 ? null : (b * dot3(r.d, w) - dot3(u, w)) / den; };
       const a = par(r0), b = par(r1); if (a === null || b === null) return false; const id = 'v2EdPart' + 'XYZ'[axis]; $(id).value = (num(id) + (b - a) * f.mm).toFixed(2);
+    } else if (kind === 'scale') {                        // v2.357: pull a cube away from the centre to stretch that side of the piece (width = its X, height = its Y, depth = its Z), push in to squash
+      const u = localAxis(m, axis), par = r => { const w = [c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]], b = dot3(u, r.d), den = 1 - b * b; return Math.abs(den) < 1e-6 ? null : -(b * dot3(r.d, w) - dot3(u, w)) / den; };   // distance along -u from the centre
+      const a = par(r0), b = par(r1); if (a === null || b === null || a < 1e-6 || b < 1e-6) return false; const fac = Math.min(2, Math.max(0.5, b / a)), id = 'v2EdPartS' + 'XYZ'[axis];
+      $(id).value = Math.min(2000, Math.max(5, num(id, 100) * fac)).toFixed(1);
     } else if (kind === 'plane') {                        // v2.344: slide in the plane whose normal is `axis` (1 = flat on the ground, 0 / 2 = upright)
       const n = [0, 0, 0]; n[axis] = 1; const hit = r => { const den = dot3(n, r.d); if (Math.abs(den) < 0.15) return null; const t = dot3(n, [c[0] - r.o[0], c[1] - r.o[1], c[2] - r.o[2]]) / den; return [r.o[0] + r.d[0] * t, r.o[1] + r.d[1] * t, r.o[2] + r.d[2] * t]; };
       const a = hit(r0), b = hit(r1); if (!a || !b) return false;
@@ -1352,7 +1363,7 @@
   }
   let gzHot = null;                                     // v2.347: the handle under the pointer (or being dragged) turns green
   function gizmoPaint(gz) {
-    gz.traverse(o => { if (!o.isMesh) return; const m = /^gizmo-(ring-|plane-)?([xyz])$/.exec(o.name); if (!m) return; const kind = m[1] === 'ring-' ? 'ring' : m[1] === 'plane-' ? 'plane' : 'arrow', ax = 'xyz'.indexOf(m[2]), hot = !!gzHot && gzHot.kind === kind && gzHot.axis === ax;
+    gz.traverse(o => { if (!o.isMesh) return; const m = /^gizmo-(ring-|plane-|scale-)?([xyz])$/.exec(o.name); if (!m) return; const kind = m[1] === 'ring-' ? 'ring' : m[1] === 'plane-' ? 'plane' : m[1] === 'scale-' ? 'scale' : 'arrow', ax = 'xyz'.indexOf(m[2]), hot = !!gzHot && gzHot.kind === kind && gzHot.axis === ax;
       o.material.color.setHex(hot ? GZ_HOT : GZ_COL[ax]); if (kind === 'plane') o.material.opacity = hot ? 0.6 : 0.3; });
   }
   function gizmoHot(h) { if ((!h && !gzHot) || (h && gzHot && h.kind === gzHot.kind && h.axis === gzHot.axis)) return; gzHot = h || null; const gz = window.__shrinkViewer?.scene?.getObjectByName?.('shrinkPartGizmo'); if (gz) gizmoPaint(gz); }
@@ -1367,6 +1378,10 @@
       const ring = put(new THREE.Mesh(new THREE.TorusGeometry(Rr, R * 0.009, 6, 72), mat(i)), i); ring.name = 'gizmo-ring-' + GZ_NAME[i]; ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), u); gz.add(ring);
       const side = R * 0.45, mid = R * 0.425, pl = put(new THREE.Mesh(new THREE.PlaneGeometry(side, side), new THREE.MeshBasicMaterial({ color: GZ_COL[i], transparent: true, opacity: 0.3, depthTest: false, depthWrite: false, side: THREE.DoubleSide })), i);   // v2.344 plane handle (normal = axis i)
       pl.name = 'gizmo-plane-' + GZ_NAME[i]; pl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), u); const pp = [0, 0, 0]; pp[(i + 1) % 3] = mid; pp[(i + 2) % 3] = mid; pl.position.set(pp[0], pp[1], pp[2]); gz.add(pl);
+    }
+    for (let i = 0; i < 3; i++) {                        // v2.357 stretch cubes on the part's own axes, minus side
+      const u = localAxis(pm.m, i), cube = put(new THREE.Mesh(new THREE.BoxGeometry(R * 0.14, R * 0.14, R * 0.14), mat(i)), i); cube.name = 'gizmo-scale-' + GZ_NAME[i];
+      cube.position.set(-u[0] * R * SC_AT, -u[1] * R * SC_AT, -u[2] * R * SC_AT); cube.quaternion.setFromRotationMatrix(new THREE.Matrix4().extractRotation(pm.m)); gz.add(cube);
     }
     gizmoPaint(gz); return gz;
   }
@@ -1487,7 +1502,7 @@
     const hl = new DataView(u8.buffer, u8.byteOffset).getUint32(magic.length, true), head = JSON.parse(dec.decode(u8.subarray(magic.length + 4, magic.length + 4 + hl))), base = magic.length + 4 + hl; let n = 0;
     for (const pc of head.pieces) {
       const arr = new Float32Array(u8.slice(base + pc.off * 4, base + (pc.off + pc.count) * 4).buffer), part = partFromPoints(arr, false, pc.name); part.copied = true; setPart(part);
-      Object.entries(pc.vals).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); }); partRot = pc.rot ? new (app().THREE.Quaternion)(...pc.rot) : null;
+      Object.entries(valsDef(pc.vals)).forEach(([a, v]) => { const e = $(a === 'H' ? 'v2EdPartH' : 'v2EdPart' + a); if (e) e.value = String(v); }); partRot = pc.rot ? new (app().THREE.Quaternion)(...pc.rot) : null;
       const md = $('v2EdMode'); if (md) { md.value = pc.mode || 'join'; md.dispatchEvent(new Event('change', { bubbles: true })); } n++;
     }
     if (n) { if (!editActive()) window.__shrinkTab?.('edit'); set$tool('part'); updateEditPreview(); }
@@ -1582,7 +1597,8 @@
   }
   async function libAddCurrent(name) {
     if (!editPart) throw new Error('Select a floating piece first (copy something with the Lasso, or open a piece from the library).');
-    const soup = soupOf(editPart.geometry), rec = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: String(name || '').trim() || 'Piece', created: Date.now(), hMm: num('v2EdPartH', 30), tris: soup.length / 9, soup, thumb: thumbOf(soup) };
+    const soup = soupOf(editPart.geometry), sk = [num('v2EdPartSX', 100) / 100, num('v2EdPartSY', 100) / 100, num('v2EdPartSZ', 100) / 100]; if (sk.some(x => Math.abs(x - 1) > 1e-6)) for (let i = 0; i < soup.length; i++) soup[i] *= sk[i % 3];   // v2.357: a stretched piece is saved as it looks
+    const rec = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: String(name || '').trim() || 'Piece', created: Date.now(), hMm: num('v2EdPartH', 30) * num('v2EdPartSY', 100) / 100, tris: soup.length / 9, soup, thumb: thumbOf(soup) };
     await libPut(rec); return rec;
   }
   async function libUse(id) {
@@ -1678,7 +1694,7 @@
     const ghost = (part, pm, mode, sel, tag) => {      // v2.326: every floating piece is drawn the same way; the selected one glows
       const col = mode === 'cut' ? 0xff9a2f : 0x2f86ff;      // v2.344: the piece is resin grey like the model, only the outline is coloured (blue = join, orange = cut)
       [{ test: false, op: sel ? 0.12 : 0.08, ro: 998 }, { test: true, op: 1, ro: 999 }].forEach((c, i) => {
-        const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: 0xc9cacd, roughness: 0.75, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
+        const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({ color: new THREE.Color(0xc9cacd).lerp(new THREE.Color(0x36d88a), 0.1), roughness: 0.75, metalness: 0, flatShading: true, transparent: c.op < 1, opacity: c.op, depthWrite: c.test, depthTest: c.test, side: THREE.DoubleSide }));
         m.name = (sel ? 'shrinkPartGhost' : 'shrinkParkedGhost') + (i ? '' : 'See'); m.userData.tag = tag; m.renderOrder = c.ro; m.matrixAutoUpdate = false; m.matrix.copy(pm.m); m.matrixWorldNeedsUpdate = true; m.raycast = () => {}; g.add(m);
       });
       { const gl = new THREE.Mesh(part.geometry, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, depthTest: true, side: THREE.BackSide })); gl.name = 'shrinkPartGlow'; gl.renderOrder = 997; gl.matrixAutoUpdate = false; gl.matrix.copy(pm.m).multiply(new THREE.Matrix4().makeScale(sel ? 1.015 : 1.01, sel ? 1.015 : 1.01, sel ? 1.015 : 1.01)); gl.matrixWorldNeedsUpdate = true; gl.raycast = () => {}; g.add(gl); }
@@ -1794,7 +1810,7 @@
       appliedChanges.delete('edited'); renderAppliedChanges(); $('v2EdUndo').hidden = true; did = true; setTimeout(updateHealthCard, 80);
     }
     const set = (id, v) => { const e = $(id); if (e) e.value = v; };
-    ['v2EdW', 'v2EdH', 'v2EdD'].forEach(i => set(i, '10')); ['v2EdX', 'v2EdY', 'v2EdZ', 'v2EdTilt', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ'].forEach(i => set(i, '0'));
+    ['v2EdW', 'v2EdH', 'v2EdD'].forEach(i => set(i, '10')); ['v2EdPartSX', 'v2EdPartSY', 'v2EdPartSZ'].forEach(i => set(i, '100')); ['v2EdX', 'v2EdY', 'v2EdZ', 'v2EdTilt', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ'].forEach(i => set(i, '0'));
     set('v2EdPos', '50'); set('v2EdAxis', 'y'); set('v2EdSide', 'high'); set('v2EdPartH', '30'); set('v2EdKind', 'cube'); set('v2EdMode', 'cut'); partRot = null; clearLasso(); sculptWork = null; sculptData = null;
     $('v2EdPosOut').textContent = '50%'; $('v2EdTiltOut').textContent = '0°';
     { const t = $('v2EdTab'); t.value = 'none'; t.dispatchEvent(new Event('change', { bubbles: true })); }
@@ -2680,6 +2696,7 @@
                 <div class="v2-edit-hint-plain" id="v2EdPartOr">or use Copy / cut to take a piece from this model.</div>
                 <div id="v2EdPartInfo" class="v2-edit-hint-plain">STL, OBJ, PLY or GLB. It must be a closed solid, e.g. a new head. Slice the old head off first, then press SIT ON TOP.</div>
                 <details class="v2-advanced v2-exact"><summary>Exact numbers</summary><div class="v2-edit-grid"><span>Height mm</span><input id="v2EdPartH" type="number" min="0.1" step="1" value="30" title="Part height"><button id="v2EdPartTop" type="button" class="v2-edit-small" title="Put the part on top of the model, centred, sunk in by 1 mm so it joins">SIT ON TOP</button><button id="v2EdPartCentre" type="button" class="v2-edit-small" title="Put the part in the middle of the model">CENTRE</button></div>
+                <div class="v2-edit-grid"><span>Stretch %</span><input id="v2EdPartSX" type="number" min="5" max="2000" step="5" value="100" title="Width (the piece's own left/right)"><input id="v2EdPartSY" type="number" min="5" max="2000" step="5" value="100" title="Height (the piece's own up/down)"><input id="v2EdPartSZ" type="number" min="5" max="2000" step="5" value="100" title="Depth (the piece's own front/back)"></div>
                 <div class="v2-edit-grid"><span>Turn °</span><input id="v2EdPartRX" type="number" step="15" value="0" title="Turn about left/right"><input id="v2EdPartRY" type="number" step="15" value="0" title="Turn about up/down"><input id="v2EdPartRZ" type="number" step="15" value="0" title="Turn about front/back"></div>
                 <div class="v2-edit-grid"><span>Move mm</span><input id="v2EdPartX" type="number" step="1" value="0" title="Left / right"><input id="v2EdPartY" type="number" step="1" value="0" title="Up / down"><input id="v2EdPartZ" type="number" step="1" value="0" title="Front / back"></div></details>
               </div>
@@ -2842,7 +2859,7 @@
     { const ed = $('v2EditCard'); if (ed) {
       ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode', smode: 'v2EdSculptMode' }[b.dataset.ed]); if (!sel) return; sel.value = (b.dataset.ed === 'tool' && b.getAttribute('aria-pressed') === 'true') ? 'none' : b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); });
       $('v2EdKind').addEventListener('change', editTabChanged);
-      ['v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
+      ['v2EdPartSX', 'v2EdPartSY', 'v2EdPartSZ', 'v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
       $('v2SculptSize').addEventListener('input', () => { $('v2SculptSizeOut').textContent = $('v2SculptSize').value + ' mm'; }); $('v2SculptStrength').addEventListener('input', () => { $('v2SculptStrengthOut').textContent = $('v2SculptStrength').value; }); $('v2EdSculptMode').addEventListener('change', editTabChanged);
       $('v2EdDepth').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); }); $('v2EdWhole').addEventListener('change', () => { updateEditHint(); if (lassoSel) lassoRed(lassoSel); });
       $('v2PieceStlBtn')?.addEventListener('click', () => downloadPieceStl('sel')); $('v2LassoDelBtn').addEventListener('click', () => lassoApply('delete')); $('v2LassoKeepBtn').addEventListener('click', e => lassoApply(e.currentTarget.dataset.op || 'copy'));

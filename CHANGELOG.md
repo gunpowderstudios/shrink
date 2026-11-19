@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.357
+- Stretch handles on the gizmo: three small cubes on the piece's own axes (width, height, depth). Pull one out to widen that direction, push in to make it thinner. A "Stretch %" row (W / H / D) in Exact numbers does the same by number. Weld, library, projects and pieces files keep the stretch.
+- Floating pieces carry a very light (10 %) green tint so they read as pieces you can pick.
+
 ## v2.356
 - The red overlap now updates live while you drag a piece (about 20 times a second), instead of appearing only after you let go.
 
