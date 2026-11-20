@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.378
+- Fix: after SHRINK, raising the Detail slider above the shrunk level reverted to the untouched upload, which sits where it was opened rather than levelled and centred, so the model could leave the build plate. The rebased copy now gets the recorded pose and is put back at the previous position on the plate.
+
 ## v2.377
 - Clicking a shape icon (cube, ball, cylinder, cone) in the Shape tool now puts that shape in the scene straight away: a quarter of the model's size, standing on the ground beside it, selected, with the gizmo up. Before, it only showed an orange preview until you pressed the big button. The Join / Cut switch still decides what WELD IT does.
 

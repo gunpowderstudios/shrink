@@ -3162,19 +3162,37 @@
       $('v2Detail').value = text;
       $('v2DetailNumber').value = text;
 
-      let reverted = false;
+      let reverted = false, prevBox = null;
       { const live = window.__shrinkLive;
         // v2.279: no "is the reducer's own root on screen" test here: after a first slider move the reducer is re-based ON the fixed/fused model (live.root === working model), and 100% must still mean the untouched upload
         const processed = ['shrunk', 'fixed', 'fused', 'rebuilt', 'clay', 'hollowed', 'edited'].some(k => appliedChanges.has(k)) || detailScale < 0.999;
         if (live?.root && sourceModel() && app()?.originalModel && sourceModel() !== app().originalModel && processed) {
           const cur = Math.min(1, modelTriangles(sourceModel()) / origTrisOf());
           if (value >= 99.95 || value / 100 > cur * 1.05) {            // asking for more detail than the processed model has: go back to the upload
+            try { const T = app()?.THREE, w = sourceModel(); if (T && w) { w.updateWorldMatrix(true, true); const bx = new T.Box3().setFromObject(w, true); if (!bx.isEmpty()) prevBox = bx; } } catch {}
             window.__shrinkSetWorkingModel?.(app().originalModel); clearApplied(); fuseReady = false; shrinkReady = false; reverted = true;
             const note = $('v2DetailNote'); if (note) note.textContent = 'Back to the original model. FIX IT and FUSE IT were undone: run them again if you still need them.';
           }
         } }
       await ensureLiveRebased();
       if (reverted) detailScale = 1;
+      // v2.378: the upload sits where it was opened, not where SHRINK levelled and centred the model: put the rebased copy back where the model was, so it does not leave the build plate
+      if (reverted && prevBox) {
+        try {
+          const T = app()?.THREE, m = sourceModel(), live = window.__shrinkLive;
+          if (T && m && m !== app()?.originalModel && live?.root === m) {
+            const pose = poseD; if (pose) { m.applyMatrix4(pose); }
+            m.updateWorldMatrix(true, true);
+            const nb = new T.Box3().setFromObject(m, true);
+            if (!nb.isEmpty()) {
+              const c1 = prevBox.getCenter(new T.Vector3()), c2 = nb.getCenter(new T.Vector3());
+              const d = new T.Vector3(c1.x - c2.x, prevBox.min.y - nb.min.y, c1.z - c2.z);
+              if (d.length() > 1e-9) moveWorldRaw(m, d, T);
+            }
+            reducedTick++; window.__shrinkStretchTick = (window.__shrinkStretchTick || 0) + 1;
+          }
+        } catch (e) { console.warn('re-pose after revert', e); }
+      }
       const nativeVal = detailScale < 1 ? Math.min(100, value / detailScale) : value;
       setNative('geometry', String(Math.round(nativeVal * 10) / 10), 'input');
       if (reverted && value < 100) { appliedChanges.add('shrunk'); renderAppliedChanges(); }
