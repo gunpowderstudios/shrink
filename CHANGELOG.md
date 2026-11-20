@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.380
+- SHRINK / QUICK-FIX no longer re-frames the camera at the end: the view stays zoomed where you left it (centring on the plate still moves the camera with the model).
+- Press 0 (top row or keypad) to centre the whole model in the window, facing forward. With a floating part selected in EDIT it still centres on that part.
+
 ## v2.379
 - New: FILL INSIDE. In the paint bucket tool, tick "Fill the inside of a cup or bowl" and click inside an egg cup / cup / bowl: the hollow becomes solid up to the rim. Needs a closed model. One undo step.
 
