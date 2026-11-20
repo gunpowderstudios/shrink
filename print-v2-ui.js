@@ -251,7 +251,14 @@
 
   // How many separate pieces (shells that share no vertex) the working model has. Quantised world positions, union-find; skipped for huge models (v2.185).
   const PIECES_MAX_TRIANGLES = 1500000;
-  const SCULPT_MAX_TRIANGLES = 2500000;           // v2.317: Sculpt and Grab-whole-piece work on the mesh itself (no Manifold), so they take bigger models
+  const SCULPT_MAX_TRIANGLES = 1e9;     // v2.395 (Tim): no hard limit any more, the edit tools run on an unshrunk model (was 2.5M)
+  const SOFT_TRIANGLES = 1000000;   // above this the Manifold tools warn once (they run on the main thread and can freeze the tab)
+  let bigOk = false; document.addEventListener('shrink:model-opened', () => { bigOk = false; });
+  function confirmBig(tris, what) {
+    if (tris <= SOFT_TRIANGLES || bigOk || window.__shrinkBatchRunning || window.__shrinkFuseTriLimit || typeof window.confirm !== 'function') return;
+    let ok; try { ok = window.confirm(`This model has ${tris.toLocaleString()} triangles. ${what} may take a minute and the page can freeze while it works. Save your project first if you have unsaved work.\n\nGo ahead?`); } catch { ok = true; }
+    if (ok === false) throw new Error('Cancelled. Nothing was changed.'); bigOk = true;
+  }
   async function countPieces(model) {
     const THREE = app()?.THREE; if (!model || !THREE) return null;
     try {
@@ -651,7 +658,7 @@
     if (label) label.textContent = text || '';
   }
 
-  const FUSE_MAX_TRIANGLES = 1000000;
+  const FUSE_MAX_TRIANGLES = 1e9;   // v2.395 (Tim): limit removed; SOFT_TRIANGLES warns instead. AUTO-SHRINK still shrinks to 1M to fuse.
   const BIG_TASK_TRIANGLES = 1000000;           // QUICK-FIX shows the "complex one" note above this many triangles
   async function fuseCheck(...a) { setWorking(true, 0, 'Fusing…'); try { return await fuseCheckInner(...a); } finally { setWorking(false); } }
   async function fuseCheckInner() {
@@ -669,6 +676,7 @@
       if (!model) throw new Error('Load a model first.');
       // The solid work runs on the page's main thread: a multi-million triangle model freezes the tab ("Page Unresponsive"). Say so up front instead of hanging.
       const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
+      if (tris <= limit) { try { confirmBig(tris, 'Fusing'); } catch (e) { btn.disabled = false; return; } }
       if (tris > limit) {
         fuseReady = false; progress(card, 100, 'Too detailed to fuse as it is.'); markStep(2, 'pending');
         $('v2FuseResult').innerHTML = `<strong>Press SHRINK IT first</strong><span>This model has ${tris.toLocaleString()} triangles, which is too many to fuse in the browser without freezing the page (the limit is ${limit.toLocaleString()}). SHRINK IT keeps the shape and cuts the triangles right down; then FUSE IT will work in a moment.</span>`;
@@ -1297,6 +1305,7 @@
       const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES, whole = wholeOn() || !!sel.wand;
       if (tris > SCULPT_MAX_TRIANGLES) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Press SHRINK first.`);
       const direct = whole || tris > limit;               // v2.318: big models are edited on the triangles themselves (DELETE leaves an open hole for FIX IT to close)
+      if (!whole && op !== 'delete') confirmBig(tris, 'Cutting');
       if (!whole && tris > limit && op !== 'delete') throw new Error(`COPY and CUT OFF need a model under ${limit.toLocaleString()} triangles (this one has ${tris.toLocaleString()}). Press SHRINK first. DELETE still works on a model this big.`);
       const THREE0 = app()?.THREE, f = editFrame(); if (!f) throw new Error('Load a model first.');
       if (!direct) {
@@ -1564,7 +1573,7 @@
   function overlapUpdate() {
     clearTimeout(ovTimer); removeOverlap(); const V = window.__shrinkViewer, model = sourceModel(), pm = partMatrix(); const on = editPart && editActive() && pieceTool();
     if (!on || !V?.scene || !model || !pm) { setJoinNote('', ''); return 0; }
-    if (modelTriangles(model) > (window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES)) { setJoinNote('', ''); return 0; }
+    if (modelTriangles(model) > (window.__shrinkFuseTriLimit || SOFT_TRIANGLES)) { setJoinNote('', ''); return 0; }
     if (!ovIndex || ovIndex.model !== model || ovIndex.tick !== (window.__shrinkStretchTick || 0)) ovIndex = ovBuild(model);
     const THREE = pm.f.THREE, g = editPart.geometry, pos = g.attributes.position, idx = g.index, n = idx ? idx.count : pos.count, nt = Math.floor(n / 3), step = Math.max(1, Math.ceil(nt / 200000)), m = pm.m, out = [], v = new THREE.Vector3(), w = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     for (let t = 0; t < nt; t += step) {
@@ -1975,6 +1984,7 @@
       if (hollowResult && model === hollowResult) throw new Error('This model is already hollow. Edit the solid model before you hollow it.');
       const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
       if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to edit in the browser. Press SHRINK first.`);
+      confirmBig(tris, 'Editing');
       const THREE0 = app()?.THREE; let snap = null;
       if (THREE0) { model.updateWorldMatrix(true, true); snap = model.clone(true); snap.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); snap.matrix.copy(model.matrixWorld); snap.matrix.decompose(snap.position, snap.quaternion, snap.scale); snap.updateMatrixWorld(true); }
       const isPart = pieceTool();
@@ -2061,6 +2071,7 @@
       else { const THREE0 = app()?.THREE; if (THREE0) { model.updateWorldMatrix(true, true); const c = model.clone(true); c.traverse(o => { if (o.isMesh) o.geometry = o.geometry.clone(); }); c.matrix.copy(model.matrixWorld); c.matrix.decompose(c.position, c.quaternion, c.scale); c.updateMatrixWorld(true); hollowBase = c; } }
       const tris = modelTriangles(model), limit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES;
       if (tris > limit) throw new Error(`This model has ${tris.toLocaleString()} triangles, too many to hollow in the browser. Press SHRINK first.`);
+      confirmBig(tris, 'Hollowing');
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, wallMm = Number($('v2HollowWall')?.value) || 2, holes = Number($('v2HollowHoles')?.value ?? 2);
       progress(card, 35, 'Working out the inside… this can take a moment');
       await paintNow();
@@ -2460,7 +2471,7 @@
       catch (err) { done('warn', '⚠', `Could not shrink (${err.message || err})`); }
       // 1b. Too detailed to fuse (v2.185). 16K ultra can leave millions of triangles, and FUSE is refused above the limit. Step down one detail level at a time
       //     (16K, 8K fine, 8K, 4K) and shrink again until it fits, and say so. The file name tag then shows the level that was really used.
-      const fuseLimit = window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES; let loweredFrom = null;
+      const fuseLimit = window.__shrinkFuseTriLimit || SOFT_TRIANGLES; let loweredFrom = null;
       if (modelTriangles(sourceModel()) > fuseLimit && fixedShrinkReady()) {         // v2.331: a fixed share cannot step down the printer ladder, so keep just enough triangles to fuse
         const o = modelTriangles(app()?.originalModel || sourceModel()) || 1, cap = Math.max(1, Math.floor(fuseLimit * 0.9 / o * 1000) / 10);
         btn.textContent = '1/4 Shrinking more…'; show(`Still ${modelTriangles(sourceModel()).toLocaleString()} triangles: too many to fuse. Keeping ${cap}% instead…`); await paintNow(); window.__shrinkShrinkCap = cap;
@@ -2550,7 +2561,7 @@
     const model = sourceModel(); add('Height input (mm)', $('v2Height')?.value); add('Native export height (mm)', nativeValue('figureHeightMm', '?')); add('Height sizing', manualHeight ? 'manual' : 'automatic'); add('SHRINK release', document.querySelector('.version-badge')?.textContent || '?'); add('When', new Date().toISOString());
     add('Browser', navigator.userAgent); add('Printer', `${currentPrinter().tag} (${dashboard?.dataset.printerType}/${dashboard?.dataset.quality})`);
     add('fuse-export build', window.__shrinkFuseBuild || 'OLD (the shell-splitting fuse is NOT loaded: hard-refresh the page)');
-    add('Fuse triangle limit', window.__shrinkFuseTriLimit || FUSE_MAX_TRIANGLES);
+    add('Fuse triangle limit', window.__shrinkFuseTriLimit || SOFT_TRIANGLES);
     const tris = model ? modelTriangles(model) : 0; add('Working model triangles', tris.toLocaleString());
     add('Shrink applied', !!shrinkReady); add('Applied chips', [...appliedChanges].join(', ') || 'none'); add('Last fuse', JSON.stringify(window.__shrinkLastFuse || 'not run this session')); add('Last Make watertight', JSON.stringify(window.__shrinkLastWatertight || 'not run this session'));
     add('Health score', $('v2HealthScore')?.textContent); add('Health rows', [...document.querySelectorAll('#v2HealthRows .v2-health-row')].map(r => r.textContent.replace(/\s+/g, ' ').trim()).join(' | '));

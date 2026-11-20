@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.395
+- Triangle limits removed from the EDIT tools, FILL, Sculpt, Lasso, FUSE IT and HOLLOW IT (Tim wants to work on unshrunk models). Above 1,000,000 triangles the Manifold tools (edit, boole, weld, fuse, hollow) ask once per model 'Go ahead?' because they run on the main thread and can freeze the tab; Cancel changes nothing. AUTO-SHRINK still shrinks to about 1M so it can fuse. Tests can still set `window.__shrinkFuseTriLimit`.
+
 ## v2.394
 - BOOLE (CUT OUT) did nothing when the Shape tool was the active tool (editModelNow made another shape instead of cutting). It now switches to Select first. Edit errors (e.g. model too big, not watertight) are also shown as a pop-up in the viewer, not only inside the EDIT panel.
 
