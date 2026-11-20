@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.393
+- FLIP button on the floating-part pad: mirrors the selected piece left to right (Shift-click: upside down), triangles kept facing outward, UNDO supported. Use it to turn a left hand into a right hand: Lasso/Wand it, COPY, FLIP, drag it into place, WELD IT.
+
 ## v2.392
 - Orbit pivot follows the view: when a zoom/pan/rotate ends, the pivot moves to the model surface under the middle of the screen (same view ray, no visible jump), so you spin round what you are looking at instead of an axis off to the right. `window.__shrinkPivotOff = true` turns it off.
 

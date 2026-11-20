@@ -640,6 +640,18 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(!w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 0, 'ED54 DELETE through the whole piece removes the floating pieces');
   page.$('v2EdUndo').click(); await wait(100);
   ok(w.__shrinkEdit.hasPart() && w.__shrinkEdit.parked() === 1, 'ED54 UNDO brings the floating pieces back');
+{ // v2.393 FLIP mirrors the selected floating piece
+  set(page, 'v2EdTab', 'select'); await wait(40); w.__shrinkEdit.discard?.();
+  w.__shrinkEdit.setPart(new Float32Array([0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1]), false, 'lefty'); await wait(60);
+  const nz = a => (a[3] - a[0]) * (a[7] - a[1]) - (a[4] - a[1]) * (a[6] - a[0]), a0 = Array.from(w.__shrinkEdit.partSoup()), x0 = partX();
+  function partX() { return w.__shrinkEdit.partState().x; }
+  ok(w.__shrinkEdit.flip('x') === true, 'ED73 FLIP works on the selected piece');
+  const a1 = Array.from(w.__shrinkEdit.partSoup());
+  ok(Math.sign(nz(a1)) === Math.sign(nz(a0)) && Math.sign(a1[0]) === -Math.sign(a0[0]), 'ED73 the piece is mirrored left to right and its triangles still face outward');
+  ok(Math.abs(partX() - x0) < 0.01, 'ED73 it stays where it was');
+  page.$('v2EdUndo').click(); await wait(80); const a2 = Array.from(w.__shrinkEdit.partSoup() || []);
+  ok(a2.length === a0.length && Math.sign(a2[0]) === Math.sign(a0[0]), 'ED73 UNDO puts the original back');
+  w.__shrinkEdit.discard?.(); }
 }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);
 
