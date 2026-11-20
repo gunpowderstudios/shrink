@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.381
+- Layout: AUTO-SHRINK, DOWNLOAD, Other formats, Finished height + RESIZE and the Hollow tick box moved up into the toolbar row beside ADVANCED and EDIT. The buttons are all the same size. The right-hand side now holds only the MODEL HEALTH box; the white "Reduced from…" note and the status line moved inside it.
+
 ## v2.380
 - SHRINK / QUICK-FIX no longer re-frames the camera at the end: the view stays zoomed where you left it (centring on the plate still moves the camera with the model).
 - Press 0 (top row or keypad) to centre the whole model in the window, facing forward. With a floating part selected in EDIT it still centres on that part.

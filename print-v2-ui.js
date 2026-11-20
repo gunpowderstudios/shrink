@@ -388,7 +388,7 @@
         if (!note && viewer) { note = document.createElement('div'); note.id = 'v2ReduceNote'; note.className = 'v2-reduce-note'; viewer.appendChild(note); }
         if (note && card) {
           const was = 84 + 50 * origTris;
-          const st = sideStack(); if (st && note.parentNode !== st) st.appendChild(note);
+          if (card && note.parentNode !== card) card.appendChild(note);
           if (origTris > 0 && tris < origTris) { const kTag = appliedChanges.has('shrunk') ? ` (${shrinkTag()})` : ''; const nf = n => new Intl.NumberFormat().format(n); note.innerHTML = `Reduced from <b class="v2-was">${fmt(was)}</b> to <b class="v2-now">${fmt(stlBytes)}</b>${kTag}<br><small>${nf(origTris)} → ${nf(tris)} triangles</small>`; note.hidden = false; }
           else note.hidden = true;
         }
@@ -2550,12 +2550,28 @@
   }
   function placeHeightBox() {   // idempotent: Finished height (+ RESIZE) above the green SHRINK button
     const st = $('v2SideStack'), mb = $('v2MagicBtn'), hr = $('v2Height')?.closest('.v2-size-row'), rb = $('v2ResizeBtn');
-    if (!st || !mb || !hr || hr.closest('#v2SideStack')) return;
+    if (!st || !mb || !hr || hr.closest('#v2SideStack') || hr.closest('.v2-side-height')) return;
     const box = document.createElement('div'); box.className = 'v2-side-height'; box.appendChild(hr); if (rb) box.appendChild(rb);
-    st.insertBefore(box, mb);
+    if (mb.parentNode === st) st.insertBefore(box, mb); else st.appendChild(box);
   }
+  // v2.381: every button that sat under the health box lives in the toolbar row with ADVANCED and EDIT (same size); only the health box stays on the right.
+  function toolbarize() {
+    const bar = document.querySelector('.viewer-toolbar .viewer-actions'); if (!bar) return false;
+    const card = $('v2HealthCard');
+    const put = el => { if (el && el.parentNode !== bar) bar.appendChild(el); };
+    placeHeightBox(); const hb = document.querySelector('.v2-side-height');
+    const items = [$('v2MagicBtn'), $('v2MagicDownload'), $('v2SideGlb'), hb, document.querySelector('.v2-auto-hollow')];
+    if (!items[0]) return false;
+    items.forEach(put);
+    [$('v2MagicBtn'), $('v2MagicDownload')].forEach(b => b?.classList.add('v2-tb-btn'));
+    // the white "Reduced from..." note and the status line go inside the health box
+    if (card) for (const id of ['v2ReduceNote', 'v2WorkflowStatus']) { const el = $(id); if (el && el.parentNode !== card) card.appendChild(el); }
+    const st = $('v2SideStack'); if (st && !st.children.length) st.hidden = true;
+    return true;
+  }
+  window.__shrinkToolbarize = toolbarize;
   function ensureMagicButton() {
-    if ($('v2MagicBtn')) { placeHeightBox(); return; }
+    if ($('v2MagicBtn')) { placeHeightBox(); toolbarize(); return; }
     const top = document.querySelector('.topbar'); if (!top) return;
     const wrap = document.createElement('div'); wrap.className = 'v2-magic-wrap';
     wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">AUTO-SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button>';
@@ -2577,6 +2593,7 @@
     { const status = document.createElement('small'); status.id = 'v2WorkflowStatus'; status.className = 'v2-workflow-status'; $('v2MagicDownload')?.insertAdjacentElement('afterend', status); updateWorkflowButtons(); }
     $('v2MagicReset').addEventListener('click', () => { const f = $('fileInput'); if (f) { f.value = ''; f.click(); } });
     $('v2MagicDownload').addEventListener('click', () => { const b = $('v2DownloadBtn'); if (b && !b.disabled) b.click(); });
+    toolbarize(); setTimeout(toolbarize, 300); setTimeout(toolbarize, 1500);
   }
 
   let activePegCut = 0;
@@ -2942,6 +2959,7 @@
       if (viewerActions) viewerActions.insertBefore(ed, advancedToggle ? advancedToggle.nextSibling : viewerActions.firstChild); else (viewerPanel || dashboard).appendChild(ed);
       const pn = $('v2EditPanel'); if (pn) (viewerPanel || dashboard).appendChild(pn);
       ed.addEventListener('click', () => setMainTab(editActive() ? 'finish' : 'edit')); pn?.querySelector('.v2-edit-close')?.addEventListener('click', () => setMainTab('finish')); }
+    toolbarize();   // v2.381: the buttons that were under the health box join ADVANCED / EDIT
     // The panel folds away again (as before v2.215); the choice is remembered.
     { const tg = $('v2LeftToggle');
       const setLeft = open => { dashboard.dataset.left = open ? 'open' : 'closed'; tg.setAttribute('aria-expanded', String(open)); tg.textContent = 'ADVANCED' /* v2.236: just the one word, open or closed */; };
