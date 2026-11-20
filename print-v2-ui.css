@@ -948,6 +948,7 @@ body[data-v2-preshrunk] :is(#v2MagicBtn,#v2ShrinkBtn){background:#3a414c!importa
 /* v2.381 — one toolbar row: ADVANCED, EDIT, AUTO-SHRINK, DOWNLOAD, Other formats, Finished height + RESIZE, all the same size; only the health box is left on the right */
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2LeftToggle,
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-edit-toggle,
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2TbSave,
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2MagicBtn,
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2MagicDownload,
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2SideGlb > summary,
@@ -995,3 +996,4 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras 
 .v2-main-extras .v2-side-glb[data-available="no"] .v2-more-menu{opacity:.4;pointer-events:none}
 /* v2.384: the red DOWNLOAD button sits at the bottom right of the screen (same size) */
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2MagicDownload{position:fixed;right:18px;bottom:18px;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2TbSave{background:#1b2635;border:1px solid #3a4a60;color:#e8eef6;cursor:pointer}

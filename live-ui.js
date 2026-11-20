@@ -295,7 +295,7 @@ window.addEventListener('shrink:model-opened', async e => {
   if (el.topo) el.topo.hidden = true;
   gatherTextures();
   try { await engine.prepare(); } catch (err) { console.error(err); say(`Could not prepare the live preview: ${err.message}`, true); return; }
-  if (mode() === 'game') { chooseTarget(S.target, { initial: true }); setRatio(DEFAULT_GAME_KEEP); } else setRatio(0.7);   // v2.270: print models open at the recommended 70%, the same value the Detail kept slider shows (it was 50% against a slider reading 70)
+  if (mode() === 'game') { chooseTarget(S.target, { initial: true }); setRatio(DEFAULT_GAME_KEEP); } else setRatio(1);   // v2.388 (Tim): a print model opens untouched at 100%; it only shrinks when SHRINK or the Detail slider is used   // v2.270: print models open at the recommended 70%, the same value the Detail kept slider shows (it was 50% against a slider reading 70)
   if (!engine.last.triangles) return;
   onSlider();
   setTimeout(() => { if (mode() === 'print' && app()?.originalModel) { try { S.topoOrig = analyzeTopology(THREE, app().originalModel); updateTopo(); } catch {} } }, 600);

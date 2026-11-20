@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.388
+- SAVE PROJECT button on the top menu (next to EDIT); same file as the one in the EDIT panel.
+- A 3D print model now opens untouched at 100% detail. Before, every opened model was quietly previewed at 70%; it only shrinks now when SHRINK / AUTO-SHRINK or the Detail slider is used.
+
 ## v2.387
 - The part gizmo never shrinks below 7% of the model's longest side, so a very small part still has grabbable handles.
 

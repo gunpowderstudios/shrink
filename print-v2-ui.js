@@ -2567,6 +2567,7 @@
     const bar = document.querySelector('.viewer-toolbar .viewer-actions'); if (!bar) return false;
     const card = $('v2HealthCard');
     const put = el => { if (el && el.parentNode !== bar) bar.appendChild(el); };
+    if (!$('v2TbSave')) { const b = document.createElement('button'); b.type = 'button'; b.id = 'v2TbSave'; b.className = 'v2-tb-save'; b.textContent = 'SAVE PROJECT'; b.title = 'Save your work so far (the model as it is now and any floating pieces) to one .shrinkproject file'; b.addEventListener('click', () => { if (!sourceModel()) { try { edToast('Open a model first.'); } catch {} return; } saveProjectFile(); }); const ed = document.querySelector('.viewer-toolbar .viewer-actions .v2-edit-toggle'); if (ed) ed.insertAdjacentElement('afterend', b); else bar.appendChild(b); }   // v2.388 (Tim): SAVE PROJECT on the top menu
     const items = [$('v2MagicBtn'), $('v2MagicDownload')];
     if (!items[0]) return false;
     items.forEach(put);
@@ -3270,14 +3271,14 @@
 
     const h = Number(nativeValue('figureHeightMm', 75)) || 75;
     $('v2Height').value = h; $('v2HeightRange').value = Math.max(10, Math.min(300, h));
-    const geom = 70; $('v2Detail').value = geom; $('v2DetailNumber').value = geom;   /* v2.268: always the recommended 70 on load; the browser's restored form value (an earlier 100%) is not used */
+    const geom = 100; $('v2Detail').value = geom; $('v2DetailNumber').value = geom;   /* v2.268: always the recommended 70 on load; the browser's restored form value (an earlier 100%) is not used */
     { const sp = savedPrinter(), okT = ['resin', 'fdm', 'custom'], okQ = ['standard', 'fine', 'ultra', 'large'];
       restoringPrinter = true;
       try { choosePrinter(sp && okT.includes(sp.type) ? sp.type : 'resin'); setQuality(sp && okQ.includes(sp.quality) ? sp.quality : 'ultra'); } finally { restoringPrinter = false; } }
     syncSplitControls();
 
     new MutationObserver(syncSplitControls).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('shrink:model-opened', e => { autoReady = false; settingsDirty = false; detailUpdating = false; updateWorkflowButtons(); poseD = null; { const cur = currentPrinter(); if (cur.type === 'resin' && cur.id !== 'r16') { try { restoringPrinter = true; const sel = $('v2PrinterSel'); if (sel) { sel.value = 'r16'; sel.dispatchEvent(new Event('change', { bubbles: true })); } } finally { restoringPrinter = false; } } } window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; detailScale = 1; { const d = $('v2Detail'), n = $('v2DetailNumber'); if (d) d.value = '70'; if (n) n.value = '70'; } { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
+    window.addEventListener('shrink:model-opened', e => { autoReady = false; settingsDirty = false; detailUpdating = false; updateWorkflowButtons(); poseD = null; { const cur = currentPrinter(); if (cur.type === 'resin' && cur.id !== 'r16') { try { restoringPrinter = true; const sel = $('v2PrinterSel'); if (sel) { sel.value = 'r16'; sel.dispatchEvent(new Event('change', { bubbles: true })); } } finally { restoringPrinter = false; } } } window.__shrinkLastFuse = null; window.__shrinkLastVerdict = null; detailManual = false; manualLevel = ''; detailScale = 1; { const d = $('v2Detail'), n = $('v2DetailNumber'); if (d) d.value = '100'; if (n) n.value = '100'; } { const n = $('v2DetailNote'); if (n) n.textContent = ''; } { const dl = $('v2MagicDownload'); if (dl) dl.disabled = true; } removeBedGuide(); setWorkingModel(app()?.originalModel); clearApplied(); fuseReady = false; shrinkReady = false; markStep(1, 'done'); markStep(2, 'active'); syncSplitControls(); setTimeout(updateHealthCard, 80); });
     window.addEventListener('shrink:reduced', () => setTimeout(updateHealthCard, 80));
   }
 
