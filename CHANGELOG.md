@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.399
+- AUTO-SHRINK never goes below 50% detail. The extra 'shrink more so it fits FUSE' pass is gone (on a 4M-triangle model it went down to about 22%). A model still over 1M triangles after 50% keeps them and FUSE asks once before running.
+
 ## v2.398
 - COPY INSIDE on a leaky model now says in plain words to press FIX IT then FUSE IT, instead of the raw Manifold message.
 

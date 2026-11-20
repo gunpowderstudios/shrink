@@ -2502,11 +2502,8 @@
       // 1b. Too detailed to fuse (v2.185). 16K ultra can leave millions of triangles, and FUSE is refused above the limit. Step down one detail level at a time
       //     (16K, 8K fine, 8K, 4K) and shrink again until it fits, and say so. The file name tag then shows the level that was really used.
       const fuseLimit = window.__shrinkFuseTriLimit || SOFT_TRIANGLES; let loweredFrom = null;
-      if (modelTriangles(sourceModel()) > fuseLimit && fixedShrinkReady()) {         // v2.331: a fixed share cannot step down the printer ladder, so keep just enough triangles to fuse
-        const o = modelTriangles(app()?.originalModel || sourceModel()) || 1, cap = Math.max(1, Math.floor(fuseLimit * 0.9 / o * 1000) / 10);
-        btn.textContent = '1/4 Shrinking more…'; show(`Still ${modelTriangles(sourceModel()).toLocaleString()} triangles: too many to fuse. Keeping ${cap}% instead…`); await paintNow(); window.__shrinkShrinkCap = cap;
-        try { await shrinkModel(); } catch (err) { console.warn('second shrink', err); } finally { window.__shrinkShrinkCap = null; }
-        const now = modelTriangles(sourceModel()); done(now > fuseLimit ? 'warn' : 'ok', now > fuseLimit ? '⚠' : '✓', `Shrunk further for fusing: ${cap}% kept (${now.toLocaleString()} triangles)`);
+      if (modelTriangles(sourceModel()) > fuseLimit && fixedShrinkReady()) {         // v2.399 (Tim): AUTO-SHRINK never goes below 50% detail. It used to shrink a second time (down to ~22% on a 4M model) so FUSE fit under 1M; now it keeps the 50% and FUSE just takes longer (it asks once before a big model).
+        done('warn', '⚠', `Kept 50% detail: ${modelTriangles(sourceModel()).toLocaleString()} triangles. Fusing a model this big can take a while.`);
       } else if (modelTriangles(sourceModel()) > fuseLimit && dashboard) {
         const type0 = dashboard.dataset.printerType || 'resin', ladder = ['ultra', 'fine', 'standard', 'large'].filter(k => PRINTER_LIST.some(x => x.type === type0 && x.quality === k)), q0 = dashboard.dataset.quality || 'standard'; 
         const from = currentPrinter(); let at = ladder.indexOf(q0);
