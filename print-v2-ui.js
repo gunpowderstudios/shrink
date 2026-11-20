@@ -304,6 +304,7 @@
     card.id = 'v2HealthCard';
     card.className = 'v2-health-card checking';
     card.innerHTML = `
+      <div id="v2FileLine" class="v2-file-line" title="The file you opened"><small>FILE</small><span id="v2FileLineName">—</span></div>
       <div class="v2-health-top">
         <div><small>MODEL HEALTH</small><strong id="v2HealthLabel">Checking…</strong></div>
         <div class="v2-health-score"><b id="v2HealthScore">—</b><span>/100</span></div>
@@ -316,6 +317,9 @@
     `;
     viewer.appendChild(card);
     $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
+    { const src = document.getElementById('fileName'), out = $('v2FileLineName');   // v2.397 (Tim): show the name of the uploaded file under the health box
+      const sync = () => { const t = String(src?.textContent || '').trim() || '—'; if (out && out.textContent !== t) { out.textContent = t; $('v2FileLine').title = t; } };
+      sync(); if (src) new MutationObserver(sync).observe(src, { childList: true, characterData: true, subtree: true }); document.addEventListener('shrink:model-opened', () => setTimeout(sync, 50)); }
     return card;
   }
 

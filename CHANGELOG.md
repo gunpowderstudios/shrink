@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.397
+- The MODEL HEALTH box shows the name of the uploaded file (FILE line at the top, above MODEL HEALTH).
+
 ## v2.396
 - COPY INSIDE on the floating-part pad: lay a shape over part of the model and turn what is inside it into a new floating piece (model untouched). Shift-click = CUT INSIDE (also removes it from the model; UNDO restores). Needs a closed model.
 

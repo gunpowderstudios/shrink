@@ -997,3 +997,8 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras 
 /* v2.384: the red DOWNLOAD button sits at the bottom right of the screen (same size) */
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2MagicDownload{position:fixed;right:18px;bottom:18px;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.45)}
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2TbSave{background:#1b2635;border:1px solid #3a4a60;color:#e8eef6;cursor:pointer}
+
+/* v2.397: file name under the health box */
+.v2-file-line{display:flex;gap:8px;align-items:baseline;margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12);min-width:0}
+.v2-file-line small{opacity:.65;letter-spacing:.08em;flex:none}
+.v2-file-line span{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
