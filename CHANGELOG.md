@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.398
+- COPY INSIDE on a leaky model now says in plain words to press FIX IT then FUSE IT, instead of the raw Manifold message.
+
 ## v2.397
 - The MODEL HEALTH box shows the name of the uploaded file (FILE line at the top, above MODEL HEALTH).
 

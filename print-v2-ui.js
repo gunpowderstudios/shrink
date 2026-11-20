@@ -1269,7 +1269,9 @@
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1;
       if (res) res.innerHTML = `<strong>✓ ${op === 'cut' ? 'Cut out' : 'Copied'}</strong><span>${(r.pieceVolume * mm * mm * mm / 1000).toFixed(1)} ml is now a floating piece${op === 'cut' ? ' and is gone from the model (UNDO brings it back)' : '; the model is untouched'}. The shape you used is still floating: DELETE PART it when you are done.</span>`;
       return true;
-    } catch (err) { try { edToast(String(err?.message || err)); } catch {} if (res) res.innerHTML = `<strong>Could not copy</strong><span>${err?.message || err}</span>`; return false; }
+    } catch (err) {
+      let m = String(err?.message || err); if (/manifold|printable|watertight|reject|closed solid/i.test(m) && !/shape is not/i.test(m)) m = 'The model has holes or bad edges, so it is not a closed solid yet (SHRINK does not fix that). Press FIX IT, then FUSE IT, in SHRINK & FINISH, then try COPY INSIDE again.';
+      try { edToast(m); } catch {} if (res) res.innerHTML = `<strong>Could not copy</strong><span>${m}</span>`; return false; }
     finally { setWorking(false); }
   }
   function floatRestore(snap) { parked = snap.parked.map(r => ({ ...r })); if (snap.sel) floatSelect(snap.sel); else { editPart = null; partRot = null; } }
