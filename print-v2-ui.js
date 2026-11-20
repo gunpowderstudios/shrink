@@ -186,7 +186,7 @@
   const HOLLOW_ON = (() => { try { return new URLSearchParams(window.location.search).get('hollow') !== '0'; } catch { return true; } })();   // v2.295: HOLLOW IT is on for everyone; ?hollow=0 switches it off
   let fusedPieces = 1;                          // how many pieces the last fuse left (v2.187): the chip says so when it is not one
   function renderAppliedChanges() {
-    { const hc = $('v2HollowCard'); if (hc) hc.hidden = !(HOLLOW_ON && appliedChanges.has('shrunk')); }
+    { const hc = $('v2HollowCard'); if (hc) hc.hidden = !(HOLLOW_ON && !!sourceModel()); }
     ensureHollowSlide(); { const hs = $('v2HollowSlide'); if (hs) hs.hidden = !appliedChanges.has('hollowed'); }
     const wrap = $('v2HealthChanges');
     if (!wrap) return;
@@ -2583,11 +2583,10 @@
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
         { const lab = document.createElement('label'); lab.className = 'v2-auto-hollow'; lab.title = 'Also hollow the model to save resin (2 mm walls, 2 drain holes in the base) as the last step of AUTO-SHRINK. Fine-tune it in ADVANCED.'; lab.innerHTML = '<input id="v2AutoHollow" type="checkbox" autocomplete="off"> <span>Hollow it too (saves resin)</span>'; st.insertBefore(lab, mb.nextSibling); }   /* v2.302: off by default */
-        const g = document.createElement('details'); g.id = 'v2SideGlb'; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)
-        g.innerHTML = '<summary title="Convert the loaded model without AUTO-SHRINK (geometry only)">Other formats / Convert</summary><div class="v2-more-menu"><button type="button" data-fmt="glb">GLB</button><button type="button" data-fmt="obj">OBJ</button><button type="button" data-fmt="3mf">3MF</button><button type="button" data-fmt="usdz">USDZ</button></div>';
+        const g = document.createElement('details'); g.id = 'v2SideGlb'; g.open = true; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)
+        g.innerHTML = '<summary title="Convert the loaded model without AUTO-SHRINK (geometry only)">Download other formats</summary><div class="v2-more-menu"><button type="button" data-fmt="glb">Download GLB</button><button type="button" data-fmt="obj">Download OBJ</button><button type="button" data-fmt="3mf">Download 3MF</button><button type="button" data-fmt="usdz">Download USDZ</button></div>';
         g.addEventListener('click', e => {
           const b = e.target.closest('[data-fmt]'); if (!b) return;
-          g.open = false;
           if (g.dataset.available !== 'yes' || !sourceModel()) return;
           window.__shrinkExportFormat?.(b.dataset.fmt);
         });
@@ -2920,7 +2919,7 @@
               <div class="v2-hollow-row"><label for="v2HollowHoleZ">Holes forward / back</label><input id="v2HollowHoleZ" type="range" min="-50" max="50" step="1" value="0" autocomplete="off"><output id="v2HollowHoleZOut">0%</output></div>
               <button id="v2HollowBtn" class="v2-mega v2-teal" type="button">HOLLOW IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
-              <div id="v2HollowResult" class="v2-result">Works best after SHRINK with fix and fuse, on one watertight piece.</div>
+              <div id="v2HollowResult" class="v2-result">Needs one watertight piece: press FIX IT and FUSE IT first if the health box shows problems.</div>
               <div id="v2HollowCut" class="v2-hollow-row" hidden><label for="v2HollowCutRange">Cut-away</label><input id="v2HollowCutRange" type="range" min="0" max="100" step="1" value="100" autocomplete="off"><output id="v2HollowCutOut">off</output></div>
             </section>
 

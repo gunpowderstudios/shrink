@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.384
+- HOLLOW IT card is always in ADVANCED (like FIX/FUSE) with all its options; Other formats are four visible Download buttons; ADVANCED column 380 px (same as EDIT); red DOWNLOAD button fixed at the bottom right of the screen.
+
 ## v2.383
 - Other formats and the Hollow tick box moved off the toolbar into the ADVANCED left column (the Extras drop-down is gone). The Finished height row is back in the ADVANCED size card. The toolbar keeps ADVANCED, EDIT, AUTO-SHRINK and DOWNLOAD.
 

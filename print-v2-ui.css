@@ -984,3 +984,14 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras 
 .v2-main-extras{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #2a384b}
 .v2-main-extras .v2-side-glb{align-self:flex-start;text-align:left}
 .v2-main-extras .v2-more-menu{justify-content:flex-start}
+
+/* v2.384: ADVANCED column as narrow as the EDIT panel; Other formats = always-open download buttons */
+.print-v2-dashboard .v2-top-grid{grid-template-columns:380px minmax(0,1fr)!important}
+.v2-main-extras .v2-side-glb summary{pointer-events:none;text-decoration:none;font-weight:800;color:#cdd6e2;text-align:left;padding:2px 0}
+.v2-main-extras .v2-side-glb summary::after{content:''}
+.v2-main-extras .v2-side-glb{align-self:stretch}
+.v2-main-extras .v2-more-menu{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.v2-main-extras .v2-more-menu button{padding:8px;border-radius:10px;border:1px solid #2f86ff;background:transparent;color:#9cc4ff;font-weight:800;cursor:pointer}
+.v2-main-extras .v2-side-glb[data-available="no"] .v2-more-menu{opacity:.4;pointer-events:none}
+/* v2.384: the red DOWNLOAD button sits at the bottom right of the screen (same size) */
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2MagicDownload{position:fixed;right:18px;bottom:18px;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.45)}

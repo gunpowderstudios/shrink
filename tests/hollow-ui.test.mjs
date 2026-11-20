@@ -7,7 +7,7 @@ const waitFor = async (fn, ms = 90000, step = 100) => { for (let t = 0; t < ms; 
 function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
 
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/?hollow=1' }); const w = page.w; await wait(300);
-  ok(page.$('v2HollowCard')?.hidden === true, 'HU2 with ?hollow=1 the card waits for SHRINK');
+  ok(page.$('v2HollowCard')?.hidden === false, 'HU2 with ?hollow=1 the card is always in ADVANCED');
   w.__shrinkMarkApplied('shrunk'); await wait(50);
   ok(page.$('v2HollowCard')?.hidden === false, 'HU2 after SHRINK the card appears');
   ok(!page.$('v2HollowSlide') || page.$('v2HollowSlide').hidden === true, 'HU11 no vertical slider before hollowing');
