@@ -38,15 +38,9 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
   ok(Math.abs(y3 - y1) / y1 < 0.03, `HU9 the same wall again gives the same result (${y1} ml vs ${y3} ml)`);
 }
 
-/* v2.302: a tick box under AUTO-SHRINK (off by default) makes the automatic run hollow the model as its last step */
-{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(300);
-  const box = page.$('v2AutoHollow'), qb = page.$('v2MagicBtn');
-  ok(!!box && box.checked === false, 'HU10 the Hollow tick box exists and is off by default');
-  ok(!!box && !!box.closest('.v2-main-extras'), 'HU10 it sits in the ADVANCED left column (v2.383)');
-  box.checked = true; qb.click();
-  const done = await waitFor(() => !qb.dataset.busy && /Hollowed/.test(page.$('v2HollowResult').textContent), 200000);
-  ok(done, 'HU10 AUTO-SHRINK with the box ticked ends with the model hollowed: ' + page.$('v2HollowResult').textContent.slice(0, 120));
-  ok(/HOLLOW/.test(page.$('v2HealthChanges').textContent), 'HU10 the HOLLOW chip shows after the automatic run');
+/* v2.385: the AUTO-SHRINK Hollow tick box is gone (the HOLLOW IT card replaces it) */
+{ const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); await wait(300);
+  ok(!page.$('v2AutoHollow'), 'HU10 there is no Hollow tick box any more');
 }
 
 /* v2.305: letting go of the wall slider on a hollow model rebuilds it by itself and keeps the cut-away where it was */

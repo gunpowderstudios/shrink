@@ -1608,7 +1608,7 @@
     const buildBinaryStl = window.__shrinkBuildStl; if (!buildBinaryStl) throw new Error('The exporter is not loaded yet. Try again in a moment.');   // set by print-tools.js
     const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, { buffer, triangles } = buildBinaryStl({ THREE: app().THREE, model, mmPerUnit: mm, zUp: true });
     const stl = new Uint8Array(buffer), pcs = buildPiecesFile() || new Uint8Array(0);
-    const head = { app: 'SHRINK 3D', kind: 'project', v: 1, name: projectName(), heightMm: Number($('v2Height')?.value) || 0, triangles, stl: stl.length, pieces: pcs.length, autoHollow: !!$('v2AutoHollow')?.checked };
+    const head = { app: 'SHRINK 3D', kind: 'project', v: 1, name: projectName(), heightMm: Number($('v2Height')?.value) || 0, triangles, stl: stl.length, pieces: pcs.length, autoHollow: false };
     const enc = new TextEncoder(), hj = enc.encode(JSON.stringify(head)), mg = enc.encode(PROJ_MAGIC), out = new Uint8Array(mg.length + 4 + hj.length + stl.length + pcs.length);
     out.set(mg, 0); new DataView(out.buffer).setUint32(mg.length, hj.length, true); out.set(hj, mg.length + 4); out.set(stl, mg.length + 4 + hj.length); out.set(pcs, mg.length + 4 + hj.length + stl.length);
     return { data: out, head };
@@ -1636,7 +1636,7 @@
     for (let i = 0; i < 100 && !($('v2Height') && sourceModel() && $('v2EditPane')); i++) await wait(150);
     await wait(700);                                                                   // let the open's own height fit and health check settle
     if (head.heightMm > 0 && Math.abs((Number($('v2Height')?.value) || 0) - head.heightMm) > 0.05) setHeightMm(head.heightMm);
-    const ah = $('v2AutoHollow'); if (ah) ah.checked = !!head.autoHollow;
+    
     markWorkflowReady();                                                               // a saved project is past the SHRINK step: DOWNLOAD works at once
     const n = pieces ? loadPiecesBuffer(pieces.buffer) : 0;
     const r = $('v2EdResult'); if (r) r.innerHTML = `<strong>✓ Project loaded</strong><span>${head.name}, ${Number(head.triangles || 0).toLocaleString()} triangles${n ? ', ' + n + ' floating piece' + (n === 1 ? '' : 's') + ' waiting in green' : ''}. Carry on where you stopped. Undo history is not kept in a project.</span>`;
@@ -1885,11 +1885,22 @@
     const ng = g.index ? g.toNonIndexed() : g, a = ng.getAttribute('position').array.slice(); g.dispose(); return a;
   }
   // v2.377 (Tim): clicking a shape icon drops a floating shape beside the model (a quarter of its size, standing on the ground) with the gizmo up, ready to drag in
+  function viewCentrePoint(f) {                          // world point at the middle of the viewer: the model surface under the centre, else the orbit target
+    const V = window.__shrinkViewer, model = sourceModel(); if (!V?.camera) return null;
+    try {
+      if (V.renderer && model) { const rc = new f.THREE.Raycaster(); rc.setFromCamera({ x: 0, y: 0 }, V.camera);
+        const hit = rc.intersectObject(model, true).find(x => x.object.isMesh && x.object.visible); if (hit) return hit.point.clone(); }
+      if (V.controls?.target) return V.controls.target.clone();
+    } catch {}
+    return null;
+  }
   function addShapeFromIcon() {
     const f = editFrame(); if (!f) return false;
     const sz = Math.max(2, Math.round(Math.max(f.size.x, f.size.y, f.size.z) * f.mm * 0.25));
     ['v2EdW', 'v2EdH', 'v2EdD'].forEach(id => { $(id).value = String(sz); });
-    $('v2EdX').value = String(Math.round(f.size.x * f.mm / 2 + sz * 0.8)); $('v2EdY').value = String(Math.round(-f.size.y * f.mm / 2 + sz / 2)); $('v2EdZ').value = '0';
+    { const c = viewCentrePoint(f);   // v2.385 (Tim): a new shape appears in the middle of the current view
+      if (c) { $('v2EdX').value = String(Math.round((c.x - f.centre.x) * f.mm)); $('v2EdY').value = String(Math.round((c.y - f.centre.y) * f.mm)); $('v2EdZ').value = String(Math.round((c.z - f.centre.z) * f.mm)); }
+      else { $('v2EdX').value = String(Math.round(f.size.x * f.mm / 2 + sz * 0.8)); $('v2EdY').value = String(Math.round(-f.size.y * f.mm / 2 + sz / 2)); $('v2EdZ').value = '0'; } }
     return makeShapePiece();
   }
   function makeShapePiece() {
@@ -2582,7 +2593,6 @@
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
-        { const lab = document.createElement('label'); lab.className = 'v2-auto-hollow'; lab.title = 'Also hollow the model to save resin (2 mm walls, 2 drain holes in the base) as the last step of AUTO-SHRINK. Fine-tune it in ADVANCED.'; lab.innerHTML = '<input id="v2AutoHollow" type="checkbox" autocomplete="off"> <span>Hollow it too (saves resin)</span>'; st.insertBefore(lab, mb.nextSibling); }   /* v2.302: off by default */
         const g = document.createElement('details'); g.id = 'v2SideGlb'; g.open = true; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)
         g.innerHTML = '<summary title="Convert the loaded model without AUTO-SHRINK (geometry only)">Download other formats</summary><div class="v2-more-menu"><button type="button" data-fmt="glb">Download GLB</button><button type="button" data-fmt="obj">Download OBJ</button><button type="button" data-fmt="3mf">Download 3MF</button><button type="button" data-fmt="usdz">Download USDZ</button></div>';
         g.addEventListener('click', e => {

@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.385
+- A new shape (Shape tool icon) appears in the middle of the current view (model surface under the centre, else the orbit target).
+- The 'Hollow it too' tick box is removed; the HOLLOW IT card is the way to hollow.
+
 ## v2.384
 - HOLLOW IT card is always in ADVANCED (like FIX/FUSE) with all its options; Other formats are four visible Download buttons; ADVANCED column 380 px (same as EDIT); red DOWNLOAD button fixed at the bottom right of the screen.
 
