@@ -1957,6 +1957,8 @@
   async function booleNow() {
     if (!editPart) return false;
     const md = $('v2EdMode'); if (md && md.value !== 'cut') { md.value = 'cut'; md.dispatchEvent(new Event('change', { bubbles: true })); }
+    const tab = $('v2EdTab'); if (tab && !pieceTool() && tab.value !== 'select') { tab.value = 'select'; try { editTabChanged(); } catch {} }   // v2.394: with the Shape tool open, editModelNow only made ANOTHER shape, so BOOLE seemed to do nothing
+    if ($('v2EdGo')?.disabled) { try { edToast('Still working on the last edit. Try again in a moment.'); } catch {} return false; }
     await editModelNow(); return true;
   }
   async function editModelNow() {
@@ -1992,6 +1994,7 @@
       setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
     } catch (err) {
       card.dataset.state = 'warn'; progress(card, 100, 'Could not edit this model.');
+      try { edToast(String(err?.message || err)); } catch {}   // v2.394: the message used to appear only inside the EDIT panel
       res.innerHTML = `<strong>Could not edit</strong><span>${err?.message || err}${/watertight|manifold|reject/i.test(String(err?.message || err)) ? ' Run FIX IT or FUSE IT first.' : ''}</span>`;
     } finally { btn.disabled = false; setWorking(false); }
   }

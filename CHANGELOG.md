@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.394
+- BOOLE (CUT OUT) did nothing when the Shape tool was the active tool (editModelNow made another shape instead of cutting). It now switches to Select first. Edit errors (e.g. model too big, not watertight) are also shown as a pop-up in the viewer, not only inside the EDIT panel.
+
 ## v2.393
 - FLIP button on the floating-part pad: mirrors the selected piece left to right (Shift-click: upside down), triangles kept facing outward, UNDO supported. Use it to turn a left hand into a right hand: Lasso/Wand it, COPY, FLIP, drag it into place, WELD IT.
 
