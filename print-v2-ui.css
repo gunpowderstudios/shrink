@@ -951,6 +951,7 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-edit-t
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2MagicBtn,
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2MagicDownload,
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2SideGlb > summary,
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras > summary,
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-side-height .v2-resize-btn{
   box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:140px;min-width:140px;height:38px;margin:0;padding:0 10px;border-radius:9px;font-size:12px;font-weight:800;line-height:1.1;white-space:nowrap;text-decoration:none;letter-spacing:0;box-shadow:none}
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2MagicBtn{background:linear-gradient(180deg,#27b56c,#1f9d5c);border:1px solid #33c882;color:#fff}
@@ -970,3 +971,12 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > .v2-auto-h
 #v2HealthCard .v2-reduce-note{position:static;width:100%;text-align:center;margin-top:8px;pointer-events:none}
 #v2HealthCard #v2WorkflowStatus.v2-workflow-status{margin:6px 0 0}
 .v2-side-stack[hidden]{display:none!important}
+
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras{position:relative;flex:0 0 auto;margin:0}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras > summary{list-style:none;background:#182230;border:1px solid #35455a;color:#cdd6e2;cursor:pointer;user-select:none}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras > summary::-webkit-details-marker{display:none}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras > summary::after{content:' \25BE';margin-left:4px}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras[open] > summary::after{content:' \25B4'}
+body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras > summary:hover{color:#fff;border-color:#2f8cff}
+.v2-extras-menu{position:absolute;top:42px;left:0;z-index:30;min-width:240px;background:#111824;border:1px solid #39485d;border-radius:10px;padding:8px 10px}
+.v2-extras-menu .v2-auto-hollow{margin:0}

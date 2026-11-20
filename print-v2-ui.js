@@ -502,14 +502,16 @@
     const working = !!magic?.dataset.busy;
     const ready = autoReady && !settingsDirty && !detailUpdating && !working;
     if (magic && !working) magic.textContent = settingsDirty ? 'AUTO-SHRINK — settings changed' : 'AUTO-SHRINK';   /* v2.301: no "AGAIN" any more; the line under DOWNLOAD says when it is done */
-    if (dl) { dl.disabled = !ready; dl.title = settingsDirty ? 'Settings changed: press SHRINK again.' : detailUpdating ? 'Waiting for the manual detail preview.' : ready ? 'Download the current model.' : 'Press SHRINK first.'; }
-    if (other) other.disabled = !ready;
+    // v2.382: DOWNLOAD is always available while a model is loaded (and nothing is running): you may only want to edit and download, without SHRINK
+    const canDownload = !!sourceModel() && !detailUpdating && !working;
+    if (dl) { dl.disabled = !canDownload; dl.title = detailUpdating ? 'Waiting for the manual detail preview.' : canDownload ? 'Download the current model as it is now.' : 'Load a model first.'; }
+    if (other) other.disabled = !canDownload;
     const otherFormats = $('v2SideGlb');
     // Direct format conversion (GLB -> OBJ etc.) does not require AUTO-SHRINK.
     // It is separate from the protected, print-ready DOWNLOAD workflow.
     if (otherFormats) { otherFormats.dataset.available = sourceModel() && !working && !detailUpdating ? 'yes' : 'no'; otherFormats.title = 'Convert the loaded model to OBJ (Cinema 4D R25), GLB, 3MF or USDZ. AUTO-SHRINK is optional.'; }
     const note = $('v2WorkflowStatus');
-    if (note) note.textContent = settingsDirty ? 'Settings changed — press SHRINK again.' : detailUpdating ? 'Updating manual detail…' : ready ? (detailManual ? 'Manual detail ready — download when happy.' : 'Optimised — ready to download.') : working ? 'SHRINK is working…' : 'Press SHRINK for automatic optimisation.';
+    if (note) note.textContent = settingsDirty ? 'Settings changed — press SHRINK again.' : detailUpdating ? 'Updating manual detail…' : ready ? (detailManual ? 'Manual detail ready — download when happy.' : 'Optimised — ready to download.') : working ? 'SHRINK is working…' : 'Ready to download as it is, or press SHRINK to optimise first.';
   }
   function markSettingsChanged() {
     if (!autoReady || $('v2MagicBtn')?.dataset.busy || restoringPrinter || window.__shrinkBatchRunning) return;
@@ -2551,7 +2553,7 @@
   function placeHeightBox() {   // idempotent: Finished height (+ RESIZE) above the green SHRINK button
     const st = $('v2SideStack'), mb = $('v2MagicBtn'), hr = $('v2Height')?.closest('.v2-size-row'), rb = $('v2ResizeBtn');
     if (!st || !mb || !hr || hr.closest('#v2SideStack') || hr.closest('.v2-side-height')) return;
-    const box = document.createElement('div'); box.className = 'v2-side-height'; box.appendChild(hr); if (rb) box.appendChild(rb);
+    const box = document.createElement('div'); box.className = 'v2-side-height'; box.appendChild(hr);   /* v2.382: RESIZE stays in ADVANCED (.v2-main-size) */
     if (mb.parentNode === st) st.insertBefore(box, mb); else st.appendChild(box);
   }
   // v2.381: every button that sat under the health box lives in the toolbar row with ADVANCED and EDIT (same size); only the health box stays on the right.
@@ -2560,7 +2562,11 @@
     const card = $('v2HealthCard');
     const put = el => { if (el && el.parentNode !== bar) bar.appendChild(el); };
     placeHeightBox(); const hb = document.querySelector('.v2-side-height');
-    const items = [$('v2MagicBtn'), $('v2MagicDownload'), $('v2SideGlb'), hb, document.querySelector('.v2-auto-hollow')];
+    // v2.382: the Hollow tick box lives in an "Extras" drop-down on the toolbar
+    let ex = $('v2Extras');
+    if (!ex) { ex = document.createElement('details'); ex.id = 'v2Extras'; ex.className = 'v2-extras'; ex.innerHTML = '<summary title="Extra options for AUTO-SHRINK">Extras</summary><div class="v2-extras-menu"></div>'; }
+    const hl = document.querySelector('.v2-auto-hollow'); const menu = ex.querySelector('.v2-extras-menu'); if (hl && hl.parentNode !== menu) menu.appendChild(hl);
+    const items = [$('v2MagicBtn'), $('v2MagicDownload'), $('v2SideGlb'), ex, hb];
     if (!items[0]) return false;
     items.forEach(put);
     [$('v2MagicBtn'), $('v2MagicDownload')].forEach(b => b?.classList.add('v2-tb-btn'));
@@ -2577,7 +2583,7 @@
     wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">AUTO-SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
-      { const hr = $('v2Height')?.closest('.v2-size-row'), rb = $('v2ResizeBtn'); if (hr && !hr.closest('#v2SideStack')) { const box = document.createElement('div'); box.className = 'v2-side-height'; box.appendChild(hr); if (rb) box.appendChild(rb); st.insertBefore(box, mb); } }   // v2.330: Finished height (+ RESIZE) lives above the green SHRINK button, not in ADVANCED
+      { const hr = $('v2Height')?.closest('.v2-size-row'), rb = $('v2ResizeBtn'); if (hr && !hr.closest('#v2SideStack')) { const box = document.createElement('div'); box.className = 'v2-side-height'; box.appendChild(hr);   /* v2.382: RESIZE stays in ADVANCED (.v2-main-size) */ st.insertBefore(box, mb); } }   // v2.330: Finished height (+ RESIZE) lives above the green SHRINK button, not in ADVANCED
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
         { const lab = document.createElement('label'); lab.className = 'v2-auto-hollow'; lab.title = 'Also hollow the model to save resin (2 mm walls, 2 drain holes in the base) as the last step of AUTO-SHRINK. Fine-tune it in ADVANCED.'; lab.innerHTML = '<input id="v2AutoHollow" type="checkbox" autocomplete="off"> <span>Hollow it too (saves resin)</span>'; st.insertBefore(lab, mb.nextSibling); }   /* v2.302: off by default */
         const g = document.createElement('details'); g.id = 'v2SideGlb'; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)

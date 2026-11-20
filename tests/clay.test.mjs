@@ -95,9 +95,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
 {
   const page = await makePage({ model: models.single(), heightMm: 40 }); await wait(300);
   const dl = page.$('v2MagicDownload');
-  ok(!!dl && dl.disabled && (dl.previousElementSibling === page.$('v2MagicBtn') || dl.previousElementSibling?.previousElementSibling === page.$('v2MagicBtn')), 'C8 the DOWNLOAD button sits under SHRINK (and its Hollow tick box) and starts greyed out');
-  dl.disabled = false; page.w.dispatchEvent(new page.w.CustomEvent('shrink:model-opened')); await wait(50);
-  ok(dl.disabled, 'C8 a newly opened model greys it out again');
+  ok(!!dl && !dl.disabled && dl.parentNode === page.$('v2MagicBtn').parentNode, 'C8 the DOWNLOAD button sits in the toolbar beside AUTO-SHRINK and is active as soon as a model is loaded (v2.382)');
+  page.w.dispatchEvent(new page.w.CustomEvent('shrink:model-opened')); await wait(50);
+  ok(!dl.disabled, 'C8 a newly opened model can be downloaded straight away');
   ok(!!page.$('v2EditPane')?.querySelector('#v2ClayCard'), 'C8 the Brush card is inside the EDIT tab');
 }
 

@@ -1,5 +1,10 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.382
+- DOWNLOAD is always active while a model is loaded (and nothing is running), so you can edit and download without pressing SHRINK.
+- The Hollow tick box is now in an "Extras" drop-down on the toolbar; Other formats stays on the bar as its own button.
+- RESIZE is back in ADVANCED (the Finished height box stays in the toolbar).
+
 ## v2.381
 - Layout: AUTO-SHRINK, DOWNLOAD, Other formats, Finished height + RESIZE and the Hollow tick box moved up into the toolbar row beside ADVANCED and EDIT. The buttons are all the same size. The right-hand side now holds only the MODEL HEALTH box; the white "Reduced from…" note and the status line moved inside it.
 
