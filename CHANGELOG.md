@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.391
+- SAVE PROJECT asks you to name the project (default = last name used, else the model name + -project). Cancel stops the save.
+
 ## v2.390
 - The red overlap marker is now 10% opaque (was 50%).
 

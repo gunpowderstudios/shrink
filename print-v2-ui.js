@@ -1613,9 +1613,14 @@
     out.set(mg, 0); new DataView(out.buffer).setUint32(mg.length, hj.length, true); out.set(hj, mg.length + 4); out.set(stl, mg.length + 4 + hj.length); out.set(pcs, mg.length + 4 + hj.length + stl.length);
     return { data: out, head };
   }
+  let projectNameLast = '';
   async function saveProjectFile() {
     const r = $('v2EdResult'); try {
-      const { data, head } = await buildProjectFile(), name = `${head.name}-project.shrinkproject`, blob = new Blob([data], { type: 'application/octet-stream' });
+      const { data, head } = await buildProjectFile();
+      let base = `${head.name}-project`;                     // v2.391 (Tim): ask what to call the project
+      if (!window.__shrinkCapture && typeof window.prompt === 'function') { let a = ''; try { a = window.prompt('Name your project:', projectNameLast || base); } catch {} if (a === null) return false; if (typeof a === 'string' && a.trim()) base = a.trim(); }
+      base = base.replace(/\.shrinkproject$/i, '').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'project'; projectNameLast = base;
+      const name = `${base}.shrinkproject`, blob = new Blob([data], { type: 'application/octet-stream' });
       if (!window.__shrinkCapture?.(blob, name)) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000); }
       const n = head.pieces ? (allPieces().length) : 0;
       if (r) r.innerHTML = `<strong>✓ Project saved</strong><span>${name}: the model as it is now${n ? ' and ' + n + ' floating piece' + (n === 1 ? '' : 's') : ''}. Open it again with LOAD PROJECT, or drop it on the start screen.</span>`;
