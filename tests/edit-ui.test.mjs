@@ -651,6 +651,14 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(Math.abs(partX() - x0) < 0.01, 'ED73 it stays where it was');
   page.$('v2EdUndo').click(); await wait(80); const a2 = Array.from(w.__shrinkEdit.partSoup() || []);
   ok(a2.length === a0.length && Math.sign(a2[0]) === Math.sign(a0[0]), 'ED73 UNDO puts the original back');
+  { // v2.396 COPY INSIDE / CUT INSIDE
+    const cube = [], c = [[-.5,-.5,-.5],[.5,-.5,-.5],[.5,.5,-.5],[-.5,.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]]; F.forEach(q => q.forEach(i => cube.push(...c[i])));
+    const m0 = w.__shrinkWorkingModel(), t0 = tris(m0);
+    w.__shrinkEdit.setPart(new Float32Array(cube), false, 'box'); await wait(60); page.$('v2EdPartH').value = '20'; page.$('v2EdPartX').value = '15'; page.$('v2EdPartY').value = '0'; page.$('v2EdPartZ').value = '0'; await wait(60);
+    const ok1 = await w.__shrinkEdit.inside('copy'); await wait(100);
+    ok(ok1 === true && w.__shrinkWorkingModel() === m0 && tris(w.__shrinkWorkingModel()) === t0 && w.__shrinkEdit.hasPart() && w.__shrinkEdit.selName() === 'Copied piece', 'ED74 COPY INSIDE makes a floating piece of what is inside the shape and leaves the model alone');
+    w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.();
+  }
   w.__shrinkEdit.discard?.(); }
 }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('edit-ui tests passed'); process.exit(0);

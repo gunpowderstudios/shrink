@@ -410,6 +410,17 @@ async function editModel(model, ops) {
         return out;
       } finally { try { c.piece?.delete?.(); c.rest?.delete?.(); } catch {} }
     }
+    if (ops.inside) {                                      // v2.396: the part of the model INSIDE a placed shape becomes a piece (op copy keeps the model whole, cut removes it from the model)
+      let sh = null;
+      try { sh = (await modelToSolid(ops.inside.root)).solid; } catch (e) { throw new Error('The shape is not a closed solid (' + (e?.message || e) + ')'); }
+      let c; try { c = lassoRegion(wasm.Manifold, solid, sh, ops.inside.op); } finally { try { sh.delete?.(); } catch {} }
+      try {
+        const out = { components };
+        if (c.piece) { out.piece = solidToThree(c.piece); out.pieceVolume = c.piece.volume(); }
+        if (c.rest) { out.root = solidToThree(c.rest); out.volume = c.rest.volume(); out.pieces = c.rest.decompose().length; }
+        return out;
+      } finally { try { c.piece?.delete?.(); c.rest?.delete?.(); } catch {} }
+    }
     let r;
     if (ops.part) {                                        // an uploaded part: already placed in world space on ops.part.root
       let part = null;

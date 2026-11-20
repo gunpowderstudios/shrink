@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.396
+- COPY INSIDE on the floating-part pad: lay a shape over part of the model and turn what is inside it into a new floating piece (model untouched). Shift-click = CUT INSIDE (also removes it from the model; UNDO restores). Needs a closed model.
+
 ## v2.395
 - Triangle limits removed from the EDIT tools, FILL, Sculpt, Lasso, FUSE IT and HOLLOW IT (Tim wants to work on unshrunk models). Above 1,000,000 triangles the Manifold tools (edit, boole, weld, fuse, hollow) ask once per model 'Go ahead?' because they run on the main thread and can freeze the tab; Cancel changes nothing. AUTO-SHRINK still shrinks to about 1M so it can fuse. Tests can still set `window.__shrinkFuseTriLimit`.
 
