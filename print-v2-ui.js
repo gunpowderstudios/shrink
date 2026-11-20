@@ -1559,7 +1559,7 @@
     const cut = $('v2EdMode')?.value === 'cut', joined = out.length / 9;
     if (joined) {
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(out), 3));
-      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.5, depthTest: false, depthWrite: false, side: THREE.DoubleSide })); mesh.renderOrder = 1001; mesh.raycast = () => {};
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.1, depthTest: false, depthWrite: false, side: THREE.DoubleSide })); mesh.renderOrder = 1001; mesh.raycast = () => {};
       const grp = new THREE.Group(); grp.name = 'shrinkPartOverlap'; grp.raycast = () => {}; grp.add(mesh); V.scene.add(grp);
     }
     setJoinNote(joined ? (cut ? 'Red = the part of the model this will cut away.' : 'Red = where it overlaps the model, so it will be joined there.') : (cut ? 'It is not touching the model, so nothing would be cut.' : 'Not touching the model yet. Move it so a little of it overlaps, or it will stay a separate piece.'), joined ? 'joined' : 'apart');

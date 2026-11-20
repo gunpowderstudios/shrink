@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.390
+- The red overlap marker is now 10% opaque (was 50%).
+
 ## v2.389
 - The Slice off tool icon is removed from the EDIT toolbar (the hidden tool code stays so nothing else breaks).
 
