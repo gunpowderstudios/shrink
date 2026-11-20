@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.387
+- The part gizmo never shrinks below 7% of the model's longest side, so a very small part still has grabbable handles.
+
 ## v2.386
 - HOLLOW IT button uses the same style as SHRINK IT / FIX IT / FUSE IT in ADVANCED (no teal override).
 

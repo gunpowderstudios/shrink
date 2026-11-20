@@ -1392,7 +1392,7 @@
   }
   // ---- v2.325: handles ON the green piece: three arrows (slide along X / Y / Z), three rings (yaw about Y, pitch about X, roll about Z) and − / + to resize.
   const GZ_COL = [0x4d9dff, 0x7fbaff, 0x2f6fd6], GZ_HOT = 0x36d88a, GZ_NAME = ['x', 'y', 'z'];
-  function gizmoSize(pm) { const g = editPart.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const k = Math.max(1e-9, (num('v2EdPartH', 30) / pm.f.mm) / (editPart.height || 1)); return Math.max(1e-6, (g.boundingSphere?.radius || 1) * k * 0.55); }   // v2.346: small, tidy handles
+  function gizmoSize(pm) { const g = editPart.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const k = Math.max(1e-9, (num('v2EdPartH', 30) / pm.f.mm) / (editPart.height || 1)); const R0 = (g.boundingSphere?.radius || 1) * k * 0.55, fs = pm.f?.size, floor = fs ? Math.max(fs.x, fs.y, fs.z) * 0.07 : 0; return Math.max(1e-6, R0, floor); }   // v2.346: small, tidy handles; v2.387 (Tim): never smaller than 7% of the model, so a tiny part keeps a grabbable gizmo
   const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const localAxis = (m, i) => { const e = m.elements, o = [e[i * 4], e[i * 4 + 1], e[i * 4 + 2]], l = Math.hypot(...o) || 1; return [o[0] / l, o[1] / l, o[2] / l]; };   // the part's own axis i in world space (v2.357 stretch handles)
   const SC_AT = 1.3;                                    // stretch cubes sit at -SC_AT * R along each local axis (keep in step with gizmoBuild)
