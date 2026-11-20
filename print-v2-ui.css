@@ -980,3 +980,7 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras[
 body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2Extras > summary:hover{color:#fff;border-color:#2f8cff}
 .v2-extras-menu{position:absolute;top:42px;left:0;z-index:30;min-width:240px;background:#111824;border:1px solid #39485d;border-radius:10px;padding:8px 10px}
 .v2-extras-menu .v2-auto-hollow{margin:0}
+
+.v2-main-extras{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #2a384b}
+.v2-main-extras .v2-side-glb{align-self:flex-start;text-align:left}
+.v2-main-extras .v2-more-menu{justify-content:flex-start}

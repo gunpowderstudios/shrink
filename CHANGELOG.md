@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.383
+- Other formats and the Hollow tick box moved off the toolbar into the ADVANCED left column (the Extras drop-down is gone). The Finished height row is back in the ADVANCED size card. The toolbar keeps ADVANCED, EDIT, AUTO-SHRINK and DOWNLOAD.
+
 ## v2.382
 - DOWNLOAD is always active while a model is loaded (and nothing is running), so you can edit and download without pressing SHRINK.
 - The Hollow tick box is now in an "Extras" drop-down on the toolbar; Other formats stays on the bar as its own button.

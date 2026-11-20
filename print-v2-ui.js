@@ -2550,26 +2550,24 @@
     if (!st._ro && window.ResizeObserver) { st._ro = new ResizeObserver(place); st._ro.observe(card); }
     return st;
   }
-  function placeHeightBox() {   // idempotent: Finished height (+ RESIZE) above the green SHRINK button
-    const st = $('v2SideStack'), mb = $('v2MagicBtn'), hr = $('v2Height')?.closest('.v2-size-row'), rb = $('v2ResizeBtn');
-    if (!st || !mb || !hr || hr.closest('#v2SideStack') || hr.closest('.v2-side-height')) return;
-    const box = document.createElement('div'); box.className = 'v2-side-height'; box.appendChild(hr);   /* v2.382: RESIZE stays in ADVANCED (.v2-main-size) */
-    if (mb.parentNode === st) st.insertBefore(box, mb); else st.appendChild(box);
-  }
+  function placeHeightBox() { /* v2.383: the Finished height row stays in the ADVANCED size card (.v2-main-size); nothing to move */ }
   // v2.381: every button that sat under the health box lives in the toolbar row with ADVANCED and EDIT (same size); only the health box stays on the right.
   function toolbarize() {
     const bar = document.querySelector('.viewer-toolbar .viewer-actions'); if (!bar) return false;
     const card = $('v2HealthCard');
     const put = el => { if (el && el.parentNode !== bar) bar.appendChild(el); };
-    placeHeightBox(); const hb = document.querySelector('.v2-side-height');
-    // v2.382: the Hollow tick box lives in an "Extras" drop-down on the toolbar
-    let ex = $('v2Extras');
-    if (!ex) { ex = document.createElement('details'); ex.id = 'v2Extras'; ex.className = 'v2-extras'; ex.innerHTML = '<summary title="Extra options for AUTO-SHRINK">Extras</summary><div class="v2-extras-menu"></div>'; }
-    const hl = document.querySelector('.v2-auto-hollow'); const menu = ex.querySelector('.v2-extras-menu'); if (hl && hl.parentNode !== menu) menu.appendChild(hl);
-    const items = [$('v2MagicBtn'), $('v2MagicDownload'), $('v2SideGlb'), ex, hb];
+    const items = [$('v2MagicBtn'), $('v2MagicDownload')];
     if (!items[0]) return false;
     items.forEach(put);
-    [$('v2MagicBtn'), $('v2MagicDownload')].forEach(b => b?.classList.add('v2-tb-btn'));
+    items.forEach(b => b?.classList.add('v2-tb-btn'));
+    // v2.383: Other formats + the Hollow tick box live in the ADVANCED left column (a section at the end of .v2-main-controls)
+    const main = document.querySelector('.v2-main-controls');
+    if (main) {
+      let ex = main.querySelector('.v2-main-extras'); if (!ex) { ex = document.createElement('div'); ex.className = 'v2-main-extras'; main.appendChild(ex); }
+      const hl = document.querySelector('.v2-auto-hollow'), gl = $('v2SideGlb');
+      if (hl && hl.parentNode !== ex) ex.appendChild(hl);
+      if (gl && gl.parentNode !== ex) ex.appendChild(gl);
+    }
     // the white "Reduced from..." note and the status line go inside the health box
     if (card) for (const id of ['v2ReduceNote', 'v2WorkflowStatus']) { const el = $(id); if (el && el.parentNode !== card) card.appendChild(el); }
     const st = $('v2SideStack'); if (st && !st.children.length) st.hidden = true;
@@ -2583,7 +2581,6 @@
     wrap.innerHTML = '<button id="v2MagicBtn" class="v2-magic" type="button" title="One press does it all: repairs, shrinks, joins touching pieces, turns the model flat and centres it on the bed. You do not need it: any tool on the left works on its own, in any order.">AUTO-SHRINK</button><button id="v2MagicDownload" class="v2-magic v2-magic-dl" type="button" disabled title="Available when automatic SHRINK or manual detail preview has finished. Downloads your finished model.">DOWNLOAD</button><button id="v2MagicReset" class="v2-magic v2-magic-reset" type="button" title="Choose a different model to load. Anything you have done to the current model is left behind.">RELOAD</button>';
     const pill = top.querySelector('.privacy-pill'); if (pill) top.insertBefore(wrap, pill); else top.appendChild(wrap);
     { ensureHealthCard(); const st = sideStack(); if (st) { const mb = $('v2MagicBtn'); mb.classList.add('v2-magic-side'); st.insertBefore(mb, st.firstChild);
-      { const hr = $('v2Height')?.closest('.v2-size-row'), rb = $('v2ResizeBtn'); if (hr && !hr.closest('#v2SideStack')) { const box = document.createElement('div'); box.className = 'v2-side-height'; box.appendChild(hr);   /* v2.382: RESIZE stays in ADVANCED (.v2-main-size) */ st.insertBefore(box, mb); } }   // v2.330: Finished height (+ RESIZE) lives above the green SHRINK button, not in ADVANCED
       const dl = $('v2MagicDownload'); if (dl) { dl.classList.add('v2-magic-side'); st.insertBefore(dl, mb.nextSibling);
         { const lab = document.createElement('label'); lab.className = 'v2-auto-hollow'; lab.title = 'Also hollow the model to save resin (2 mm walls, 2 drain holes in the base) as the last step of AUTO-SHRINK. Fine-tune it in ADVANCED.'; lab.innerHTML = '<input id="v2AutoHollow" type="checkbox" autocomplete="off"> <span>Hollow it too (saves resin)</span>'; st.insertBefore(lab, mb.nextSibling); }   /* v2.302: off by default */
         const g = document.createElement('details'); g.id = 'v2SideGlb'; g.className = 'v2-side-glb';   // v2.236: "Other formats" menu (was the lone download GLB link)
@@ -2955,7 +2952,7 @@
 
     // v2.215: the left column is gone. One big MODEL HEALTH card holds the size, detail, tools and download; the old printer, split and peg controls stay in a hidden holder because BATCH and the tests drive them.
     buildMainCard();
-    placeHeightBox();   // v2.339: the first ensureMagicButton() runs before the dashboard exists, so the Height row never left ADVANCED
+    toolbarize(); placeHeightBox();   // v2.339: the first ensureMagicButton() runs before the dashboard exists, so the Height row never left ADVANCED
     // v2.288: ADVANCED shares the viewer toolbar's flex row instead of overlaying Compare.
     const advancedToggle = $('v2LeftToggle');
     const viewerActions = viewerPanel?.querySelector('.viewer-toolbar .viewer-actions');

@@ -42,7 +42,7 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); const w = page.w; await wait(300);
   const box = page.$('v2AutoHollow'), qb = page.$('v2MagicBtn');
   ok(!!box && box.checked === false, 'HU10 the Hollow tick box exists and is off by default');
-  ok(!!box && !!box.closest('#v2Extras'), 'HU10 it sits in the Extras drop-down on the toolbar');
+  ok(!!box && !!box.closest('.v2-main-extras'), 'HU10 it sits in the ADVANCED left column (v2.383)');
   box.checked = true; qb.click();
   const done = await waitFor(() => !qb.dataset.busy && /Hollowed/.test(page.$('v2HollowResult').textContent), 200000);
   ok(done, 'HU10 AUTO-SHRINK with the box ticked ends with the model hollowed: ' + page.$('v2HollowResult').textContent.slice(0, 120));
@@ -75,7 +75,7 @@ function w_mark(page) { page.w.__shrinkMarkApplied('shrunk'); }
 }
 { const page = await makePage({ model: models.single(), heightMm: 40, url: 'https://example.test/' }); await wait(300);
   const h = page.$('v2Height'), st = page.$('v2SideStack');
-  ok(!!h && !!h.closest('.v2-side-height') && !!h.closest('.viewer-actions'), 'HU14 the Finished height box is in the toolbar row, not ADVANCED');
+  ok(!!h && !!h.closest('.v2-main-size'), 'HU14 the Finished height box is back in the ADVANCED size card (v2.383)');
   ok(!!page.$('v2ResizeBtn')?.closest('.v2-main-size'), 'HU15 RESIZE is back in ADVANCED (v2.382)');
   ok(!!page.$('v2HollowHoleX') && !!page.$('v2HollowHoleZ'), 'HU16 hole left/right and forward/back sliders exist'); }
 if (failures()) { console.log(failures() + ' FAILED'); process.exit(1); } console.log('hollow ui tests passed'); process.exit(0);
