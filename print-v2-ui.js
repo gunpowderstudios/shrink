@@ -1890,6 +1890,24 @@
     const ng = g.index ? g.toNonIndexed() : g, a = ng.getAttribute('position').array.slice(); g.dispose(); return a;
   }
   // v2.377 (Tim): clicking a shape icon drops a floating shape beside the model (a quarter of its size, standing on the ground) with the gizmo up, ready to drag in
+  // v2.392 (Tim): orbit about what you are looking at. After a zoom or pan the pivot used to stay at the old model centre, so the model swung round an axis off to the side.
+  // When a camera move ends we put the pivot on the model surface under the middle of the screen (on the same view ray, so nothing visibly jumps).
+  let pivotWired = false;
+  function repivotToView() {
+    const V = window.__shrinkViewer, model = sourceModel(); if (!V?.camera || !V?.controls || !model) return false;
+    try {
+      const TH = V.camera.constructor && window.__shrinkApp?.THREE; if (!TH) return false;
+      const rc = new TH.Raycaster(); rc.setFromCamera({ x: 0, y: 0 }, V.camera);
+      const hit = rc.intersectObject(model, true).find(x => x.object.isMesh && x.object.visible); if (!hit) return false;
+      V.controls.target.copy(hit.point); V.controls.update?.(); return true;
+    } catch { return false; }
+  }
+  function wirePivot() {
+    if (pivotWired) return; const c = window.__shrinkViewer?.controls; if (!c?.addEventListener) return; pivotWired = true;
+    c.addEventListener('end', () => { if (window.__shrinkPivotOff) return; try { repivotToView(); } catch {} });
+  }
+  window.__shrinkRepivot = repivotToView;
+  wirePivot(); setTimeout(wirePivot, 1500); document.addEventListener('shrink:model-opened', () => setTimeout(wirePivot, 300));
   function viewCentrePoint(f) {                          // world point at the middle of the viewer: the model surface under the centre, else the orbit target
     const V = window.__shrinkViewer, model = sourceModel(); if (!V?.camera) return null;
     try {

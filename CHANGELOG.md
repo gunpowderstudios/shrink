@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.392
+- Orbit pivot follows the view: when a zoom/pan/rotate ends, the pivot moves to the model surface under the middle of the screen (same view ray, no visible jump), so you spin round what you are looking at instead of an axis off to the right. `window.__shrinkPivotOff = true` turns it off.
+
 ## v2.391
 - SAVE PROJECT asks you to name the project (default = last name used, else the model name + -project). Cancel stops the save.
 
