@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.386
+- HOLLOW IT button uses the same style as SHRINK IT / FIX IT / FUSE IT in ADVANCED (no teal override).
+
 ## v2.385
 - A new shape (Shape tool icon) appears in the middle of the current view (model surface under the centre, else the orbit target).
 - The 'Hollow it too' tick box is removed; the HOLLOW IT card is the way to hollow.

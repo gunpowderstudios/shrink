@@ -2927,7 +2927,7 @@
               <div class="v2-hollow-row"><label for="v2HollowHoleSize">Hole size</label><input id="v2HollowHoleSize" type="range" min="2" max="8" step="0.5" value="3" autocomplete="off"><output id="v2HollowHoleSizeOut">3 mm</output></div>
               <div class="v2-hollow-row"><label for="v2HollowHoleX">Holes left / right</label><input id="v2HollowHoleX" type="range" min="-50" max="50" step="1" value="0" autocomplete="off"><output id="v2HollowHoleXOut">0%</output></div>
               <div class="v2-hollow-row"><label for="v2HollowHoleZ">Holes forward / back</label><input id="v2HollowHoleZ" type="range" min="-50" max="50" step="1" value="0" autocomplete="off"><output id="v2HollowHoleZOut">0%</output></div>
-              <button id="v2HollowBtn" class="v2-mega v2-teal" type="button">HOLLOW IT</button>
+              <button id="v2HollowBtn" class="v2-mega" type="button">HOLLOW IT</button>
               <div class="v2-card-progress"><i></i></div><div class="v2-card-progress-label">Ready when you are.</div>
               <div id="v2HollowResult" class="v2-result">Needs one watertight piece: press FIX IT and FUSE IT first if the health box shows problems.</div>
               <div id="v2HollowCut" class="v2-hollow-row" hidden><label for="v2HollowCutRange">Cut-away</label><input id="v2HollowCutRange" type="range" min="0" max="100" step="1" value="100" autocomplete="off"><output id="v2HollowCutOut">off</output></div>
