@@ -95,8 +95,8 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(pressed('tool', 'shape') === 'true' && pressed('kind', 'cube') === 'true' && pressed('mode', 'cut') === 'true', 'ED14 the defaults are highlighted');
   page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="kind"][data-value="ball"]').click(); await wait(50);
   ok(page.$('v2EdKind').value === 'ball' && pressed('kind', 'ball') === 'true' && pressed('kind', 'cube') === 'false', 'ED14 clicking the Ball icon picks ball');
-  page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="slice"]').click(); await wait(50);
-  ok(page.$('v2EdTab').value === 'slice' && page.$('v2EdSliceBox').hidden === false && pressed('tool', 'slice') === 'true', 'ED14 clicking the Slice icon opens the slice controls');
+  set(page, 'v2EdTab', 'slice'); await wait(50);
+  ok(page.$('v2EdTab').value === 'slice' && page.$('v2EdSliceBox').hidden === false , 'ED14 the Slice tool (no icon any more) still opens its controls');
   page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="razor"]').click(); await wait(50);
   ok(page.$('v2EdTab').value === 'razor' && pressed('tool', 'razor') === 'true' && !page.$('v2EditCard').querySelector('.v2-icon-btn[data-value="brush"]'), 'ED14 the Razor icon is there and the pink/orange Brush icon is gone');
 }
@@ -176,7 +176,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   ok(page.$('v2EdTab').value === 'none', 'ED24 Esc also puts down the Shape tool');
   /* two edits, a brush stroke and a part, then reset */
   const m0 = w.__shrinkWorkingModel(), h0 = height(page);
-  tool('slice').click(); set(page, 'v2EdPos', 50); set(page, 'v2EdSide', 'high'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click();
+  set(page, 'v2EdTab', 'slice'); await wait(50); set(page, 'v2EdPos', 50); set(page, 'v2EdSide', 'high'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click();
   await waitFor(() => /Sliced|Could not/.test(page.$('v2EdResult').textContent), 60000);
   tool('shape').click(); set(page, 'v2EdKind', 'ball'); set(page, 'v2EdMode', 'cut'); page.$('v2EdResult').textContent = ''; page.$('v2EdGo').click(); await wait(100); page.$('v2EdGo').click();   // v2.373: first click floats the shape, second welds it
   await waitFor(() => /Cut|Could not/.test(page.$('v2EdResult').textContent), 60000);
@@ -255,7 +255,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
   w.__shrinkFuseTriLimit = 100; page.$('v2TabEdit').click(); await wait(80); set(page, 'v2EdTab', 'shape'); await wait(40);
   const hint = () => page.$('v2EdHint'), tool = v => page.$('v2EditCard').querySelector(`.v2-icon-btn[data-ed="tool"][data-value="${v}"]`);
   ok(!hint().hidden && /Shapes needs under 100/.test(hint().textContent), 'ED29 Shape warns when the model is over the Manifold limit: ' + hint().textContent.slice(0, 90));
-  tool('slice').click(); await wait(40); ok(/Slicing needs under/.test(hint().textContent) && /Sculpt tool works on bigger/.test(hint().textContent), 'ED29 Slice names itself and points to Sculpt');
+  set(page, 'v2EdTab', 'slice'); await wait(40); ok(/Slicing needs under/.test(hint().textContent) && /Sculpt tool works on bigger/.test(hint().textContent), 'ED29 Slice names itself and points to Sculpt');
   tool('sculpt').click(); await wait(40); ok(hint().hidden === true, 'ED29 Sculpt shows no warning on a model Manifold would refuse');
   tool('lasso').click(); await wait(40); ok(hint().hidden === false && /DELETE works on the triangles directly/.test(hint().textContent), 'ED29 the plain lasso says DELETE still works on a big model');
   page.$('v2EdWhole').checked = true; page.$('v2EdWhole').dispatchEvent(new w.Event('change', { bubbles: true })); await wait(40); ok(hint().hidden === true, 'ED29 ticking "Grab the whole loose piece" clears it');

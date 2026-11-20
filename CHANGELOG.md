@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.389
+- The Slice off tool icon is removed from the EDIT toolbar (the hidden tool code stays so nothing else breaks).
+
 ## v2.388
 - SAVE PROJECT button on the top menu (next to EDIT); same file as the one in the EDIT panel.
 - A 3D print model now opens untouched at 100% detail. Before, every opened model was quietly previewed at 70%; it only shrinks now when SHRINK / AUTO-SHRINK or the Detail slider is used.
