@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.379
+- New: FILL INSIDE. In the paint bucket tool, tick "Fill the inside of a cup or bowl" and click inside an egg cup / cup / bowl: the hollow becomes solid up to the rim. Needs a closed model. One undo step.
+
 ## v2.378
 - Fix: after SHRINK, raising the Detail slider above the shrunk level reverted to the untouched upload, which sits where it was opened rather than levelled and centred, so the model could leave the build plate. The rebased copy now gets the recorded pose and is put back at the previous position on the plate.
 

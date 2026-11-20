@@ -1,6 +1,6 @@
 // edit-core.js against the real Manifold library: shapes join/cut and plane slicing (shorten a "sword").
 import Module from 'manifold-3d';
-import { applyShapes, sliceSolid, applySolid, lassoPrism, lassoRegion } from '../edit-core.js';
+import { applyShapes, sliceSolid, applySolid, lassoPrism, lassoRegion, fillPocket } from '../edit-core.js';
 const wasm = await Module(); wasm.setup(); const M = wasm.Manifold;
 let bad = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) bad++; };
 const T = (x, y, z, sx = 1, sy = 1, sz = 1) => [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, x, y, z, 1];   // column-major translate + scale
@@ -60,4 +60,14 @@ ok(/whole model/.test(msg), 'E9 a cut that removes everything says so: ' + msg);
   let m2 = ''; try { lassoPrism(M, CS, [[0, 0], [1, 1]], ortho, 10, 190); } catch (e) { m2 = e.message; }
   ok(/loop/.test(m2), 'E19 a two-point scribble is refused');
 }
+/* v2.378 FILL INSIDE */
+{ const outer = M.cylinder(20, 10, 10, 48).rotate([-90, 0, 0]), inner = M.cylinder(18, 7, 7, 48).rotate([-90, 0, 0]).translate([0, 4, 0]), cup = outer.subtract(inner);
+  const r = fillPocket(M, wasm.CrossSection, cup, [7, 10, 0]);
+  ok(Math.abs(r.solid.volume() - outer.volume()) / outer.volume() < 0.01 && r.solid.decompose().length === 1, `EP1 FILL INSIDE makes the cup solid (volume ${r.solid.volume().toFixed(0)} vs ${outer.volume().toFixed(0)})`);
+  const bb = r.solid.boundingBox(); ok(Math.abs(bb.max[0] - 10) < 1e-6 && Math.abs(bb.max[1] - 20) < 1e-6, 'EP2 the fill does not poke outside the cup');
+  const tap = M.cylinder(20, 6, 12, 48).rotate([-90, 0, 0]).subtract(M.cylinder(18, 3, 9, 48).rotate([-90, 0, 0]).translate([0, 3, 0]));
+  const t2 = fillPocket(M, wasm.CrossSection, tap, [4.5, 12, 0]); const full = M.cylinder(20, 6, 12, 48).rotate([-90, 0, 0]);
+  ok(t2.solid.volume() > tap.volume() && t2.solid.volume() <= full.volume() * 1.001 && t2.solid.boundingBox().max[0] < 12.001, 'EP3 a tapered cup is filled without growing past its outside');
+  let m2 = ''; try { fillPocket(M, wasm.CrossSection, outer, [0, 10, 0]); } catch (e) { m2 = e.message; } ok(/cup or a pocket/.test(m2), 'EP4 a solid block says there is no pocket'); }
 console.log(bad ? `${bad} FAILED` : 'edit tests passed'); process.exit(bad ? 1 : 0);
+

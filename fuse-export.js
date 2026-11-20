@@ -395,7 +395,11 @@ async function editModel(model, ops) {
   const { solid, components } = await modelToSolid(model);
   try {
     const q = (() => { try { return new URL(import.meta.url).search; } catch { return ''; } })();
-    const { applyShapes, sliceSolid, applySolid, lassoPrism, lassoRegion } = await import('./edit-core.js' + q);
+    const { applyShapes, sliceSolid, applySolid, lassoPrism, lassoRegion, fillPocket } = await import('./edit-core.js' + q);
+    if (ops.pocket) {                                      // v2.378 FILL INSIDE
+      const pr = fillPocket(wasm.Manifold, wasm.CrossSection, solid, ops.pocket.point);
+      try { return { root: solidToThree(pr.solid), volume: pr.solid.volume(), pieces: pr.solid.decompose().length, components, top: pr.top }; } finally { try { pr.solid.delete?.(); } catch {} }
+    }
     if (ops.lasso) {                                       // v2.313: lasso / razor. cam + pts + near/far describe the screen outline; op = delete | copy | cut
       const L = ops.lasso, prism = lassoPrism(wasm.Manifold, wasm.CrossSection, L.pts, L.cam, L.near, L.far);
       let c; try { c = lassoRegion(wasm.Manifold, solid, prism, L.op); } finally { try { prism.delete?.(); } catch {} }

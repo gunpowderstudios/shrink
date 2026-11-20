@@ -79,3 +79,50 @@ export function lassoRegion(M, solid, prism, op) {
   }
   return { piece, rest };
 }
+
+/**
+ * v2.378 FILL INSIDE: solidify the cup / bowl / egg-cup pocket that the point [x,y,z] (a hit on its inner wall or floor) sits in.
+ * Works in a copy turned so world +Y is Manifold's +Z: it slices upward from the point, follows the void ring that contains the point
+ * (a void ring has the material outline around it) for as long as it stays enclosed, extrudes that ring slab by slab and unions the
+ * slabs with the model. Returns { solid, top, slabs } (a NEW solid) or throws a plain-English error.
+ */
+export function fillPocket(M, CS, solid, point, steps = 160) {
+  const P = [point[0], -point[2]], y0 = point[1];
+  const rs = solid.rotate([90, 0, 0]);                                  // (x, y, z) -> (x, -z, y)
+  const bb = rs.boundingBox(), zTop = bb.max[2];
+  const inRing = (r, p) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], b = r[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+  const area = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += (r[j][0] * r[i][1] - r[i][0] * r[j][1]); return s / 2; };
+  const ringDist = (r, p) => { let m = 1e30; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[j], b = r[i], dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy || 1e-12; const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l)); m = Math.min(m, Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)); } return m; };
+  const tol = Math.max(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1]) * 0.02;
+  const rings = [], hs = [];
+  const step = Math.max((zTop - y0) / steps, 1e-6);
+  const holeAt = zz => {
+    const cs = rs.slice(zz); let polys; try { polys = cs.toPolygons(); } finally { try { cs.delete?.(); } catch {} }
+    // a void is a hole outline (negative area). The picked point sits ON the wall or floor, so take hole outlines that contain it or pass within tol of it; the smallest one is the pocket
+    const near = polys.filter(r => r.length > 2 && area(r) < 0 && (inRing(r, P) || ringDist(r, P) <= tol));
+    return near.length ? near.reduce((a, b) => (Math.abs(area(a)) <= Math.abs(area(b)) ? a : b)) : null;
+  };
+  const up = [], down = [];
+  for (let z = y0 + step * 0.25; z < zTop; z += step) { const h = holeAt(z); if (h) up.push([z, h]); else if (up.length || z > y0 + step * 3) break; }
+  if (up.length) for (let z = y0 - step * 0.75; z > bb.min[2]; z -= step) { const h = holeAt(z); if (h) down.push([z, h]); else break; }
+  else for (let z = y0 - step * 0.75; z > bb.min[2] && z > y0 - step * 3; z -= step) { const h = holeAt(z); if (h) { down.push([z, h]); } else break; }
+  const all = down.reverse().concat(up);
+  for (const [zz, h] of all) { hs.push(zz); rings.push(h); }
+  if (!rings.length) { try { rs.delete?.(); } catch {} throw new Error('That does not look like a cup or a pocket with material all round it. Click inside it, on its inner wall or floor.'); }
+  let out = rs, slabs = 0; const made = [];
+  try {
+    for (let i = 0; i < rings.length; i++) {
+      const lo = hs[i] - step * (i ? 1 : 0.5), hi = (i + 1 < rings.length ? hs[i + 1] : hs[i] + step * 0.5);
+      const cs = CS.ofPolygons([rings[i].slice().reverse()], 'Positive'); const cs2 = i + 1 < rings.length ? CS.ofPolygons([rings[i + 1].slice().reverse()], 'Positive') : null;
+      const sec = cs2 ? CS.union ? CS.union(cs, cs2) : cs.add(cs2) : cs;
+      const slab = M.extrude(sec, hi - lo).translate([0, 0, lo]); made.push(slab); slabs++;
+      try { cs.delete?.(); cs2?.delete?.(); if (sec !== cs) sec.delete?.(); } catch {}
+    }
+    // the floor: from the lowest solid below the first ring up to it is already material; start the fill a hair below the first slice
+    let acc = rs; for (const s of made) { const n = acc.add(s); if (acc !== rs) try { acc.delete?.(); } catch {} acc = n; }
+    // slab seams can leave zero-volume sliver shells: keep only real pieces
+    let clean = acc; try { const parts = acc.decompose(), vols = parts.map(q => q.volume()), big = Math.max(...vols); const keep = parts.filter((q, i) => vols[i] > big * 1e-6); if (keep.length !== parts.length) clean = M.compose(keep); parts.forEach(q => { if (!keep.includes(q)) try { q.delete?.(); } catch {} }); } catch {}
+    out = clean.rotate([-90, 0, 0]); if (acc !== rs) try { acc.delete?.(); } catch {} if (clean !== acc) try { clean.delete?.(); } catch {}
+    return { solid: out, top: hs[hs.length - 1], slabs };
+  } finally { made.forEach(s => { try { s.delete?.(); } catch {} }); try { rs.delete?.(); } catch {} }
+}

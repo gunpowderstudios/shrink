@@ -4,7 +4,7 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.378** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.379** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
@@ -205,6 +205,8 @@ Floating pieces are solid (the `shrinkPartGhostSee` pass was removed); the red o
 (v2.377) A click on a `.v2-icon-btn[data-ed=kind]` while the Shape tool is active calls `addShapeFromIcon()`: sets W/H/D to 25% of the model's biggest side, X to the right of the model, Y on the ground, then `makeShapePiece()`. Test ED72 (`__shrinkEdit.addShape`).
 
 (v2.378) `applyDetailValue` revert path: before switching to `app().originalModel` it records the working model's world box; after the rebase it applies `poseD` to the new `engine.root` and moves it back to the old box (bottom + centre). Real reducer path untested in a browser (jsdom has no live reducer).
+
+(v2.379) FILL INSIDE: `edit-core.js` `fillPocket(M, CS, solid, point)` rotates the solid so world Y is Manifold Z, slices up and down from the click, follows the hole outline (negative-area ring containing or within 2% of the point, smallest wins) while it stays enclosed, extrudes it slab by slab, unions, drops zero-volume slivers. `fuse-export.js` `editModel(model, {pocket:{point}})`; `print-v2-ui.js` `fillInsideNow(point)`, tick box `#v2FillInside` in the Fill box (`__shrinkEdit.fillInside`). Tests EP1-EP4 in `edit.test.mjs`. Stair-stepped slabs (160 per side): a strongly tapered cup may keep tiny gaps. Real-browser click untested.
 
 ### CLAY / Brush (v2.141; switched off in v2.173; back on in v2.308 as the Brush tool in the EDIT tab, chip BRUSH)
 `clay.js` (ES module, loaded by `ui-mode.js`; card built into `#v2ClayHost`, which `print-v2-ui.js` puts above the Advanced drawer) + `clay-core.js` (no DOM, no three.js: icosphere, `dabSoup`, `dabsAlong`, `thin`, `joinSoups`). Strokes are lists of world-space balls `{x,y,z,r}` kept in `window.__shrinkClay` (`hasClay`, `apply`, `finish`, `addStroke` for tests). The preview is two `InstancedMesh`es in a `shrinkClay` scene group (pink = add, orange = cut); they ignore raycasts. Painting raycasts the working model; Ctrl/Cmd+drag rotates, Esc leaves the tool, as the other brushes do. `fixHealthModel()` calls `__shrinkClay.apply(model)` instead of the gentle repair when clay exists, and `shrinkMyModel()` no longer skips the fix step when clay is present. `apply()`: route A = `modelToSolid` (exact Manifold union/difference, keeps all detail); route B (Manifold rejects a leaky mesh, e.g. piece_55) = add balls to the triangle soup and run `makeWatertight` (balanced, then fast; `high` pinches), then subtract cuts with Manifold. The result must pass `healthOfModel` or nothing is installed. Ball count is thinned and coarsened (`ballLevel`) because the wrap refuses above 1.5M triangles. Tests: `tests/clay.test.mjs`.
