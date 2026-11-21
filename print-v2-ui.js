@@ -49,6 +49,7 @@
   window.__shrinkPrinterList = PRINTER_LIST;
   // v2.310: small line icons for the EDIT tab (24x24, drawn with the text colour)
   const ICON = {
+    clay: '<path d="M5 17c0-3 2-5 4-5 .5-3 3-5 6-4 3 1 4 4 3 7-.5 2-2 3-4 3H8c-2 0-3-.5-3-1z"/><path d="M12 11v5M9.500 13.500h5"/>',
     brush: '<path d="M20 4l-9 9"/><path d="M11 13c-3 0-4 2-4 4 0 2-1 3-3 3 3 2 8 1 9-2 .8-2.2-.2-4.2-2-5z"/>',
     shape: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
     slice: '<rect x="6" y="4" width="12" height="16" rx="1"/><path d="M2 15l20-6" stroke-dasharray="3 2"/>',
@@ -1892,16 +1893,18 @@
     V.scene.add(g);
   }
   const editActive = () => { const p = $('v2EditPanel'); return !!p && !p.hidden; };   // v2.321: the EDIT tools have their own drop-down panel under the EDIT button
+  window.__shrinkBeforeClay = () => { const m = sourceModel(); if (m) { if (!editBase) editBase = cloneRoot(m); undoPush(cloneRoot(m)); const u = $('v2EdUndo'); if (u) u.hidden = false; } };
   function editTabChanged() {
     if (pieceTool() && !editPart && parked.length) takeParked(parked.length - 1);   // v2.344: Select / Paste part always has a piece in hand when anything floats
     const t = $('v2EdTab').value, sl = t === 'slice';
     const lz = t === 'lasso' || t === 'razor' || t === 'wand';
-    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2EdFillBox'), t !== 'fill'); setHid($('v2EdGo'), lz || t === 'sculpt' || t === 'select' || t === 'fill'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
+    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2ClayCard'), t !== 'clay'); setHid($('v2EdFillBox'), t !== 'fill'); setHid($('v2EdGo'), lz || t === 'sculpt' || t === 'select' || t === 'fill'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
     { const tip = $('v2EdTip'); const msg = t === 'none' ? 'No tool selected. Pick one above.' : 'Click the tool again or press Esc to put it down.'; if (tip && tip.textContent !== msg) tip.textContent = msg; updateGoState(); }
     if (lz && t !== lastLz) { clearLasso(); const dp = $('v2EdDepth'); if (dp) dp.value = t === 'razor' ? 'through' : 'near'; const k = $('v2LassoKeepBtn'); if (k) { k.dataset.op = t === 'razor' ? 'cut' : 'copy'; k.querySelector('span').textContent = t === 'razor' ? 'CUT OFF & KEEP' : 'COPY'; } const d = $('v2LassoDelBtn'); if (d) d.querySelector('span').textContent = t === 'razor' ? 'CUT OFF' : 'DELETE'; { const bx = $('v2EdLassoBox'); if (bx) bx.dataset.tool = t; } const h = $('v2LassoHelp'); if (h) h.textContent = t === 'wand' ? 'Touch a piece to select it, like a bucket fill: the whole connected piece turns red. A loose floating piece is picked on its own. If it is attached to the rest of the model it will select everything, so cut it off with the Lasso or Razor first. Then DELETE it or COPY it. Alt + drag turns the model.' : t === 'razor' ? 'The razor cuts straight through. Draw a loop round the piece you want off. The hole is always closed flat. Ctrl / ⌘ + drag turns the model.' : 'Hold the mouse button down and draw a loop round the part on the model. Ctrl / ⌘ + drag still turns the model.'; }
     if (!lz && lastLz) clearLasso(); lastLz = lz ? t : '';
     { const v = $('viewer'); if (v) { v.classList.toggle('v2-cur-lasso', t === 'lasso' && editActive()); v.classList.toggle('v2-cur-razor', t === 'razor' && editActive()); v.classList.toggle('v2-cur-wand', t === 'wand' && editActive()); } }
     if (lz) wireLasso();
+    try { const C = window.__shrinkClay; if (C) { if (t === 'clay' && editActive()) { if (!C.state.on) C.setTool(true, C.state.mode || 'add'); } else if (C.state.on) C.setTool(false); } } catch {}   // v2.400: Clay tool (clay.js)
     if (t === 'fill' && editActive()) { wireFill(); fillLinesUpdate(); } else removeFillLines();
     updateEditHint();
     if (t === 'sculpt') { wireSculpt(); if (!sculptSized) { const f = editFrame(); if (f) { sculptSized = true; const v = Math.min(60, Math.max(2, Math.round(f.size.y * f.mm * 0.06 * 2) / 2)); $('v2SculptSize').value = String(v); $('v2SculptSizeOut').textContent = v + ' mm'; } } } else sculptRing(null);
@@ -2946,8 +2949,8 @@
             <section id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
               <div class="v2-card-head"><div><h2>Edit model</h2><p>Lasso a part to delete or copy it, cut a piece off with the razor, add a shape, paste a part, or slice a piece off.</p></div></div>
               <div id="v2EdHint" class="v2-edit-hint" hidden></div>
-              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'select', 'Select')}${iconBtn('tool', 'wand', 'Wand')}${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'fill', 'Fill holes')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}</div>
-              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="select">Select</option><option value="wand">Wand</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="fill">Fill holes</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
+              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'select', 'Select')}${iconBtn('tool', 'wand', 'Wand')}${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'clay', 'Clay')}${iconBtn('tool', 'fill', 'Fill holes')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}</div>
+              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="select">Select</option><option value="wand">Wand</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="clay">Clay</option><option value="fill">Fill holes</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
               <div id="v2EdTip" class="v2-edit-hint-plain">Click the tool again or press Esc to put it down.</div>
               <div id="v2EdModeRow"><div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
                 <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>

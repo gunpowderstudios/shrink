@@ -657,6 +657,11 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     w.__shrinkEdit.setPart(new Float32Array(cube), false, 'box'); await wait(60); page.$('v2EdPartH').value = '20'; page.$('v2EdPartX').value = '15'; page.$('v2EdPartY').value = '0'; page.$('v2EdPartZ').value = '0'; await wait(60);
     const ok1 = await w.__shrinkEdit.inside('copy'); await wait(100);
     ok(ok1 === true && w.__shrinkWorkingModel() === m0 && tris(w.__shrinkWorkingModel()) === t0 && w.__shrinkEdit.hasPart() && w.__shrinkEdit.selName() === 'Copied piece', 'ED74 COPY INSIDE makes a floating piece of what is inside the shape and leaves the model alone');
+  { // v2.400 the Clay tool is back in the EDIT toolbar
+    ok(!!page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="clay"]'), 'ED75 there is a Clay icon in the EDIT toolbar');
+    set(page, 'v2EdTab', 'clay'); await wait(60); ok(page.$('v2ClayCard').hidden === false, 'ED75 choosing Clay shows the Clay card');
+    set(page, 'v2EdTab', 'select'); await wait(60); ok(page.$('v2ClayCard').hidden === true, 'ED75 choosing another tool hides it again');
+  }
     w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.();
   }
   w.__shrinkEdit.discard?.(); }

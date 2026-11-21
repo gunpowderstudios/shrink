@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.399';
+  const PRINT_RELEASE = '2.400';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -19,7 +19,7 @@
   import(`./game-protection-fix.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err));
   import(`./batch.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Batch tool did not load`, err));
   import(`./free-model.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Free model did not load`, err));
-  const CLAY_ENABLED = false;      // v2.317: the pink/orange brush is gone from the EDIT tab (lasso + razor replace it); clay.js stays in the repo, dormant
+  const CLAY_ENABLED = true;      // v2.317: the pink/orange brush is gone from the EDIT tab (lasso + razor replace it); clay.js stays in the repo, dormant
   if (CLAY_ENABLED) import(`./clay.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Clay tool did not load`, err));
   import(`./print-v2-ui.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Friendly print workflow did not load`, err));
   import(`./print-upload.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Print upload control did not load`, err));

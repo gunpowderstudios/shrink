@@ -194,6 +194,7 @@ async function applyNow() {
   st.busy = true; refreshUi(); setTool(false); window.__shrinkWork?.(true, 0, 'Applying brush…');
   try {
     const r = await apply(src, t => say(t));
+    try { window.__shrinkBeforeClay?.(); } catch {}   // v2.400: an undo step for the EDIT panel
     window.__shrinkInstallWorkingModel(r.root, 'clay');
     st.strokes = []; drawPreview(); removePreview();
     window.__shrinkRefreshHealth?.();
@@ -212,12 +213,12 @@ function refreshUi() {
 }
 function buildCard() {
   const host = $('v2ClayHost'); if (!host || host.dataset.built) return; host.dataset.built = '1';
-  host.innerHTML = `<div class="v2-card-head"><div><h2>Brush</h2><p>Paint to add material (pink) or carve it away (orange). Press APPLY BRUSH to make it real.</p></div></div>
+  host.innerHTML = `<div class="v2-card-head"><div><h2>Clay</h2><p>Paint to add material (pink) or carve it away (orange). Press APPLY CLAY to make it real. UNDO in the EDIT panel takes it back.</p></div></div>
     <div class="v2-clay-tools"><button id="v2ClayAdd" type="button" aria-pressed="false"><svg class="v2-ico" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/></svg><span>ADD (pink)</span></button><button id="v2ClayCut" type="button" aria-pressed="false"><svg class="v2-ico" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M7 12h10"/></svg><span>CARVE (orange)</span></button></div>
     <label class="v2-clay-size">Tip size <input id="v2ClaySize" type="range" min="1" max="30" step="0.5" value="6"><output id="v2ClaySizeVal">6.0 mm wide</output></label>
     <div class="v2-clay-row"><span id="v2ClayCount">No clay yet</span><button id="v2ClayUndo" type="button">UNDO</button><button id="v2ClayClear" type="button">CLEAR</button></div>
-    <button id="v2ClayApply" class="v2-mega v2-green" type="button">APPLY BRUSH NOW</button>
-    <div id="v2ClayNote" class="v2-result">Pick ADD or CARVE, then drag on the model. Nothing changes until you press APPLY BRUSH NOW (FIX IT also applies it).</div>`;
+    <button id="v2ClayApply" class="v2-mega v2-green" type="button">APPLY CLAY NOW</button>
+    <div id="v2ClayNote" class="v2-result">Pick ADD or CARVE, then drag on the model. Nothing changes until you press APPLY CLAY NOW (FIX IT also applies it).</div>`;
   $('v2ClayAdd').addEventListener('click', () => setTool(!(st.on && st.mode === 'add'), 'add'));
   $('v2ClayCut').addEventListener('click', () => setTool(!(st.on && st.mode === 'cut'), 'cut'));
   $('v2ClaySize').addEventListener('input', e => { st.mm = Number(e.target.value) || 6; refreshUi(); });
@@ -228,6 +229,6 @@ function buildCard() {
 window.__shrinkClay = { apply, hasClay, clear, strokes: () => st.strokes, addStroke: (mode, dabs) => { st.strokes.push({ mode, r: dabs[0]?.r || radius(), dabs }); drawPreview(); }, setTool, ring: moveRing, state: st, applyNow, finish: () => { st.strokes = []; drawPreview(); removePreview(); } };
 const init = () => { buildCard(); if (!document.body.classList.contains('app-mode-print')) setTool(false); };
 window.addEventListener('shrink:ui-mode', init);
-window.addEventListener('shrink:model-opened', () => { setTool(false); st.strokes = []; drawPreview(); say('Pick ADD or CARVE, then drag on the model. Nothing changes until you press APPLY BRUSH NOW (FIX IT also applies it).'); });
+window.addEventListener('shrink:model-opened', () => { setTool(false); st.strokes = []; drawPreview(); say('Pick ADD or CARVE, then drag on the model. Nothing changes until you press APPLY CLAY NOW (FIX IT also applies it).'); });
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
 { let tries = 0; const retry = () => { if ($('v2ClayHost')?.dataset.built || ++tries > 20) return; buildCard(); setTimeout(retry, 500); }; setTimeout(retry, 300); }

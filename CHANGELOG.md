@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.400
+- The Clay tool is back in the EDIT toolbar (clay.js re-enabled). Paint to add material (pink) or carve it away (orange), then APPLY CLAY NOW; it joins exactly with Manifold on a closed model, or seals a leaky one first. UNDO in the EDIT panel takes it back.
+
 ## v2.399
 - AUTO-SHRINK never goes below 50% detail. The extra 'shrink more so it fits FUSE' pass is gone (on a 4M-triangle model it went down to about 22%). A model still over 1M triangles after 50% keeps them and FUSE asks once before running.
 
