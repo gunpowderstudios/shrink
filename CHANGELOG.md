@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.401
+- AUTO-SHRINK no longer fuses (it was hard on big models and threw errors): steps are now fix, shrink, fix again if needed, then level and centre. Use FUSE IT in ADVANCED when you want it. The verdict reports the piece count and says to press FUSE IT if there is more than one.
+
 ## v2.400
 - The Clay tool is back in the EDIT toolbar (clay.js re-enabled). Paint to add material (pink) or carve it away (orange), then APPLY CLAY NOW; it joins exactly with Manifold on a closed model, or seals a leaky one first. UNDO in the EDIT panel takes it back.
 

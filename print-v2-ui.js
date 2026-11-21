@@ -2489,7 +2489,7 @@
       // 0. REPAIR FIRST, at full detail (v2.147). Shrinking a model that still has holes bakes the holes into a coarse mesh that is much harder to
       //    close, so a model under FIX_FIRST_MAX triangles is repaired before it is reduced. Bigger ones are shrunk first (repair runs on the main thread).
       if (startTris <= FIX_FIRST_MAX) {
-        btn.textContent = '1/4 Fixing…'; show('Checking and repairing at full detail…'); await updateHealthCard(); await paintNow();
+        btn.textContent = '1/3 Fixing…'; show('Checking and repairing at full detail…'); await updateHealthCard(); await paintNow();
         if ($('v2HealthScore')?.textContent !== '100' || window.__shrinkClay?.hasClay?.()) {
           try {
             await fixHealthModel(); await wait(60);
@@ -2499,21 +2499,21 @@
         }
       }
       // 1. SHRINK
-      btn.textContent = '1/4 Shrinking…'; show('Shrinking…'); await paintNow();
+      btn.textContent = '1/3 Shrinking…'; show('Shrinking…'); await paintNow();
       try { await shrinkModel(); const now = modelTriangles(sourceModel()); done('ok', '✓', `Shrunk: ${startTris.toLocaleString()} → ${now.toLocaleString()} triangles`); }
       catch (err) { done('warn', '⚠', `Could not shrink (${err.message || err})`); }
       // 1b. Too detailed to fuse (v2.185). 16K ultra can leave millions of triangles, and FUSE is refused above the limit. Step down one detail level at a time
       //     (16K, 8K fine, 8K, 4K) and shrink again until it fits, and say so. The file name tag then shows the level that was really used.
       const fuseLimit = window.__shrinkFuseTriLimit || SOFT_TRIANGLES; let loweredFrom = null;
-      if (modelTriangles(sourceModel()) > fuseLimit && fixedShrinkReady()) {         // v2.399 (Tim): AUTO-SHRINK never goes below 50% detail. It used to shrink a second time (down to ~22% on a 4M model) so FUSE fit under 1M; now it keeps the 50% and FUSE just takes longer (it asks once before a big model).
+      if (false && modelTriangles(sourceModel()) > fuseLimit && fixedShrinkReady()) {         // v2.399 (dead since v2.401: AUTO-SHRINK no longer fuses) (Tim): AUTO-SHRINK never goes below 50% detail. It used to shrink a second time (down to ~22% on a 4M model) so FUSE fit under 1M; now it keeps the 50% and FUSE just takes longer (it asks once before a big model).
         done('warn', '⚠', `Kept 50% detail: ${modelTriangles(sourceModel()).toLocaleString()} triangles. Fusing a model this big can take a while.`);
-      } else if (modelTriangles(sourceModel()) > fuseLimit && dashboard) {
+      } else if (false && modelTriangles(sourceModel()) > fuseLimit && dashboard) {
         const type0 = dashboard.dataset.printerType || 'resin', ladder = ['ultra', 'fine', 'standard', 'large'].filter(k => PRINTER_LIST.some(x => x.type === type0 && x.quality === k)), q0 = dashboard.dataset.quality || 'standard'; 
         const from = currentPrinter(); let at = ladder.indexOf(q0);
         while (at >= 0 && at < ladder.length - 1 && modelTriangles(sourceModel()) > fuseLimit && type0 !== 'custom') {
           at++;
           loweredFrom = loweredFrom || from; setQuality(ladder[at]);
-          btn.textContent = '1/4 Shrinking more…'; show(`Still ${modelTriangles(sourceModel()).toLocaleString()} triangles: too many to fuse. Shrinking more (${currentPrinter().tag})…`); await paintNow();
+          btn.textContent = '1/3 Shrinking more…'; show(`Still ${modelTriangles(sourceModel()).toLocaleString()} triangles: too many to fuse. Shrinking more (${currentPrinter().tag})…`); await paintNow();
           try { await shrinkModel(); } catch (err) { console.warn('second shrink', err); break; }
         }
         if (loweredFrom) {
@@ -2523,7 +2523,7 @@
         }
       }
       // 2. FIX (only if the health check says something is wrong)
-      btn.textContent = '2/4 Fixing…'; show('Checking and fixing…'); await updateHealthCard(); await paintNow();
+      btn.textContent = '2/3 Fixing…'; show('Checking and fixing…'); await updateHealthCard(); await paintNow();
       if ($('v2HealthScore')?.textContent === '100' && !window.__shrinkClay?.hasClay?.()) done('ok', '✓', 'Already clean: nothing to fix');
       else {
         await fixHealthModel(); await wait(60);
@@ -2537,23 +2537,16 @@
         done(sc === 100 ? 'ok' : 'warn', sc === 100 ? '✓' : '⚠', sc === 100 ? 'Fixed: the model is watertight' : `Fixed what could be fixed (health ${Number.isFinite(sc) ? sc + '/100' : 'unknown'})`);
       }
       if (!(Number($('v2HealthScore')?.textContent) >= 95)) done('warn', '⚠', 'Still not fully sealed. Detail was kept, nothing was rebuilt.');
-      // 3. FUSE
-      btn.textContent = '3/4 Fusing…'; show('Fusing…'); await paintNow();
-      const fc = $('v2FuseCard'); if (fc) fc.dataset.state = '';
-      await fuseCheck(); await wait(60);
-      const fs = fc?.dataset.state;
-      done(fs === 'good' ? 'ok' : 'warn', fs === 'good' ? '✓' : '⚠', fs === 'good' ? 'Fused: touching parts joined' : 'Could not fuse this model (see the Fuse box). It is still fixed and shrunk');
+      // 3. FUSE: removed from AUTO-SHRINK in v2.401 (Tim): it is hard on big models and threw errors. FUSE IT in ADVANCED does it when wanted.
+      const fs = null;
       // The verdict (v2.185): said plainly, and kept in the health box (Separate pieces row) because the step list above is hidden.
       await updateHealthCard(); await wait(80);
       let pieces = null; for (let i = 0; i < 40 && !pieces; i++) { pieces = Number($('v2HealthRows')?.dataset.pieces) || null; if (!pieces) await wait(50); }
       const healthy = lastHealth?.h ? (lastHealth.h.clean === true || minorCount(lastHealth.h) > 0) : Number($('v2HealthScore')?.textContent) >= 95, oneSolid = pieces === 1;   // degenerate triangles alone do not make a model unfixed (v2.189)
-      const why = modelTriangles(sourceModel()) > fuseLimit ? 'it still has too many triangles to fuse' : fs === 'good' ? 'the pieces do not all touch' : 'the fuse step could not finish (see the Fuse box)';
-      // v2.253: already ONE watertight piece but Manifold refuses it (a few flipped faces, Tarak): there is nothing to fuse, and slicers take it. Not a failure.
-      const alreadyOne = oneSolid && fs !== 'good' && healthy && lastHealth?.h && !(lastHealth.h.openEdges > 0) && modelTriangles(sourceModel()) <= fuseLimit;
-      if (alreadyOne) { const i = rows.findIndex(r => /Could not fuse/.test(r.text)); if (i >= 0) rows[i] = { cls: 'ok', icon: '✓', text: 'Already one solid piece: nothing to fuse' }; }
-      verdict = { healthy, pieces, fused: oneSolid && (fs === 'good' || alreadyOne), text: (healthy ? 'FIXED' : 'NOT FULLY FIXED') + ' · ' + (oneSolid && fs === 'good' ? 'FUSED into one solid' : alreadyOne ? 'ONE SOLID PIECE (nothing to fuse)' : oneSolid ? 'ONE PIECE, but the fuse step could not finish (see the Fuse box)' : pieces ? `NOT FUSED: ${pieces} separate pieces (${why})` : `fuse not confirmed (${why})`) };
+            // v2.253: already ONE watertight piece but Manifold refuses it (a few flipped faces, Tarak): there is nothing to fuse, and slicers take it. Not a failure.
+      verdict = { healthy, pieces, fused: oneSolid, text: (healthy ? 'FIXED' : 'NOT FULLY FIXED') + ' · ' + (oneSolid ? 'ONE SOLID PIECE' : pieces ? `${pieces} separate pieces (press FUSE IT in ADVANCED to join them)` : 'pieces not counted') };
       // 4. CENTRE
-      btn.textContent = '4/4 Levelling…'; show('Levelling and centring…'); await paintNow();
+      btn.textContent = '3/3 Levelling…'; show('Levelling and centring…'); await paintNow();
       try { if (resetStretch()) done('ok', '✓', 'Width and depth set back to the original proportions'); } catch (e) { console.warn('stretch reset', e); }
       let lv = null; try { lv = levelModel(); } catch (e) { console.warn('level', e); }
       if (lv?.ok && lv.changed) done('ok', '✓', `Model ${lv.text}`);

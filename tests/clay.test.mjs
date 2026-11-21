@@ -339,7 +339,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   for (let i = 0; i < 120 && page2.$('v2MagicBtn').dataset.busy; i++) await wait(250);
   const v = page2.w.__shrinkLastVerdict;
   ok(!!v && v.pieces >= 1 && typeof v.text === 'string' && /FIXED|NOT FULLY FIXED/.test(v.text), 'P3 QUICK-FIX ends with a verdict: ' + (v && v.text));
-  ok(v && (v.pieces === 1 ? v.fused === true : v.fused === false && /NOT FUSED/.test(v.text)), 'P3 the verdict says NOT FUSED when separate pieces remain');
+  ok(v && (v.pieces === 1 ? v.fused === true : v.fused === false && /separate pieces/.test(v.text)), 'P3 the verdict names the separate pieces (and AUTO-SHRINK does not fuse them)');
 }
 
 
@@ -350,9 +350,9 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   page.$('v2MagicBtn').click(); await wait(2000);
   for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250);
   const note = page.$('v2MagicNote').textContent; if (0) console.log('NOTE:', note.replace(/×$/,''), '| tris', w.__shrinkWorkingModel() && (()=>{let n=0;w.__shrinkWorkingModel().traverse(o=>{if(o.isMesh)n+=(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3});return n})());
-  ok(/Shrunk further for fusing/.test(note) && /from 16K to/.test(note), 'L1 over the fuse limit: QUICK-FIX shrinks again at a lower detail level and says so');
-  ok(w.__shrinkDownloadStem('x') !== tag0, 'L1 the file name tag follows the level really used (' + tag0 + ' -> ' + w.__shrinkDownloadStem('x') + ')');
-  ok(/NOT FUSED|FUSED|ONE PIECE/.test(w.__shrinkLastVerdict?.text || ''), 'L1 and still ends with a verdict: ' + w.__shrinkLastVerdict?.text);
+  ok(!/Shrunk further for fusing/.test(note), 'L1 v2.401: AUTO-SHRINK no longer shrinks again just to fit FUSE');
+  
+  ok(/ONE SOLID PIECE|separate pieces|pieces not counted/.test(w.__shrinkLastVerdict?.text || ''), 'L1 and still ends with a verdict: ' + w.__shrinkLastVerdict?.text);
   let saved = ''; try { saved = w.localStorage.getItem('shrink-printer'); } catch {} ok(/ultra/.test(saved || 'ultra'), 'L1 your own saved printer choice is put back for the next model');
 }
 
@@ -389,7 +389,7 @@ const bakedVolume = m => { let v = 0; m.updateMatrixWorld(true); m.traverse(o =>
   page.$('v2MagicBtn').click(); await wait(2000);
   for (let i = 0; i < 160 && page.$('v2MagicBtn').dataset.busy; i++) await wait(250);
   const v = w.__shrinkLastVerdict;
-  ok(!!v && v.fused === true && v.pieces === 1 && /FIXED/.test(v.text) && /FUSED into one solid/.test(v.text), 'V1 two overlapping spheres: QUICK-FIX says FIXED and FUSED into one solid: ' + (v && v.text));
+  ok(!!v && v.fused === false && v.pieces === 2 && /FIXED/.test(v.text) && /FUSE IT/.test(v.text), 'V1 two overlapping spheres: AUTO-SHRINK no longer fuses and says so: ' + (v && v.text));
   ok(/2\.189/.test(w.__shrinkFuseBuild || ''), 'V1 the report names the 2.189 fuse build');
 }
 
