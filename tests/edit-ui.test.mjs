@@ -661,6 +661,18 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     ok(!!page.$('v2EditCard').querySelector('.v2-icon-btn[data-ed="tool"][data-value="clay"]'), 'ED75 there is a Clay icon in the EDIT toolbar');
     set(page, 'v2EdTab', 'clay'); await wait(60); ok(page.$('v2ClayCard').hidden === false, 'ED75 choosing Clay shows the Clay card');
     set(page, 'v2EdTab', 'select'); await wait(60); ok(page.$('v2ClayCard').hidden === true, 'ED75 choosing another tool hides it again');
+  { // v2.402 SPLIT INTO PARTS
+    const T = w.__shrinkApp.THREE, grp = new T.Group(), mk = (s, x) => { const m = new T.Mesh(new T.BoxGeometry(s, s, s), new T.MeshStandardMaterial()); m.position.set(x, 0, 0); m.name = 'Box' + s; grp.add(m); };
+    mk(20, 0); mk(6, 20); mk(4, -20);
+    const before = w.__shrinkWorkingModel(), pk0 = w.__shrinkEdit.parked(); w.__shrinkSetWorkingModel(grp); await wait(60);
+    ok(w.__shrinkEdit.split() === true, 'ED76 SPLIT INTO PARTS works on a model of several meshes');
+    await wait(80);
+    const pk = w.__shrinkEdit.parked(); ok(pk - pk0 >= 1 && pk - pk0 <= 2 && w.__shrinkEdit.hasPart(), 'ED76 the other two meshes float as pieces (one selected, one waiting), parked=' + JSON.stringify(pk).slice(0, 120));
+    const rest = tris(w.__shrinkWorkingModel()); ok(rest === 12, 'ED76 the biggest mesh stays as the model (' + rest + ' triangles)');
+    page.$('v2EdUndo').click(); await wait(80);
+    ok(tris(w.__shrinkWorkingModel()) === 36, 'ED76 UNDO puts every mesh back (' + tris(w.__shrinkWorkingModel()) + ' triangles)');
+    w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.(); w.__shrinkSetWorkingModel(before);
+  }
   }
     w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.();
   }

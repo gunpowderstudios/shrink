@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.402
+- A GLB chosen from Home now opens in 3D Printing (the Gaming tab still opens it as a game asset). New SPLIT INTO PARTS button in the EDIT panel: the biggest mesh stays as the model and every other mesh floats as its own piece exactly where it was, so each can be moved, turned, flipped, resized and welded back. UNDO restores it all.
+
 ## v2.401
 - AUTO-SHRINK no longer fuses (it was hard on big models and threw errors): steps are now fix, shrink, fix again if needed, then level and centre. Use FUSE IT in ADVANCED when you want it. The verdict reports the piece count and says to press FUSE IT if there is more than one.
 
