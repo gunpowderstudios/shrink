@@ -169,6 +169,7 @@
   // Make a tool's result the new current working model: show it, keep the camera, tell the rest of the app,
   // record the change chip and clear the red warning. Fix It, Make watertight and any future tool go through here.
   function installWorkingResult(root, kind) {
+    try { removePartsView(); setTimeout(() => partsDetect(), 50); } catch {}   // v2.403: the parts colouring belongs to the model it was made for
     if (kind !== 'hollow') { try { removeHollowBlue(); } catch {} }
     const view = app()?.getViewState?.();
     app()?.setPreview?.(root);
@@ -306,6 +307,7 @@
     card.className = 'v2-health-card checking';
     card.innerHTML = `
       <div id="v2FileLine" class="v2-file-line" title="The file you opened"><small>FILE</small><span id="v2FileLineName">—</span></div>
+      <div id="v2PartsLine" class="v2-parts-line" hidden><span id="v2PartsText"></span><button type="button" id="v2PartsShow" title="Colour each separate part of the model">SHOW PARTS</button><button type="button" id="v2PartsSplit" title="Turn the separate parts into floating pieces you can move">SPLIT</button></div>
       <div class="v2-health-top">
         <div><small>MODEL HEALTH</small><strong id="v2HealthLabel">Checking…</strong></div>
         <div class="v2-health-score"><b id="v2HealthScore">—</b><span>/100</span></div>
@@ -320,6 +322,8 @@
     $('v2MagicNote').addEventListener('click', () => { $('v2MagicNote').hidden = true; });
     { const src = document.getElementById('fileName'), out = $('v2FileLineName');   // v2.397 (Tim): show the name of the uploaded file under the health box
       const sync = () => { const t = String(src?.textContent || '').trim() || '—'; if (out && out.textContent !== t) { out.textContent = t; $('v2FileLine').title = t; } };
+      $('v2PartsShow').addEventListener('click', () => { if (window.__shrinkViewer?.scene?.getObjectByName?.('shrinkPartsColour')) removePartsView(); else showPartsView(); });
+      $('v2PartsSplit').addEventListener('click', () => { try { setMainTab('edit'); } catch {} splitIntoParts(); });
       sync(); if (src) new MutationObserver(sync).observe(src, { childList: true, characterData: true, subtree: true }); document.addEventListener('shrink:model-opened', () => setTimeout(sync, 50)); }
     return card;
   }
@@ -901,7 +905,7 @@
   // v2.315: which triangles does the loop take? One mask per mesh (same traversal order everywhere). With `whole` it grows to every loose piece (separate shell) the loop touches.
   let islandCache = null;
   function islandsOf(model) {
-    if (islandCache && islandCache.model === model) return islandCache.meshes;
+    if (islandCache && islandCache.model === model && islandCache.tick === reducedTick) return islandCache.meshes;
     const THREE = app().THREE, f = editFrame(); model.updateWorldMatrix(true, true);
     const q = 1e6 / Math.max(1e-9, f.size.length()), key = new Map(), parent = [], v = new THREE.Vector3(), meshes = [];
     const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
@@ -915,7 +919,7 @@
     });
     for (const m of meshes) { m.isl = new Int32Array(m.nt); for (let t = 0; t < m.nt; t++) m.isl[t] = find(m.tv[t * 3]); }   // v2.339: m.tv (welded vertex ids per triangle) is kept for the surface grow of 'Nearest part'
     meshes.gids = parent.length;
-    islandCache = { model, meshes }; return meshes;
+    islandCache = { model, meshes, tick: reducedTick }; return meshes;
   }
   const wholeOn = () => !!$('v2EdWhole')?.checked;
   const depthMode = () => { const v = $('v2EdDepth')?.value; return v === 'through' || v === 'front' ? v : 'near'; };   // near = the nearest part under the loop (auto), through = everything under it, front = half way
@@ -1275,12 +1279,48 @@
       try { edToast(m); } catch {} if (res) res.innerHTML = `<strong>Could not copy</strong><span>${m}</span>`; return false; }
     finally { setWorking(false); }
   }
+  // v2.403 PARTS: find the separate pieces of the model when it opens, say how many, and colour them on request (SHOW PARTS). Pieces = connected islands of triangles (welded by position, all meshes together).
+  const PARTS_MAX_TRIANGLES = 1500000;
+  function partsList(model) {
+    if (!model || modelTriangles(model) > PARTS_MAX_TRIANGLES) return null;
+    const isl = islandsOf(model), cnt = new Map(); let total = 0;
+    isl.forEach(m => { for (let t = 0; t < m.nt; t++) { const id = m.isl[t]; cnt.set(id, (cnt.get(id) || 0) + 1); } total += m.nt; });
+    const list = [...cnt].map(([id, tris]) => ({ id, tris })).sort((a, b) => b.tris - a.tris);
+    list.forEach((x, i) => { const h = (i * 0.61803398875) % 1, a = 0.55 * Math.min(h, 1 - h), f = n => { const k = (n + h * 12) % 12; return 0.62 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)) * 1.4; }; x.c = [Math.max(0, Math.min(1, f(0))), Math.max(0, Math.min(1, f(8))), Math.max(0, Math.min(1, f(4)))]; });
+    return { list, total };
+  }
+  function removePartsView() { const V = window.__shrinkViewer, g = V?.scene?.getObjectByName?.('shrinkPartsColour'); if (!g) return; V.scene.remove(g); g.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); const b = $('v2PartsShow'); if (b) b.textContent = 'SHOW PARTS'; }
+  function showPartsView() {
+    const V = window.__shrinkViewer, model = sourceModel(), THREE0 = app()?.THREE; if (!V?.scene || !model || !THREE0) return false;
+    const pl = partsList(model); if (!pl) { edToast('This model is too big to colour its parts.'); return false; }
+    removePartsView(); const col = new Map(pl.list.map(x => [x.id, x.c])), isl = islandsOf(model), grp = new THREE0.Group(); grp.name = 'shrinkPartsColour'; let k = 0;
+    model.updateWorldMatrix(true, true);
+    model.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; const I = isl[k++], g = o.geometry, pos = g.attributes.position, idx = g.index, c = new Float32Array(pos.count * 3);
+      for (let t = 0; t < I.nt; t++) { const rgb = col.get(I.isl[t]) || [0.7, 0.7, 0.7]; for (let q = 0; q < 3; q++) { const v = idx ? idx.getX(t * 3 + q) : t * 3 + q; c[v * 3] = rgb[0]; c[v * 3 + 1] = rgb[1]; c[v * 3 + 2] = rgb[2]; } }
+      const og = new THREE0.BufferGeometry(); og.setAttribute('position', pos); if (g.attributes.normal) og.setAttribute('normal', g.attributes.normal); og.setAttribute('color', new THREE0.BufferAttribute(c, 3)); if (idx) og.setIndex(idx);
+      const m = new THREE0.Mesh(og, new THREE0.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })); m.matrixAutoUpdate = false; m.matrix.copy(o.matrixWorld); m.matrixWorld.copy(o.matrixWorld); m.raycast = () => {}; grp.add(m); });
+    V.scene.add(grp); const b = $('v2PartsShow'); if (b) b.textContent = 'HIDE PARTS'; return true;
+  }
+  let partsTick = 0;
+  async function partsDetect() {
+    const tick = ++partsTick, line = $('v2PartsLine'), txt = $('v2PartsText'); if (!line || !txt) return null; removePartsView();
+    await wait(1200); if (tick !== partsTick) return null; const model = sourceModel();
+    if (!model) { line.hidden = true; return null; }
+    const pl = partsList(model); if (!pl || pl.list.length < 2) { line.hidden = true; return pl ? 1 : null; }
+    const big = pl.list.filter(x => x.tris >= Math.max(4, pl.total * 0.0005)).length, n = pl.list.length;
+    txt.textContent = big < n ? `${n.toLocaleString()} separate parts (${big} sizeable)` : `${n} separate parts`; line.hidden = false; return n;
+  }
+  { let dn = null;   // click a part while the colours are on: the Wand selects it (DELETE / COPY / cut it out)
+    document.addEventListener('pointerdown', e => { dn = (e.button === 0 && !e.altKey && e.target?.closest?.('#viewer') && window.__shrinkViewer?.scene?.getObjectByName?.('shrinkPartsColour')) ? { x: e.clientX, y: e.clientY } : null; }, true);
+    document.addEventListener('pointerup', e => { const d = dn; dn = null; if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) return; try { const hit = sculptPick(e); if (!hit) return; setMainTab('edit'); set$tool('wand'); wandSelect(hit.mesh, hit.faceIndex); } catch {} }, true); }
+  window.__shrinkParts = { detect: partsDetect, list: () => partsList(sourceModel()), show: showPartsView, hide: removePartsView };
+  document.addEventListener('shrink:model-opened', () => { partsDetect(); });
   // v2.402 (Tim, "like Nomad"): SPLIT INTO PARTS. A GLB made of several meshes (sword, head, base...) becomes: the biggest mesh stays as the model, every other mesh floats as its own piece exactly where it was, so each can be moved, turned, flipped, resized, then WELDed back. UNDO restores the whole thing.
   function meshesOf(model) { const a = []; model?.updateWorldMatrix?.(true, true); model?.traverse(o => { if (o.isMesh && o.visible && o.geometry?.attributes?.position) a.push(o); }); return a; }
   function splitIntoParts() {
     const model = sourceModel(), THREE0 = app()?.THREE, f = editFrame(); if (!model || !THREE0 || !f) return false;
     const tri = m => (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3, list = meshesOf(model);
-    if (list.length < 2) { edToast('This model is one piece already, so there are no separate parts to split off. (Use Lasso or Wand to cut parts out of it.)'); return false; }
+    if (list.length < 2) return splitByIslands(model, f);
     if (detailUpdating) { edToast('Wait for the Detail slider to finish, then try again.'); return false; }
     const order = list.map((m, i) => i).sort((a, b) => tri(list[b]) - tri(list[a])), keep = order[0], snap = cloneRoot(model); if (!snap) return false;
     const soups = [];
@@ -1290,11 +1330,39 @@
     if (!editBase) editBase = cloneRoot(model); undoPush(snap); $('v2EdUndo').hidden = false;
     const base = cloneRoot(model), bl = meshesOf(base); bl.forEach((m, i) => { if (i !== keep) m.parent?.remove(m); });
     removeEditPreview(); installWorkingResult(base, 'edit'); setTimeout(updateHealthCard, 80);
+    return floatSoups(soups, f);
+  }
+  // v2.403: a single-mesh model (STL, scan) with several loose pieces: the biggest island stays, each other island of a useful size floats as a piece in place
+  function splitByIslands(model, f) {
+    const pl = partsList(model); if (!pl) { edToast('This model is too big to look for separate parts.'); return false; }
+    if (pl.list.length < 2) { edToast('This model is one connected piece, so there are no separate parts to split off. (Use Lasso or Wand to cut parts out of it.)'); return false; }
+    const keepId = pl.list[0].id, min = Math.max(4, Math.floor(pl.total * 0.0005)), chosen = new Set(pl.list.slice(1).filter(x => x.tris >= min).map(x => x.id));
+    if (!chosen.size) { edToast('The loose bits are all tiny (under 0.05% of the model), so nothing was split off.'); return false; }
+    const isl = islandsOf(model), list = meshesOf(model), snap = cloneRoot(model), by = new Map(), masks = []; let count = 0;
+    list.forEach((o, k) => { const g = o.geometry, pos = g.attributes.position, idx = g.index, e = o.matrixWorld.elements, I = isl[k], m = new Uint8Array(I.nt);
+      for (let t = 0; t < I.nt; t++) { const id = I.isl[t]; if (!chosen.has(id)) continue; m[t] = 1; count++; let a = by.get(id); if (!a) by.set(id, a = []);
+        for (let c = 0; c < 3; c++) { const v = idx ? idx.getX(t * 3 + c) : t * 3 + c, x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v); a.push(e[0] * x + e[4] * y + e[8] * z + e[12], e[1] * x + e[5] * y + e[9] * z + e[13], e[2] * x + e[6] * y + e[10] * z + e[14]); } }
+      masks.push({ mesh: o, mask: m }); });
+    masks.count = count; masks.total = pl.total;
+    const soups = pl.list.slice(1).filter(x => chosen.has(x.id)).map((x, i) => ({ w: Float32Array.from(by.get(x.id)), name: 'Part ' + (i + 2) }));
+    // remove those triangles from a copy of the model (compacting the vertices), exactly as the Wand's DELETE does
+    const THREE0 = app().THREE, root = cloneRoot(model), dst = meshesOf(root);
+    dst.forEach((o, k) => { const mask = masks[k].mask, g = o.geometry, idx = g.index, remap = new Map(), kept = [];
+      for (let t = 0; t < mask.length; t++) if (!mask[t]) for (let c = 0; c < 3; c++) { const old = idx ? idx.getX(t * 3 + c) : t * 3 + c; let nv = remap.get(old); if (nv === undefined) { nv = remap.size; remap.set(old, nv); } kept.push(nv); }
+      const olds = new Uint32Array(remap.size); remap.forEach((nv, old) => { olds[nv] = old; });
+      for (const name of Object.keys(g.attributes)) { const at = g.attributes[name], sz = at.itemSize, arr = new at.array.constructor(olds.length * sz); for (let i = 0; i < olds.length; i++) for (let c = 0; c < sz; c++) arr[i * sz + c] = at.array[olds[i] * sz + c]; g.setAttribute(name, new THREE0.BufferAttribute(arr, sz, at.normalized)); }
+      g.setIndex(new THREE0.BufferAttribute(new Uint32Array(kept), 1)); g.computeBoundingBox?.(); g.computeBoundingSphere?.(); });
+    root.updateMatrixWorld(true);
+    if (!editBase) editBase = cloneRoot(model); undoPush(snap); $('v2EdUndo').hidden = false;
+    removeEditPreview(); installWorkingResult(root, 'edit'); setTimeout(updateHealthCard, 80);
+    return floatSoups(soups, f);
+  }
+  function floatSoups(soups, f) {
     const mm = f.mm; let made = 0;
     for (const { w, name } of soups) {
-      const part = partFromPoints(w, false, name); let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+      let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];   // the bounding box is read BEFORE partFromPoints, which centres the array in place
       for (let i = 0; i < w.length; i += 3) for (let k = 0; k < 3; k++) { if (w[i + k] < lo[k]) lo[k] = w[i + k]; if (w[i + k] > hi[k]) hi[k] = w[i + k]; }
-      const c = lo.map((v, k) => (v + hi[k]) / 2); setPart(part); partRot = null; made++;
+      const c = lo.map((v, k) => (v + hi[k]) / 2), part = partFromPoints(w, false, name); setPart(part); partRot = null; made++;
       Object.entries(valsDef({ X: (c[0] - f.centre.x) * mm, Y: (c[1] - f.centre.y) * mm, Z: (c[2] - f.centre.z) * mm, RX: 0, RY: 0, RZ: 0, H: part.height * mm })).forEach(([k, v]) => { const el = $(k === 'H' ? 'v2EdPartH' : 'v2EdPart' + k); if (el) el.value = String(v); });
     }
     set$tool('select'); updateEditPreview(); updateGoState(); try { updatePad(); } catch {}

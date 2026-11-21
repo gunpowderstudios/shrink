@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.402';
+  const PRINT_RELEASE = '2.403';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -82,7 +82,7 @@
   const GO_KEY='shrink-go';   /* v2.281: set only so a tab/logo switch with a model open survives its own reload; a plain reload always lands on Home */
   /* v2.281: one button on the start screen. The file type picks the tools (GLB = game, anything else = print), then the file opens as if dropped in the normal zone. */
   { const inp=chooser.querySelector('#startOpenInput'), btn=chooser.querySelector('#startOpenBtn');
-    const openIt=f=>{ if(!f) return; const chosen=location.hash==='#gaming'?'game':'print';   /* v2.402 (Tim): a GLB from Home opens as a print/edit model (its separate meshes can become parts); the Gaming tab still opens it as a game asset */ setMode(/\.(stl|obj|ply|shrinkproject)$/i.test(f.name)?'print':chosen,true); window.__shrinkApp?.openFile?.(f); };
+    const openIt=f=>{ if(!f) return; const chosen=location.hash==='#gaming'?'game':'print';   /* v2.403 (Tim): a GLB from Home opens as a print/edit model (its separate meshes can become parts); the Gaming tab still opens it as a game asset */ setMode(/\.(stl|obj|ply|shrinkproject)$/i.test(f.name)?'print':chosen,true); window.__shrinkApp?.openFile?.(f); };
     btn.addEventListener('click',()=>inp.click());
     inp.addEventListener('change',()=>{ const f=inp.files[0]; inp.value=''; openIt(f); });
     chooser.addEventListener('dragover',e=>{ e.preventDefault(); btn.classList.add('drag'); });

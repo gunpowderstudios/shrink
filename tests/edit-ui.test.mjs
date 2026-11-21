@@ -671,6 +671,21 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     const rest = tris(w.__shrinkWorkingModel()); ok(rest === 12, 'ED76 the biggest mesh stays as the model (' + rest + ' triangles)');
     page.$('v2EdUndo').click(); await wait(80);
     ok(tris(w.__shrinkWorkingModel()) === 36, 'ED76 UNDO puts every mesh back (' + tris(w.__shrinkWorkingModel()) + ' triangles)');
+  { // v2.403 PARTS: detect, colour, split a single mesh by its loose pieces
+    const T = w.__shrinkApp.THREE, box = (s, x) => { const g = new T.BoxGeometry(s, s, s).toNonIndexed(); g.translate(x, 0, 0); return g.attributes.position.array; };
+    const a = box(20, 0), b = box(8, 25), c = box(5, -22), all = new Float32Array(a.length + b.length + c.length); all.set(a, 0); all.set(b, a.length); all.set(c, a.length + b.length);
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(all, 3)); const one = new T.Group(); one.add(new T.Mesh(g, new T.MeshStandardMaterial()));
+    const before = w.__shrinkWorkingModel(); w.__shrinkSetWorkingModel(one); await wait(60);
+    const pl = w.__shrinkParts.list(); ok(pl && pl.list.length === 3 && pl.list[0].tris === 12, 'ED77 three separate pieces are found in a single mesh');
+    const n = await w.__shrinkParts.detect(); ok(n === 3 && page.$('v2PartsLine').hidden === false && /3 separate parts/.test(page.$('v2PartsText').textContent), 'ED77 the health box says how many parts there are: ' + page.$('v2PartsText').textContent);
+    const scene = new T.Scene(); w.__shrinkViewer = Object.assign(w.__shrinkViewer || {}, { scene });
+    ok(w.__shrinkParts.show() === true && !!scene.getObjectByName('shrinkPartsColour') && page.$('v2PartsShow').textContent === 'HIDE PARTS', 'ED77 SHOW PARTS adds the coloured view');
+    w.__shrinkParts.hide(); ok(!scene.getObjectByName('shrinkPartsColour') && page.$('v2PartsShow').textContent === 'SHOW PARTS', 'ED77 HIDE PARTS removes it');
+    const pk0 = w.__shrinkEdit.parked(); ok(w.__shrinkEdit.split() === true, 'ED77 SPLIT INTO PARTS works on a single mesh with loose pieces'); await wait(80);
+    ok(tris(w.__shrinkWorkingModel()) === 12 && w.__shrinkEdit.parked() - pk0 >= 1, 'ED77 the biggest piece stays, the other two float (' + tris(w.__shrinkWorkingModel()) + ' triangles left)');
+    page.$('v2EdUndo').click(); await wait(80); ok(tris(w.__shrinkWorkingModel()) === 36, 'ED77 UNDO restores all three');
+    w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.(); w.__shrinkSetWorkingModel(before);
+  }
     w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.(); w.__shrinkSetWorkingModel(before);
   }
   }

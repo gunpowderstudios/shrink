@@ -1002,3 +1002,9 @@ body.app-mode-print.print-v2-active .v2-viewer-slot .viewer-actions > #v2TbSave{
 .v2-file-line{display:flex;gap:8px;align-items:baseline;margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12);min-width:0}
 .v2-file-line small{opacity:.65;letter-spacing:.08em;flex:none}
 .v2-file-line span{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+
+/* v2.403: parts line in the health box */
+.v2-parts-line{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-2px 0 8px;font-size:12px}
+.v2-parts-line[hidden]{display:none}
+.v2-parts-line span{font-weight:800;flex:1 1 100%}
+.v2-parts-line button{padding:4px 9px;border-radius:8px;border:1px solid #3a4a60;background:#1b2635;color:#e8eef6;font-weight:800;font-size:11px;cursor:pointer}

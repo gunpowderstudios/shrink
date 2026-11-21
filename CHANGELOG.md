@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.403
+- Parts detection on upload: the health box shows '7 separate parts' (connected pieces, up to 1.5M triangles) with SHOW PARTS (colours each part; click a part to select it with the Wand) and SPLIT. SPLIT INTO PARTS also works on a single mesh with loose pieces: the biggest stays, every sizeable loose piece (over 0.05%) floats where it was. UNDO restores it.
+
 ## v2.402
 - A GLB chosen from Home now opens in 3D Printing (the Gaming tab still opens it as a game asset). New SPLIT INTO PARTS button in the EDIT panel: the biggest mesh stays as the model and every other mesh floats as its own piece exactly where it was, so each can be moved, turned, flipped, resized and welded back. UNDO restores it all.
 
