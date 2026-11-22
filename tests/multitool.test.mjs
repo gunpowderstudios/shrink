@@ -224,17 +224,30 @@ await block(21, async () => {
 
   // ---- the Detail kept slider: numbers AND picture change, and the model stays clean ----
   page.$('v2Detail').value = '50'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
-  ok(await settle(page, 0.5), 'K moving the slider to 50% updates the live preview');
-  ok(window.__shrinkLive.root === root && page.app.optimizedModel === root && window.__shrinkWorkingModel() === root, 'K the visible model is still the one the slider drives');
-  const t50 = triOf(root), tFull = triOf(figure);
+  const tFull = triOf(figure);
+  // Raising detail above the current reduced mesh's capacity legitimately re-bases the reducer.
+  // Observe the CURRENT working root after the asynchronous rebase, not the pre-slider root.
+  const at50 = await waitFor(() => {
+    const liveRoot = window.__shrinkLive?.root, shown = window.__shrinkWorkingModel?.();
+    return liveRoot && shown === liveRoot && page.app.optimizedModel === liveRoot
+      && Math.abs(triOf(liveRoot) / tFull - 0.5) < 0.04;
+  }, 30000);
+  ok(at50, `K moving to 50% updates the actual working model (shown ${triOf(window.__shrinkWorkingModel())} / ${tFull}; engine ${page.engine.last?.ratio})`);
+  const root50 = window.__shrinkLive.root;
+  ok(window.__shrinkWorkingModel() === root50 && page.app.optimizedModel === root50, 'K the visible model is the current reducer root');
+  const t50 = triOf(root50);
   ok(Math.abs(t50 / tFull - 0.5) < 0.04, `K the picture really changed: ${t50} triangles on screen = ${(100 * t50 / tFull).toFixed(1)}% of ${tFull}`);
-  ok((await healthOf(root)).clean, 'K and the model on screen is still clean at 50%');
+  ok((await healthOf(root50)).clean, 'K and the model on screen is still clean at 50%');
   page.$('v2Detail').value = '100'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
   ok(await settle(page, 1), 'K moving the slider to 100% updates the preview');
   const g100 = window.__shrinkLive.root.children[0].geometry; // 100% can rebase to a new root.
   ok(g100.index.count / 3 === tFull && g100.attributes.position.count === figure.children[0].geometry.attributes.position.count, `K at 100% the preview is the original again (${g100.index.count / 3} triangles, original vertices)`);
   page.$('v2Detail').value = '10'; page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
-  ok(await settle(page, 0.1) && (await healthOf(window.__shrinkLive.root)).clean, 'K dragging back down to 10% works and is clean');
+  const at10 = await waitFor(() => {
+    const current = window.__shrinkWorkingModel?.(), liveRoot = window.__shrinkLive?.root;
+    return current && current === liveRoot && Math.abs(triOf(current) / tFull - 0.1) < 0.04;
+  }, 30000);
+  ok(at10 && (await healthOf(window.__shrinkWorkingModel())).clean, `K dragging back to 10% changes the visible geometry and stays clean (shown ${triOf(window.__shrinkWorkingModel())} / ${tFull}; engine ${page.engine.last?.ratio})`);
 });
 await block(22, async () => {
   // another tool replaced the working model after SHRINK: the slider re-bases on the current model instead of changing a picture nobody can see
