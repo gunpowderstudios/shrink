@@ -1,5 +1,9 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.408 (review branch; not released)
+- CUT PART OUT / BOOLE now refuses an unsafe open-surface cut on non-watertight meshes or when Manifold rejects the model. The original working model and floating cutter remain available; the error directs the user to FIX IT before retrying. Joining parts retains its existing separate-solid fallback. This is a safety change, not yet a complete solution for hollow cavities or tilted-cut lips.
+- Regression test ED78 updated to assert unchanged model, preserved floating cutter and a clear error on rejected solid cuts. Real miniature and live-browser tests still required.
+
 ## v2.407
 - WELD IT / JOIN on a model Manifold cannot read (open edges, not watertight) no longer ends in a red error (Tim: "I can't weld the text"). The floating part (text, shape, uploaded part) is added to the model as its own closed solid in the right place (`surfaceJoinByPart`), with a message saying so; slicers print overlapping solids as one, and FIX IT then FUSE IT can merge it properly. Same rule as the surface cut: on a model that is known not to be clean it skips Manifold at once. UNDO removes it. Test ED80. Checked that real letters ("Hello", "Hi", "Tim 2026", "OBOE", "Tim" from a Chromium canvas) are accepted by Manifold as solids, so the failure was the model, not the text.
 
