@@ -688,7 +688,10 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     const cube = [], c = [[-.5,-.5,-.5],[.5,-.5,-.5],[.5,.5,-.5],[-.5,.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]]; F.forEach(q => q.forEach(i => cube.push(...c[i])));
     const m0 = w.__shrinkWorkingModel(), t0 = tris(m0), real = w.__shrinkFuse.editModel; w.__shrinkFuse.editModel = async () => { throw new Error('Manifold rejected a mesh part after repair: Not manifold'); };
     w.__shrinkEdit.setPart(new Float32Array(cube), false, 'blk'); await wait(60); page.$('v2EdPartH').value = '20'; page.$('v2EdPartX').value = '15'; page.$('v2EdPartY').value = '0'; page.$('v2EdPartZ').value = '0'; await wait(60);
+    const keyOf = m => { const set = new Set(); m.updateMatrixWorld(true); m.traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position, ix = o.geometry.index, n = ix ? ix.count : p.count; for (let i = 0; i < n; i += 3) { const v = []; for (let c = 0; c < 3; c++) { const k = ix ? ix.getX(i + c) : i + c; v.push([p.getX(k), p.getY(k), p.getZ(k)].map(x => x.toFixed(3)).join(',')); } set.add(v.sort().join('|')); } }); return set; };
+    const before0 = keyOf(m0);
     const okb = await w.__shrinkEdit.boole(); await wait(150); const t1 = tris(w.__shrinkWorkingModel());
+    { const after0 = keyOf(w.__shrinkWorkingModel()); let stray = 0; after0.forEach(k => { if (!before0.has(k)) stray++; }); ok(stray === 0, 'ED78b every triangle left after the surface cut is an unchanged original triangle (' + stray + ' scrambled of ' + after0.size + ')'); }
     ok(okb !== false && t1 > 0 && t1 < t0, 'ED78 a model Manifold rejects is still cut by the surface cut (' + t0 + ' -> ' + t1 + ' triangles)');
     page.$('v2EdUndo').click(); await wait(80); ok(tris(w.__shrinkWorkingModel()) === t0, 'ED78 UNDO restores the model');
     w.__shrinkFuse.editModel = real; w.__shrinkEdit.discard?.(); }
