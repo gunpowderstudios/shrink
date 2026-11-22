@@ -712,6 +712,7 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     await w.__shrinkEdit.boole(); await wait(150);
     ok(w.__shrinkWorkingModel() === beforeModel && tris(w.__shrinkWorkingModel()) === t0, 'ED78 rejected solid cut does not change the working model');
     ok(w.__shrinkEdit.hasPart() && /Could not edit|Cannot make a solid cut/.test(page.$('v2EdResult').textContent), 'ED78 failed cut preserves floating cutter and explains FIX IT');
+    w.__shrinkEdit.discard(); // The failed cut keeps the cutter; clear it before the separate JOIN regression.
     { // v2.407 JOIN (a welded text / part) on a model Manifold rejects: added as its own solid instead of an error
       w.__shrinkFuse.editModel = async () => { throw new Error('No printable solid parts could be read from this model after detail-preserving repair. Not manifold'); };
       const mj = w.__shrinkWorkingModel(), tj = tris(mj); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'blk2'); await wait(60); page.$('v2EdPartH').value = '10'; page.$('v2EdPartX').value = '0'; page.$('v2EdPartY').value = '0'; page.$('v2EdPartZ').value = '0'; set(page, 'v2EdMode', 'join'); await wait(60);
