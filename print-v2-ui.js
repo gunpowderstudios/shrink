@@ -2148,7 +2148,7 @@
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
       if (isPart) { dropSelected(); updatePad(); if (!autoWelding) try { edToast('Welded. Wrong place? Press Ctrl / ⌘ + Z (or UNDO LAST EDIT) and the piece floats again.', true); } catch {} $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Press UPLOAD A PART (top of this card) if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
       if (surface) { res.innerHTML = `<strong>✓ Cut away (surface cut)</strong><span>${surface.tris.toLocaleString()} triangles inside the shape were removed. This model is not watertight, so the cut edge is left open: use the Fill holes tool to cap it. UNDO brings it back.</span>`; try { edToast('Cut away. The model is not watertight, so the cut edge is open: use Fill holes to close it.', true); } catch {} }
-      else res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
+      else res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}.${r.plugged ? ' The hollow inside next to the cut was filled solid, so the new face is solid.' : ''} Press UNDO if that is not what you wanted.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       $('v2EdUndo').hidden = !editStack.length;
       setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);

@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.405
+- CUT PART OUT (BOOLE) leaves a SOLID face on a hollow model (Tim: a base with a hollow inside showed the hollow at the cut). Before the cutter is subtracted, `plugCavities` (edit-core.js) fills every void outline in the horizontal slices that comes within a quarter of the cutter's size of it, one step past the hollow's floor and ceiling so no thin crack stays open; the hollow further away stays, closed again. Solid models are untouched. The result note says when it filled the hollow. Not done on the surface-cut path (non-watertight models: use FIX IT first). Tests SC1-SC6 in edit.test.mjs (hollow disc with a drain hole, volume matches the exact plug within 3%, genus unchanged). Real scan untested: slicing twice per step on a million-triangle model may take several seconds.
+
 ## v2.404
 - CUT PART OUT (and BOOLE) on a model that is not watertight no longer tries Manifold (it froze the page, then said 'Not manifold'). It cuts the surface instead: every triangle whose centre is inside the floating shape is removed, the edge is left open, and Fill holes caps it. Also used as the fallback when Manifold rejects a model it was not expected to. UNDO works.
 

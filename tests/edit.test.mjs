@@ -1,6 +1,6 @@
 // edit-core.js against the real Manifold library: shapes join/cut and plane slicing (shorten a "sword").
 import Module from 'manifold-3d';
-import { applyShapes, sliceSolid, applySolid, lassoPrism, lassoRegion, fillPocket } from '../edit-core.js';
+import { applyShapes, sliceSolid, applySolid, lassoPrism, lassoRegion, fillPocket, plugCavities } from '../edit-core.js';
 const wasm = await Module(); wasm.setup(); const M = wasm.Manifold;
 let bad = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) bad++; };
 const T = (x, y, z, sx = 1, sy = 1, sz = 1) => [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, x, y, z, 1];   // column-major translate + scale
@@ -69,5 +69,26 @@ ok(/whole model/.test(msg), 'E9 a cut that removes everything says so: ' + msg);
   const t2 = fillPocket(M, wasm.CrossSection, tap, [4.5, 12, 0]); const full = M.cylinder(20, 6, 12, 48).rotate([-90, 0, 0]);
   ok(t2.solid.volume() > tap.volume() && t2.solid.volume() <= full.volume() * 1.001 && t2.solid.boundingBox().max[0] < 12.001, 'EP3 a tapered cup is filled without growing past its outside');
   let m2 = ''; try { fillPocket(M, wasm.CrossSection, outer, [0, 10, 0]); } catch (e) { m2 = e.message; } ok(/cup or a pocket/.test(m2), 'EP4 a solid block says there is no pocket'); }
+
+/* v2.405 SOLID CUT: a hollow base (cavity + drain hole) cut by a block leaves a SOLID face, not an open hollow */
+{ const Y = x => x.rotate([-90, 0, 0]);
+  const base = Y(M.cylinder(10, 40, 40, 64)).subtract(Y(M.cylinder(6, 34, 34, 64)).translate([0, 2, 0])).subtract(Y(M.cylinder(4, 3, 3, 24)).translate([0, -1, 0]));
+  const cutter = M.cube([30, 30, 60], true).translate([42, 8, 0]);                       // bites the right edge of the disc
+  const naive = applySolid(M, base, cutter, 'cut'), pl = plugCavities(M, wasm.CrossSection, base, cutter, 12);
+  ok(pl && pl.slabs > 0, `SC1 a hollow near the cutter is found (${pl?.slabs} slabs)`);
+  const fixed = applySolid(M, pl.solid, cutter, 'cut');
+  const exactPlug = Y(M.cylinder(6, 34, 34, 64)).translate([0, 2, 0]).intersect(M.cube([54, 54, 84], true).translate([42, 8, 0]));
+  const want = naive.volume() + exactPlug.subtract(cutter).volume();
+  ok(Math.abs(fixed.volume() - want) / want < 0.03, `SC2 the plug is about as deep as asked: ${fixed.volume().toFixed(0)} vs ${want.toFixed(0)} (open ${naive.volume().toFixed(0)})`);
+  ok(fixed.decompose().length === 1 && fixed.genus() <= naive.genus(), `SC3 still one piece, no new tunnels (genus ${fixed.genus()})`);
+  // a probe at the cut face: slice at y=5 just inside the new face (x = 27.5): it is material now, it was air before
+  const insideAt = (sol, x) => { const cs = sol.slice(5 * 1); const polys = cs.toPolygons(); cs.delete(); let c = false; const P = [x, 0]; for (const r of polys) for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], b = r[j]; if ((a[1] > -P[1]) !== (b[1] > -P[1]) && P[0] < (b[0] - a[0]) * (-P[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+  void insideAt;
+  const solidBase = Y(M.cylinder(10, 40, 40, 64)), clean = applySolid(M, solidBase, cutter, 'cut');
+  ok(plugCavities(M, wasm.CrossSection, solidBase, cutter, 12) === null, 'SC4 a solid model needs no plug (nothing changes)');
+  ok(Math.abs(clean.volume() - (solidBase.volume() - solidBase.intersect(cutter).volume())) < 1e-3 * clean.volume(), 'SC5 solid cut is the plain subtract');
+  const far = M.cube([10, 10, 10], true).translate([0, 5, 0]); const pf = plugCavities(M, wasm.CrossSection, base, far, 3);
+  ok(pf === null || pf.solid.volume() < base.volume() + exactPlug.volume(), 'SC6 a cutter in the middle plugs only near itself');
+}
 console.log(bad ? `${bad} FAILED` : 'edit tests passed'); process.exit(bad ? 1 : 0);
 

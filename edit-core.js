@@ -126,3 +126,44 @@ export function fillPocket(M, CS, solid, point, steps = 160) {
     return { solid: out, top: hs[hs.length - 1], slabs };
   } finally { made.forEach(s => { try { s.delete?.(); } catch {} }); try { rs.delete?.(); } catch {} }
 }
+
+/**
+ * v2.405 SOLID CUT (Tim): cutting a block out of a hollow model (a base with a hollow inside) used to leave the hollow open at the cut face.
+ * Before the cutter is subtracted, every cavity (void outline in the horizontal slices) that comes within `margin` of the cutter is filled with
+ * material, as a plug `margin` deep around the cutter, so the new face is solid. The cavity further away stays, closed again.
+ * Works in a copy turned so world +Y is Manifold's +Z, like fillPocket. Returns { solid, slabs } (a NEW solid) or null when nothing needed plugging.
+ */
+export function plugCavities(M, CS, solid, cutter, margin, steps = 48) {
+  const area = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += (r[j][0] * r[i][1] - r[i][0] * r[j][1]); return s / 2; };
+  const rs = solid.rotate([90, 0, 0]), cr = cutter.rotate([90, 0, 0]), made = [];
+  try {
+    const cb = cr.boundingBox(), mb = rs.boundingBox(), z0 = Math.max(cb.min[2], mb.min[2]), z1 = Math.min(cb.max[2], mb.max[2]);
+    if (!(z1 > z0)) return null;
+    const n = Math.max(8, steps), step = (z1 - z0) / n, grow = Math.max(step * 0.6, margin * 0.02);
+    const fills = [];
+    for (let i = 0; i < n; i++) {
+      const z = z0 + step * (i + 0.5); fills.push(null);
+      const cs = rs.slice(z); let polys; try { polys = cs.toPolygons(); } finally { try { cs.delete?.(); } catch {} }
+      const holes = polys.filter(r => r.length > 2 && area(r) < 0);                      // a void has a material outline around it
+      if (!holes.length) continue;
+      const bs = cr.slice(z); if (bs.isEmpty()) { try { bs.delete?.(); } catch {} continue; }
+      const zone = bs.offset(margin, 'Round'); try { bs.delete?.(); } catch {}
+      const hs0 = CS.ofPolygons(holes.map(r => r.slice().reverse()), 'Positive'), hs = hs0.offset(grow, 'Round'); try { hs0.delete?.(); } catch {}
+      const fill = hs.intersect(zone); try { hs.delete?.(); zone.delete?.(); } catch {}
+      if (fill.isEmpty()) { try { fill.delete?.(); } catch {} continue; }
+      fills[i] = fill;
+    }
+    for (let i = 0; i < n; i++) {                                                         // the hollow's floor and ceiling fall between two slices: reach one step past the last slice with a hollow, or a thin crack stays open
+      if (!fills[i]) continue; const z = z0 + step * (i + 0.5), lo = z - step * (fills[i - 1] ? 0.54 : 1.5), hi = z + step * (fills[i + 1] ? 0.54 : 1.5);
+      made.push(M.extrude(fills[i], hi - lo).translate([0, 0, lo]));
+    }
+    fills.forEach(f => { try { f?.delete?.(); } catch {} });
+    if (!made.length) return null;
+    const plug = made.length === 1 ? made[0] : M.union(made), joined = rs.add(plug);
+    if (plug !== made[0]) try { plug.delete?.(); } catch {}
+    let clean = joined;                                                                    // seams can leave zero-volume slivers: keep real pieces. An enclosed void has NEGATIVE volume and must stay
+    try { const parts = joined.decompose(), vols = parts.map(q => Math.abs(q.volume())), big = Math.max(...vols), keep = parts.filter((q, k) => vols[k] > big * 1e-6); if (keep.length !== parts.length) clean = M.compose(keep); parts.forEach(q => { if (!keep.includes(q)) try { q.delete?.(); } catch {} }); } catch {}
+    const out = clean.rotate([-90, 0, 0]); if (clean !== joined) try { clean.delete?.(); } catch {} try { joined.delete?.(); } catch {}
+    return { solid: out, slabs: made.length };
+  } finally { made.forEach(q => { try { q.delete?.(); } catch {} }); try { rs.delete?.(); cr.delete?.(); } catch {} }
+}
