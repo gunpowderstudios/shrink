@@ -684,6 +684,14 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     const pk0 = w.__shrinkEdit.parked(); ok(w.__shrinkEdit.split() === true, 'ED77 SPLIT INTO PARTS works on a single mesh with loose pieces'); await wait(80);
     ok(tris(w.__shrinkWorkingModel()) === 12 && w.__shrinkEdit.parked() - pk0 >= 1, 'ED77 the biggest piece stays, the other two float (' + tris(w.__shrinkWorkingModel()) + ' triangles left)');
     page.$('v2EdUndo').click(); await wait(80); ok(tris(w.__shrinkWorkingModel()) === 36, 'ED77 UNDO restores all three');
+  { // v2.404 CUT PART OUT on a model Manifold cannot read: surface cut instead of an error
+    const cube = [], c = [[-.5,-.5,-.5],[.5,-.5,-.5],[.5,.5,-.5],[-.5,.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]]; F.forEach(q => q.forEach(i => cube.push(...c[i])));
+    const m0 = w.__shrinkWorkingModel(), t0 = tris(m0), real = w.__shrinkFuse.editModel; w.__shrinkFuse.editModel = async () => { throw new Error('Manifold rejected a mesh part after repair: Not manifold'); };
+    w.__shrinkEdit.setPart(new Float32Array(cube), false, 'blk'); await wait(60); page.$('v2EdPartH').value = '20'; page.$('v2EdPartX').value = '15'; page.$('v2EdPartY').value = '0'; page.$('v2EdPartZ').value = '0'; await wait(60);
+    const okb = await w.__shrinkEdit.boole(); await wait(150); const t1 = tris(w.__shrinkWorkingModel());
+    ok(okb !== false && t1 > 0 && t1 < t0, 'ED78 a model Manifold rejects is still cut by the surface cut (' + t0 + ' -> ' + t1 + ' triangles)');
+    page.$('v2EdUndo').click(); await wait(80); ok(tris(w.__shrinkWorkingModel()) === t0, 'ED78 UNDO restores the model');
+    w.__shrinkFuse.editModel = real; w.__shrinkEdit.discard?.(); }
     w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.(); w.__shrinkSetWorkingModel(before);
   }
     w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.(); w.__shrinkSetWorkingModel(before);

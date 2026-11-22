@@ -1,5 +1,8 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.404
+- CUT PART OUT (and BOOLE) on a model that is not watertight no longer tries Manifold (it froze the page, then said 'Not manifold'). It cuts the surface instead: every triangle whose centre is inside the floating shape is removed, the edge is left open, and Fill holes caps it. Also used as the fallback when Manifold rejects a model it was not expected to. UNDO works.
+
 ## v2.403
 - Parts detection on upload: the health box shows '7 separate parts' (connected pieces, up to 1.5M triangles) with SHOW PARTS (colours each part; click a part to select it with the Wand) and SPLIT. SPLIT INTO PARTS also works on a single mesh with loose pieces: the biggest stays, every sizeable loose piece (over 0.05%) floats where it was. UNDO restores it.
 

@@ -2097,6 +2097,25 @@
     if ($('v2EdGo')?.disabled) { try { edToast('Still working on the last edit. Try again in a moment.'); } catch {} return false; }
     await editModelNow(); return true;
   }
+  // v2.404 (Tim): CUT PART OUT on a model that is not watertight. Manifold cannot read it (and used to freeze the page trying), so this cuts the SURFACE: every triangle whose centre is inside the floating shape is removed. The cut edge is left open; FILL holes caps it afterwards.
+  async function surfaceCutByPart(model, shapeRoot) {
+    const THREE0 = app().THREE; shapeRoot.updateWorldMatrix(true, true); model.updateWorldMatrix(true, true);
+    const tri = [], bb = new THREE0.Box3(), v = new THREE0.Vector3();
+    shapeRoot.traverse(o => { if (!o.isMesh) return; const pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count; for (let i = 0; i < n; i += 3) { const t = []; for (let c = 0; c < 3; c++) { v.fromBufferAttribute(pos, idx ? idx.getX(i + c) : i + c).applyMatrix4(o.matrixWorld); bb.expandByPoint(v); t.push(v.x, v.y, v.z); } tri.push(t); } });
+    if (!tri.length) throw new Error('The shape is empty.');
+    const inside = (x, y, z) => { let hits = 0; for (const t of tri) {   // ray along +Y, parity of crossings with the shape's triangles
+      const ax = t[0] - x, az = t[2] - z, bx = t[3] - x, bz = t[5] - z, cx = t[6] - x, cz = t[8] - z;
+      const d1 = ax * bz - az * bx, d2 = bx * cz - bz * cx, d3 = cx * az - cz * ax; if ((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)) continue;
+      const area = d1 + d2 + d3; if (!area) continue; const y0 = (d2 * t[1] + d3 * t[4] + d1 * t[7]) / area; if (y0 > y) hits++; } return (hits & 1) === 1; };
+    const masks = []; let count = 0, total = 0, n = 0; const a = new THREE0.Vector3(), b = new THREE0.Vector3(), c = new THREE0.Vector3();
+    model.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; const pos = o.geometry.attributes.position, idx = o.geometry.index, nt = Math.floor((idx ? idx.count : pos.count) / 3), m = new Uint8Array(nt);
+      for (let t = 0; t < nt; t++) { const i = t * 3; a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(o.matrixWorld); b.fromBufferAttribute(pos, idx ? idx.getX(i + 1) : i + 1).applyMatrix4(o.matrixWorld); c.fromBufferAttribute(pos, idx ? idx.getX(i + 2) : i + 2).applyMatrix4(o.matrixWorld);
+        const x = (a.x + b.x + c.x) / 3, y = (a.y + b.y + c.y) / 3, z = (a.z + b.z + c.z) / 3; if (x < bb.min.x || x > bb.max.x || y < bb.min.y || y > bb.max.y || z < bb.min.z || z > bb.max.z) continue; if (inside(x, y, z)) { m[t] = 1; count++; } }
+      total += nt; masks.push({ mesh: o, mask: m }); });
+    if (!count) throw new Error('Nothing of the model is inside that shape. Move it over the part you want to cut away.');
+    masks.count = count; masks.total = total; masks.islands = 1; masks.model = model;
+    const r = await wholePieceEdit(model, { pts: [], wand: masks }, 'delete', false); return { root: r.root, tris: count };
+  }
   async function editModelNow() {
     const btn = $('v2EdGo'), card = $('v2EditCard'), res = $('v2EdResult');
     if (!btn || btn.disabled) return;
@@ -2118,14 +2137,18 @@
       if (isPart && !editPart) throw new Error('Upload a part first (UPLOAD A PART at the top of this card).');
       const ops = isPart ? (() => { const pm = partMatrix(), mesh = new pm.f.THREE.Mesh(editPart.geometry, new pm.f.THREE.MeshStandardMaterial()); mesh.matrixAutoUpdate = false; mesh.matrix.copy(pm.m); const root = new pm.f.THREE.Group(); root.add(mesh); root.updateMatrixWorld(true); return { part: { root, mode: $('v2EdMode').value } }; })() : sl ? (() => { const s = sliceSpec(); return { slice: { normal: s.normal, offset: s.offset } }; })() : (() => { const s = shapeSpec(); return { shapes: [{ kind: s.kind, mode: s.mode, matrix: s.matrix }] }; })();
       progress(card, 40, 'Working…'); await paintNow();
-      const r = await window.__shrinkFuse.editModel(model, ops);
+      const unsure = isPart && ops.part?.mode === 'cut' && lastHealth && lastHealth.model === model && lastHealth.h && !lastHealth.h.clean;   // v2.404: not watertight -> do not even try Manifold (it froze the page)
+      let r, surface = null;
+      if (unsure) { surface = await surfaceCutByPart(model, ops.part.root); r = { root: surface.root, volume: 0, pieces: 0 }; }
+      else { try { r = await window.__shrinkFuse.editModel(model, ops); } catch (e) { if (isPart && ops.part?.mode === 'cut' && /manifold|printable|watertight|reject/i.test(String(e?.message || e))) { surface = await surfaceCutByPart(model, ops.part.root); r = { root: surface.root, volume: 0, pieces: 0 }; } else throw e; } }
       progress(card, 85, 'Checking the result…');
       if (snap && isPart && editPart) snap.userData.shrinkWeld = { part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode').value };   // v2.348: UNDO floats the piece again
       if (snap) { if (!editBase) editBase = cloneRoot(snap); undoPush(snap); }
       removeEditPreview(); installWorkingResult(r.root, 'edit');
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
       if (isPart) { dropSelected(); updatePad(); if (!autoWelding) try { edToast('Welded. Wrong place? Press Ctrl / ⌘ + Z (or UNDO LAST EDIT) and the piece floats again.', true); } catch {} $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Press UPLOAD A PART (top of this card) if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
-      res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
+      if (surface) { res.innerHTML = `<strong>✓ Cut away (surface cut)</strong><span>${surface.tris.toLocaleString()} triangles inside the shape were removed. This model is not watertight, so the cut edge is left open: use the Fill holes tool to cap it. UNDO brings it back.</span>`; try { edToast('Cut away. The model is not watertight, so the cut edge is open: use Fill holes to close it.', true); } catch {} }
+      else res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}. Press UNDO if that is not what you wanted.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       $('v2EdUndo').hidden = !editStack.length;
       setTimeout(() => { updateHealthCard(); updateEditPreview(); }, 80);
