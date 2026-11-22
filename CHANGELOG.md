@@ -4,6 +4,7 @@
 - Regression suite now includes Text geometry tests, and auto-height tests distinguish manual override from a new upload.
 - Detail slider regression covers 20% → 50% → 100% → 10% against actual visible geometry and reducer rebasing.
 - Fixed a live reduction scheduling race: if a slider timer fires while an exact reduction is busy, the queued slider request is processed when the exact reduction finishes, instead of being stranded.
+- Detail slider changes now ignore stale asynchronous results from earlier overlapping slider requests (for example 100% → 10% while the reducer is rebasing). Latest value wins.
 - Bumped browser import cache keys for `live-ui.js` and `live-reduce.js`; no live release until checks and a real browser test pass.
 
 
