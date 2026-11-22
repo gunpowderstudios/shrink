@@ -133,11 +133,12 @@ export function fillPocket(M, CS, solid, point, steps = 160) {
  * material, as a plug `margin` deep around the cutter, so the new face is solid. The cavity further away stays, closed again.
  * Works in a copy turned so world +Y is Manifold's +Z, like fillPocket. Returns { solid, slabs } (a NEW solid) or null when nothing needed plugging.
  */
-export function plugCavities(M, CS, solid, cutter, margin, steps = 48) {
+export function plugCavities(M, CS, solid, cutter, margin, steps = 48, full = false) {
   const area = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += (r[j][0] * r[i][1] - r[i][0] * r[j][1]); return s / 2; };
   const rs = solid.rotate([90, 0, 0]), cr = cutter.rotate([90, 0, 0]), made = [];
   try {
-    const cb = cr.boundingBox(), mb = rs.boundingBox(), z0 = Math.max(cb.min[2], mb.min[2]), z1 = Math.min(cb.max[2], mb.max[2]);
+    const cb = cr.boundingBox(), mb = rs.boundingBox(), z0 = full ? mb.min[2] : Math.max(cb.min[2], mb.min[2]), z1 = full ? mb.max[2] : Math.min(cb.max[2], mb.max[2]);   // full (v2.406): all the way up the model, so a tilted cut has no thin hollow skin left over it
+    const shadow = full ? cr.project().offset(margin, 'Round') : null;
     if (!(z1 > z0)) return null;
     const n = Math.max(8, steps), step = (z1 - z0) / n, grow = Math.max(step * 0.6, margin * 0.02);
     const fills = [];
@@ -146,8 +147,9 @@ export function plugCavities(M, CS, solid, cutter, margin, steps = 48) {
       const cs = rs.slice(z); let polys; try { polys = cs.toPolygons(); } finally { try { cs.delete?.(); } catch {} }
       const holes = polys.filter(r => r.length > 2 && area(r) < 0);                      // a void has a material outline around it
       if (!holes.length) continue;
-      const bs = cr.slice(z); if (bs.isEmpty()) { try { bs.delete?.(); } catch {} continue; }
-      const zone = bs.offset(margin, 'Round'); try { bs.delete?.(); } catch {}
+      let zone;
+      if (shadow) zone = shadow.offset(0, 'Round');
+      else { const bs = cr.slice(z); if (bs.isEmpty()) { try { bs.delete?.(); } catch {} continue; } zone = bs.offset(margin, 'Round'); try { bs.delete?.(); } catch {} }
       const hs0 = CS.ofPolygons(holes.map(r => r.slice().reverse()), 'Positive'), hs = hs0.offset(grow, 'Round'); try { hs0.delete?.(); } catch {}
       const fill = hs.intersect(zone); try { hs.delete?.(); zone.delete?.(); } catch {}
       if (fill.isEmpty()) { try { fill.delete?.(); } catch {} continue; }
@@ -157,7 +159,7 @@ export function plugCavities(M, CS, solid, cutter, margin, steps = 48) {
       if (!fills[i]) continue; const z = z0 + step * (i + 0.5), lo = z - step * (fills[i - 1] ? 0.54 : 1.5), hi = z + step * (fills[i + 1] ? 0.54 : 1.5);
       made.push(M.extrude(fills[i], hi - lo).translate([0, 0, lo]));
     }
-    fills.forEach(f => { try { f?.delete?.(); } catch {} });
+    fills.forEach(f => { try { f?.delete?.(); } catch {} }); try { shadow?.delete?.(); } catch {}
     if (!made.length) return null;
     const plug = made.length === 1 ? made[0] : M.union(made), joined = rs.add(plug);
     if (plug !== made[0]) try { plug.delete?.(); } catch {}

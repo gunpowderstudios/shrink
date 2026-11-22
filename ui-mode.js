@@ -1,7 +1,7 @@
 // SHRINK 3D v2.18 — mode chooser + plain-language wording for each destination (Game / 3D Print).
 (() => {
   const VERSION = '2.18';
-  const PRINT_RELEASE = '2.405';
+  const PRINT_RELEASE = '2.406';
   const APP_NAME = 'SHRINK 3D';
   const body = document.body;
   const $ = id => document.getElementById(id);
@@ -17,6 +17,7 @@
   import(`./wheel-split.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Wheel splitter did not load`, err));
   import(`./game-save-guard.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game save verification did not load`, err));
   import(`./game-protection-fix.js?v=${VERSION}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Game/print protection isolation did not load`, err));
+  import(`./text-core.js?v=${PRINT_RELEASE}`).then(m => { window.__shrinkTextCore = m; }).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Text tool core did not load`, err));
   import(`./batch.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Batch tool did not load`, err));
   import(`./free-model.js?v=${PRINT_RELEASE}`).catch(err => console.warn(`[SHRINK 3D ${VERSION}] Free model did not load`, err));
   const CLAY_ENABLED = true;      // v2.317: the pink/orange brush is gone from the EDIT tab (lasso + razor replace it); clay.js stays in the repo, dormant

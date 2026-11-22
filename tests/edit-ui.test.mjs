@@ -41,6 +41,25 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     ok(w.__shrinkEdit.hasPart() && page.$('v2EdTab').value === 'select' && w.__shrinkEdit.selName() === 'cylinder' && ps.h >= 2 && Math.abs(ps.x) > 1 && before === 0, 'ED72 clicking a shape icon puts a floating shape beside the model, selected with the gizmo tool (x ' + ps.x + ', h ' + ps.h + ')');
     w.__shrinkEdit.discard(); }
 
+  /* v2.406 TEXT tool: words float as an editable piece, then weld */
+  { const core = await import('../text-core.js'); w.__shrinkTextCore = core;
+    const ringBits = () => { const b = new Uint8Array(100 * 100); for (let y = 0; y < 100; y++) for (let x = 0; x < 100; x++) { const d = Math.hypot(x - 50, y - 50); b[y * 100 + x] = d < 38 && d > 18 ? 1 : 0; } return { bits: b, w: 100, h: 100, px: 100 }; };
+    w.__shrinkTextBits = () => ringBits();
+    set(page, 'v2EdTab', 'text'); await wait(60);
+    ok(page.$('v2EdTextBox').hidden === false && page.$('v2EdGo').hidden === true && page.$('v2EdModeRow').hidden === false, 'ED79 the Text tool shows its box (and no weld button yet)');
+    const before = w.__shrinkEdit.parked() + (w.__shrinkEdit.hasPart() ? 1 : 0);
+    set(page, 'v2TextSize', 10); set(page, 'v2TextDepth', 2); page.$('v2TextAdd').click(); await wait(150); 
+    const ps = w.__shrinkEdit.partState() || {};
+    ok(w.__shrinkEdit.hasPart() && w.__shrinkEdit.selName() === 'text' && page.$('v2EdTab').value === 'select' && ps.h > 3 && ps.h < 12 && before === 0, `ED79 ADD TEXT floats a text piece (height ${ps.h} mm)`);
+    ok(page.$('v2EdTextBox').hidden === false && page.$('v2TextStr').value === 'Hello', 'ED79 the text box stays open while the text piece is selected');
+    set(page, 'v2TextSize', 20); w.__shrinkText.rebuild(); await wait(100);
+    ok(Math.abs(w.__shrinkEdit.partState().h - ps.h * 2) < 0.2, `ED79 changing the size rebuilds it in place (${ps.h} -> ${w.__shrinkEdit.partState().h})`);
+    set(page, 'v2TextStr', 'Hi'); w.__shrinkText.rebuild(); await wait(100);
+    ok(w.__shrinkEdit.hasPart() && w.__shrinkEdit.selName() === 'text', 'ED79 changing the words keeps the piece');
+    set(page, 'v2EdMode', 'join'); const mm0 = w.__shrinkWorkingModel(); page.$('v2PadPlace').click();
+    ok(await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 60000) && /Joined/.test(page.$('v2EdResult').textContent) && w.__shrinkWorkingModel() !== mm0, 'ED79 WELD IT joins the text onto the model: ' + page.$('v2EdResult').textContent.replace(/<[^>]+>/g, ' ').slice(0, 120));
+    page.$('v2EdUndo').click(); await wait(200); w.__shrinkEdit.discard(); w.__shrinkEdit.discard(); delete w.__shrinkTextBits; }
+
   /* slice off the top half: the model gets shorter */
   const h0 = height(page);
   set(page, 'v2EdTab', 'slice'); await wait(50);

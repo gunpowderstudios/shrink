@@ -427,7 +427,7 @@ async function editModel(model, ops) {
       try { part = (await modelToSolid(ops.part.root)).solid; } catch (e) { throw new Error('The part is not a closed solid, so it cannot be joined (' + (e?.message || e) + ')'); }
       try {
         if (ops.part.mode === 'cut' && ops.part.solidCut !== false) {                // v2.405: plug any hollow inside near the cutter so the new face is solid
-          try { const bb = part.boundingBox(), size = Math.max(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]); plugged = plugCavities(wasm.Manifold, wasm.CrossSection, solid, part, size * 0.25); } catch (e) { console.warn('plug cavities failed', e); }
+          try { const bb = part.boundingBox(), size = Math.max(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]); plugged = plugCavities(wasm.Manifold, wasm.CrossSection, solid, part, size * 0.25, 48, true); } catch (e) { console.warn('plug cavities failed', e); }
         }
         r = applySolid(wasm.Manifold, plugged ? plugged.solid : solid, part, ops.part.mode);
       } finally { try { part.delete?.(); } catch {} try { plugged?.solid?.delete?.(); } catch {} }

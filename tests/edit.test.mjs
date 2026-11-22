@@ -87,6 +87,10 @@ ok(/whole model/.test(msg), 'E9 a cut that removes everything says so: ' + msg);
   const solidBase = Y(M.cylinder(10, 40, 40, 64)), clean = applySolid(M, solidBase, cutter, 'cut');
   ok(plugCavities(M, wasm.CrossSection, solidBase, cutter, 12) === null, 'SC4 a solid model needs no plug (nothing changes)');
   ok(Math.abs(clean.volume() - (solidBase.volume() - solidBase.intersect(cutter).volume())) < 1e-3 * clean.volume(), 'SC5 solid cut is the plain subtract');
+  { const low = M.cube([30, 3, 60], true).translate([42, 4, 0]);                       // a flat, low cutter: only the lowest part of the hollow is near it
+    const a = plugCavities(M, wasm.CrossSection, base, low, 12), b = plugCavities(M, wasm.CrossSection, base, low, 12, 48, true);
+    ok(a && b && b.solid.volume() > a.solid.volume() + 100, `SC7 full height plugs the hollow all the way up beside the cut (${a?.solid.volume().toFixed(0)} -> ${b?.solid.volume().toFixed(0)})`);
+    ok(applySolid(M, b.solid, low, 'cut').decompose().length === 1, 'SC8 the full plug cuts cleanly'); }
   const far = M.cube([10, 10, 10], true).translate([0, 5, 0]); const pf = plugCavities(M, wasm.CrossSection, base, far, 3);
   ok(pf === null || pf.solid.volume() < base.volume() + exactPlug.volume(), 'SC6 a cutter in the middle plugs only near itself');
 }

@@ -69,6 +69,7 @@
     select: '<path d="M6 3l13 8-6 2-3.5 6z"/>',
     wand: '<path d="M4 20L14 10"/><path d="M14 10l2-2"/><path d="M17 3v3M15.5 4.5h3M20 8v2M19 9h2M12 4v2M11 5h2"/>',
     fill: '<path d="M5.5 11.5l6-6.5 7 7-6 6.5a2 2 0 0 1-2.8 0l-4.2-4.2a2 2 0 0 1 0-2.8z"/><path d="M11.5 5L9 2.5"/><path d="M5.5 11.5h13"/><path d="M20.5 15c1 1.4 1.7 2.4 1.7 3.4a1.7 1.7 0 0 1-3.4 0c0-1 .7-2 1.7-3.4z"/>',
+    text: '<path d="M5 6h14M12 6v13M9 19h6"/>',
     part: '<rect x="5" y="12" width="14" height="8" rx="1"/><rect x="8.5" y="3" width="7" height="9" rx="1"/>'
   };
   const icon = k => `<svg class="v2-ico" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
@@ -1942,7 +1943,7 @@
     return 0;
   }
   async function weldAll() { let guard = 0; while (editPart && guard++ < 30) { const cur = editPart; await editModelNow(); if (editPart === cur) break; } }
-  function updatePad() { if (parked.length && editActive() && pieceTool()) wirePartDrag(); const show = !!editPart && editActive() && pieceTool(); const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show); if (show) { const t = $('v2PartPad').querySelector('.v2-pad-title'), txt = parked.length ? `Move the part (${parked.length + 1} floating)` : 'Move the part'; if (t && t.textContent !== txt) t.textContent = txt; setHid($('v2PadAll'), !parked.length); { const wa = $('v2PadAll'); if (wa) { const t = 'WELD ALL (' + (parked.length + 1) + ')'; if (wa.textContent !== t) wa.textContent = t; } } wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
+  function updatePad() { syncTextBox(); if (parked.length && editActive() && pieceTool()) wirePartDrag(); const show = !!editPart && editActive() && pieceTool(); const pad = show ? ensurePad() : $('v2PartPad'); setHid(pad, !show); hudUpdate(show); if (show) { const t = $('v2PartPad').querySelector('.v2-pad-title'), txt = parked.length ? `Move the part (${parked.length + 1} floating)` : 'Move the part'; if (t && t.textContent !== txt) t.textContent = txt; setHid($('v2PadAll'), !parked.length); { const wa = $('v2PadAll'); if (wa) { const t = 'WELD ALL (' + (parked.length + 1) + ')'; if (wa.textContent !== t) wa.textContent = t; } } wirePartDrag(); if (pad && pad.dataset.shown !== '1') { pad.dataset.shown = '1'; const pn = $('v2EditPanel'); if (pn) pn.scrollTop = 0; } } else if (pad && pad.dataset.shown) delete pad.dataset.shown; }
   function set$tool(t) { const sel = $('v2EdTab'); sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true })); }
   function updateGoState() { const go = $('v2EdGo'); if (!go) return; const need = $('v2EdTab').value === 'part' && !editPart; if (go.dataset.needPart !== String(need)) go.dataset.needPart = String(need); }
   function sliceSpec() {                                // plane through the chosen spot; normal points to the side that is KEPT
@@ -1992,7 +1993,7 @@
     if (pieceTool() && !editPart && parked.length) takeParked(parked.length - 1);   // v2.344: Select / Paste part always has a piece in hand when anything floats
     const t = $('v2EdTab').value, sl = t === 'slice';
     const lz = t === 'lasso' || t === 'razor' || t === 'wand';
-    setHid($('v2EdShapeBox'), t !== 'shape'); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2ClayCard'), t !== 'clay'); setHid($('v2EdFillBox'), t !== 'fill'); setHid($('v2EdGo'), lz || t === 'sculpt' || t === 'select' || t === 'fill'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part')); setHid($('v2EdRun'), t === 'none');
+    setHid($('v2EdShapeBox'), t !== 'shape'); syncTextBox(); setHid($('v2EdSliceBox'), !sl); setHid($('v2EdPartBox'), t !== 'part'); setHid($('v2EdLassoBox'), !lz); setHid($('v2EdSculptBox'), t !== 'sculpt'); setHid($('v2ClayCard'), t !== 'clay'); setHid($('v2EdFillBox'), t !== 'fill'); setHid($('v2EdGo'), lz || t === 'sculpt' || t === 'select' || t === 'fill' || t === 'text'); setHid($('v2EdModeRow'), !(t === 'shape' || t === 'part' || t === 'text' || (t === 'select' && editPart?.textMeta))); setHid($('v2EdRun'), t === 'none');
     { const tip = $('v2EdTip'); const msg = t === 'none' ? 'No tool selected. Pick one above.' : 'Click the tool again or press Esc to put it down.'; if (tip && tip.textContent !== msg) tip.textContent = msg; updateGoState(); }
     if (lz && t !== lastLz) { clearLasso(); const dp = $('v2EdDepth'); if (dp) dp.value = t === 'razor' ? 'through' : 'near'; const k = $('v2LassoKeepBtn'); if (k) { k.dataset.op = t === 'razor' ? 'cut' : 'copy'; k.querySelector('span').textContent = t === 'razor' ? 'CUT OFF & KEEP' : 'COPY'; } const d = $('v2LassoDelBtn'); if (d) d.querySelector('span').textContent = t === 'razor' ? 'CUT OFF' : 'DELETE'; { const bx = $('v2EdLassoBox'); if (bx) bx.dataset.tool = t; } const h = $('v2LassoHelp'); if (h) h.textContent = t === 'wand' ? 'Touch a piece to select it, like a bucket fill: the whole connected piece turns red. A loose floating piece is picked on its own. If it is attached to the rest of the model it will select everything, so cut it off with the Lasso or Razor first. Then DELETE it or COPY it. Alt + drag turns the model.' : t === 'razor' ? 'The razor cuts straight through. Draw a loop round the piece you want off. The hole is always closed flat. Ctrl / ⌘ + drag turns the model.' : 'Hold the mouse button down and draw a loop round the part on the model. Ctrl / ⌘ + drag still turns the model.'; }
     if (!lz && lastLz) clearLasso(); lastLz = lz ? t : '';
@@ -2077,6 +2078,60 @@
       else { $('v2EdX').value = String(Math.round(f.size.x * f.mm / 2 + sz * 0.8)); $('v2EdY').value = String(Math.round(-f.size.y * f.mm / 2 + sz / 2)); $('v2EdZ').value = '0'; } }
     return makeShapePiece();
   }
+
+  // ---- v2.406 (Tim): TEXT tool. Words become a floating 3D piece (same handles, JOIN raises / CUT engraves, WELD IT) that stays editable while selected.
+  let textTimer = 0;
+  function textLooks() { return { text: ($('v2TextStr')?.value || '').replace(/\s+/g, ' ').trim(), family: $('v2TextFont')?.value || 'Arial, sans-serif', bold: !!$('v2TextBold')?.checked, sizeMm: Math.max(0.5, num('v2TextSize', 10)), depthMm: Math.max(0.2, num('v2TextDepth', 2)) }; }
+  function textBits(text, family, bold) {                // draw the words on a canvas, return the ink as a 0/1 picture
+    if (window.__shrinkTextBits) return window.__shrinkTextBits(text, family, bold);
+    const PX = 200, pad = 12, c = document.createElement('canvas'), x = c.getContext('2d'); if (!x) throw new Error('This browser cannot draw text here.');
+    const font = `${bold ? 'bold ' : ''}${PX}px ${family}`; x.font = font; const w = Math.ceil(x.measureText(text).width) + pad * 2, h = Math.ceil(PX * 1.5) + pad * 2;
+    c.width = Math.min(w, 8000); c.height = h; const y = c.getContext('2d'); y.font = font; y.fillStyle = '#000'; y.textBaseline = 'alphabetic'; y.fillText(text, pad, pad + PX * 1.05);
+    const d = y.getImageData(0, 0, c.width, c.height).data, bits = new Uint8Array(c.width * c.height); for (let i = 0; i < bits.length; i++) bits[i] = d[i * 4 + 3] > 127 ? 1 : 0;
+    return { bits, w: c.width, h: c.height, px: PX };
+  }
+  function textSoup(looks) {                              // -> { arr (triangle soup, font size = 1 unit), ratio (ink height / font size) }
+    const core = window.__shrinkTextCore, THREE = app()?.THREE; if (!core || !THREE) throw new Error('The text tool is still loading. Try again in a moment.');
+    if (!looks.text) throw new Error('Type some words first.');
+    const b = textBits(looks.text, looks.family, looks.bold), shapes = core.bitmapToShapes(b.bits, b.w, b.h, 0.8); if (!shapes.length) throw new Error('Those letters did not draw. Try other words or another font.');
+    const k = 1 / b.px, P = r => r.map(([x, y]) => new THREE.Vector2(x * k, -y * k)), parts = [];
+    for (const sh of shapes) { const s = new THREE.Shape(P(sh.outer)); s.holes = sh.holes.map(h => new THREE.Path(P(h))); parts.push(s); }
+    const depth = Math.max(0.002, looks.depthMm / looks.sizeMm), g = new THREE.ExtrudeGeometry(parts, { depth, bevelEnabled: false, curveSegments: 1 }), ng = g.index ? g.toNonIndexed() : g, arr = ng.getAttribute('position').array.slice();
+    g.dispose(); g.computeBoundingBox?.(); let miny = Infinity, maxy = -Infinity; for (let i = 1; i < arr.length; i += 3) { if (arr[i] < miny) miny = arr[i]; if (arr[i] > maxy) maxy = arr[i]; }
+    return { arr, ratio: maxy - miny };
+  }
+  function addText() {
+    const f = editFrame(); if (!f) { try { edToast('Load a model first.'); } catch {} return false; }
+    const looks = textLooks(); let soup; try { soup = textSoup(looks); } catch (e) { try { edToast(String(e?.message || e)); } catch {} return false; }
+    const part = partFromPoints(soup.arr, false, 'text'); part.isShape = true; part.textMeta = { ...looks, ratio: soup.ratio }; setPart(part);
+    const c = viewCentrePoint(f), z = c ? (c.z - f.centre.z) * f.mm : 0;
+    $('v2EdPartH').value = String(Math.max(0.1, Math.round(looks.sizeMm * soup.ratio * 100) / 100)); ['SX', 'SY', 'SZ'].forEach(a => { $('v2EdPart' + a).value = '100'; });
+    $('v2EdPartX').value = String(c ? Math.round((c.x - f.centre.x) * f.mm) : 0); $('v2EdPartY').value = String(c ? Math.round((c.y - f.centre.y) * f.mm) : 0); $('v2EdPartZ').value = String(Math.round(z));
+    set$tool('select'); updateEditPreview(); updateGoState(); updatePad(); syncTextBox();
+    try { edToast('Text ready. Move and tilt it with the handles; change the words below any time. JOIN raises it, CUT engraves it. Then WELD IT.', true); } catch {}
+    return true;
+  }
+  function rebuildText() {                                // the words / font / size / thickness changed while a text piece is selected: swap its geometry, keep its place
+    textTimer = 0; const p = editPart; if (!p?.textMeta) return false; const looks = textLooks(); let soup; try { soup = textSoup(looks); } catch (e) { try { edToast(String(e?.message || e)); } catch {} return false; }
+    const np = partFromPoints(soup.arr, false, 'text'); noteTransform('text');
+    editPart = { ...p, geometry: np.geometry, size: np.size, height: np.height, textMeta: { ...looks, ratio: soup.ratio } };   // a NEW piece object, so UNDO still holds the old words
+    $('v2EdPartH').value = String(Math.max(0.1, Math.round(looks.sizeMm * soup.ratio * 100) / 100));
+    updateEditPreview(); updatePad(); return true;
+  }
+  function syncTextBox() {                                // show the text controls for the Text tool, or while a text piece is selected; fill them from that piece
+    const box = $('v2EdTextBox'); if (!box) return; const t = $('v2EdTab')?.value, tm = editPart?.textMeta, show = t === 'text' || (pieceTool() && !!tm);
+    if (setHid) setHid(box, !show);
+    if (tm && !(document.activeElement && box.contains(document.activeElement))) { const w = (id, v) => { const e = $(id); if (e && e.value !== String(v)) e.value = String(v); }; w('v2TextStr', tm.text); w('v2TextFont', tm.family); w('v2TextSize', tm.sizeMm); w('v2TextDepth', tm.depthMm); const b = $('v2TextBold'); if (b && b.checked !== !!tm.bold) b.checked = !!tm.bold; }
+    const add = $('v2TextAdd'); if (add) { const lbl = add.querySelector('span'), want = tm && t !== 'text' ? 'ADD ANOTHER TEXT' : 'ADD TEXT'; if (lbl && lbl.textContent !== want) lbl.textContent = want; }
+  }
+  function wireText() {
+    const box = $('v2EdTextBox'); if (!box || box.dataset.wired) return; box.dataset.wired = '1';
+    $('v2TextAdd').addEventListener('click', () => { addText(); });
+    const edit = () => { if (editPart?.textMeta) { clearTimeout(textTimer); textTimer = setTimeout(rebuildText, 180); } };
+    ['v2TextStr', 'v2TextFont', 'v2TextBold', 'v2TextSize', 'v2TextDepth'].forEach(id => { const e = $(id); e.addEventListener('input', edit); e.addEventListener('change', edit); });
+    $('v2TextStr').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); if (editPart?.textMeta) rebuildText(); else addText(); } });
+  }
+  window.__shrinkText = { add: addText, rebuild: rebuildText, looks: textLooks };
   function makeShapePiece() {
     const f = editFrame(); if (!f) return false; const sp = shapeSpec(); if (!sp) return false;
     const arr = shapeSoup(sp.kind); if (!arr) return false;
@@ -3059,11 +3114,18 @@
             <section id="v2EditCard" class="v2-card v2-action-card v2-edit-card">
               <div class="v2-card-head"><div><h2>Edit model</h2><p>Lasso a part to delete or copy it, cut a piece off with the razor, add a shape, paste a part, or slice a piece off.</p></div></div>
               <div id="v2EdHint" class="v2-edit-hint" hidden></div>
-              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'select', 'Select')}${iconBtn('tool', 'wand', 'Wand')}${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'clay', 'Clay')}${iconBtn('tool', 'fill', 'Fill holes')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'part', 'Paste part')}</div>
-              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="select">Select</option><option value="wand">Wand</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="clay">Clay</option><option value="fill">Fill holes</option><option value="shape" selected>Shape</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
+              <div class="v2-icon-row v2-icon-row-6" role="group" aria-label="Edit tool">${iconBtn('tool', 'select', 'Select')}${iconBtn('tool', 'wand', 'Wand')}${iconBtn('tool', 'lasso', 'Lasso')}${iconBtn('tool', 'razor', 'Razor')}${iconBtn('tool', 'sculpt', 'Sculpt')}${iconBtn('tool', 'clay', 'Clay')}${iconBtn('tool', 'fill', 'Fill holes')}${iconBtn('tool', 'shape', 'Shape', true)}${iconBtn('tool', 'text', 'Text')}${iconBtn('tool', 'part', 'Paste part')}</div>
+              <select id="v2EdTab" autocomplete="off" hidden><option value="none">None</option><option value="select">Select</option><option value="wand">Wand</option><option value="lasso">Lasso</option><option value="razor">Razor</option><option value="sculpt">Sculpt</option><option value="clay">Clay</option><option value="fill">Fill holes</option><option value="shape" selected>Shape</option><option value="text">Text</option><option value="part">Paste part</option><option value="slice">Slice off</option></select>
               <div id="v2EdTip" class="v2-edit-hint-plain">Click the tool again or press Esc to put it down.</div>
               <div id="v2EdModeRow"><div class="v2-icon-row v2-icon-row-2" role="group" aria-label="Join or cut">${iconBtn('mode', 'join', 'Join (add on)')}${iconBtn('mode', 'cut', 'Cut (make a hole)', true)}</div>
                 <select id="v2EdMode" autocomplete="off" hidden><option value="join">Join (add on)</option><option value="cut" selected>Cut (make a hole)</option></select></div>
+              <div id="v2EdTextBox" hidden>
+                <input id="v2TextStr" type="text" maxlength="60" value="Hello" autocomplete="off" spellcheck="false" aria-label="Text" style="width:100%;box-sizing:border-box;font-size:16px;padding:8px 10px">
+                <div class="v2-edit-grid"><span>Font</span><select id="v2TextFont" autocomplete="off"><option value="Arial, Helvetica, sans-serif">Clean</option><option value="Georgia, 'Times New Roman', serif">Serif</option><option value="'Courier New', monospace">Typewriter</option><option value="Impact, 'Arial Black', sans-serif">Heavy</option><option value="'Brush Script MT', 'Segoe Script', cursive">Script</option></select><label style="display:flex;gap:6px;align-items:center"><input id="v2TextBold" type="checkbox"> Bold</label></div>
+                <div class="v2-edit-grid"><span>Size mm</span><input id="v2TextSize" type="number" min="1" step="1" value="10" title="Letter height in mm"><span>Thick mm</span><input id="v2TextDepth" type="number" min="0.2" step="0.5" value="2" title="How far the letters stand out (or cut in)"></div>
+                <button type="button" id="v2TextAdd" class="v2-icon-btn v2-wide-btn" title="Put the words in the scene"><span>ADD TEXT</span></button>
+                <div id="v2TextNote" class="v2-edit-hint-plain">Type your words, press ADD TEXT, then move and tilt them with the handles. Change the words any time while the text is selected. JOIN raises them, CUT engraves them. Then WELD IT.</div>
+              </div>
               <div id="v2EdShapeBox">
                 <div class="v2-icon-row v2-icon-row-4" role="group" aria-label="Shape">${iconBtn('kind', 'cube', 'Cube', true)}${iconBtn('kind', 'ball', 'Ball')}${iconBtn('kind', 'cylinder', 'Cylinder')}${iconBtn('kind', 'cone', 'Cone')}</div>
                 <select id="v2EdKind" autocomplete="off" hidden><option value="cube">Cube</option><option value="ball">Ball</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option></select>
@@ -3257,7 +3319,7 @@
     /* v2.307: EDIT MODEL wiring */
     { const ed = $('v2EditCard'); if (ed) {
       ed.addEventListener('click', e => { const b = e.target.closest('.v2-icon-btn'); if (!b) return; const sel = $({ tool: 'v2EdTab', kind: 'v2EdKind', mode: 'v2EdMode', smode: 'v2EdSculptMode' }[b.dataset.ed]); if (!sel) return; sel.value = (b.dataset.ed === 'tool' && b.getAttribute('aria-pressed') === 'true') ? 'none' : b.dataset.value; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); if (b.dataset.ed === 'kind' && $('v2EdTab').value === 'shape') addShapeFromIcon(); });   // v2.377: a click on a shape icon puts that shape in the scene straight away
-      $('v2EdKind').addEventListener('change', editTabChanged);
+      $('v2EdKind').addEventListener('change', editTabChanged); wireText();
       ['v2EdPartSX', 'v2EdPartSY', 'v2EdPartSZ', 'v2EdPartH', 'v2EdPartRX', 'v2EdPartRY', 'v2EdPartRZ', 'v2EdPartX', 'v2EdPartY', 'v2EdPartZ'].forEach(id => { $(id).addEventListener('focus', () => { inputSnap = (editPart || parked.length) ? floatSnap() : null; }); $(id).addEventListener('change', () => { const sn = inputSnap; inputSnap = null; if (!sn) return; const sig = floatSigOf(sn), top = editStack[editStack.length - 1]; if (sig === floatSigOf(floatSnap()) || (top && top.pieceSnap && top.sig === sig)) return; undoPush({ pieceSnap: sn, sig, kind: 'input', t: performance.now() }); }, true); $(id).addEventListener('input', updateEditPreview); $(id).addEventListener('change', updateEditPreview); });
       $('v2SculptSize').addEventListener('input', () => { $('v2SculptSizeOut').textContent = $('v2SculptSize').value + ' mm'; }); $('v2SculptStrength').addEventListener('input', () => { $('v2SculptStrengthOut').textContent = $('v2SculptStrength').value; }); $('v2EdSculptMode').addEventListener('change', editTabChanged);
       $('v2EdDepth').addEventListener('change', () => { if (lassoSel) lassoRed(lassoSel); }); $('v2EdWhole').addEventListener('change', () => { updateEditHint(); if (lassoSel) lassoRed(lassoSel); });
