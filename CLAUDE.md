@@ -4,11 +4,14 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.407** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current user-facing release: **v2.408 review branch (main remains v2.407)** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## Solid CUT safety (v2.408 review branch)
+- CUT PART OUT / BOOLE no longer runs `surfaceCutByPart` when the model is open or Manifold fails. It refuses the edit without changing the model or consuming the floating cutter, and asks for FIX IT. JOIN continues to use `surfaceJoinByPart` on unsuitable inputs. This does **not** guarantee a sealed cavity in an otherwise manifold hollow shell; test the real diorama before release.
 
 ## 3D Print multitool (v2.38 onward) — read this before touching print code
 
