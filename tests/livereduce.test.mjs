@@ -73,5 +73,24 @@ const g0 = figure.children[0].geometry, origVerts = g0.attributes.position.count
   ok(g1.index.count === g0c.index.count && g1.attributes.position.count === g0c.attributes.position.count && engine.last.tidied === 0, 'tidy on: back at 100% the preview is exactly the original (nothing tidied)');
 }
 
+// A queued slider request must survive if its timer fires while an exact job is busy.
+{
+  const app = mkApp(await makeFigure()), engine = createLiveReducer(app);
+  await engine.prepare();
+  let queued = false;
+  const queueSlider = e => {
+    if (!queued && e.detail?.busy && e.detail?.ratio === 0.5) {
+      queued = true;
+      engine.request(0.1, {}, 0);
+    }
+  };
+  win.addEventListener('shrink:live-busy', queueSlider);
+  await engine.runExact(0.5);
+  win.removeEventListener('shrink:live-busy', queueSlider);
+  for (let n = 0; n < 200 && Math.abs((engine.last?.ratio ?? 0) - 0.1) > 0.001; n++) await wait(10);
+  ok(queued && Math.abs((engine.last?.ratio ?? 0) - 0.1) < 0.001,
+    'a slider request queued during runExact still applies after the exact job completes');
+}
+
 console.log(failures() ? `\n${failures()} FAILED` : '\nall passed');
 process.exit(failures() ? 1 : 0);
