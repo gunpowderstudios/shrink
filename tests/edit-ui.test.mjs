@@ -703,16 +703,15 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     const pk0 = w.__shrinkEdit.parked(); ok(w.__shrinkEdit.split() === true, 'ED77 SPLIT INTO PARTS works on a single mesh with loose pieces'); await wait(80);
     ok(tris(w.__shrinkWorkingModel()) === 12 && w.__shrinkEdit.parked() - pk0 >= 1, 'ED77 the biggest piece stays, the other two float (' + tris(w.__shrinkWorkingModel()) + ' triangles left)');
     page.$('v2EdUndo').click(); await wait(80); ok(tris(w.__shrinkWorkingModel()) === 36, 'ED77 UNDO restores all three');
-  { // v2.404 CUT PART OUT on a model Manifold cannot read: surface cut instead of an error
+  { // v2.408 CUT PART OUT must refuse a failed Manifold cut without changing the model
     const cube = [], c = [[-.5,-.5,-.5],[.5,-.5,-.5],[.5,.5,-.5],[-.5,.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]], F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]]; F.forEach(q => q.forEach(i => cube.push(...c[i])));
     const m0 = w.__shrinkWorkingModel(), t0 = tris(m0), real = w.__shrinkFuse.editModel; w.__shrinkFuse.editModel = async () => { throw new Error('Manifold rejected a mesh part after repair: Not manifold'); };
     w.__shrinkEdit.setPart(new Float32Array(cube), false, 'blk'); await wait(60); page.$('v2EdPartH').value = '20'; page.$('v2EdPartX').value = '15'; page.$('v2EdPartY').value = '0'; page.$('v2EdPartZ').value = '0'; await wait(60);
     const keyOf = m => { const set = new Set(); m.updateMatrixWorld(true); m.traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position, ix = o.geometry.index, n = ix ? ix.count : p.count; for (let i = 0; i < n; i += 3) { const v = []; for (let c = 0; c < 3; c++) { const k = ix ? ix.getX(i + c) : i + c; v.push([p.getX(k), p.getY(k), p.getZ(k)].map(x => x.toFixed(3)).join(',')); } set.add(v.sort().join('|')); } }); return set; };
-    const before0 = keyOf(m0);
-    const okb = await w.__shrinkEdit.boole(); await wait(150); const t1 = tris(w.__shrinkWorkingModel());
-    { const after0 = keyOf(w.__shrinkWorkingModel()); let stray = 0; after0.forEach(k => { if (!before0.has(k)) stray++; }); ok(stray === 0, 'ED78b every triangle left after the surface cut is an unchanged original triangle (' + stray + ' scrambled of ' + after0.size + ')'); }
-    ok(okb !== false && t1 > 0 && t1 < t0, 'ED78 a model Manifold rejects is still cut by the surface cut (' + t0 + ' -> ' + t1 + ' triangles)');
-    page.$('v2EdUndo').click(); await wait(80); ok(tris(w.__shrinkWorkingModel()) === t0, 'ED78 UNDO restores the model');
+    const beforeModel = w.__shrinkWorkingModel();
+    await w.__shrinkEdit.boole(); await wait(150);
+    ok(w.__shrinkWorkingModel() === beforeModel && tris(w.__shrinkWorkingModel()) === t0, 'ED78 rejected solid cut does not change the working model');
+    ok(w.__shrinkEdit.hasPart() && /Could not edit|Cannot make a solid cut/.test(page.$('v2EdResult').textContent), 'ED78 failed cut preserves floating cutter and explains FIX IT');
     { // v2.407 JOIN (a welded text / part) on a model Manifold rejects: added as its own solid instead of an error
       w.__shrinkFuse.editModel = async () => { throw new Error('No printable solid parts could be read from this model after detail-preserving repair. Not manifold'); };
       const mj = w.__shrinkWorkingModel(), tj = tris(mj); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'blk2'); await wait(60); page.$('v2EdPartH').value = '10'; page.$('v2EdPartX').value = '0'; page.$('v2EdPartY').value = '0'; page.$('v2EdPartZ').value = '0'; set(page, 'v2EdMode', 'join'); await wait(60);
