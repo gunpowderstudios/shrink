@@ -2171,6 +2171,14 @@
     masks.count = count; masks.total = total; masks.islands = 1; masks.model = model;
     const r = await wholePieceEdit(model, { pts: [], wand: masks }, 'delete', false); return { root: r.root, tris: count };
   }
+  // v2.407 (Tim: "I can't weld the text"): JOIN on a model Manifold cannot read (open edges). The piece is added to the model file as its own closed shell, in the right place. Slicers merge overlapping solids when they print; FIX IT then FUSE IT can fuse it later.
+  function surfaceJoinByPart(model, shapeRoot) {
+    const THREE0 = app().THREE; const root = cloneRoot(model); if (!root) throw new Error('Could not copy the model.');
+    shapeRoot.updateWorldMatrix(true, true); root.updateMatrixWorld(true); const inv = root.matrixWorld.clone().invert(); let mat = null, n = 0;
+    root.traverse(o => { if (!mat && o.isMesh && o.material) mat = Array.isArray(o.material) ? o.material[0] : o.material; });
+    shapeRoot.traverse(o => { if (!o.isMesh) return; const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.applyMatrix4(inv); g.computeVertexNormals(); const m = new THREE0.Mesh(g, mat ? mat.clone() : new THREE0.MeshStandardMaterial({ color: 0xe8ebef, roughness: 0.72 })); m.name = 'SHRINK joined part'; root.add(m); n += (g.index ? g.index.count : g.attributes.position.count) / 3; });
+    if (!n) throw new Error('The part is empty.'); root.updateMatrixWorld(true); return { root, tris: n };
+  }
   async function editModelNow() {
     const btn = $('v2EdGo'), card = $('v2EditCard'), res = $('v2EdResult');
     if (!btn || btn.disabled) return;
@@ -2192,10 +2200,11 @@
       if (isPart && !editPart) throw new Error('Upload a part first (UPLOAD A PART at the top of this card).');
       const ops = isPart ? (() => { const pm = partMatrix(), mesh = new pm.f.THREE.Mesh(editPart.geometry, new pm.f.THREE.MeshStandardMaterial()); mesh.matrixAutoUpdate = false; mesh.matrix.copy(pm.m); const root = new pm.f.THREE.Group(); root.add(mesh); root.updateMatrixWorld(true); return { part: { root, mode: $('v2EdMode').value } }; })() : sl ? (() => { const s = sliceSpec(); return { slice: { normal: s.normal, offset: s.offset } }; })() : (() => { const s = shapeSpec(); return { shapes: [{ kind: s.kind, mode: s.mode, matrix: s.matrix }] }; })();
       progress(card, 40, 'Working…'); await paintNow();
-      const unsure = isPart && ops.part?.mode === 'cut' && lastHealth && lastHealth.model === model && lastHealth.h && !lastHealth.h.clean;   // v2.404: not watertight -> do not even try Manifold (it froze the page)
-      let r, surface = null;
-      if (unsure) { surface = await surfaceCutByPart(model, ops.part.root); r = { root: surface.root, volume: 0, pieces: 0 }; }
-      else { try { r = await window.__shrinkFuse.editModel(model, ops); } catch (e) { if (isPart && ops.part?.mode === 'cut' && /manifold|printable|watertight|reject/i.test(String(e?.message || e))) { surface = await surfaceCutByPart(model, ops.part.root); r = { root: surface.root, volume: 0, pieces: 0 }; } else throw e; } }
+      const unsure = isPart && lastHealth && lastHealth.model === model && lastHealth.h && !lastHealth.h.clean;   // v2.404: not watertight -> do not even try Manifold (it froze the page)
+      let r, surface = null, joined = null; const cutting = isPart && ops.part?.mode === 'cut', joining = isPart && ops.part?.mode !== 'cut', soft = e => /manifold|printable|watertight|reject/i.test(String(e?.message || e));
+      const viaSurface = async () => { if (cutting) { surface = await surfaceCutByPart(model, ops.part.root); r = { root: surface.root, volume: 0, pieces: 0 }; } else { joined = surfaceJoinByPart(model, ops.part.root); r = { root: joined.root, volume: 0, pieces: 0 }; } };
+      if (unsure) await viaSurface();
+      else { try { r = await window.__shrinkFuse.editModel(model, ops); } catch (e) { if ((cutting || joining) && soft(e)) await viaSurface(); else throw e; } }
       progress(card, 85, 'Checking the result…');
       if (snap && isPart && editPart) snap.userData.shrinkWeld = { part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode').value };   // v2.348: UNDO floats the piece again
       if (snap) { if (!editBase) editBase = cloneRoot(snap); undoPush(snap); }
@@ -2203,6 +2212,7 @@
       const mm = Number(window.__shrinkPrint?.mmPerUnit?.()) || 1, ml = r.volume * mm * mm * mm / 1000;
       if (isPart) { dropSelected(); updatePad(); if (!autoWelding) try { edToast('Welded. Wrong place? Press Ctrl / ⌘ + Z (or UNDO LAST EDIT) and the piece floats again.', true); } catch {} $('v2EdPartInfo').textContent = parked.length || editPart ? 'Welded. The other floating pieces are still waiting.' : 'Done. Press UPLOAD A PART (top of this card) if you want to add more.'; try { $('v2EdPartFile').value = ''; } catch {} }
       if (surface) { res.innerHTML = `<strong>✓ Cut away (surface cut)</strong><span>${surface.tris.toLocaleString()} triangles inside the shape were removed. This model is not watertight, so the cut edge is left open: use the Fill holes tool to cap it. UNDO brings it back.</span>`; try { edToast('Cut away. The model is not watertight, so the cut edge is open: use Fill holes to close it.', true); } catch {} }
+      else if (joined) { res.innerHTML = '<strong>✓ Joined (as its own solid)</strong><span>This model is not watertight, so the part was added as a separate closed solid in the right place instead of being fused into it. Slicers print overlapping solids as one. Run FIX IT, then FUSE IT, if you want it truly merged. UNDO brings it back.</span>'; try { edToast('Joined as its own solid (the model is not watertight, so it could not be fused). Slicers print it as one.', true); } catch {} }
       else res.innerHTML = `<strong>✓ ${sl ? 'Sliced' : ($('v2EdMode').value === 'cut' ? 'Cut' : 'Joined')}</strong><span>Now ${ml.toFixed(1)} ml in ${r.pieces} piece${r.pieces === 1 ? '' : 's'}.${r.plugged ? ' The hollow inside next to the cut was filled solid, so the new face is solid.' : ''} Press UNDO if that is not what you wanted.</span>`;
       card.dataset.state = 'good'; progress(card, 100, 'Done.');
       $('v2EdUndo').hidden = !editStack.length;

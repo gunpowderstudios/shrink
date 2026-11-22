@@ -713,6 +713,12 @@ const height = (page, THREE = page.w.__shrinkApp?.THREE) => { const b = new THRE
     { const after0 = keyOf(w.__shrinkWorkingModel()); let stray = 0; after0.forEach(k => { if (!before0.has(k)) stray++; }); ok(stray === 0, 'ED78b every triangle left after the surface cut is an unchanged original triangle (' + stray + ' scrambled of ' + after0.size + ')'); }
     ok(okb !== false && t1 > 0 && t1 < t0, 'ED78 a model Manifold rejects is still cut by the surface cut (' + t0 + ' -> ' + t1 + ' triangles)');
     page.$('v2EdUndo').click(); await wait(80); ok(tris(w.__shrinkWorkingModel()) === t0, 'ED78 UNDO restores the model');
+    { // v2.407 JOIN (a welded text / part) on a model Manifold rejects: added as its own solid instead of an error
+      w.__shrinkFuse.editModel = async () => { throw new Error('No printable solid parts could be read from this model after detail-preserving repair. Not manifold'); };
+      const mj = w.__shrinkWorkingModel(), tj = tris(mj); w.__shrinkEdit.setPart(new Float32Array(cube), false, 'blk2'); await wait(60); page.$('v2EdPartH').value = '10'; page.$('v2EdPartX').value = '0'; page.$('v2EdPartY').value = '0'; page.$('v2EdPartZ').value = '0'; set(page, 'v2EdMode', 'join'); await wait(60);
+      page.$('v2PadPlace').click(); await waitFor(() => /Joined|Could not/.test(page.$('v2EdResult').textContent), 30000);
+      ok(/Joined/.test(page.$('v2EdResult').textContent) && tris(w.__shrinkWorkingModel()) === tj + 12 && w.__shrinkWorkingModel() !== mj, `ED80 a JOIN on a model Manifold rejects adds the part as its own solid (${tj} -> ${tris(w.__shrinkWorkingModel())} triangles)`);
+      page.$('v2EdUndo').click(); await wait(150); ok(tris(w.__shrinkWorkingModel()) === tj, 'ED80 UNDO removes it again'); w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.(); }
     w.__shrinkFuse.editModel = real; w.__shrinkEdit.discard?.(); }
     w.__shrinkEdit.discard?.(); w.__shrinkEdit.discard?.(); w.__shrinkSetWorkingModel(before);
   }
