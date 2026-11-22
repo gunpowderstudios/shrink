@@ -2202,9 +2202,20 @@
       progress(card, 40, 'Working…'); await paintNow();
       const unsure = isPart && lastHealth && lastHealth.model === model && lastHealth.h && !lastHealth.h.clean;   // v2.404: not watertight -> do not even try Manifold (it froze the page)
       let r, surface = null, joined = null; const cutting = isPart && ops.part?.mode === 'cut', joining = isPart && ops.part?.mode !== 'cut', soft = e => /manifold|printable|watertight|reject/i.test(String(e?.message || e));
-      const viaSurface = async () => { if (cutting) { surface = await surfaceCutByPart(model, ops.part.root); r = { root: surface.root, volume: 0, pieces: 0 }; } else { joined = surfaceJoinByPart(model, ops.part.root); r = { root: joined.root, volume: 0, pieces: 0 }; } };
-      if (unsure) await viaSurface();
-      else { try { r = await window.__shrinkFuse.editModel(model, ops); } catch (e) { if ((cutting || joining) && soft(e)) await viaSurface(); else throw e; } }
+      // A cut must never silently degrade to deleting triangles: that leaves an open,
+      // unprintable edge (and spikes where large triangles cross the cutter).
+      // Keep the floating cutter untouched so the person can run FIX IT and retry.
+      const viaSurface = async () => { joined = surfaceJoinByPart(model, ops.part.root); r = { root: joined.root, volume: 0, pieces: 0 }; };
+      if (unsure) {
+        if (cutting) throw new Error('Cannot make a solid cut: this model has open or non-manifold edges. Run FIX IT first, then try CUT PART OUT again. Nothing was changed.');
+        await viaSurface();
+      } else {
+        try { r = await window.__shrinkFuse.editModel(model, ops); }
+        catch (e) {
+          if (cutting && soft(e)) throw new Error('Cannot make a solid cut: Manifold could not process this model. Run FIX IT first, then retry. Nothing was changed.');
+          if (joining && soft(e)) await viaSurface(); else throw e;
+        }
+      }
       progress(card, 85, 'Checking the result…');
       if (snap && isPart && editPart) snap.userData.shrinkWeld = { part: editPart, vals: partVals(), rot: partRot ? partRot.clone() : null, mode: $('v2EdMode').value };   // v2.348: UNDO floats the piece again
       if (snap) { if (!editBase) editBase = cloneRoot(snap); undoPush(snap); }
