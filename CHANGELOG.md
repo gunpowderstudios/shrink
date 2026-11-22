@@ -1,5 +1,12 @@
 # CHANGELOG — SHRINK 3D
 
+## v2.408 (draft review branch, not deployed)
+- Regression suite now includes Text geometry tests, and auto-height tests distinguish manual override from a new upload.
+- Detail slider regression covers 20% → 50% → 100% → 10% against actual visible geometry and reducer rebasing.
+- Fixed a live reduction scheduling race: if a slider timer fires while an exact reduction is busy, the queued slider request is processed when the exact reduction finishes, instead of being stranded.
+- Bumped browser import cache keys for `live-ui.js` and `live-reduce.js`; no live release until checks and a real browser test pass.
+
+
 ## v2.407
 - WELD IT / JOIN on a model Manifold cannot read (open edges, not watertight) no longer ends in a red error (Tim: "I can't weld the text"). The floating part (text, shape, uploaded part) is added to the model as its own closed solid in the right place (`surfaceJoinByPart`), with a message saying so; slicers print overlapping solids as one, and FIX IT then FUSE IT can merge it properly. Same rule as the surface cut: on a model that is known not to be clean it skips Manifold at once. UNDO removes it. Test ED80. Checked that real letters ("Hello", "Hi", "Tim 2026", "OBOE", "Tim" from a Chromium canvas) are accepted by Manifold as solids, so the failure was the model, not the text.
 
