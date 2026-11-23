@@ -105,8 +105,22 @@ export const models = {
 // DOM, so every timer remembers which page scheduled it and is dropped once a newer page exists.
 let pageCounter = 0, currentRun = 0;
 const realSetTimeout = globalThis.setTimeout;
+const realSetInterval = globalThis.setInterval;
+const realClearInterval = globalThis.clearInterval;
+const pageIntervals = new Set();
 globalThis.setTimeout = (fn, ms, ...args) => { const run = currentRun; return realSetTimeout(() => { if (run === currentRun) fn(...args); }, ms); };
+// Unlike timeouts, setInterval callbacks otherwise survive into later pages,
+// executing against the NEXT page's global window/document and corrupting tests.
+globalThis.setInterval = (fn, ms, ...args) => {
+  const run = currentRun;
+  const id = realSetInterval(() => { if (run === currentRun) fn(...args); }, ms);
+  pageIntervals.add(id);
+  return id;
+};
+globalThis.clearInterval = id => { pageIntervals.delete(id); return realClearInterval(id); };
 export async function makePage({ model, heightMm = 52, splitMax = 80, live = null, url = 'https://example.test/' } = {}) {
+  for (const id of pageIntervals) realClearInterval(id);
+  pageIntervals.clear();
   const run = ++pageCounter; currentRun = run;
   prepareMultitool();
   const html = `<!doctype html><html><body class="app-mode-print"><header class="topbar"></header>
