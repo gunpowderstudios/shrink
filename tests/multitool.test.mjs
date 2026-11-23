@@ -262,7 +262,10 @@ await block(22, async () => {
   ok(window.__shrinkWorkingModel() === fixed && window.__shrinkLive.root === oldRoot, 'K2 setup: FIX IT replaced the working model; the reducer\'s own preview is no longer on screen');
   const base = triOf(fixed);
   const origTris = triOf(figure), shownFor = pctOfCurrent => String(Math.max(1, Math.round(pctOfCurrent * (base / origTris) * 1000) / 10));
+  console.log('K2 DIAG before', JSON.stringify({base,origTris,requested:shownFor(0.3),oldRoot:!!window.__shrinkLive.root,ready:window.__shrinkLive.ready,workingEqualsRoot:window.__shrinkWorkingModel()===window.__shrinkLive.root,previewEqualsRoot:page.app.optimizedModel===window.__shrinkLive.root}));
   page.$('v2Detail').value = shownFor(0.3); page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
+  await wait(500);
+  console.log('K2 DIAG after', JSON.stringify({root:!!window.__shrinkLive.root,ready:window.__shrinkLive.ready,ratio:window.__shrinkLive.last?.ratio,workingEqualsRoot:window.__shrinkWorkingModel()===window.__shrinkLive.root,previewEqualsRoot:page.app.optimizedModel===window.__shrinkLive.root,optimized:!!page.app.optimizedModel,working:!!window.__shrinkWorkingModel(),native:page.$('geometry').value,visible:page.$('v2Detail').value,errors:page.statuses.filter(e=>e.error).slice(-3)}));
   ok(await waitFor(() => window.__shrinkLive.root === window.__shrinkWorkingModel() && Math.abs((window.__shrinkLive.last?.ratio ?? 0) - 0.3) < 0.02 && page.app.optimizedModel === window.__shrinkLive.root, 30000), 'K2 the slider re-based on the current model and the preview on screen follows it');
   const now = triOf(window.__shrinkLive.root);
   // asked for 30%; the simplifier stops earlier when its error limit binds on an already-reduced mesh, which is correct
