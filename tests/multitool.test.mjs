@@ -212,6 +212,7 @@ await block(21, async () => {
   await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
   ok(page.$('v2HealthScore').textContent === '100', 'K the figure shows 100 before SHRINK');
   page.w.__shrinkShrinkTarget = 20; // Test the 20% tidy path; the default is now 50%.
+  ok(await waitFor(() => page.engine?.ready && !page.$('autoBtn')?.disabled && !!window.__shrinkLive?.root, 15000), 'K live reducer is ready before SHRINK starts');
   page.$('v2ShrinkBtn').click();
   ok(await waitFor(() => /Optimised|Looks the same|✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000), 'K SHRINK IT finished');
   const root = window.__shrinkLive.root, h = await healthOf(root);
@@ -254,6 +255,7 @@ await block(22, async () => {
   const figure = await makeFigure();
   const page = await makePage({ model: figure, heightMm: 40, live: { ratio: 0.2 } });
   page.w.__shrinkSetWorkingModel(figure); await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
+  ok(await waitFor(() => page.engine?.ready && !page.$('autoBtn')?.disabled && !!window.__shrinkLive?.root, 15000), 'K live reducer is ready before SHRINK starts');
   page.$('v2ShrinkBtn').click();
   await waitFor(() => /✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000);
   const oldRoot = window.__shrinkLive.root;
@@ -262,12 +264,9 @@ await block(22, async () => {
   ok(window.__shrinkWorkingModel() === fixed && window.__shrinkLive.root === oldRoot, 'K2 setup: FIX IT replaced the working model; the reducer\'s own preview is no longer on screen');
   const base = triOf(fixed);
   const origTris = triOf(figure), shownFor = pctOfCurrent => String(Math.max(1, Math.round(pctOfCurrent * (base / origTris) * 1000) / 10));
-  console.log('K2 DIAG before', JSON.stringify({base,origTris,requested:shownFor(0.3),oldRoot:!!window.__shrinkLive.root,ready:window.__shrinkLive.ready,workingEqualsRoot:window.__shrinkWorkingModel()===window.__shrinkLive.root,previewEqualsRoot:page.app.optimizedModel===window.__shrinkLive.root}));
   page.$('v2Detail').value = shownFor(0.3); page.$('v2Detail').dispatchEvent(new page.w.Event('input', { bubbles: true }));
-  await wait(500);
-  console.log('K2 DIAG after', JSON.stringify({root:!!window.__shrinkLive.root,ready:window.__shrinkLive.ready,ratio:window.__shrinkLive.last?.ratio,workingEqualsRoot:window.__shrinkWorkingModel()===window.__shrinkLive.root,previewEqualsRoot:page.app.optimizedModel===window.__shrinkLive.root,optimized:!!page.app.optimizedModel,working:!!window.__shrinkWorkingModel(),native:page.$('geometry').value,visible:page.$('v2Detail').value,errors:page.statuses.filter(e=>e.error).slice(-3)}));
   ok(await waitFor(() => window.__shrinkLive.root === window.__shrinkWorkingModel() && Math.abs((window.__shrinkLive.last?.ratio ?? 0) - 0.3) < 0.02 && page.app.optimizedModel === window.__shrinkLive.root, 30000), 'K2 the slider re-based on the current model and the preview on screen follows it');
-  const now = triOf(window.__shrinkLive.root);
+  const now = window.__shrinkLive.root ? triOf(window.__shrinkLive.root) : 0;
   // asked for 30%; the simplifier stops earlier when its error limit binds on an already-reduced mesh, which is correct
   ok(now < base * 0.5 && now > base * 0.2, `K2 the picture changed: ${now} triangles on screen (${(100 * now / base).toFixed(1)}% of the current model's ${base})`);
   // v2.279: the reducer is now re-based ON the fixed model (live.root === working model); 100% must still bring the upload back
