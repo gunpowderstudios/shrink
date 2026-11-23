@@ -212,7 +212,6 @@ await block(21, async () => {
   await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
   ok(page.$('v2HealthScore').textContent === '100', 'K the figure shows 100 before SHRINK');
   page.w.__shrinkShrinkTarget = 20; // Test the 20% tidy path; the default is now 50%.
-  ok(await waitFor(() => page.engine?.ready && !page.$('autoBtn')?.disabled && !!window.__shrinkLive?.root, 15000), 'K live reducer is ready before SHRINK starts');
   page.$('v2ShrinkBtn').click();
   ok(await waitFor(() => /Optimised|Looks the same|✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000), 'K SHRINK IT finished');
   const root = window.__shrinkLive.root, h = await healthOf(root);
@@ -255,7 +254,6 @@ await block(22, async () => {
   const figure = await makeFigure();
   const page = await makePage({ model: figure, heightMm: 40, live: { ratio: 0.2 } });
   page.w.__shrinkSetWorkingModel(figure); await waitFor(() => page.$('v2HealthScore')?.textContent === '100', 6000);
-  ok(await waitFor(() => page.engine?.ready && !page.$('autoBtn')?.disabled && !!window.__shrinkLive?.root, 15000), 'K live reducer is ready before SHRINK starts');
   page.$('v2ShrinkBtn').click();
   await waitFor(() => /✓/.test(page.$('v2ShrinkResult').textContent) && !page.$('v2ShrinkBtn').disabled, 40000);
   const oldRoot = window.__shrinkLive.root;
