@@ -335,6 +335,7 @@
   let manualLevel = '';                         // '16K' | '8K' | 'below 8K': what the hand-set Detail kept still prints safely at (from the last measurement)
   const shrinkTag = () => detailManual ? `${$('v2Detail')?.value || ''}% kept${manualLevel ? ' · ' + manualLevel : ''}` : currentPrinter().tag;
   let rebasing = null;                          // a re-base of the live reducer that is in flight (the slider waits for it)
+  let detailRequestSeq = 0;                    // ignore stale async Detail slider changes after an overlapping rebase
   let lastHealth = null;                         // { model, h }: the newest health result and the model it belongs to
   // v2.244: the yellow "Too many triangles to fuse" banner is gone (too confusing). FUSE IT still refuses above the limit (fuseCheck) and says so in its own card.
   function updateSizeWarning() { $('v2SizeWarn')?.remove(); }
@@ -3465,6 +3466,7 @@
     });
     window.addEventListener('shrink:auto-found', () => setTimeout(markQuick, 0));
     async function applyDetailValue(raw, source = 'slider') {
+      const requestId = ++detailRequestSeq;
       let value = Number(raw);
       if (!Number.isFinite(value)) value = Number($('v2Detail')?.value || 70);
       value = Math.max(1, Math.min(100, value));
@@ -3487,6 +3489,9 @@
           }
         } }
       await ensureLiveRebased();
+      // An older 100% request can finish rebasing AFTER the person has already
+      // dragged to 10%. Never let that stale request overwrite the newer value.
+      if (requestId !== detailRequestSeq) return;
       if (reverted) detailScale = 1;
       // v2.378: the upload sits where it was opened, not where SHRINK levelled and centred the model: put the rebased copy back where the model was, so it does not leave the build plate
       if (reverted && prevBox) {

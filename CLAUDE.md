@@ -4,11 +4,14 @@ Read this file before changing the repository.
 
 ## Current baseline
 
-- Current user-facing release: **v2.407** (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
+- Current main release: **v2.407**. `audit-regression-tests-20261122` is an unreleased v2.408 review branch. (see CHANGELOG.md; the multitool core dates from v2.57; see "3D Print multitool" below). The old Simple wizard and the Racer preset were deleted in v2.239; their notes are in `ARCHIVE.md`.
 - Default branch: **main**
 - The current core engine graph is still **v2.18**.
 - v2.19–v2.25 are deliberately layered mainly through Simple-mode workflow/UI files rather than retagging the whole engine graph.
 - Current public app: https://gunpowderstudios.github.io/shrink/
+
+## Detail slider queue (v2.408 review branch)
+- `live-reduce.js` `request()` can run its delayed `pump()` while `runExact()` owns `R.busy`. The exact call now drains any queued slider request when it finishes. Keep the reducer's `request`-during-`runExact` test in `tests/livereduce.test.mjs`. `tests/multitool.test.mjs` also checks the visible model through 20%, 50%, 100%, 10%. Browser verification required before release.
 
 ## 3D Print multitool (v2.38 onward) — read this before touching print code
 

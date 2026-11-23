@@ -224,10 +224,16 @@ export function createLiveReducer(app) {
   }
 
   async function pump() {
+    // A delayed slider timer can fire while runExact() has the reducer locked.
+    // Do not abandon that request: after the exact operation finishes, pump
+    // the latest requested slider value (older values are intentionally replaced).
     if (R.busy) return;
     R.busy = true;
     try { while (R.wanted) { const job = R.wanted; R.wanted = null; await runJob(job); } }
-    finally { R.busy = false; }
+    finally {
+      R.busy = false;
+      if (R.wanted) queueMicrotask(pump);
+    }
   }
 
   // Slider-style request: only the newest value matters.
@@ -243,7 +249,13 @@ export function createLiveReducer(app) {
     clearTimeout(R.timer); R.wanted = null;
     while (R.busy) await new Promise(r => setTimeout(r, 20));
     R.busy = true;
-    try { return await runJob({ ratio, ...opts }); } finally { R.busy = false; }
+    try { return await runJob({ ratio, ...opts }); }
+    finally {
+      R.busy = false;
+      // A slider input may have queued while the exact job was running.
+      // Its timer may already have fired and returned from pump() above.
+      if (R.wanted) queueMicrotask(pump);
+    }
   }
 
   return {
